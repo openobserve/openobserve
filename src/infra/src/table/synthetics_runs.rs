@@ -95,7 +95,7 @@ pub struct ListRunsParams<'a> {
     pub page_size: i64,
 }
 
-/// Lists runs for a monitor in reverse chronological order, with optional time range filter.
+/// Lists runs for a check in reverse chronological order, with optional time range filter.
 /// Returns (rows, total_count).
 pub async fn list_runs<C: ConnectionTrait>(
     conn: &C,

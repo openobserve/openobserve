@@ -42,14 +42,14 @@ pub struct EnqueueParams<'a> {
     pub valid_until: i64,
     /// KSUID of the parent `synthetics_runs` row.
     pub run_id: &'a str,
-    /// JSON array of `{execution_id, engine, device}` — browser monitors only. `None` for
-    /// protocol monitors.
+    /// JSON array of `{execution_id, engine, device}` — browser checks only. `None` for
+    /// protocol checks.
     pub browser_devices: Option<&'a str>,
-    /// Serialized `JobMetadata` — monitor-level context copied at enqueue time.
+    /// Serialized `JobMetadata` — check-level context copied at enqueue time.
     pub metadata: &'a str,
 }
 
-/// Monitor-level metadata copied into the job row at enqueue time.
+/// Check-level metadata copied into the job row at enqueue time.
 /// Stored as a JSON blob so new fields can be added without schema migrations.
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct JobMetadata {
@@ -57,7 +57,7 @@ pub struct JobMetadata {
     pub tags: Vec<String>,
     /// The synthetic's check type ("http", "tcp", "browser", …) — copied at
     /// enqueue time so stream records (including dispatcher error records)
-    /// can carry `type` without a monitor lookup.
+    /// can carry `type` without a check lookup.
     #[serde(default)]
     pub synthetic_type: String,
 }
@@ -216,8 +216,8 @@ pub async fn get_by_id<C: ConnectionTrait>(
         .map_err(errors::Error::from)
 }
 
-/// Deletes all pending checks for a synthetic (called on monitor delete).
-pub async fn drain_monitor<C: ConnectionTrait>(
+/// Deletes all pending checks for a synthetic (called on check delete).
+pub async fn drain_check<C: ConnectionTrait>(
     conn: &C,
     synthetics_id: &str,
 ) -> Result<u64, errors::Error> {
@@ -596,7 +596,7 @@ pub enum DispatchFailureOutcome {
     /// Reset to Pending; a future lease will retry it.
     Requeued,
     /// Budget exhausted. Pure decision — no DB write here. The caller already
-    /// owns terminating the job (status + run counter + monitor status, e.g.
+    /// owns terminating the job (status + run counter + check status, e.g.
     /// via the dispatcher's existing `mark_failure`), so writing an
     /// intermediate status here would just be overwritten and wastes a query.
     DeadLettered,

@@ -34,7 +34,7 @@ use crate::service::auth::{UserEmail, check_permissions};
 pub struct ListSyntheticsQuery {
     pub folder: Option<String>,
     #[serde(rename = "type")]
-    pub monitor_type: Option<config::meta::synthetics::SyntheticType>,
+    pub check_type: Option<config::meta::synthetics::SyntheticType>,
     pub enabled: Option<bool>,
     pub location: Option<String>,
     pub tag: Option<String>,
@@ -46,7 +46,7 @@ impl From<ListSyntheticsQuery> for config::meta::synthetics::ListSyntheticsParam
     fn from(q: ListSyntheticsQuery) -> Self {
         Self {
             folder_id: q.folder,
-            monitor_type: q.monitor_type,
+            check_type: q.check_type,
             enabled: q.enabled,
             location: q.location,
             tag: q.tag,
@@ -88,11 +88,11 @@ pub struct ListRunsQuery {
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "ListSyntheticsRuns",
-    summary = "List runs for a monitor",
+    summary = "List runs for a check",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
+        ("id" = String, Path, description = "Check ID"),
         ("start_time" = Option<i64>, Query, description = "Filter runs with scheduled_ts >= start_time (microseconds)"),
         ("end_time" = Option<i64>, Query, description = "Filter runs with scheduled_ts <= end_time (microseconds)"),
         ("page" = Option<i64>, Query, description = "Page number (0-indexed, default 0)"),
@@ -146,7 +146,7 @@ pub async fn list_runs(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
+        ("id" = String, Path, description = "Check ID"),
         ("run_id" = String, Path, description = "Run ID (KSUID)"),
     ),
     responses(
@@ -332,7 +332,7 @@ pub async fn job_upload(
     }
 }
 
-// ── Monitors ──────────────────────────────────────────────────────────────────
+// ── Checks ──────────────────────────────────────────────────────────────────
 
 #[utoipa::path(
     get,
@@ -345,7 +345,7 @@ pub async fn job_upload(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("folder" = Option<String>, Query, description = "Filter by folder ID (KSUID)"),
-        ("type" = Option<String>, Query, description = "Filter by monitor type (http|browser|tcp|tls|ssh)"),
+        ("type" = Option<String>, Query, description = "Filter by check type (http|browser|tcp|tls|ssh)"),
         ("enabled" = Option<bool>, Query, description = "Filter by enabled status"),
         ("location" = Option<String>, Query, description = "Filter by location"),
         ("tag" = Option<String>, Query, description = "Filter by tag"),
@@ -428,7 +428,7 @@ pub async fn create_synthetic(
         )
         .await
         {
-            Ok(monitor) => MetaHttpResponse::json(monitor),
+            Ok(check) => MetaHttpResponse::json(check),
             Err(e) => {
                 let msg = e.to_string();
                 if msg.starts_with("validation: ") {
@@ -457,7 +457,7 @@ pub async fn create_synthetic(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
+        ("id" = String, Path, description = "Check ID"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::synthetics::Synthetic),
@@ -488,8 +488,8 @@ pub async fn get_synthetic(
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::synthetics::service::get_synthetic(&org_id, &id).await {
-            Ok(Some(monitor)) => MetaHttpResponse::json(monitor),
-            Ok(None) => MetaHttpResponse::not_found("monitor not found"),
+            Ok(Some(check)) => MetaHttpResponse::json(check),
+            Ok(None) => MetaHttpResponse::not_found("check not found"),
             Err(e) => {
                 tracing::error!("[synthetics] get_synthetic: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -514,7 +514,7 @@ pub async fn get_synthetic(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
+        ("id" = String, Path, description = "Check ID"),
         ("folder" = Option<String>, Query, description = "Current folder ID of the synthetic (for RBAC)"),
     ),
     request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
@@ -550,7 +550,7 @@ pub async fn update_synthetic(
         match o2_enterprise::enterprise::synthetics::service::update_synthetic(&org_id, &id, body)
             .await
         {
-            Ok(monitor) => MetaHttpResponse::json(monitor),
+            Ok(check) => MetaHttpResponse::json(check),
             Err(e) => {
                 let msg = e.to_string();
                 if msg.starts_with("validation: ") {
@@ -582,7 +582,7 @@ pub async fn update_synthetic(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
+        ("id" = String, Path, description = "Check ID"),
         ("folder" = Option<String>, Query, description = "Current folder ID of the synthetic (for RBAC)"),
     ),
     responses(
@@ -614,8 +614,8 @@ pub async fn delete_synthetic(
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::synthetics::service::delete_synthetic(&org_id, &id).await {
-            Ok(true) => MetaHttpResponse::ok("monitor deleted"),
-            Ok(false) => MetaHttpResponse::not_found("monitor not found"),
+            Ok(true) => MetaHttpResponse::ok("check deleted"),
+            Ok(false) => MetaHttpResponse::not_found("check not found"),
             Err(e) => {
                 tracing::error!("[synthetics] delete_synthetic: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -662,7 +662,7 @@ pub async fn delete_synthetics_bulk(
         )
         .await
         {
-            Ok(_) => MetaHttpResponse::ok("monitors deleted"),
+            Ok(_) => MetaHttpResponse::ok("checks deleted"),
             Err(e) => {
                 tracing::error!("[synthetics] delete_synthetics_bulk: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -732,7 +732,7 @@ pub async fn move_synthetics(
         )
         .await
         {
-            Ok(_) => MetaHttpResponse::ok("monitors moved"),
+            Ok(_) => MetaHttpResponse::ok("checks moved"),
             Err(e) => {
                 tracing::error!("[synthetics] move_synthetics: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -757,7 +757,7 @@ pub async fn move_synthetics(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
+        ("id" = String, Path, description = "Check ID"),
     ),
     request_body(content = Object, description = r#"{"enabled": true}"#, content_type = "application/json"),
     responses(
@@ -799,11 +799,11 @@ pub async fn set_synthetic_enabled(
         .await
         {
             Ok(true) => MetaHttpResponse::ok(if enabled {
-                "monitor enabled"
+                "check enabled"
             } else {
-                "monitor paused"
+                "check paused"
             }),
-            Ok(false) => MetaHttpResponse::not_found("monitor not found"),
+            Ok(false) => MetaHttpResponse::not_found("check not found"),
             Err(e) => {
                 tracing::error!("[synthetics] set_synthetic_enabled: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -828,7 +828,7 @@ pub async fn set_synthetic_enabled(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("id" = String, Path, description = "Monitor ID"),
+        ("id" = String, Path, description = "Check ID"),
     ),
     responses(
         (status = 202, description = "Accepted — scheduler will fire within 5 seconds"),
@@ -886,7 +886,7 @@ pub async fn run_synthetic_now(
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "SyntheticsJobResolve",
-    summary = "Resolve a job — probe fetches monitor config (authenticated via o2syn_ token)",
+    summary = "Resolve a job — probe fetches check config (authenticated via o2syn_ token)",
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
@@ -1128,9 +1128,9 @@ async fn process_ack(
     if should_notify && !resp.destinations.is_empty() {
         let notification = openobserve_core::synthetics::CheckNotification {
             org_id: resp.org_id.clone(),
-            monitor_name: resp.synthetics_name.clone(),
-            monitor_id: resp.synthetics_id.clone(),
-            monitor_type: resp.synthetic_type.clone(),
+            check_name: resp.synthetics_name.clone(),
+            check_id: resp.synthetics_id.clone(),
+            check_type: resp.synthetic_type.clone(),
             target: resp.target.clone(),
             destinations: resp.destinations.clone(),
             run_id: resp.run_id.clone(),

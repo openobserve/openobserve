@@ -13,9 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::synthetics::{
-    BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticCookie,
-    SyntheticFrequency, SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
+use config::{
+    RwHashMap,
+    meta::synthetics::{
+        BrowserConfig, ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticCookie,
+        SyntheticFrequency, SyntheticSettings, SyntheticStatus, SyntheticType, SyntheticVariable,
+    },
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -23,16 +31,78 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::entity::synthetics_monitors::{self, ActiveModel, Column, Entity};
+use super::entity::synthetics_checks::{self, ActiveModel, Column, Entity};
 use crate::errors;
+
+/// `org_id/synthetics_id` → the synthetic check **definition**, with load time.
+///
+/// The probe job path reads a check twice per job — once at `resolve` to build
+/// the `CheckJob`, once at `ack` for its type and destinations — which is the
+/// single biggest per-job read in the feature (~400/min at 100 checks). The
+/// definition changes only when a user edits the check.
+///
+/// **This cache backs [`get_cached`] only, never [`get`].** The distinction is
+/// load-bearing: `Synthetic` carries `next_run_at` and `last_check_status`
+/// alongside the definition, and those are rewritten on *every run* by
+/// `advance_schedule` / `update_last_check_status`. Invalidating on those would
+/// make the cache useless (they fire at the same rate as the reads it serves),
+/// so instead they deliberately do **not** invalidate — and callers that need
+/// scheduling or status state must use [`get`], `fetch_due` or `get_alert_state`.
+static SYNTHETIC_CACHE: LazyLock<RwHashMap<String, (Synthetic, Instant)>> =
+    LazyLock::new(Default::default);
+
+const SYNTHETIC_CACHE_TTL: Duration = Duration::from_secs(15);
+
+fn synthetic_cache_key(org_id: &str, id: &str) -> String {
+    format!("{org_id}/{id}")
+}
+
+/// Drops one check from the definition cache. Called by every path that edits
+/// a definition, so an edit is visible on this node immediately.
+pub fn invalidate_cache(org_id: &str, id: &str) {
+    SYNTHETIC_CACHE.remove(&synthetic_cache_key(org_id, id));
+}
+
+/// Drops the whole definition cache. Used where a write may touch many rows.
+pub fn invalidate_all_cache() {
+    SYNTHETIC_CACHE.clear();
+}
+
+/// Invalidates locally **and** tells every other node to do the same.
+///
+/// Write paths call this; the coordinator watcher calls the plain
+/// [`invalidate_cache`], which is what stops an event from echoing forever.
+///
+/// A failed emit is logged, not propagated: the database write has already
+/// committed, and the cache TTL is the backstop for a dropped event. Failing
+/// the user's save because a cache hint did not send would be the worse trade.
+async fn invalidate_and_publish(org_id: &str, id: &str) {
+    invalidate_cache(org_id, id);
+    if let Err(e) = crate::coordinator::synthetics::emit_check_put(org_id, id).await {
+        log::error!("[synthetics] emit check cache event failed for {org_id}/{id}: {e}");
+    }
+}
+
+/// Same as [`invalidate_and_publish`], but emits a *delete* event.
+///
+/// Both events invalidate identically on the receiving side, so this is not
+/// about the handler — it is about the coordinator's key store. `emit_*_put`
+/// writes a key; only a delete event removes it. Publishing a put on the delete
+/// path would leave one dead key per check ever created, growing without bound.
+async fn invalidate_and_publish_delete(org_id: &str, id: &str) {
+    invalidate_cache(org_id, id);
+    if let Err(e) = crate::coordinator::synthetics::emit_check_delete(org_id, id).await {
+        log::error!("[synthetics] emit check delete event failed for {org_id}/{id}: {e}");
+    }
+}
 
 // ── TryFrom: ORM model → meta type ───────────────────────────────────────────
 
-impl TryFrom<synthetics_monitors::Model> for Synthetic {
+impl TryFrom<synthetics_checks::Model> for Synthetic {
     type Error = errors::Error;
 
-    fn try_from(m: synthetics_monitors::Model) -> Result<Self, Self::Error> {
-        let monitor_type: SyntheticType = serde_json::from_value(serde_json::Value::String(
+    fn try_from(m: synthetics_checks::Model) -> Result<Self, Self::Error> {
+        let check_type: SyntheticType = serde_json::from_value(serde_json::Value::String(
             m.synthetics_type.clone(),
         ))
         .map_err(|e| {
@@ -70,7 +140,7 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
             name: m.name,
             description: m.description,
             tags,
-            monitor_type,
+            check_type,
             target: m.target,
             config: m.config,
             frequency,
@@ -100,6 +170,11 @@ impl TryFrom<synthetics_monitors::Model> for Synthetic {
 
 // ── Public CRUD API ───────────────────────────────────────────────────────────
 
+/// Reads a check straight from the database. Every field is current, including
+/// `next_run_at` and `last_check_status`.
+///
+/// Use this anywhere scheduling or status state matters. For the probe job path,
+/// which only needs the definition, prefer [`get_cached`].
 pub async fn get<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -108,6 +183,41 @@ pub async fn get<C: ConnectionTrait>(
     let _lock = super::get_lock().await;
     let maybe = get_model(conn, org_id, id).await?;
     maybe.map(Synthetic::try_from).transpose()
+}
+
+/// Reads a check **definition**, served from [`SYNTHETIC_CACHE`] when fresh.
+///
+/// Intended for the probe job path (`resolve`, `ack`), which needs `config`,
+/// `check_type`, `target`, `destinations` and the retry settings — all of
+/// which change only on a user edit.
+///
+/// # Staleness contract
+///
+/// - **Definition fields are correct**, within `SYNTHETIC_CACHE_TTL` of an edit made on another
+///   node, and immediately for an edit made on this one.
+/// - **`next_run_at` and `last_check_status` may be stale by design.** They are rewritten every run
+///   and this cache is not invalidated when they change. Read them via [`get`], [`fetch_due`] or
+///   [`get_alert_state`] instead.
+///
+/// A missing check is not cached — a resolve for a deleted check should keep
+/// reaching the DB and failing loudly rather than being served from memory.
+pub async fn get_cached<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<Option<Synthetic>, errors::Error> {
+    let key = synthetic_cache_key(org_id, id);
+    if let Some(entry) = SYNTHETIC_CACHE.get(&key)
+        && entry.1.elapsed() < SYNTHETIC_CACHE_TTL
+    {
+        return Ok(Some(entry.0.clone()));
+    }
+
+    let found = get(conn, org_id, id).await?;
+    if let Some(synthetic) = &found {
+        SYNTHETIC_CACHE.insert(key, (synthetic.clone(), Instant::now()));
+    }
+    Ok(found)
 }
 
 pub async fn list<C: ConnectionTrait>(
@@ -185,26 +295,27 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
-    monitor: Synthetic,
+    check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
     let id = config::ider::uuid();
 
-    let mut am = build_active_model(&monitor)?;
+    let mut am = build_active_model(&check)?;
     am.id = Set(id);
     am.org_id = Set(org_id.to_owned());
-    am.folder_id = Set(monitor.folder_id.clone());
-    am.synthetics_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
+    am.folder_id = Set(check.folder_id.clone());
+    am.synthetics_type = Set(check_type_to_str(&check.check_type).to_owned());
     am.created_at = Set(now);
     am.updated_at = Set(now);
-    am.next_run_at = Set(monitor.start.unwrap_or(0));
-    am.owner = Set(monitor.owner.clone());
+    am.next_run_at = Set(check.start.unwrap_or(0));
+    am.owner = Set(check.owner.clone());
 
     let model = am.insert(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
     txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
 
@@ -212,48 +323,49 @@ pub async fn update<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
-    monitor: Synthetic,
+    check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let Some(m) = get_model(&txn, org_id, id).await? else {
-        return Err(errors::Error::Message(format!("monitor not found: {id}")));
+        return Err(errors::Error::Message(format!("check not found: {id}")));
     };
 
     let mut am: ActiveModel = m.into();
-    update_mutable_fields(&mut am, &monitor)?;
+    update_mutable_fields(&mut am, &check)?;
     am.updated_at = Set(config::utils::time::now_micros());
 
     let model = am.update(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
     txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
 
 pub async fn put<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
-    monitor: Synthetic,
+    check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
 
-    let result = match get_model(&txn, org_id, &monitor.id).await? {
+    let result = match get_model(&txn, org_id, &check.id).await? {
         Some(m) => {
             let mut am: ActiveModel = m.into();
-            update_mutable_fields(&mut am, &monitor)?;
+            update_mutable_fields(&mut am, &check)?;
             am.updated_at = Set(now);
             let model = am.update(&txn).await?.try_into_model()?;
             Synthetic::try_from(model)?
         }
         None => {
-            let mut am = build_active_model(&monitor)?;
-            am.id = Set(monitor.id.clone());
+            let mut am = build_active_model(&check)?;
+            am.id = Set(check.id.clone());
             am.org_id = Set(org_id.to_owned());
-            am.folder_id = Set(monitor.folder_id.clone());
-            am.synthetics_type = Set(monitor_type_to_str(&monitor.monitor_type).to_owned());
+            am.folder_id = Set(check.folder_id.clone());
+            am.synthetics_type = Set(check_type_to_str(&check.check_type).to_owned());
             am.created_at = Set(now);
             am.updated_at = Set(now);
             let model = am.insert(&txn).await?.try_into_model()?;
@@ -262,6 +374,7 @@ pub async fn put<C: TransactionTrait>(
     };
 
     txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
 
@@ -276,10 +389,11 @@ pub async fn delete<C: ConnectionTrait>(
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
+    invalidate_and_publish_delete(org_id, id).await;
     Ok(res.rows_affected > 0)
 }
 
-/// Moves a batch of monitors to a different folder.
+/// Moves a batch of checks to a different folder.
 pub async fn move_to_folder<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -300,6 +414,9 @@ pub async fn move_to_folder<C: ConnectionTrait>(
         .filter(Column::Id.is_in(ids.to_vec()))
         .exec(conn)
         .await?;
+    for id in ids {
+        invalidate_and_publish(org_id, id).await;
+    }
     Ok(res.rows_affected)
 }
 
@@ -321,31 +438,32 @@ pub async fn set_enabled<C: ConnectionTrait>(
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
+    invalidate_and_publish(org_id, id).await;
     Ok(res.rows_affected > 0)
 }
 
 // ── Scheduler helpers ─────────────────────────────────────────────────────────
 
 /// Scheduler's fan-out data — the subset of Synthetic fields the scheduler needs.
-pub struct DueMonitor {
+pub struct DueCheck {
     pub id: String,
     pub name: String,
     pub org_id: String,
-    pub monitor_type: SyntheticType,
+    pub check_type: SyntheticType,
     pub locations: Vec<String>,
     pub frequency: SyntheticFrequency,
     /// Minutes from UTC — used for cron scheduling. 0 = UTC.
     pub tz_offset: i32,
-    /// The scheduled due time that made this monitor eligible. The scheduler
+    /// The scheduled due time that made this check eligible. The scheduler
     /// anchors the NEXT run to this (fixed-rate) instead of `now`, so the tick
     /// lag doesn't accumulate into schedule drift.
     pub next_run_at: i64,
-    /// Populated only for browser monitors (parsed from config.browser_devices).
+    /// Populated only for browser checks (parsed from config.browser_devices).
     pub browser_devices: Vec<config::meta::synthetics::BrowserDevice>,
     pub tags: Vec<String>,
 }
 
-/// Returns up to `limit` enabled monitors whose `next_run_at` is at or before `now_us`.
+/// Returns up to `limit` enabled checks whose `next_run_at` is at or before `now_us`.
 /// Ordered by next_run_at ASC so the most overdue fire first.
 ///
 /// NOTE: Does not use FOR UPDATE SKIP LOCKED — the scheduler is single-node on alert_manager.
@@ -354,7 +472,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
     conn: &C,
     now_us: i64,
     limit: u64,
-) -> Result<Vec<DueMonitor>, errors::Error> {
+) -> Result<Vec<DueCheck>, errors::Error> {
     let _lock = super::get_lock().await;
     let models = Entity::find()
         .filter(Column::Enabled.eq(true))
@@ -367,7 +485,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
     models
         .into_iter()
         .map(|m| {
-            let monitor_type: SyntheticType =
+            let check_type: SyntheticType =
                 serde_json::from_value(serde_json::Value::String(m.synthetics_type.clone()))
                     .map_err(|e| {
                         errors::Error::Message(format!(
@@ -383,7 +501,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
             let frequency: SyntheticFrequency =
                 serde_json::from_value(m.frequency).unwrap_or_default();
 
-            let browser_devices = if monitor_type == SyntheticType::Browser {
+            let browser_devices = if check_type == SyntheticType::Browser {
                 let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
                 cfg.browser_devices
             } else {
@@ -392,11 +510,11 @@ pub async fn fetch_due<C: ConnectionTrait>(
 
             let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
 
-            Ok(DueMonitor {
+            Ok(DueCheck {
                 id: m.id,
                 name: m.name,
                 org_id: m.org_id,
-                monitor_type,
+                check_type,
                 locations,
                 frequency,
                 tz_offset: m.tz_offset,
@@ -408,7 +526,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
         .collect()
 }
 
-/// Updates `last_triggered_at` and `next_run_at` after the scheduler fans out a monitor.
+/// Updates `last_triggered_at` and `next_run_at` after the scheduler fans out a check.
 pub async fn advance_schedule<C: ConnectionTrait>(
     conn: &C,
     id: &str,
@@ -454,7 +572,7 @@ pub struct AlertState {
     pub degraded_notified_at: i64,
 }
 
-/// Reads the alert state without pulling the whole monitor (config, secrets and
+/// Reads the alert state without pulling the whole check (config, secrets and
 /// step definitions are several KB, and this runs on every ack).
 pub async fn get_alert_state<C: ConnectionTrait>(
     conn: &C,
@@ -532,7 +650,7 @@ async fn get_model<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
-) -> Result<Option<synthetics_monitors::Model>, sea_orm::DbErr> {
+) -> Result<Option<synthetics_checks::Model>, sea_orm::DbErr> {
     Entity::find_by_id(id)
         .filter(Column::OrgId.eq(org_id))
         .one(conn)
@@ -543,7 +661,7 @@ async fn list_models<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     params: &ListSyntheticsParams,
-) -> Result<Vec<synthetics_monitors::Model>, sea_orm::DbErr> {
+) -> Result<Vec<synthetics_checks::Model>, sea_orm::DbErr> {
     let q = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .apply_filters(params)
@@ -557,15 +675,15 @@ async fn list_models<C: ConnectionTrait>(
     q.all(conn).await
 }
 
-fn pack_settings(monitor: &Synthetic) -> Result<serde_json::Value, errors::Error> {
+fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> {
     Ok(serde_json::to_value(SyntheticSettings {
-        retries: monitor.retries,
-        cooldown_mins: monitor.cooldown_mins,
-        wait_before_retry_secs: monitor.wait_before_retry_secs,
-        alert_if_fails: monitor.alert_if_fails,
-        collect_rum_data: monitor.collect_rum_data,
-        session_replay: monitor.session_replay,
-        start: monitor.start,
+        retries: check.retries,
+        cooldown_mins: check.cooldown_mins,
+        wait_before_retry_secs: check.wait_before_retry_secs,
+        alert_if_fails: check.alert_if_fails,
+        collect_rum_data: check.collect_rum_data,
+        session_replay: check.session_replay,
+        start: check.start,
     })?)
 }
 
@@ -586,61 +704,61 @@ struct StoredSecrets {
     config: std::collections::BTreeMap<String, String>,
 }
 
-fn pack_secrets(monitor: &Synthetic) -> Result<String, errors::Error> {
+fn pack_secrets(check: &Synthetic) -> Result<String, errors::Error> {
     serde_json::to_string(&StoredSecrets {
-        auth: monitor.auth.clone(),
-        cookies: monitor.cookies.clone(),
-        variables: monitor.variables.clone(),
-        config: monitor.config_secrets.clone(),
+        auth: check.auth.clone(),
+        cookies: check.cookies.clone(),
+        variables: check.variables.clone(),
+        config: check.config_secrets.clone(),
     })
     .map_err(|e| errors::Error::Message(format!("secrets serialize failed: {e}")))
 }
 
-fn update_mutable_fields(am: &mut ActiveModel, monitor: &Synthetic) -> Result<(), errors::Error> {
-    let locations = serde_json::to_value(&monitor.locations)?;
-    let destinations = serde_json::to_value(&monitor.destinations)?;
-    let tags = serde_json::to_value(&monitor.tags)?;
-    let frequency = serde_json::to_value(&monitor.frequency)?;
-    let settings = pack_settings(monitor)?;
-    am.folder_id = Set(monitor.folder_id.clone());
-    am.tz_offset = Set(monitor.tz_offset);
-    am.name = Set(monitor.name.clone());
-    am.description = Set(monitor.description.clone());
+fn update_mutable_fields(am: &mut ActiveModel, check: &Synthetic) -> Result<(), errors::Error> {
+    let locations = serde_json::to_value(&check.locations)?;
+    let destinations = serde_json::to_value(&check.destinations)?;
+    let tags = serde_json::to_value(&check.tags)?;
+    let frequency = serde_json::to_value(&check.frequency)?;
+    let settings = pack_settings(check)?;
+    am.folder_id = Set(check.folder_id.clone());
+    am.tz_offset = Set(check.tz_offset);
+    am.name = Set(check.name.clone());
+    am.description = Set(check.description.clone());
     am.tags = Set(tags);
-    am.target = Set(monitor.target.clone());
-    am.config = Set(monitor.config.clone());
+    am.target = Set(check.target.clone());
+    am.config = Set(check.config.clone());
     am.frequency = Set(frequency);
     am.locations = Set(locations);
-    am.enabled = Set(monitor.enabled);
+    am.enabled = Set(check.enabled);
     am.destinations = Set(destinations);
     am.settings = Set(settings);
-    am.secrets = Set(pack_secrets(monitor)?);
+    am.secrets = Set(pack_secrets(check)?);
     Ok(())
 }
 
-fn build_active_model(monitor: &Synthetic) -> Result<ActiveModel, errors::Error> {
-    let locations = serde_json::to_value(&monitor.locations)?;
-    let destinations = serde_json::to_value(&monitor.destinations)?;
-    let tags = serde_json::to_value(&monitor.tags)?;
-    let frequency = serde_json::to_value(&monitor.frequency)?;
-    let settings = pack_settings(monitor)?;
+fn build_active_model(check: &Synthetic) -> Result<ActiveModel, errors::Error> {
+    let locations = serde_json::to_value(&check.locations)?;
+    let destinations = serde_json::to_value(&check.destinations)?;
+    let tags = serde_json::to_value(&check.tags)?;
+    let frequency = serde_json::to_value(&check.frequency)?;
+    let settings = pack_settings(check)?;
     Ok(ActiveModel {
-        name: Set(monitor.name.clone()),
-        description: Set(monitor.description.clone()),
+        name: Set(check.name.clone()),
+        description: Set(check.description.clone()),
         tags: Set(tags),
-        target: Set(monitor.target.clone()),
-        config: Set(monitor.config.clone()),
+        target: Set(check.target.clone()),
+        config: Set(check.config.clone()),
         frequency: Set(frequency),
         locations: Set(locations),
-        enabled: Set(monitor.enabled),
+        enabled: Set(check.enabled),
         destinations: Set(destinations),
         settings: Set(settings),
-        secrets: Set(pack_secrets(monitor)?),
+        secrets: Set(pack_secrets(check)?),
         ..Default::default()
     })
 }
 
-fn monitor_type_to_str(t: &SyntheticType) -> &'static str {
+fn check_type_to_str(t: &SyntheticType) -> &'static str {
     match t {
         SyntheticType::Http => "http",
         SyntheticType::Api => "api",
@@ -655,18 +773,18 @@ fn monitor_type_to_str(t: &SyntheticType) -> &'static str {
 
 // ── Filter extension ──────────────────────────────────────────────────────────
 
-trait ApplyMonitorFilters {
+trait ApplyCheckFilters {
     fn apply_filters(self, params: &ListSyntheticsParams) -> Self;
 }
 
-impl ApplyMonitorFilters for sea_orm::Select<Entity> {
+impl ApplyCheckFilters for sea_orm::Select<Entity> {
     fn apply_filters(self, params: &ListSyntheticsParams) -> Self {
         let mut q = self;
         if let Some(folder_id) = &params.folder_id {
             q = q.filter(Column::FolderId.eq(folder_id.clone()));
         }
-        if let Some(monitor_type) = &params.monitor_type {
-            q = q.filter(Column::SyntheticsType.eq(monitor_type_to_str(monitor_type)));
+        if let Some(check_type) = &params.check_type {
+            q = q.filter(Column::SyntheticsType.eq(check_type_to_str(check_type)));
         }
         if let Some(enabled) = params.enabled {
             q = q.filter(Column::Enabled.eq(enabled));
@@ -678,7 +796,7 @@ impl ApplyMonitorFilters for sea_orm::Select<Entity> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::table::entity::synthetics_monitors::Model;
+    use crate::table::entity::synthetics_checks::Model;
 
     fn make_model() -> Model {
         Model {
@@ -689,7 +807,7 @@ mod tests {
             name: "Login Flow".to_string(),
             synthetics_type: "browser".to_string(),
             target: "https://app.example.com".to_string(),
-            description: "Monitors the login flow".to_string(),
+            description: "Checks the login flow".to_string(),
             tags: serde_json::json!(["prod"]),
             config: serde_json::json!({
                 "browser_devices": [{"browser": "chromium", "device": "desktop"}],
@@ -716,14 +834,14 @@ mod tests {
 
     #[test]
     fn test_try_from_model() {
-        let monitor = Synthetic::try_from(make_model()).unwrap();
-        assert_eq!(monitor.id, "mon-1");
-        assert_eq!(monitor.monitor_type, SyntheticType::Browser);
-        assert_eq!(monitor.locations, vec!["aws-us-east-1"]);
-        assert!(monitor.enabled);
-        assert_eq!(monitor.frequency.interval, 5);
+        let check = Synthetic::try_from(make_model()).unwrap();
+        assert_eq!(check.id, "mon-1");
+        assert_eq!(check.check_type, SyntheticType::Browser);
+        assert_eq!(check.locations, vec!["aws-us-east-1"]);
+        assert!(check.enabled);
+        assert_eq!(check.frequency.interval, 5);
         assert_eq!(
-            monitor.frequency.frequency_type,
+            check.frequency.frequency_type,
             config::meta::synthetics::SyntheticFrequencyType::Minutes
         );
     }
@@ -737,14 +855,14 @@ mod tests {
 
     #[test]
     fn test_monitor_type_to_str() {
-        assert_eq!(monitor_type_to_str(&SyntheticType::Http), "http");
-        assert_eq!(monitor_type_to_str(&SyntheticType::Browser), "browser");
-        assert_eq!(monitor_type_to_str(&SyntheticType::Api), "api");
-        assert_eq!(monitor_type_to_str(&SyntheticType::Tcp), "tcp");
-        assert_eq!(monitor_type_to_str(&SyntheticType::Tls), "tls");
-        assert_eq!(monitor_type_to_str(&SyntheticType::Ssh), "ssh");
-        assert_eq!(monitor_type_to_str(&SyntheticType::Ping), "ping");
-        assert_eq!(monitor_type_to_str(&SyntheticType::Dns), "dns");
+        assert_eq!(check_type_to_str(&SyntheticType::Http), "http");
+        assert_eq!(check_type_to_str(&SyntheticType::Browser), "browser");
+        assert_eq!(check_type_to_str(&SyntheticType::Api), "api");
+        assert_eq!(check_type_to_str(&SyntheticType::Tcp), "tcp");
+        assert_eq!(check_type_to_str(&SyntheticType::Tls), "tls");
+        assert_eq!(check_type_to_str(&SyntheticType::Ssh), "ssh");
+        assert_eq!(check_type_to_str(&SyntheticType::Ping), "ping");
+        assert_eq!(check_type_to_str(&SyntheticType::Dns), "dns");
     }
 
     #[test]
@@ -753,9 +871,9 @@ mod tests {
         m.next_run_at = 1750000001000000;
         m.last_triggered_at = 1750000000500000;
         m.last_check_status = 1;
-        let monitor = Synthetic::try_from(m).unwrap();
-        assert_eq!(monitor.next_run_at, 1750000001000000);
-        assert_eq!(monitor.last_triggered_at, 1750000000500000);
-        assert_eq!(monitor.last_check_status, SyntheticStatus::Passed);
+        let check = Synthetic::try_from(m).unwrap();
+        assert_eq!(check.next_run_at, 1750000001000000);
+        assert_eq!(check.last_triggered_at, 1750000000500000);
+        assert_eq!(check.last_check_status, SyntheticStatus::Passed);
     }
 }

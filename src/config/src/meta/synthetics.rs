@@ -124,10 +124,10 @@ pub struct Synthetic {
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(rename = "type")]
-    pub monitor_type: SyntheticType,
+    pub check_type: SyntheticType,
     /// Target URL (HTTP/Browser) or host:port (TCP/TLS/SSH).
     pub target: String,
-    /// Type-specific config, stored as JSONB. Shape depends on monitor_type.
+    /// Type-specific config, stored as JSONB. Shape depends on check_type.
     pub config: serde_json::Value,
     /// Schedule — same modular format as reports frequency.
     pub frequency: SyntheticFrequency,
@@ -148,10 +148,10 @@ pub struct Synthetic {
     /// Silence period (minutes) between repeated alert notifications.
     #[serde(default, alias = "cooldown_secs")]
     pub cooldown_mins: i32,
-    /// Collect RUM data for browser monitors (session replay / performance).
+    /// Collect RUM data for browser checks (session replay / performance).
     #[serde(default)]
     pub collect_rum_data: bool,
-    /// Enable session replay capture (browser monitors only).
+    /// Enable session replay capture (browser checks only).
     #[serde(default)]
     pub session_replay: bool,
     /// Optional authentication config (basic auth, bearer token, etc.).
@@ -440,7 +440,7 @@ pub struct SyntheticVariable {
 
 // ── Settings (packed into the `settings` JSON column) ────────────────────────
 
-/// Non-type-specific monitor settings stored as a single `settings` JSON blob.
+/// Non-type-specific check settings stored as a single `settings` JSON blob.
 /// auth and variables are stored in their own dedicated encrypted TEXT columns, not here.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SyntheticSettings {
@@ -489,7 +489,7 @@ pub struct SyntheticListItem {
     pub description: String,
     pub tags: Vec<String>,
     #[serde(rename = "type")]
-    pub monitor_type: SyntheticType,
+    pub check_type: SyntheticType,
     pub target: String,
     pub frequency: SyntheticFrequency,
     pub locations: Vec<String>,
@@ -509,7 +509,7 @@ pub struct SyntheticListItem {
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ListSyntheticsParams {
     pub folder_id: Option<String>,
-    pub monitor_type: Option<SyntheticType>,
+    pub check_type: Option<SyntheticType>,
     pub enabled: Option<bool>,
     pub location: Option<String>,
     pub tag: Option<String>,
@@ -519,7 +519,7 @@ pub struct ListSyntheticsParams {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SyntheticListResponse {
-    pub monitors: Vec<SyntheticListItem>,
+    pub checks: Vec<SyntheticListItem>,
     pub total: i64,
 }
 
@@ -623,7 +623,7 @@ pub struct SshAuth {
 //
 // The retired version-1 step was untyped JSON with a single `selector` and a
 // recorder-stamped `timeout_ms`. This typed, server-validated structure replaced
-// it, and is now the only shape a monitor can hold.
+// it, and is now the only shape a check can hold.
 //
 // The envelope is defined ONCE, complete, even though later phases populate
 // parts of it: `settle.navigation` (Phase 3), `settle.responses` (Phase 4),
@@ -773,7 +773,7 @@ pub struct BrowserStepV2 {
     pub timeout_ms: Option<u32>,
 }
 
-/// A (browser, device) pair for browser monitor fan-out.
+/// A (browser, device) pair for browser check fan-out.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BrowserDevice {
     /// "chromium" | "firefox" | "edge"
@@ -803,7 +803,7 @@ pub struct BrowserConfig {
     /// retry sequence cannot outlive it — see `validate_browser_config`.
     pub journey_budget_ms: Option<u32>,
     pub capture: Option<BrowserCapture>,
-    /// The DOM attribute the recorder selects on for this monitor.
+    /// The DOM attribute the recorder selects on for this check.
     ///
     /// Absent means [`DEFAULT_TEST_ID_ATTR`]. It exists because the attribute is
     /// a property of the application under test, not of OpenObserve: Playwright
@@ -815,7 +815,7 @@ pub struct BrowserConfig {
     /// application outside that list produces NO `test_attribute` candidates at
     /// all and every step degrades to role/text/css without any error.
     ///
-    /// Recorded per monitor rather than per org so a journey that was recorded
+    /// Recorded per check rather than per org so a journey that was recorded
     /// against one application keeps working when another is added.
     pub test_id_attr: Option<String>,
 }
@@ -1013,7 +1013,7 @@ fn validate_net_retry_budget(
 }
 
 /// The complete v2 action vocabulary — exactly Playwright's recorder action
-/// model, minus what a monitor cannot use.
+/// model, minus what a check cannot use.
 ///
 /// Deliberately excludes `hover`, `scroll`, `wait`/`waitFor` and `screenshot`:
 /// upstream `ActionName` has no counterpart for any of them, so the recorder
@@ -1078,7 +1078,7 @@ const LOCATOR_ORIGINS: &[&str] = &["recorded", "authored", "composite"];
 /// How one part of a combined locator attaches to the part before it.
 ///
 /// Named after Playwright's own operations rather than CSS's, because the
-/// stored value IS a Playwright selector string and anyone debugging a monitor
+/// stored value IS a Playwright selector string and anyone debugging a check
 /// reads Playwright's documentation: `and` is `.and(b)`, `has` and `has_not`
 /// are `.filter({ has })` / `.filter({ hasNot })`, `descendant` is `.locator(b)`.
 ///
@@ -1088,11 +1088,11 @@ const LOCATOR_ORIGINS: &[&str] = &["recorded", "authored", "composite"];
 /// order and so destroys the preference the ordered bundle exists to express.
 const COMPOSITE_RELATIONS: &[&str] = &["and", "has", "has_not", "descendant"];
 
-/// The recorder's test-id attribute when a monitor does not set one.
+/// The recorder's test-id attribute when a check does not set one.
 ///
 /// `data-test` rather than Playwright's `data-testid`: OpenObserve's own
 /// frontend marks interactive elements with it, and self-monitoring is this
-/// feature's acceptance test (X-1's o2.introspect monitors).
+/// feature's acceptance test (X-1's o2.introspect checks).
 pub const DEFAULT_TEST_ID_ATTR: &str = "data-test";
 
 /// Longest attribute name accepted. A DOM attribute name this long is not a
@@ -1102,12 +1102,12 @@ const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
 const MAX_VARIABLES: usize = 50;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
-/// Minimum schedule interval (seconds) for protocol monitors (http/tcp/ping/…).
+/// Minimum schedule interval (seconds) for protocol checks (http/tcp/ping/…).
 /// Ping-style checks legitimately run at 1s granularity.
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
 /// resolution — allowed here, but effective cadence is bounded by the tick.
 const MIN_INTERVAL_SECS: i64 = 1;
-/// Minimum schedule interval (seconds) for browser monitors — each fire costs
+/// Minimum schedule interval (seconds) for browser checks — each fire costs
 /// one Lambda invocation per location per browser×device combo.
 const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
 
@@ -1152,11 +1152,11 @@ fn location_allowed(loc: &str, allowed: &[String]) -> bool {
             && allowed.iter().any(|a| a == &format!("aws-{loc}"))
 }
 
-/// A save-time warning: the monitor is accepted, but something about it is worth
+/// A save-time warning: the check is accepted, but something about it is worth
 /// telling the author.
 ///
 /// Separate from the `Err(String)` channel on purpose. A zero-assertion journey
-/// is legitimate — a monitor that only navigates still proves the site answers —
+/// is legitimate — a check that only navigates still proves the site answers —
 /// so refusing it would be wrong; but it can also click its way through a broken
 /// application and pass, which is worth saying out loud (P5.2.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1174,14 +1174,14 @@ pub struct SyntheticWarning {
 }
 
 impl Synthetic {
-    /// Non-blocking problems worth surfacing when a monitor is saved.
+    /// Non-blocking problems worth surfacing when a check is saved.
     ///
     /// Deliberately not part of `validate`: everything here is accepted. A caller
     /// that ignores this returns exactly the behaviour it had before.
     pub fn warnings(&self) -> Vec<SyntheticWarning> {
         let mut warnings = Vec::new();
 
-        if self.monitor_type == SyntheticType::Browser {
+        if self.check_type == SyntheticType::Browser {
             let has_assertion = self
                 .config
                 .get("steps")
@@ -1215,8 +1215,8 @@ impl Synthetic {
     /// Returns the first problem found as `Err(message)`; messages are safe to
     /// return verbatim in a 400 response.
     /// `is_create`: the `start` freshness check only applies on create — edits
-    /// round-trip the monitor's original start date, which is legitimately in
-    /// the past for any monitor older than the grace window.
+    /// round-trip the check's original start date, which is legitimately in
+    /// the past for any check older than the grace window.
     pub fn validate(
         &self,
         allowed_locations: &[String],
@@ -1250,7 +1250,7 @@ impl Synthetic {
         }
 
         // ── target ─────────────────────────────────────────────────────────
-        match self.monitor_type {
+        match self.check_type {
             SyntheticType::Http | SyntheticType::Api | SyntheticType::Browser => {
                 validate_http_url("target", &self.target)?
             }
@@ -1284,16 +1284,16 @@ impl Synthetic {
                         self.frequency.interval
                     ));
                 }
-                let min_secs = if self.monitor_type == SyntheticType::Browser {
+                let min_secs = if self.check_type == SyntheticType::Browser {
                     MIN_BROWSER_INTERVAL_SECS
                 } else {
                     MIN_INTERVAL_SECS
                 };
                 if self.frequency.interval_secs() < min_secs {
                     return Err(format!(
-                        "frequency: interval too short ({}s < {min_secs}s minimum for {:?} monitors)",
+                        "frequency: interval too short ({}s < {min_secs}s minimum for {:?} checks)",
                         self.frequency.interval_secs(),
-                        self.monitor_type
+                        self.check_type
                     ));
                 }
             }
@@ -1421,13 +1421,13 @@ impl Synthetic {
         self.validate_config(allowed_browsers, allowed_devices)
     }
 
-    /// Parses `config` into the struct matching `monitor_type` and validates it.
+    /// Parses `config` into the struct matching `check_type` and validates it.
     fn validate_config(
         &self,
         allowed_browsers: &[String],
         allowed_devices: &[String],
     ) -> Result<(), String> {
-        let type_check = match self.monitor_type {
+        let type_check = match self.check_type {
             SyntheticType::Browser => {
                 let cfg: BrowserConfig = serde_json::from_value(self.config.clone())
                     .map_err(|e| format!("config: not a valid browser config: {e}"))?;
@@ -1513,7 +1513,7 @@ impl Synthetic {
         // browser path applies inside `validate_browser_config`. Done here, once,
         // rather than in each arm: the arms are per-type and this rule is not, and
         // adding a check type should not be able to opt out of it silently.
-        if self.monitor_type != SyntheticType::Browser {
+        if self.check_type != SyntheticType::Browser {
             validate_net_retry_budget(&self.config, self.retries, self.wait_before_retry_secs)?;
         }
         Ok(())
@@ -2198,7 +2198,7 @@ mod tests {
     fn valid_browser_synthetic() -> Synthetic {
         Synthetic {
             name: "login flow".to_string(),
-            monitor_type: SyntheticType::Browser,
+            check_type: SyntheticType::Browser,
             target: "https://example.com".to_string(),
             frequency: SyntheticFrequency {
                 frequency_type: SyntheticFrequencyType::Minutes,
@@ -2242,7 +2242,7 @@ mod tests {
     fn valid_tcp_synthetic() -> Synthetic {
         Synthetic {
             name: "db port".to_string(),
-            monitor_type: SyntheticType::Tcp,
+            check_type: SyntheticType::Tcp,
             target: "db.example.com".to_string(),
             frequency: SyntheticFrequency {
                 frequency_type: SyntheticFrequencyType::Minutes,
@@ -2826,9 +2826,9 @@ mod tests {
 
     #[test]
     fn test_a_zero_assertion_journey_is_accepted_with_a_machine_readable_warning() {
-        // P5.2.4 — accepted, not refused: a monitor that only navigates still
+        // P5.2.4 — accepted, not refused: a check that only navigates still
         // proves the site answers. The warning is what stops it being mistaken
-        // for a monitor that checks something.
+        // for a check that checks something.
         let (locs, brs, devs) = allowed();
         let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
@@ -3299,7 +3299,7 @@ mod tests {
     fn test_validate_http_assertion_field_and_operator() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.monitor_type = SyntheticType::Http;
+        s.check_type = SyntheticType::Http;
         s.target = "https://example.com/".to_string();
         s.config = serde_json::json!({
             "method": "GET",
@@ -3326,7 +3326,7 @@ mod tests {
     fn test_validate_ssh_config_fields() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.monitor_type = SyntheticType::Ssh;
+        s.check_type = SyntheticType::Ssh;
         s.target = "test.rebex.net:22".to_string();
 
         s.config = serde_json::json!({
@@ -3509,9 +3509,9 @@ mod tests {
     fn test_validate_config_shape_mismatch() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.monitor_type = SyntheticType::Tcp;
+        s.check_type = SyntheticType::Tcp;
         s.target = "example.com:443".to_string();
-        // browser-shaped config on a tcp monitor → port missing → shape error
+        // browser-shaped config on a tcp check → port missing → shape error
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("not a valid tcp config"), "{err}");
     }
@@ -3532,7 +3532,7 @@ mod tests {
     fn test_validate_http_ok() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.monitor_type = SyntheticType::Http;
+        s.check_type = SyntheticType::Http;
         s.config = serde_json::json!({ "method": "GET" });
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }

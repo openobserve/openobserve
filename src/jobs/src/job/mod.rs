@@ -500,6 +500,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
+    // Synthetics config caches (checks, locations, probe tokens, agents) live on
+    // every node, so every node must hear invalidations — including routers,
+    // which serve the probe auth path.
+    tokio::task::spawn(infra::coordinator::synthetics::watch());
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with

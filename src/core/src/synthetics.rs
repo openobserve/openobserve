@@ -23,9 +23,9 @@
 #[cfg(feature = "enterprise")]
 pub struct CheckNotification {
     pub org_id: String,
-    pub monitor_name: String,
-    pub monitor_id: String,
-    pub monitor_type: String,
+    pub check_name: String,
+    pub check_id: String,
+    pub check_type: String,
     pub target: String,
     pub destinations: Vec<String>,
     pub run_id: String,
@@ -100,10 +100,7 @@ pub async fn notify_check_result(n: CheckNotification) {
                 };
 
                 let subject = if n.recovery {
-                    format!(
-                        "[OpenObserve Synthetics] ✅ {} has RECOVERED",
-                        n.monitor_name
-                    )
+                    format!("[OpenObserve Synthetics] ✅ {} has RECOVERED", n.check_name)
                 } else if n.degraded {
                     // Not "is WARNING": the point of the message is that this needs
                     // action before it becomes an outage. Named where we know the
@@ -113,21 +110,21 @@ pub async fn notify_check_result(n: CheckNotification) {
                     match n.status_reason.as_deref() {
                         Some("cert_expiring") => format!(
                             "[OpenObserve Synthetics] 🟡 {} — CERTIFICATE EXPIRING SOON",
-                            n.monitor_name
+                            n.check_name
                         ),
                         Some("sftp_degraded") => format!(
                             "[OpenObserve Synthetics] 🟡 {} — SFTP DEGRADED",
-                            n.monitor_name
+                            n.check_name
                         ),
-                        _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.monitor_name),
+                        _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.check_name),
                     }
                 } else if n.flaky {
-                    format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.monitor_name)
+                    format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.check_name)
                 } else {
                     format!(
                         "[OpenObserve Synthetics] {} {} is {}",
                         status_emoji(&n.status),
-                        n.monitor_name,
+                        n.check_name,
                         n.status.to_uppercase()
                     )
                 };
@@ -136,8 +133,8 @@ pub async fn notify_check_result(n: CheckNotification) {
                         .await
                 {
                     log::error!(
-                        "[synthetics] notify dest={dest_name} monitor={}: {e}",
-                        n.monitor_id
+                        "[synthetics] notify dest={dest_name} check={}: {e}",
+                        n.check_id
                     );
                 }
             }
@@ -163,7 +160,7 @@ fn status_emoji(status: &str) -> &'static str {
 #[cfg(feature = "enterprise")]
 fn status_headline(n: &CheckNotification) -> String {
     if n.recovery {
-        return format!("{} has recovered", n.monitor_name);
+        return format!("{} has recovered", n.check_name);
     }
     // `warning` covers two unrelated things, and they need opposite responses:
     // a flaky run already fixed itself, a degrading target will not.
@@ -175,31 +172,31 @@ fn status_headline(n: &CheckNotification) -> String {
         return match n.status_reason.as_deref() {
             Some("cert_expiring") => format!(
                 "{} — the TLS certificate is expiring soon, renew it before it lapses",
-                n.monitor_name
+                n.check_name
             ),
             Some("sftp_degraded") => format!(
                 "{} connects and authenticates, but its SFTP subsystem is failing",
-                n.monitor_name
+                n.check_name
             ),
             _ => format!(
                 "{} is reachable but degrading — this needs attention before it fails",
-                n.monitor_name
+                n.check_name
             ),
         };
     }
     if n.flaky {
         return format!(
             "{} passed only after retries (flaky) — it recovered on its own",
-            n.monitor_name
+            n.check_name
         );
     }
     match n.status.as_str() {
-        "warning" => format!("{} passed only after retries (flaky)", n.monitor_name),
+        "warning" => format!("{} passed only after retries (flaky)", n.check_name),
         "error" => format!(
             "{} could not be checked — probe infrastructure error",
-            n.monitor_name
+            n.check_name
         ),
-        _ => format!("{} is failing", n.monitor_name),
+        _ => format!("{} is failing", n.check_name),
     }
 }
 
@@ -219,7 +216,7 @@ fn checked_at_utc(checked_at_micros: i64) -> String {
         .unwrap_or_else(|| checked_at_micros.to_string())
 }
 
-/// Deep link to the monitor's results page in the UI.
+/// Deep link to the check's results page in the UI.
 #[cfg(feature = "enterprise")]
 fn run_url(n: &CheckNotification) -> String {
     let cfg = config::get_config();
@@ -227,7 +224,7 @@ fn run_url(n: &CheckNotification) -> String {
     let base_uri = &cfg.common.base_uri;
     format!(
         "{web_url}{base_uri}/web/synthetic/{}/results?org_identifier={}",
-        n.monitor_id, n.org_id
+        n.check_id, n.org_id
     )
 }
 
@@ -258,7 +255,7 @@ fn build_slack_json(n: &CheckNotification) -> String {
     let mut lines = vec![
         format!("{} *{}*", status_emoji(&n.status), status_headline(n)),
         String::new(),
-        format!("*Monitor:* {} ({})", n.monitor_name, n.monitor_type),
+        format!("*Check:* {} ({})", n.check_name, n.check_type),
         format!("*Target:* {}", n.target),
         format!("*Locations:* {}", locations_line(n)),
     ];
@@ -278,7 +275,7 @@ fn build_slack_json(n: &CheckNotification) -> String {
 fn build_plain_text(n: &CheckNotification) -> String {
     let mut lines = vec![
         status_headline(n),
-        format!("Monitor: {} ({})", n.monitor_name, n.monitor_type),
+        format!("Check: {} ({})", n.check_name, n.check_type),
         format!("Target: {}", n.target),
         format!("Status: {}", n.status),
         format!("Locations: {}", locations_line(n)),
@@ -316,7 +313,7 @@ fn build_email_html(n: &CheckNotification) -> String {
         r#"<div style="font-family:sans-serif;max-width:560px;">
   <h2 style="color:{color};margin-bottom:4px;">{emoji} {headline}</h2>
   <table style="border-collapse:collapse;background:#f7f7f7;border-radius:6px;width:100%;">
-    <tr><td style="padding:6px 12px;color:#666;width:140px;">Monitor</td>
+    <tr><td style="padding:6px 12px;color:#666;width:140px;">Check</td>
         <td style="padding:6px 12px;">{name} ({mtype})</td></tr>
     <tr><td style="padding:6px 12px;color:#666;">Target</td>
         <td style="padding:6px 12px;">{target}</td></tr>
@@ -334,8 +331,8 @@ fn build_email_html(n: &CheckNotification) -> String {
 </div>"#,
         emoji = status_emoji(&n.status),
         headline = html_escape(&status_headline(n)),
-        name = html_escape(&n.monitor_name),
-        mtype = html_escape(&n.monitor_type),
+        name = html_escape(&n.check_name),
+        mtype = html_escape(&n.check_type),
         target = html_escape(&n.target),
         status = n.status.to_uppercase(),
         jobs = html_escape(&locations_line(n)),
@@ -405,11 +402,10 @@ pub async fn location_staleness_watcher() {
             let conn = infra::db::ORM_CLIENT
                 .get_or_init(infra::db::connect_to_orm)
                 .await;
-            let checks = infra::table::synthetics_monitors::list_referencing_location(
-                conn, &org_id, &loc.id,
-            )
-            .await
-            .unwrap_or_default();
+            let checks =
+                infra::table::synthetics_checks::list_referencing_location(conn, &org_id, &loc.id)
+                    .await
+                    .unwrap_or_default();
             if checks.is_empty() {
                 // Nothing runs here — stay quiet, re-evaluate next tick.
                 continue;

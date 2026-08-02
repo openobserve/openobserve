@@ -19,6 +19,12 @@
 //! `/synthetics/agent/register`; `last_seen_at` refreshed by register and by
 //! every job lease. A location whose agents are all stale is reported "down".
 
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
+use config::RwHashMap;
 use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, sea_query::Expr,
 };
@@ -60,6 +66,37 @@ impl From<Model> for SyntheticsAgentRecord {
             last_seen_at: m.last_seen_at,
             created_at: m.created_at,
         }
+    }
+}
+
+/// `agent_id` → the agent row, with load time.
+///
+/// Backs [`get_cached`] only. The lease path reads an agent once per poll purely
+/// for its `capabilities`, and agents poll every 2 s — ~330 reads/min for 11
+/// agents, all for a value that changes only when an agent re-registers.
+///
+/// # Staleness contract
+///
+/// `last_seen_at` is rewritten by [`touch`] on **every lease**, and `touch` does
+/// not invalidate — invalidating there would defeat the cache entirely, since it
+/// fires at exactly the rate of the reads being served. Anything that judges
+/// agent liveness (the staleness watcher, location health) must use [`get`].
+static AGENT_CACHE: LazyLock<RwHashMap<String, (SyntheticsAgentRecord, Instant)>> =
+    LazyLock::new(Default::default);
+
+const AGENT_CACHE_TTL: Duration = Duration::from_secs(15);
+
+/// Drops one agent from the cache. Called on register, where capabilities change.
+pub fn invalidate_cache(agent_id: &str) {
+    AGENT_CACHE.remove(agent_id);
+}
+
+/// Invalidates locally **and** tells every other node. Write paths call this;
+/// the coordinator watcher calls [`invalidate_cache`] so events do not echo.
+async fn invalidate_and_publish(agent_id: &str) {
+    invalidate_cache(agent_id);
+    if let Err(e) = crate::coordinator::synthetics::emit_agent_changed(agent_id).await {
+        log::error!("[synthetics] emit agent cache event failed for {agent_id}: {e}");
     }
 }
 
@@ -106,10 +143,16 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
         }
     }
+    // Register is where capabilities change, so the cached copy is now stale.
+    invalidate_and_publish(&record.id).await;
     Ok(())
 }
 
 /// Refresh `last_seen_at` for an agent (called on heartbeat and every lease).
+///
+/// Deliberately does **not** invalidate [`AGENT_CACHE`] — it fires once per
+/// lease, which is exactly the rate of the reads the cache serves. Callers that
+/// need a current `last_seen_at` use [`get`], not [`get_cached`].
 pub async fn touch(agent_id: &str, now_us: i64) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::update_many()
@@ -133,6 +176,39 @@ pub async fn list_by_location(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(rows.into_iter().map(Into::into).collect())
+}
+
+/// All agents for a set of locations, grouped by `location_id`.
+///
+/// One query for the whole set instead of [`list_by_location`] per location —
+/// the locations list endpoint iterates every visible location to compute
+/// per-type availability, so the per-location form issued ~20 queries to build
+/// one response. Locations with no agents are absent from the map; callers
+/// should treat a missing key as an empty slice.
+pub async fn list_by_locations(
+    location_ids: &[String],
+) -> Result<std::collections::HashMap<String, Vec<SyntheticsAgentRecord>>, errors::Error> {
+    if location_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let rows = Entity::find()
+        .filter(Column::LocationId.is_in(location_ids.to_vec()))
+        .order_by_desc(Column::LastSeenAt)
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    let mut grouped: std::collections::HashMap<String, Vec<SyntheticsAgentRecord>> =
+        std::collections::HashMap::new();
+    for row in rows {
+        let rec: SyntheticsAgentRecord = row.into();
+        grouped
+            .entry(rec.location_id.clone())
+            .or_default()
+            .push(rec);
+    }
+    Ok(grouped)
 }
 
 /// Find an agent by its deploy identity. Agents hold no persistent state, so
@@ -180,6 +256,22 @@ pub async fn count_by_token(
 }
 
 /// Find one agent by id.
+/// Reads an agent from cache when fresh — see [`AGENT_CACHE`] for the staleness
+/// contract. Use [`get`] when `last_seen_at` matters.
+pub async fn get_cached(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
+    if let Some(entry) = AGENT_CACHE.get(agent_id)
+        && entry.1.elapsed() < AGENT_CACHE_TTL
+    {
+        return Ok(Some(entry.0.clone()));
+    }
+    let found = get(agent_id).await?;
+    if let Some(rec) = &found {
+        AGENT_CACHE.insert(agent_id.to_string(), (rec.clone(), Instant::now()));
+    }
+    Ok(found)
+}
+
+/// Reads an agent straight from the database, `last_seen_at` included.
 pub async fn get(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let row = Entity::find_by_id(agent_id)
