@@ -868,12 +868,11 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     org_id: &str,
     external_alert_id: &str,
 ) -> Result<(), anyhow::Error> {
-    let Some(incident) =
-        infra::table::alert_incidents::find_open_incident_containing_alert(
-            org_id,
-            external_alert_id,
-        )
-        .await?
+    let Some(incident) = infra::table::alert_incidents::find_open_incident_containing_alert(
+        org_id,
+        external_alert_id,
+    )
+    .await?
     else {
         return Ok(());
     };
