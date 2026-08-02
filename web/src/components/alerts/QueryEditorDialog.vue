@@ -188,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test-prefix="alert"
                         :keywords="effectiveKeywords"
                         :suggestions="effectiveSuggestions"
+                        :field-value-resolver="resolveFieldValues"
                       />
                       <div
                         v-if="

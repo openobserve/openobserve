@@ -61,6 +61,7 @@
         language="sql"
         :keywords="keywords"
         :suggestions="suggestions ?? undefined"
+        :field-value-resolver="fieldValueResolver ?? null"
         :show-line-numbers="false"
         :sticky-scroll="false"
         :data-test="`${dataTest}-editor`"
@@ -89,12 +90,15 @@ withDefaults(
     /** Field/function completions, from the parent's `useSqlSuggestions`. */
     keywords?: unknown[];
     suggestions?: unknown[] | null;
+    /** Field-value lookup, awaited by the completion provider. */
+    fieldValueResolver?: ((field: string) => Promise<string[]>) | null;
     dataTest?: string;
   }>(),
   {
     modelValue: "",
     keywords: () => [],
     suggestions: null,
+    fieldValueResolver: null,
   },
 );
 

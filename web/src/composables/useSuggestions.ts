@@ -201,6 +201,35 @@ const useSqlSuggestions = () => {
     return labelMeta;
   }
 
+  /**
+   * Field values for one column, for the completion provider to await directly.
+   *
+   * The same merge getSuggestions does — in-session values first, then what
+   * IndexedDB has kept — but callable, so the provider can resolve values
+   * inline instead of the parent debouncing, fetching, pushing the result down
+   * as a prop and force-reopening the widget.
+   */
+  const resolveFieldValues = async (fieldName: string): Promise<string[]> => {
+    if (!fieldName) return [];
+    const inSession = Array.from(
+      autoCompleteData.value.fieldValues[fieldName] || new Set(),
+    ) as string[];
+
+    const { org, streamType, streamName } = autoCompleteData.value;
+    let stored: string[] = [];
+    // Without the composite key there is nothing to look up; the in-session
+    // values are still perfectly good on their own.
+    if (org && streamType && streamName) {
+      try {
+        stored = await getFieldValuesForSuggestion({ org, streamType, streamName }, fieldName);
+      } catch {
+        // A failed lookup must not take completion down with it.
+        stored = [];
+      }
+    }
+    return [...new Set([...inSession, ...stored])];
+  };
+
   const getSuggestions = async () => {
     // Awaited so the server functions are present on the FIRST popup, not the
     // next keystroke.
@@ -443,6 +472,7 @@ const useSqlSuggestions = () => {
     updateAllKeywords,
     updateStreamKeywords,
     setServerFunctions,
+    resolveFieldValues,
     defaultSuggestions, // Export for use in natural language detection
   };
 };

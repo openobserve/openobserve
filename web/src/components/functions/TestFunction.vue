@@ -96,6 +96,7 @@
             language="sql"
             :keywords="effectiveKeywords"
             :suggestions="effectiveSuggestions"
+            :field-value-resolver="resolveFieldValues"
             @focus="onQueryEditorFocus"
             @blur="onQueryEditorBlur"
           />

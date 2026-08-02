@@ -52,7 +52,6 @@ import {
   ref,
   onMounted,
   nextTick,
-  type Ref,
   onDeactivated,
   onUnmounted,
   onActivated,
@@ -79,12 +78,39 @@ const loadMonaco = async () => {
 };
 
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+
+/**
+ * Per-editor configuration, keyed by model URI.
+ *
+ * Monaco aggregates every provider registered for a language, so registering
+ * one per component meant N providers answering each keystroke and N-1 of them
+ * returning an empty list for a model that did not ask. One provider set per
+ * language now, looking its editor up by model.
+ */
+interface EditorConfig {
+  enabled: () => boolean;
+  keywords: () => any[];
+  suggestions: () => any[];
+  resolveFieldValues: () => ((field: string) => Promise<string[]>) | null;
+}
+const editorConfigs = new Map<string, EditorConfig>();
+const registeredLanguages = new Set<string>();
+const modelKey = (model: any): string => model?.uri?.toString?.() ?? "";
 import {
   resolveKeywords,
   resolveSuggestions,
   buildCompletionItems,
   hasDynamicEntries,
 } from "@/utils/query/sqlCompletion";
+import {
+  parseCallContext,
+  parseValueContext,
+  buildValueEntries,
+  buildSignatureHelp,
+  buildHoverContents,
+  findCatalogEntry,
+  findFunctionEntry,
+} from "@/utils/query/editorProviders";
 import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
 import { useStore } from "vuex";
@@ -177,6 +203,11 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    /** Resolves the values of one field, awaited by the completion provider. */
+    fieldValueResolver: {
+      type: Function,
+      default: null,
+    },
   },
   emits: [
     "update-query",
@@ -204,7 +235,6 @@ export default defineComponent({
     const { detectNaturalLanguage, generateSQL, transformToSQL, isGenerating, streamingResponse } =
       useNLQuery();
 
-    let provider: Ref<any | null> = ref(null);
     const currentEditorText = ref("");
 
     watch(
@@ -349,6 +379,22 @@ export default defineComponent({
       }
     };
 
+    /** Point this editor's model at its live configuration. */
+    let publishedKey: string | null = null;
+    const publishEditorConfig = () => {
+      const key = modelKey(editorObj?.getModel?.());
+      if (!key) return;
+      publishedKey = key;
+      // Getters, not snapshots: keywords and suggestions are computeds that
+      // change as the stream schema and server catalog arrive.
+      editorConfigs.set(key, {
+        enabled: () => props.showAutoComplete,
+        keywords: () => keywords.value as any[],
+        suggestions: () => suggestions.value as any[],
+        resolveFieldValues: () => (props.fieldValueResolver as any) ?? null,
+      });
+    };
+
     const setupEditor = async () => {
       // Lazy load Monaco Editor on first use
       const monacoModule = await loadMonaco();
@@ -406,9 +452,8 @@ export default defineComponent({
         colors: {},
       });
 
-      // Dispose the provider if it already exists before registering a new one
-      provider.value?.dispose();
-      registerAutoCompleteProvider();
+      // One provider set per language, shared by every editor of that language.
+      registerLanguageProviders(props.language);
 
       let editorElement = document.getElementById(props.editorId);
       let retryCount = 0;
@@ -501,10 +546,19 @@ export default defineComponent({
         minimap: { enabled: false },
         readOnly: props.readOnly,
         renderValidationDecorations: "on",
+        // Monaco defaults strings to 'off', which is why field-VALUE completion
+        // used to need a forced hide/re-trigger to appear at all.
+        quickSuggestions: { other: "on", comments: "off", strings: "on" },
+        // Default is 'matchingDocuments'. Nothing observable comes from it in
+        // this app today, but the reason is not established — this states the
+        // intent rather than relying on that continuing to hold.
+        wordBasedSuggestions: "off",
         stickyScroll: {
           enabled: props.stickyScroll,
         },
       });
+
+      publishEditorConfig();
 
       // The editor's content only reaches the parent after `debounceTime`. Held
       // as a named handle so it can be flushed on the paths that consume the
@@ -597,8 +651,6 @@ export default defineComponent({
     };
 
     onMounted(async () => {
-      provider.value?.dispose();
-
       if (props.language === "sql") {
         await import("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js");
       }
@@ -630,18 +682,14 @@ export default defineComponent({
         setupEditor();
         editorObj?.layout();
       } else {
-        provider.value?.dispose();
-        registerAutoCompleteProvider();
+        registerLanguageProviders(props.language);
+        publishEditorConfig();
       }
     });
 
-    onDeactivated(() => {
-      provider.value?.dispose();
-    });
+    onDeactivated(() => {});
 
     onUnmounted(() => {
-      provider.value?.dispose();
-
       // Clean up global event listeners
       if (editorObj) {
         if (editorObj._windowClickHandler) {
@@ -650,6 +698,11 @@ export default defineComponent({
         if (editorObj._windowResizeHandler) {
           window.removeEventListener("resize", editorObj._windowResizeHandler);
         }
+
+        // Drop this editor's entry so the shared provider stops answering for
+        // a model that no longer exists.
+        if (publishedKey) editorConfigs.delete(publishedKey);
+        publishedKey = null;
 
         // Dispose the editor
         editorObj.dispose();
@@ -719,32 +772,35 @@ export default defineComponent({
       }
     };
 
-    const registerAutoCompleteProvider = () => {
-      if (!props.showAutoComplete || !monaco) return;
-      provider.value = monaco.languages.registerCompletionItemProvider(props.language, {
-        provideCompletionItems: function (
+    /**
+     * Register the provider set for a language exactly once.
+     *
+     * Each provider resolves the asking editor from the model, so three SQL
+     * editors share one registration instead of stacking three.
+     */
+    const registerLanguageProviders = (language: string) => {
+      if (!monaco || registeredLanguages.has(language)) return;
+      registeredLanguages.add(language);
+      const kinds = () => monaco.languages.CompletionItemKind;
+      const rules = () => monaco.languages.CompletionItemInsertTextRule;
+
+      monaco.languages.registerCompletionItemProvider(language, {
+        // Without these nothing opens after a paren, a comma or an opening
+        // quote — the positions where help is most wanted.
+        triggerCharacters: [".", "(", ",", "'", '"', " "],
+        provideCompletionItems: async (
           model: MonacoEditor.editor.ITextModel,
           position: MonacoEditor.Position,
-        ) {
-          // Answer only for THIS editor's model.
-          //
-          // Monaco registers completion providers globally per LANGUAGE, not
-          // per editor, and aggregates the results of every registered
-          // provider. Each instance of this component registers one, so with
-          // two SQL editors mounted at once every suggestion was returned
-          // twice — three editors, three times. The duplicates are not a
-          // keyword-list bug: each provider is correctly returning the full
-          // list, for an editor that did not ask.
-          //
-          // Guarded on `editorObj` because the provider is registered before
-          // the editor finishes creating; until then answering is correct.
-          const own = editorObj?.getModel?.();
-          if (own && model !== own) return { suggestions: [] };
+        ) => {
+          const config = editorConfigs.get(modelKey(model));
+          if (!config || !config.enabled()) return { suggestions: [] };
 
-          // Monaco's own word at the cursor. Previously this was derived with
-          // textUntilPosition.trim().split(" ").pop(), which broke on every
-          // newline ("SELECT *\nFROM" yielded "*\nFROM") and on half-typed
-          // quoted values ("'err").
+          const textUntilPosition = model.getValueInRange({
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          });
           const word = model.getWordUntilPosition(position);
           const range = {
             startLineNumber: position.lineNumber,
@@ -753,28 +809,96 @@ export default defineComponent({
             endColumn: word.endColumn,
           };
 
-          // No substring pre-filter here on purpose. Monaco scores candidates
-          // with a word-boundary-aware subsequence matcher; filtering with
-          // String.includes first threw away matches it would have ranked
-          // first (typing "knn" never surfaced kubernetes_namespace_name).
+          // Field VALUES, resolved here rather than by the parent debouncing,
+          // fetching, pushing a prop down and force-reopening the widget.
+          const valueContext = parseValueContext(textUntilPosition);
+          const resolver = config.resolveFieldValues();
+          if (valueContext && resolver) {
+            const values = await resolver(valueContext.field);
+            if (values.length) {
+              return {
+                suggestions: buildCompletionItems({
+                  keywords: buildValueEntries(values, valueContext.hasOpenQuote) as any[],
+                  suggestions: [],
+                  word: word.word,
+                  range,
+                  kinds: kinds(),
+                  insertTextRules: rules(),
+                  tags: monaco.languages.CompletionItemTag,
+                }),
+              };
+            }
+          }
+
+          const keywordList = config.keywords();
+          const suggestionList = config.suggestions();
           return {
             suggestions: buildCompletionItems({
-              keywords: keywords.value as any[],
-              suggestions: suggestions.value as any[],
+              keywords: keywordList,
+              suggestions: suggestionList,
               word: word.word,
               range,
-              kinds: monaco.languages.CompletionItemKind,
-              insertTextRules: monaco.languages.CompletionItemInsertTextRule,
+              kinds: kinds(),
+              insertTextRules: rules(),
               tags: monaco.languages.CompletionItemTag,
             }),
-            // Monaco filters a returned list client-side and only re-queries
-            // mid-word when it is marked incomplete. The shared catalog is
-            // static so that would be wasted work, but a legacy caller passing
-            // callable label/insertText needs the re-query or its content
-            // freezes at the first keystroke.
-            incomplete:
-              hasDynamicEntries(suggestions.value as any[]) ||
-              hasDynamicEntries(keywords.value as any[]),
+            // Only a list whose content depends on the typed word needs
+            // re-querying; the shared catalog is static.
+            incomplete: hasDynamicEntries(suggestionList) || hasDynamicEntries(keywordList),
+          };
+        },
+      });
+
+      monaco.languages.registerSignatureHelpProvider(language, {
+        signatureHelpTriggerCharacters: ["(", ","],
+        signatureHelpRetriggerCharacters: [","],
+        provideSignatureHelp: async (
+          model: MonacoEditor.editor.ITextModel,
+          position: MonacoEditor.Position,
+        ) => {
+          const config = editorConfigs.get(modelKey(model));
+          if (!config || !config.enabled()) return null;
+
+          const text = model.getValueInRange({
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          });
+          const call = parseCallContext(text);
+          if (!call) return null;
+
+          // The parser reports any identifier before the paren; the catalog
+          // decides whether it is a function.
+          const entry = findFunctionEntry(call.name, config.keywords(), config.suggestions());
+          const value = buildSignatureHelp(entry as any, call.activeParameter);
+          if (!value) return null;
+          // monaco reads `.value` off a SignatureHelpResult and disposes it.
+          return { value, dispose: () => {} };
+        },
+      });
+
+      monaco.languages.registerHoverProvider(language, {
+        provideHover: async (
+          model: MonacoEditor.editor.ITextModel,
+          position: MonacoEditor.Position,
+        ) => {
+          const config = editorConfigs.get(modelKey(model));
+          if (!config || !config.enabled()) return null;
+
+          const word = model.getWordAtPosition(position);
+          if (!word?.word) return null;
+          const entry = findCatalogEntry(word.word, config.keywords(), config.suggestions());
+          const contents = buildHoverContents(entry as any);
+          if (!contents) return null;
+          return {
+            contents,
+            range: {
+              startLineNumber: position.lineNumber,
+              endLineNumber: position.lineNumber,
+              startColumn: word.startColumn,
+              endColumn: word.endColumn,
+            },
           };
         },
       });

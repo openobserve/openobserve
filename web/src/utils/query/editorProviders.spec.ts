@@ -115,8 +115,12 @@ describe("parseCallContext — locating the enclosing call", () => {
   });
 
   it("returns null when the paren has no identifier before it at all", () => {
-    expect(parseCallContext("WHERE (")).toBeNull();
+    // `WHERE (` would NOT belong here: WHERE is an identifier as far as a
+    // syntactic parser is concerned, and the test below requires it to be
+    // reported. Using it here made this pair mutually unsatisfiable.
     expect(parseCallContext("(")).toBeNull();
+    expect(parseCallContext("WHERE x = (")).toBeNull();
+    expect(parseCallContext("SELECT 1 + (")).toBeNull();
   });
 
   it("tolerates whitespace between the name and the paren", () => {

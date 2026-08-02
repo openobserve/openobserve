@@ -1054,6 +1054,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disable-ai="!streamName"
                         :keywords="effectiveKeywords"
                         :suggestions="effectiveSuggestions"
+                        :field-value-resolver="resolveFieldValues"
                         @focus="onQueryEditorFocus"
                         @blur="onBlurInlineSqlEditor"
                         @update:query="handleInlineQueryUpdate"

@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :query="customSql || ''"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
+                :field-value-resolver="resolveFieldValues"
                 :show-auto-complete="true"
                 :disable-ai="!config.stream_name"
                 :disable-ai-reason="

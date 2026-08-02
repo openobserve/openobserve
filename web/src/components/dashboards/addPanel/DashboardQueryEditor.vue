@@ -184,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :keywords="currentEditorKeywords"
                 :suggestions="currentEditorSuggestions"
+                :field-value-resolver="resolveFieldValues"
                 @update:query="handleQueryUpdate"
                 @focus="_sqlOnFocus"
                 @blur="_sqlOnBlur"

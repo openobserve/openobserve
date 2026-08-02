@@ -172,6 +172,7 @@
               :hint="t('slos.field.scopeHint')"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               data-test="slos-addslo-scope"
             />
@@ -182,6 +183,7 @@
               :hint="t('slos.field.goodWhenHint')"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               required
               class="mt-3"
               data-test="slos-addslo-good-expr"
@@ -221,6 +223,7 @@
               :hint="t('slos.field.aggregateHint')"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               required
               data-test="slos-addslo-aggregate"
@@ -243,6 +246,7 @@
               :label="t('slos.field.scope')"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               data-test="slos-addslo-timeslice-scope"
             />

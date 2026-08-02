@@ -94,6 +94,7 @@
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
         :suggestions="suggestions"
+        :field-value-resolver="fieldValueResolver"
         :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
         @run-query="emit('run-query')"
@@ -168,6 +169,7 @@ interface Props {
   // Editor autocomplete (forwarded to CodeQueryEditor)
   keywords?: any[]; // Autocomplete keywords for Monaco
   suggestions?: any[]; // Autocomplete suggestions for Monaco
+  fieldValueResolver?: ((field: string) => Promise<string[]>) | null; // Field-value lookup awaited by the completion provider
   debounceTime?: number; // Debounce time for query updates (ms)
 
   // NL Mode (optional external control)

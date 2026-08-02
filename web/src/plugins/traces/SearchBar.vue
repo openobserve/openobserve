@@ -336,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
           :suggestions="effectiveSuggestions"
+          :field-value-resolver="resolveFieldValues"
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
