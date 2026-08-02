@@ -168,10 +168,13 @@ describe("Phase 2 — the server catalog is actually fetched (B4 wiring)", () =>
 
 // ─── Surfaces that never call getSuggestions ─────────────────────────────────
 // The SLO form (AddSlo.vue) wires the editor with updateFieldKeywords ONLY: it
-// never calls getSuggestions and never sets autoCompleteData.org. Hanging the
-// catalog fetch off getSuggestions therefore left that page with the ~26 local
-// functions and none of the ~330 from the registry — reported as "many
-// functions are not available in typeahead".
+// never calls getSuggestions. Hanging the catalog fetch off getSuggestions
+// therefore left that page with the ~26 local functions and none of the ~330
+// from the registry — reported as "many functions are not available in
+// typeahead". It does now set autoCompleteData.org (for the field-value
+// resolver's lookup key), but only once a stream is chosen — so the fallback
+// to the store's org still carries the fetch for every surface, including this
+// one before a stream is picked.
 
 describe("Phase 2 — the catalog loads for surfaces that only set up fields", () => {
   const SERVER_LIST = [

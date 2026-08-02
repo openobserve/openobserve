@@ -788,8 +788,13 @@ export default defineComponent({
     // Same completion machinery every other SQL editor in the app uses, so this
     // one also gets SQL keywords, the O2 functions and the server function
     // catalog rather than bare field names.
-    const { effectiveKeywords, effectiveSuggestions, updateFieldKeywords, resolveFieldValues } =
-      useSqlSuggestions();
+    const {
+      autoCompleteData,
+      effectiveKeywords,
+      effectiveSuggestions,
+      updateFieldKeywords,
+      resolveFieldValues,
+    } = useSqlSuggestions();
     const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
     const filteredDetectionFields = ref<string[]>([]);
@@ -815,6 +820,13 @@ export default defineComponent({
     const loadStreamFields = async () => {
       const streamName = props.config.stream_name;
       const streamType = props.config.stream_type;
+
+      // Field VALUES are looked up under "org|streamType|streamName|field", so
+      // the resolver returns nothing at all until this is set.
+      autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+      autoCompleteData.value.streamType = String(streamType ?? "");
+      autoCompleteData.value.streamName = String(streamName ?? "");
+
       if (!streamName || !streamType) {
         allStreamFields.value = [];
         updateFieldKeywords([]);
@@ -836,6 +848,10 @@ export default defineComponent({
             ? schema.uds_schema
             : schema.schema || schema.fields || [];
         allStreamFields.value = fieldsArray.map((f: any) => f.name).sort();
+        // The two failure branches below already cleared the keywords; without
+        // this the success branch never set them, so the SQL editor offered
+        // functions and keywords but not one field of the selected stream.
+        updateFieldKeywords(fieldsArray);
         numericStreamFields.value = fieldsArray
           .filter((f: any) => {
             const t: string = f.field_type || f.data_type || f.type || "";

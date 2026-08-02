@@ -88,6 +88,36 @@ describe("editor wiring — every surface supplies both completion sources", () 
     ).toBe(true);
   });
 
+  // A resolver that can never resolve anything is the same class of silent gap
+  // as a missing prop: the wiring test passes, the editor works, and value
+  // completion just quietly does nothing. resolveFieldValues reads the stored
+  // values under the composite key "org|streamType|streamName|field", so a
+  // surface that never sets those three gets [] on every lookup and the
+  // provider falls straight through to the ordinary function list.
+  const composableHosts = editorHosts.filter((f) => /useSqlSuggestions\s*\(/.test(f.source));
+
+  it("finds the surfaces that own a composable (not the pass-through wrappers)", () => {
+    expect(composableHosts.length).toBeGreaterThan(8);
+    // QueryEditor.vue and SloExpressionField.vue forward a resolver prop rather
+    // than owning one; they have no stream context to set and must not be
+    // required to have any.
+    expect(composableHosts.map((f) => f.path)).not.toContain("components/QueryEditor.vue");
+  });
+
+  it.each(composableHosts.map((f) => f.path))(
+    "%s sets the stream context its resolver looks values up under",
+    (path) => {
+      const { source } = composableHosts.find((f) => f.path === path)!;
+      for (const key of ["org", "streamType", "streamName"]) {
+        expect(
+          new RegExp(`[Aa]utoCompleteData(\\.value)?\\.${key}\\s*=`).test(source),
+          `${path} owns a useSqlSuggestions resolver but never sets ` +
+            `autoCompleteData.${key}, so every field-value lookup returns []`,
+        ).toBe(true);
+      }
+    },
+  );
+
   it.each(editorHosts.map((f) => f.path))("%s does not bind the base keyword list", (path) => {
     const { source } = editorHosts.find((f) => f.path === path)!;
     // autoCompleteKeywords is the pre-context list; binding it means field

@@ -646,6 +646,27 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Field VALUES are looked up under "org|streamType|streamName|field", so the
+    // resolver returns nothing at all until this is set. Tracked per QUERY, not
+    // per panel: each tab has its own stream, and switching tabs must not leave
+    // the previous tab's values on offer. A multi-stream query is keyed on its
+    // primary stream — the same one the Fields panel is built from.
+    watch(
+      [
+        () => dashboardPanelData.layout.currentQueryIndex,
+        () =>
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields,
+      ],
+      () => {
+        const fields =
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
+        sqlAutoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+        sqlAutoCompleteData.value.streamType = String(fields?.stream_type ?? "");
+        sqlAutoCompleteData.value.streamName = String(fields?.stream ?? "");
+      },
+      { immediate: true, deep: true },
+    );
+
     const removeTab = async (rawIndex: string | number) => {
       const index = Number(rawIndex);
       if (dashboardPanelData.layout.currentQueryIndex >= dashboardPanelData.data.queries.length - 1)
