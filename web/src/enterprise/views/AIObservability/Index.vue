@@ -69,6 +69,7 @@ const activeSection = computed<string>(() => {
   if (route.name === "aiSessions") return "sessions";
   if (route.name === "aiAgentGraph") return "agentGraph";
   if (route.name === "aiAgentBehavior") return "agentBehavior";
+  if (route.name === "aiDatasets") return "datasets";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;
@@ -112,6 +113,14 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     group: "Monitor",
   },
   {
+    key: "datasets",
+    label: t("aiObservability.nav.datasets"),
+    icon: "table-chart",
+    to: { name: "aiDatasets", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-datasets",
+    group: "Annotate",
+  },
+  {
     key: "quality",
     label: t("aiObservability.nav.quality"),
     icon: "star-rate",
@@ -149,11 +158,12 @@ const activeSectionItem = computed(() =>
   sectionItems.value.find((i) => i.key === activeSection.value),
 );
 
-// Group order: Monitor before Evaluate.
-const sectionGroupOrder = ["Monitor", "Evaluate"];
+// Group order: Monitor, then Evaluate, then Annotate at the bottom.
+const sectionGroupOrder = ["Monitor", "Evaluate", "Annotate"];
 
 const groupLabels = computed<Record<string, I18nText>>(() => ({
   Monitor: t("aiObservability.sections.monitor"),
+  Annotate: t("aiObservability.sections.annotate"),
   Evaluate: t("aiObservability.sections.evaluate"),
 }));
 
