@@ -25,6 +25,11 @@ const usePromqlSuggestions = () => {
   // which runs on a query update — so Ctrl+Space on a freshly opened PromQL
   // editor offered nothing at all until the user typed a character.
   const autoCompletePromqlKeywords: any = ref([...PROMQL_CATALOG]);
+
+  // True while the list belongs to a label or value position. Metrics arriving
+  // in the background must not replace such a list, and an empty result in one
+  // means "nothing matches here" — not "show me the language".
+  let contextualSuggestions = false;
   const metricKeywords: any = ref([]);
 
   const parsePromQlQuery = (query: string) => {
@@ -225,10 +230,14 @@ const usePromqlSuggestions = () => {
           );
         })
         .finally(() => {
-          if (labelSuggestions) updatePromqlKeywords(labelSuggestions);
-          else {
-            // Back to the catalog rather than to nothing — the labels are
-            // unavailable, the language is not.
+          if (labelSuggestions) {
+            updatePromqlKeywords(labelSuggestions, { contextual: true });
+            // Nothing matched: leave the position empty and take the widget
+            // away, rather than leaving an empty box open over the query.
+            if (!labelSuggestions.length) autoCompleteData.value.popup.close("");
+          } else {
+            // The request itself failed. The labels are unavailable; the
+            // language is not, so fall back to the catalog.
             updatePromqlKeywords([]);
             autoCompleteData.value.popup.close("");
           }
@@ -265,13 +274,29 @@ const usePromqlSuggestions = () => {
     return keywords;
   };
 
-  const updatePromqlKeywords = async (data: any[]) => {
-    // A caller with something contextual to show — label names, label values —
-    // replaces the list outright. Otherwise: the catalog, plus this org's
-    // metrics, which sort above it.
-    autoCompletePromqlKeywords.value = data.length
-      ? [...data]
-      : [...PROMQL_CATALOG, ...metricKeywords.value];
+  /** The default list: the language, plus this org's metrics above it. */
+  const rebuildBaseSuggestions = () => {
+    autoCompletePromqlKeywords.value = [...PROMQL_CATALOG, ...metricKeywords.value];
+    contextualSuggestions = false;
+  };
+
+  const updatePromqlKeywords = async (
+    data: any[],
+    { contextual = false }: { contextual?: boolean } = {},
+  ) => {
+    if (contextual) {
+      // Verbatim, INCLUDING an empty list. A label lookup that matched nothing
+      // and a plain request for the catalog both arrive as [], and treating
+      // them the same put 97 function names inside `up{instance="`, where not
+      // one of them can be typed.
+      autoCompletePromqlKeywords.value = [...data];
+      contextualSuggestions = true;
+    } else if (data.length) {
+      autoCompletePromqlKeywords.value = [...data];
+      contextualSuggestions = true;
+    } else {
+      rebuildBaseSuggestions();
+    }
 
     await nextTick();
     autoCompleteData.value.popup.open("");
@@ -289,6 +314,13 @@ const usePromqlSuggestions = () => {
         sortText: SORT_LANE.field + metric.label,
       });
     });
+
+    // Rebuild what is on offer, because these arrive from a watcher AFTER the
+    // list was seeded — without this a freshly opened editor showed the whole
+    // catalog and not one metric name until the user edited the query. Not
+    // while a label or value list is showing, and never by opening the widget:
+    // this is a refresh, not an invitation.
+    if (!contextualSuggestions) rebuildBaseSuggestions();
   };
 
   return {

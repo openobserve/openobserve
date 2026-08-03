@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { flushPromises } from "@vue/test-utils";
 
 // Mock services
 vi.mock("@/services/search", () => ({
@@ -670,6 +671,67 @@ describe("PromQL catalog reaches the editor", () => {
     fresh.autoCompleteData.value.position.cursorIndex = -1;
     await fresh.getSuggestions();
     expect((fresh.autoCompletePromqlKeywords.value as any[]).length).toBeGreaterThan(90);
+  });
+
+  it("offers metric names the moment they arrive, with no keystroke", async () => {
+    // The catalog is seeded at construction, but METRICS arrive later, from a
+    // watcher on the stream results. Nothing rebuilt the offered list when they
+    // did, so a freshly opened PromQL editor showed 113 catalog entries and not
+    // one metric name until the user edited the query — the same "Ctrl+Space
+    // shows nothing useful" complaint, half fixed.
+    const fresh = usePromqlSuggestions();
+    const popupOpen = vi.fn();
+    fresh.autoCompleteData.value.popup.open = popupOpen;
+
+    fresh.updateMetricKeywords([{ label: "http_requests_total", type: "counter" }]);
+
+    const labels = (fresh.autoCompletePromqlKeywords.value as any[]).map((k: any) => k.label);
+    expect(labels.some((l: string) => l.startsWith("http_requests_total"))).toBe(true);
+    // Rebuilding the list is not a reason to open the widget over whatever the
+    // user is doing.
+    expect(popupOpen, "arriving metrics popped the suggest widget open").not.toHaveBeenCalled();
+  });
+
+  it("does not let arriving metrics clobber a contextual list", async () => {
+    // Label suggestions are showing; a metric refresh landing at that moment
+    // must not replace them with the catalog.
+    const fresh = usePromqlSuggestions();
+    const labelList = [{ label: "instance", kind: "Variable", insertText: "instance=" }];
+    await fresh.updatePromqlKeywords(labelList, { contextual: true });
+    fresh.updateMetricKeywords([{ label: "http_requests_total", type: "counter" }]);
+    expect(fresh.autoCompletePromqlKeywords.value).toEqual(labelList);
+  });
+
+  it("keeps an empty label result empty instead of showing every function", async () => {
+    // A label lookup that matched nothing is not the same as "no context" — but
+    // both arrived as `[]`, so the catalog took over and offered 97 functions
+    // inside `up{instance="`, where none of them can be typed.
+    vi.mocked(searchService.get_promql_series).mockResolvedValue({ data: { data: [] } } as any);
+    const fresh = usePromqlSuggestions();
+    fresh.autoCompleteData.value.query = 'up{instance="';
+    fresh.autoCompleteData.value.position.cursorIndex = 12;
+
+    await fresh.getSuggestions();
+    await flushPromises();
+
+    const rows = fresh.autoCompletePromqlKeywords.value as any[];
+    expect(rows.filter((k: any) => k.kind === "Function")).toEqual([]);
+  });
+
+  it("still shows the label suggestions when the lookup finds some", async () => {
+    vi.mocked(searchService.get_promql_series).mockResolvedValue({
+      data: { data: [{ instance: "server-1", job: "api" }] },
+    } as any);
+    const fresh = usePromqlSuggestions();
+    fresh.autoCompleteData.value.query = "up{";
+    fresh.autoCompleteData.value.position.cursorIndex = 2;
+
+    await fresh.getSuggestions();
+    await flushPromises();
+
+    const labels = (fresh.autoCompletePromqlKeywords.value as any[]).map((k: any) => k.label);
+    expect(labels).toContain("instance");
+    expect(labels).not.toContain("rate");
   });
 
   it("has the catalog ready before the first keystroke", async () => {
