@@ -16,21 +16,17 @@
 use std::{collections::HashSet, sync::Arc};
 
 use arrow::buffer::BooleanBuffer;
-#[cfg(not(feature = "enterprise"))]
-use config::tantivy::query::histogram_collector::{
-    MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
-};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
     tantivy::query::{
-        contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
+        contains_query::ContainsAutomaton,
+        histogram_collector::{
+            MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
+        },
+        ids_collector::SingleSegmentDocIdCollector,
         topn_collector::TopNCollector,
     },
-};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::tantivy::histogram_collector::{
-    MultiHistogramCollector, SimpleHistogramCollector, simple_histogram_rank,
 };
 use tantivy::{
     DocId, Score, Searcher,
@@ -207,7 +203,7 @@ impl TantivyResult {
             (false, None)
         };
 
-        // RANK fast path (enterprise); None falls back to the collector below
+        // RANK fast path; None falls back to the collector below
         if rank_eligible
             && let Some(counts) = simple_histogram_rank(
                 searcher,

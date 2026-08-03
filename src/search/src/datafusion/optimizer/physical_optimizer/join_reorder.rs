@@ -28,11 +28,10 @@ use datafusion::{
     },
 };
 
-#[cfg(feature = "enterprise")]
-use crate::datafusion::optimizer::physical_optimizer::enrichment::{
-    is_enrichment_table, should_use_enrichment_broadcast_join,
+use crate::datafusion::optimizer::physical_optimizer::{
+    enrichment::{is_enrichment_table, should_use_enrichment_broadcast_join},
+    utils::is_aggregate_exec,
 };
-use crate::datafusion::optimizer::physical_optimizer::utils::is_aggregate_exec;
 
 #[derive(Default, Debug)]
 pub struct JoinReorderRule;
@@ -67,7 +66,6 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
         let right = hash_join.right();
 
         // If right table is enrichment table and left table is not, swap them
-        #[cfg(feature = "enterprise")]
         if config::get_config()
             .common
             .feature_enrichment_broadcast_join_enabled
