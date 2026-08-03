@@ -15,7 +15,6 @@
 
 pub mod broadcast_join;
 pub mod distribute_analyze;
-#[cfg(feature = "enterprise")]
 pub mod enrichment;
 pub mod index;
 pub mod index_optimizer;

@@ -33,7 +33,6 @@ pub mod display;
 pub mod distribute_analyze_exec;
 pub mod empty_exec;
 pub mod enrich_exec;
-#[cfg(feature = "enterprise")]
 pub mod enrichment_exec;
 pub mod node;
 mod once_async;

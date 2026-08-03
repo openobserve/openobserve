@@ -24,7 +24,6 @@ use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 mod aggregate_topk_exec;
 mod deduplication_exec;
 mod empty_exec;
-#[cfg(feature = "enterprise")]
 mod enrichment_exec;
 mod physical_plan_node;
 #[cfg(feature = "enterprise")]
