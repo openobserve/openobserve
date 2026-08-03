@@ -40,6 +40,9 @@ const BUNDLE: StepLocator = {
   ],
 };
 
+/** A step added by hand: the input is the only way it can name its element. */
+const EMPTY: StepLocator = { candidates: [] };
+
 function render(locator: StepLocator = BUNDLE) {
   return mount(BrowserJourneyLocator, {
     props: { locator },
@@ -87,6 +90,39 @@ describe("BrowserJourneyLocator", () => {
     // Absent origin means recorded — the shape every pre-provenance bundle has.
     expect(rows[1].text()).toContain("Recorded");
   });
+
+  // Provenance is worth a glance, not only a read: a row the author added should
+  // be tellable from a recorded one without parsing the badge's text.
+  it("colours the origin badge by where the candidate came from", () => {
+    const wrapper = render({
+      candidates: [
+        { kind: "test_attribute", value: TESTID },
+        { kind: "css", value: "#mine", origin: "authored" },
+        { kind: "css", value: "#built", origin: "composite" },
+      ],
+    });
+    const variants = wrapper.findAllComponents({ name: "OBadge" }).map((c) => c.props("variant"));
+    expect(variants).toContain("primary-outline");
+    expect(variants).toContain("info-outline");
+  });
+});
+
+// "The first one that matches is used" is invisible in a list that conveys its
+// order through vertical stacking alone.
+describe("order", () => {
+  it("numbers every row by its position in the list", () => {
+    const orders = render()
+      .findAll(test("synthetics-journey-step-locator-row-order"))
+      .map((n) => n.text());
+    expect(orders).toEqual(["1", "2", "3"]);
+  });
+
+  it("marks only the first row as the one that is tried first", () => {
+    const wrapper = render();
+    const marks = wrapper.findAll(test("synthetics-journey-step-locator-row-tried-first"));
+    expect(marks).toHaveLength(1);
+    expect(wrapper.findAll("tbody tr")[0].text()).toContain("Tried first");
+  });
 });
 
 // The reorder is the replacement for pinning. A pin was exclusive: the only way
@@ -114,18 +150,9 @@ describe("adding your own locator", () => {
 
   it("labels the input as the primary control, not an override", () => {
     const wrapper = render(EMPTY);
-    expect(overrideInput(wrapper).exists()).toBe(true);
+    expect(ownInput(wrapper).exists()).toBe(true);
     expect(wrapper.text()).toContain("How to find this element");
     expect(wrapper.text()).not.toContain("Use a different locator");
-  });
-
-  it("shows no primary card, no fallbacks and no positional warning", () => {
-    const wrapper = render(EMPTY);
-    expect(wrapper.find(test("synthetics-journey-step-locator-primary")).exists()).toBe(false);
-    expect(wrapper.find(test("synthetics-journey-step-locator-fallbacks")).exists()).toBe(false);
-    expect(wrapper.find(test("synthetics-journey-step-locator-positional-warning")).exists()).toBe(
-      false,
-    );
   });
 
   it("marks the input required — the block only renders when a target is needed", () => {
@@ -133,17 +160,18 @@ describe("adding your own locator", () => {
     expect(wrapper.findComponent({ name: "OInput" }).props("required")).toBe(true);
   });
 
+  // A hand-added step reaches the same append path a recorded one does. There is
+  // no separate override slot to write into — the candidate list is the only
+  // place a locator lives, so the first entry simply starts it.
   it("still emits update:locator when a value is applied", async () => {
     const wrapper = render(EMPTY);
-    await overrideInput(wrapper).setValue('[data-test="sign-in"]');
-    await wrapper.find(test("synthetics-journey-step-locator-override-btn")).trigger("click");
+    await addOwn(wrapper, '[data-test="sign-in"]');
 
-    const emitted = wrapper.emitted("update:locator");
-    expect(emitted).toBeTruthy();
-    expect(emitted![0][0]).toEqual({
-      candidates: [],
-      user_override: { kind: "css", value: '[data-test="sign-in"]' },
-    });
+    const next = emitted(wrapper);
+    expect(next.candidates).toEqual([
+      { kind: "css", value: '[data-test="sign-in"]', origin: "authored" },
+    ]);
+    expect(next.author_ordered).toBe(true);
   });
 
   it("appends it, with a kind read from the value", async () => {
@@ -173,16 +201,16 @@ describe("adding your own locator", () => {
     );
   });
 
-  it("prefills from a row without editing the recorded value in place", async () => {
+  // A recorded row has no in-place edit and no "start from this" copy button: the
+  // stored list is what a later healing pass compares against, so an author's
+  // correction is appended as their own row rather than written over the evidence.
+  it("offers no way to edit a recorded value in place", () => {
     const wrapper = render();
-    await wrapper
-      .findAll(test("synthetics-journey-step-locator-start-from-btn"))[1]
-      .trigger("click");
-
-    expect((ownInput(wrapper).element as HTMLInputElement).value).toBe(ROLE);
-    // Copying, not editing: the stored list is what a later healing pass
-    // compares against, and an author's correction is not evidence.
-    expect(wrapper.emitted("update:locator")).toBeFalsy();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[0].find("input[type='text']").exists()).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-locator-start-from-btn")).exists()).toBe(
+      false,
+    );
   });
 });
 
@@ -260,6 +288,14 @@ describe("combining", () => {
 
     await select(wrapper, [TESTID, ROLE]);
     expect(wrapper.find(test("synthetics-journey-step-locator-combine")).exists()).toBe(true);
+  });
+
+  // "Combine" alone reads as "merge these into a fallback set", which is the
+  // opposite of what it builds — the result fails if any part stops matching.
+  it("says what combining produces, beside the button", async () => {
+    const wrapper = render();
+    await select(wrapper, [TESTID, ROLE]);
+    expect(wrapper.text()).toContain("Merge into one stricter locator");
   });
 
   async function openDialog(wrapper: VueWrapper, values: string[]) {

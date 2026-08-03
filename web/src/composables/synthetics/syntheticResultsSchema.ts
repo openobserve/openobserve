@@ -526,7 +526,15 @@ const EVIDENCE_GROUP_ORDER: EvidenceGroup["kind"][] = [
   "network",
 ];
 
-function groupKindOf(e: EvidenceEvent): EvidenceGroup["kind"] {
+/**
+ * Which group a row belongs to.
+ *
+ * Exported because the panel renders kind as a per-row badge rather than as a
+ * section boundary — the same conclusion step attribution reached earlier, now
+ * applied to kind. The fold still calls it to build the groups the view counts
+ * are folded from.
+ */
+export function evidenceGroupKind(e: EvidenceEvent): EvidenceGroup["kind"] {
   if (e.kind === "pageerror" || e.kind === "crash") return "pageErrors";
   if (e.kind === "requestfailed") return "requestsFailed";
   if (e.kind === "console" || e.kind === "dialog") return "console";
@@ -552,7 +560,7 @@ export function foldEvidenceBundle(
 
   const byKind = new Map<EvidenceGroup["kind"], EvidenceEvent[]>();
   for (const e of named) {
-    const k = groupKindOf(e);
+    const k = evidenceGroupKind(e);
     const list = byKind.get(k);
     if (list) list.push(e);
     else byKind.set(k, [e]);
@@ -577,6 +585,24 @@ export function foldEvidenceBundle(
     },
     truncated: recordTruncated || named.some((e) => e.kind === "truncation"),
   };
+}
+
+/**
+ * Epoch ms of the earliest event, or null when there are none.
+ *
+ * The zero point every elapsed reading counts from. `initiated_ts ?? ts`, the
+ * same instant the groups sort on: an event belongs on the timeline where the
+ * work BEGAN, not where the response landed. A loop rather than a spread into
+ * `Math.min` — a capped bundle can be tens of thousands of lines, which is
+ * argument-count territory.
+ */
+export function evidenceOriginTs(events: EvidenceEvent[]): number | null {
+  let min: number | null = null;
+  for (const e of events) {
+    const ts = e.initiatedTs ?? e.ts;
+    if (min === null || ts < min) min = ts;
+  }
+  return min;
 }
 
 /**

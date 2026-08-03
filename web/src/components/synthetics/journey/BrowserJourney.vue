@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
+import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
@@ -53,8 +53,10 @@ const props = defineProps<{
   stepResults?: Map<string, StepReplayResult>;
   /** Id of the step currently being executed (set by stepReplayStarted). */
   activeStepId?: string | null;
-  /** When true, show the incognito blocked warning in the toolbar area. */
-  blockedReason?: "incognito" | null;
+  /** Why the last replay never reached step 1, or null when it did. */
+  blockedReason?: BlockedReason | null;
+  /** The extension's own error text, rendered verbatim for `preflight`. */
+  blockedDetail?: string;
 }>();
 
 const emit = defineEmits<{
@@ -82,6 +84,17 @@ const emit = defineEmits<{
 const filterQuery = ref("");
 const expandedStepIds = ref<string[]>([]);
 const selectedStepIds = ref<string[]>([]);
+
+// ── "Where did my new step go?" ────────────────────────────────────────────
+// Root element, so the row lookup in revealStep stays inside THIS journey's
+// table rather than matching a same-indexed row in some other OTable.
+const journeyRootRef = ref<HTMLElement | null>(null);
+/** Step to highlight briefly after it is created; see revealStep. */
+const flashStepId = ref<string | null>(null);
+/** Long enough to catch the eye after a smooth scroll, short enough not to be
+ * mistaken for a persistent status. Matches SessionDetails' turn flash. */
+const FLASH_MS = 1400;
+let flashTimer: number | undefined;
 
 // Delete confirmation
 const deleteConfirm = ref<{ show: boolean; step: BrowserStep | null }>({
@@ -429,6 +442,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
   recorder.setOnExternalStop(null);
   recorder.cleanup();
+  window.clearTimeout(flashTimer);
 });
 
 // ── Step list (single flat list — one journey, one start URL) ───────────────
@@ -492,15 +506,16 @@ function cancelDelete() {
 function handleDuplicate(row: BrowserStep) {
   const idx = findIndex(row);
   if (idx < 0) return;
+  const copy = { ...props.modelValue[idx], id: getUUIDv7(true) };
   const next = [...props.modelValue];
-  next.splice(idx + 1, 0, { ...next[idx], id: getUUIDv7(true) });
+  next.splice(idx + 1, 0, copy);
   emit("update:modelValue", next);
+  revealStep(copy.id);
 }
 function handleInsertBelow(row: BrowserStep) {
   const idx = findIndex(row);
   if (idx < 0) return;
-  const next = [...props.modelValue];
-  next.splice(idx + 1, 0, {
+  const step: BrowserStep = {
     id: getUUIDv7(true),
     action: "click",
     name: "",
@@ -509,8 +524,11 @@ function handleInsertBelow(row: BrowserStep) {
     // Locator block from the start, and what lets isV2Journey stay true once the
     // author supplies a locator instead of flipping the journey to v1 (SE-18).
     locator: { candidates: [] },
-  });
+  };
+  const next = [...props.modelValue];
+  next.splice(idx + 1, 0, step);
   emit("update:modelValue", next);
+  revealStep(step.id);
 }
 function handleRowReorder(reordered: BrowserStep[]) {
   emit("update:modelValue", reordered);
@@ -522,16 +540,63 @@ function handleUpdateExpanded(ids: string[]) {
   expandedStepIds.value = ids;
 }
 function addStep() {
-  emit("update:modelValue", [
-    ...props.modelValue,
-    {
-      id: getUUIDv7(true),
-      action: "click",
-      name: "",
-      // See handleInsertBelow — a new step is version 2.
-      locator: { candidates: [] },
-    },
-  ]);
+  const step: BrowserStep = {
+    id: getUUIDv7(true),
+    action: "click",
+    name: "",
+    // See handleInsertBelow — a new step is version 2.
+    locator: { candidates: [] },
+  };
+  emit("update:modelValue", [...props.modelValue, step]);
+  revealStep(step.id);
+}
+
+/**
+ * Bring a just-created step to the author: expand it, scroll to it, flash it.
+ *
+ * "Add Step" appended a blank row to the end of the list and did nothing else.
+ * On a 20-step journey the row was below the fold, collapsed, and — if a filter
+ * was active — not rendered at all, so the button read as broken.
+ *
+ * Expanding is the same reflex this component already has for a step that needs
+ * attention (a validation error, a failed replay): the evidence, or here the
+ * empty fields, live in the expansion. A new step is by definition incomplete —
+ * it has no locator and will fail `validateJourneySteps` — so it always needs
+ * the author, and the expansion is what they came for.
+ *
+ * Deliberately NOT a success toast. The scroll + expansion is the confirmation,
+ * and it persists; a toast would be redundant on top of it, would stack twenty
+ * deep while building a journey, and would break this file's convention of
+ * reserving toasts for things the user CANNOT see (blocked saves, errors).
+ * The one toast here is for the filter reset, which is a change the author did
+ * not ask for and would otherwise be baffling.
+ */
+function revealStep(stepId: string) {
+  // A blank step matches no filter query, so it would land invisible. Clearing
+  // is better than silently appending into a hidden part of the list — but say
+  // so, because the author's filter disappearing on its own is confusing.
+  if (filterQuery.value.trim()) {
+    filterQuery.value = "";
+    toast({ variant: "info", message: t("synthetics.journey.filterClearedForNewStep") });
+  }
+  if (!expandedStepIds.value.includes(stepId)) {
+    expandedStepIds.value = [...expandedStepIds.value, stepId];
+  }
+  flashStepId.value = stepId;
+  nextTick(() => {
+    // The anchor lives inside the row's expansion, which the line above just
+    // opened — so it exists by now, and it is keyed by step id rather than by
+    // row position. Scoped to this journey's root so a second journey on the
+    // page cannot be scrolled instead.
+    // `block: "nearest"` leaves an already-visible row where it is.
+    journeyRootRef.value
+      ?.querySelector(`[data-test="synthetics-journey-step-anchor-${stepId}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+  window.clearTimeout(flashTimer);
+  flashTimer = window.setTimeout(() => {
+    if (flashStepId.value === stepId) flashStepId.value = null;
+  }, FLASH_MS);
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {
   capturedSteps.value.splice(index + 1, 0, { ...step, id: getUUIDv7(true) });
@@ -548,6 +613,10 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
   const hasFirstStepErr = firstStepError.value && first?.id === row.id;
   const hasSelectorErr = selectorErrors.value.has(row.id);
   if (hasFirstStepErr || hasSelectorErr) return "var(--color-status-error-text)";
+  // Transient "this is the one you just added". Lowest priority on purpose — an
+  // error on the same row is the more important thing to show, and the flash
+  // clears itself a moment later anyway.
+  if (flashStepId.value === row.id) return "var(--color-status-info-text)";
   return undefined;
 }
 
@@ -575,7 +644,7 @@ function openChromeExtensions() {
 </script>
 
 <template>
-  <div class="flex min-h-0 w-full flex-col py-4">
+  <div ref="journeyRootRef" class="flex min-h-0 w-full flex-col py-4">
     <!-- Toolbar — pl-4 mirrors the expand column (w-4) so the select-all checkbox
          aligns with the row checkboxes in the OTable below. -->
     <div class="mb-3 ml-5.5 flex items-center gap-4 px-3">
@@ -690,6 +759,7 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
+      class="mx-3"
     />
 
     <!-- Zero test attributes across a whole recording is a misconfiguration,
@@ -698,12 +768,13 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
+      class="mx-3"
     />
 
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="rounded-default bg-warning-50 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] px-3 py-3"
+      class="rounded-default bg-warning-50 mx-3 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] py-3"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
@@ -754,6 +825,61 @@ function openChromeExtensions() {
           @click="openChromeExtensions"
         >
           {{ t("synthetics.journey.openExtensions") }}
+        </OButton>
+      </div>
+    </div>
+
+    <!--
+      Every other pre-flight failure. The card above is for the ONE cause with a
+      known fix; this one reports what the extension actually said rather than
+      guessing, which is what sent authors to chrome://extensions for problems
+      that had nothing to do with Chrome.
+    -->
+    <div
+      v-else-if="blockedReason"
+      class="rounded-default bg-warning-50 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] px-3 py-3"
+      role="alert"
+      data-test="synthetics-journey-preflight-warning"
+    >
+      <div class="flex items-center gap-2">
+        <OIcon name="error_outline" size="sm" class="text-warning-600" aria-hidden="true" />
+        <span class="text-text-heading text-sm font-semibold">
+          {{
+            blockedReason === "in-progress"
+              ? t("synthetics.journey.replayInProgressTitle")
+              : t("synthetics.journey.preflightTitle")
+          }}
+        </span>
+      </div>
+      <p class="text-text-secondary m-0 text-xs">
+        {{
+          blockedReason === "in-progress"
+            ? t("synthetics.journey.replayInProgressDescription")
+            : t("synthetics.journey.preflightDescription")
+        }}
+      </p>
+      <pre
+        v-if="blockedDetail"
+        class="text-text-body bg-surface-subtle rounded-default m-0 overflow-x-auto px-2 py-1.5 font-mono text-xs whitespace-pre-wrap"
+        data-test="synthetics-journey-preflight-detail"
+        >{{ blockedDetail }}</pre
+      >
+      <div class="flex items-center gap-2">
+        <OButton
+          variant="primary"
+          size="sm"
+          data-test="synthetics-journey-preflight-retry-btn"
+          @click="emit('replay')"
+        >
+          {{ t("synthetics.journey.retry") }}
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="sm"
+          data-test="synthetics-journey-preflight-dismiss-btn"
+          @click="emit('clear-results')"
+        >
+          {{ t("synthetics.journey.dismiss") }}
         </OButton>
       </div>
     </div>
@@ -995,6 +1121,15 @@ function openChromeExtensions() {
       <!-- Inline editor (expanded content) — the same component the recording
            panel renders, so an author sees the same fields either way -->
       <template #expansion="{ row }">
+        <!-- Scroll target for revealStep. Deliberately markup THIS component
+             owns: OTable's own `o2-table-row-N` hook is index-based and
+             internal to that component, so scrolling to it would couple this
+             file to OTable's row numbering. -->
+        <span
+          class="sr-only"
+          aria-hidden="true"
+          :data-test="`synthetics-journey-step-anchor-${(row as BrowserStep).id}`"
+        />
         <!-- What the runner saw, when this step is the one that failed. Above the
              editor because it is the reason the author opened the row. -->
         <BrowserJourneyStepError

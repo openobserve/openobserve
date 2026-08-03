@@ -18,6 +18,9 @@ import { mount } from "@vue/test-utils";
 
 import i18n from "@/locales";
 import EvidencePanel from "./EvidencePanel.vue";
+import EvidenceEvents from "./EvidenceEvents.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import {
   foldEvidenceBundle,
   isEvidenceAnomaly,
@@ -45,8 +48,8 @@ const STEP_DEFS = new Map([
 
 describe("evidence bundle parsing", () => {
   it("parses NDJSON line by line, not as a JSON document", () => {
-    // JSON.parse on the whole payload throws — which is also why the download
-    // button must not be labelled "JSON".
+    // JSON.parse on the whole payload throws: the bundle is one object per line,
+    // not an array.
     expect(() => JSON.parse(NDJSON)).toThrow();
     expect(parseEvidenceNdjson(NDJSON)).toHaveLength(4);
   });
@@ -182,7 +185,6 @@ describe("EvidencePanel", () => {
     mount(EvidencePanel, {
       props: {
         evidenceKey: "synthetics/org/mon/RUN/EXEC/attempt-1-evidence.ndjson",
-        resolveUrl: (k: string) => `/artifact?key=${k}`,
         stepDefs: STEP_DEFS,
         events: named(),
         status: "ready",
@@ -195,13 +197,43 @@ describe("EvidencePanel", () => {
       global: { plugins: [i18n] },
     });
 
-  it("renders a section per kind", () => {
+  it("renders ONE table, with kind as a column rather than as a section", () => {
+    // Four tables bought four pagination bars, four column grids and four
+    // restarting timelines to say what the view toggle already says.
     const w = mountPanel();
     expect(w.find('[data-test="synthetics-evidence-panel"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
-    // No page errors in this bundle, so no empty section header for them.
-    expect(w.find('[data-test="synthetics-evidence-group-pageErrors"]').exists()).toBe(false);
+    expect(w.findAllComponents(EvidenceEvents)).toHaveLength(1);
+    expect(
+      new Set(w.findAll('[data-test="synthetics-evidence-events-type"]').map((b) => b.text())),
+    ).toEqual(new Set(["Network", "Console"]));
+  });
+
+  it("orders the whole list by time, so a page error does not jump the queue", () => {
+    // One table means one timeline; a timeline out of time order is not one.
+    const w = mountPanel({
+      events: parseEvidenceNdjson(
+        [
+          '{"ts":3,"kind":"response","status":200,"initiated_ts":3}',
+          '{"ts":1,"kind":"response","status":200,"initiated_ts":1}',
+          '{"ts":2,"kind":"pageerror","message":"boom"}',
+        ].join("\n"),
+      ),
+    });
+    expect(w.findAll('[data-test="synthetics-evidence-events-type"]').map((b) => b.text())).toEqual(
+      ["Network", "Page error", "Network"],
+    );
+  });
+
+  it("narrows the list to first-party without moving the view counts", async () => {
+    // A checkbox narrows what is shown, never what the attempt contained.
+    const w = mountPanel();
+    const before = w.find('[data-test="synthetics-evidence-filter-all"]').text();
+    w.findComponent(OCheckbox).vm.$emit("update:modelValue", true);
+    await w.vm.$nextTick();
+    // The one third-party row is gone from the list...
+    expect(w.findAll('[data-test="synthetics-evidence-events-row"]')).toHaveLength(4);
+    // ...but the tally still describes the attempt.
+    expect(w.find('[data-test="synthetics-evidence-filter-all"]').text()).toBe(before);
   });
 
   it("shows which step each row belongs to", () => {
@@ -211,20 +243,36 @@ describe("EvidencePanel", () => {
     );
   });
 
-  it("keeps zero-count chips visible rather than hiding them", () => {
+  it("offers exactly All, Network and Console", () => {
     const w = mountPanel();
-    // A hidden zero is indistinguishable from a chip that does not exist, and
-    // "no page errors" is information.
-    expect(w.find('[data-test="synthetics-evidence-chip-pageErrors"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-chip-pageErrors"]').text()).toContain("0");
+    expect(
+      w
+        .findAll('[data-test^="synthetics-evidence-filter-"]')
+        .map((t) => t.attributes("data-test")?.replace("synthetics-evidence-filter-", "")),
+    ).toEqual(["all", "network", "console"]);
   });
 
-  it("narrows both the rows and the chip counts to the filtered step", () => {
-    // A chip that counts the whole run while the list shows one step is a lie.
+  it("badges every option with its own count", () => {
+    // 4 events on s19 plus 1 on fa1: 4 network responses, 1 console error.
+    const w = mountPanel();
+    expect(w.find('[data-test="synthetics-evidence-filter-all"]').text()).toContain("5");
+    expect(w.find('[data-test="synthetics-evidence-filter-network"]').text()).toContain("4");
+    expect(w.find('[data-test="synthetics-evidence-filter-console"]').text()).toContain("1");
+  });
+
+  it("keeps a zero-count option visible rather than hiding it", () => {
+    // A hidden zero is indistinguishable from an option that does not exist, and
+    // "nothing on the console" is information.
+    const w = mountPanel({ events: named().filter((e) => e.kind !== "console") });
+    expect(w.find('[data-test="synthetics-evidence-filter-console"]').text()).toContain("0");
+  });
+
+  it("narrows both the rows and the badge counts to the filtered step", () => {
+    // A badge that counts the whole run while the list shows one step is a lie.
     const all = mountPanel();
     const scoped = mountPanel({ stepFilter: "s19", stepFilterName: "Navigate to /web/login" });
-    expect(scoped.find('[data-test="synthetics-evidence-chip-all"]').text()).not.toBe(
-      all.find('[data-test="synthetics-evidence-chip-all"]').text(),
+    expect(scoped.find('[data-test="synthetics-evidence-filter-all"]').text()).not.toBe(
+      all.find('[data-test="synthetics-evidence-filter-all"]').text(),
     );
     expect(scoped.find('[data-test="synthetics-evidence-step-filter"]').text()).toContain(
       "Navigate to /web/login",
@@ -271,63 +319,89 @@ describe("EvidencePanel", () => {
     const w = mountPanel({ truncated: true });
     expect(w.find('[data-test="synthetics-evidence-truncated"]').exists()).toBe(true);
   });
-
-  it("labels the download as NDJSON", () => {
-    const w = mountPanel();
-    expect(w.find('[data-test="synthetics-evidence-download"]').text()).toContain(".ndjson");
-  });
 });
 
-describe("EvidencePanel filter chips", () => {
+describe("EvidencePanel view filter", () => {
   const named = () =>
     parseEvidenceNdjson(NDJSON).map((e) => ({
       ...e,
       stepName: e.stepId ? STEP_DEFS.get(e.stepId)?.name || e.stepId : null,
     }));
 
-  const mountPanel = () =>
+  const mountPanel = (props: Record<string, unknown> = {}) =>
     mount(EvidencePanel, {
       props: {
         evidenceKey: "k",
-        resolveUrl: (k: string) => k,
         stepDefs: STEP_DEFS,
         events: named(),
         status: "ready",
         error: null,
+        ...props,
       },
       global: { plugins: [i18n] },
     });
 
-  it("narrows the list when a chip is chosen", async () => {
+  /** Which kinds the single table is currently showing. */
+  const kinds = (w: ReturnType<typeof mountPanel>) =>
+    new Set(w.findAll('[data-test="synthetics-evidence-events-type"]').map((b) => b.text()));
+
+  it("narrows the list to the chosen surface", async () => {
     const w = mountPanel();
-    await w.find('[data-test="synthetics-evidence-chip-consoleErrors"]').trigger("click");
+    await w.find('[data-test="synthetics-evidence-filter-console"]').trigger("click");
     await w.vm.$nextTick();
-    // The console group survives the filter; the network group does not.
-    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(false);
+    expect(kinds(w)).toEqual(new Set(["Console"]));
   });
 
-  it("keeps the selection when the active chip is clicked again", async () => {
-    // Swapping the bare buttons for OToggleGroup put a deselect-on-reclick
-    // behaviour within reach. It does not fire here, and it must not start to:
-    // an empty filter would blank the chip row and silently show everything,
-    // a state the old buttons could never reach.
+  it("keeps the selection when the active option is clicked again", async () => {
+    // OToggleGroup can deselect on re-click. It must not here: an empty
+    // selection would blank the row and silently show everything, a state the
+    // group has no way to render.
     const w = mountPanel();
-    const chip = '[data-test="synthetics-evidence-chip-consoleErrors"]';
-    await w.find(chip).trigger("click");
+    const consoleOption = '[data-test="synthetics-evidence-filter-console"]';
+    await w.find(consoleOption).trigger("click");
     await w.vm.$nextTick();
-    await w.find(chip).trigger("click");
+    await w.find(consoleOption).trigger("click");
     await w.vm.$nextTick();
-    expect(w.find('[data-test="synthetics-evidence-group-console"]').exists()).toBe(true);
-    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(false);
+    expect(kinds(w)).toEqual(new Set(["Console"]));
   });
 
-  it("returns to the whole run when All is chosen", async () => {
+  it("returns to the whole attempt when All is chosen", async () => {
     const w = mountPanel();
-    await w.find('[data-test="synthetics-evidence-chip-consoleErrors"]').trigger("click");
+    await w.find('[data-test="synthetics-evidence-filter-console"]').trigger("click");
     await w.vm.$nextTick();
-    await w.find('[data-test="synthetics-evidence-chip-all"]').trigger("click");
+    await w.find('[data-test="synthetics-evidence-filter-all"]').trigger("click");
     await w.vm.$nextTick();
-    expect(w.find('[data-test="synthetics-evidence-group-network"]').exists()).toBe(true);
+    expect(kinds(w)).toEqual(new Set(["Network", "Console"]));
+  });
+
+  it("keeps failed requests under Network and page errors under Console", async () => {
+    // The two that matter most used to sit in filters of their own, away from
+    // the surface they belong to.
+    const w = mountPanel({
+      events: parseEvidenceNdjson(
+        [
+          '{"ts":1,"kind":"pageerror","message":"boom"}',
+          '{"ts":2,"kind":"requestfailed","url":"https://o2.example.dev/api/x"}',
+        ].join("\n"),
+      ),
+    });
+    await w.find('[data-test="synthetics-evidence-filter-network"]').trigger("click");
+    await w.vm.$nextTick();
+    expect(kinds(w)).toEqual(new Set(["Failed req."]));
+
+    await w.find('[data-test="synthetics-evidence-filter-console"]').trigger("click");
+    await w.vm.$nextTick();
+    expect(kinds(w)).toEqual(new Set(["Page error"]));
+  });
+
+  it("says the view is empty rather than rendering nothing", async () => {
+    const w = mountPanel({
+      events: parseEvidenceNdjson('{"ts":1,"kind":"response","status":200}'),
+    });
+    await w.find('[data-test="synthetics-evidence-filter-console"]').trigger("click");
+    await w.vm.$nextTick();
+    // The table's own empty state now carries this — one table, one empty case.
+    expect(w.findComponent(OEmptyState).exists()).toBe(true);
+    expect(kinds(w).size).toBe(0);
   });
 });

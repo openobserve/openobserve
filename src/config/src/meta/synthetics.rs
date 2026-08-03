@@ -1088,6 +1088,22 @@ fn worst_case_run_ms(
             + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000)
 }
 
+/// Render a millisecond duration the way the person reading the error thinks
+/// about it. `1210000` is arithmetic; `20m10s` is a schedule.
+///
+/// These strings go straight into a save-time validation message that the UI
+/// shows verbatim, so the unit has to be legible without mental division.
+fn human_ms(ms: i64) -> String {
+    let total_secs = ms / 1_000;
+    let mins = total_secs / 60;
+    let secs = total_secs % 60;
+    match (mins, secs) {
+        (0, s) => format!("{s}s"),
+        (m, 0) => format!("{m}m"),
+        (m, s) => format!("{m}m{s}s"),
+    }
+}
+
 /// Bounds a protocol check's `timeout_ms` and its full retry sequence.
 ///
 /// The browser path has had this since `journey_budget_ms` was introduced; the
@@ -1120,14 +1136,26 @@ fn validate_net_retry_budget(
 
     let budget_secs = limits().max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
+    // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
+    // remedy first, durations rather than raw milliseconds.
     if worst_case_ms > budget_secs * 1_000 {
+        let attempts = retries + 1;
+        let retries_fix = if retries > 0 {
+            format!("lower retries below {retries}, ")
+        } else {
+            String::new()
+        };
         return Err(format!(
-            "config: a full retry sequence must fit inside the {budget_secs}s check budget, but \
-             (retries={retries} + 1) x timeout_ms={timeout_ms} + retries x \
-             wait_before_retry_secs={wait_before_retry_secs} needs {worst_case_ms}ms. Lower \
-             timeout_ms, retries, or wait_before_retry_secs — a check that outlives the budget is \
-             killed mid-run by the probe's function timeout and reports a failure the target \
-             never had."
+            "config: this check needs up to {} per run, which is over the {} check budget. To fix \
+             it, {retries_fix}or lower config.timeout_ms (currently {}). Detail: {} attempt(s) x \
+             {} each, plus {}s between retries. A check that outlives the budget is killed mid-run \
+             by the probe's function timeout and reports a failure the target never had.",
+            human_ms(worst_case_ms),
+            human_ms(budget_secs * 1_000),
+            human_ms(i64::from(timeout_ms)),
+            attempts,
+            human_ms(i64::from(timeout_ms)),
+            wait_before_retry_secs,
         ));
     }
     Ok(())
@@ -1951,14 +1979,32 @@ fn validate_browser_config(
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
     let budget_secs = limits().max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
+    // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
+    // remedy first, and journey_budget_ms named last because the UI does not
+    // render it.
     if worst_case_ms > budget_secs * 1_000 {
+        let attempts = retries + 1;
+        let combos_fix = if devices > 1 {
+            format!("drop a combo from config.browser_devices (currently {devices}), ")
+        } else {
+            String::new()
+        };
+        let retries_fix = if retries > 0 {
+            format!("lower retries below {retries}, ")
+        } else {
+            String::new()
+        };
         return Err(format!(
-            "config: a full retry sequence across all browser/device combos must fit inside the \
-             {budget_secs}s check budget, but browser_devices={devices} x (retries={retries} x \
-             journey_budget_ms={budget_ms} + wait_before_retry_secs={wait_before_retry_secs}) needs \
-             {worst_case_ms}ms. Lower journey_budget_ms, retries, or the number of browser/device \
-             combos — a run that outlives the budget is killed mid-journey by the probe's function \
-             timeout, and one that outlives the lease is requeued and executed a second time."
+            "config: this check needs up to {} per run, which is over the {} check budget. To fix \
+             it, {combos_fix}{retries_fix}or shorten the run with config.journey_budget_ms \
+             (currently {}). Detail: {devices} browser/device combo(s) x {attempts} attempt(s) x \
+             {} each, plus {}s between retries. A run that outlives the budget is killed \
+             mid-journey by the probe's function timeout.",
+            human_ms(worst_case_ms),
+            human_ms(budget_secs * 1_000),
+            human_ms(i64::from(budget_ms)),
+            human_ms(i64::from(budget_ms)),
+            wait_before_retry_secs,
         ));
     }
 
@@ -3459,7 +3505,77 @@ mod tests {
         assert!(err.contains("browser_devices"), "{err}");
         assert!(err.contains("journey_budget_ms"), "{err}");
         assert!(err.contains("retries"), "{err}");
-        assert!(err.contains("lease"), "{err}");
+        // "budget", not "lease": validation measures against the check budget so
+        // a config the probe's function timeout would kill is rejected on save.
+        assert!(err.contains("budget"), "{err}");
+    }
+
+    #[test]
+    fn human_ms_renders_durations_not_milliseconds() {
+        assert_eq!(human_ms(45_000), "45s");
+        assert_eq!(human_ms(300_000), "5m");
+        assert_eq!(human_ms(1_210_000), "20m10s");
+        assert_eq!(human_ms(900_000), "15m");
+    }
+
+    /// The over-lease message is what a user sees INSTEAD of a saved check, so
+    /// it has to lead with something they can act on.
+    ///
+    /// It used to open with "Lower journey_budget_ms" — a field the web UI
+    /// neither renders nor sends — and put the arithmetic ahead of the
+    /// instruction, in raw milliseconds.
+    #[test]
+    fn over_lease_message_leads_with_an_actionable_remedy() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        // 2, not 3: browser retries are capped at MAX_BROWSER_RETRIES, so 3 is
+        // rejected by that rule first and never reaches the budget message.
+        s.retries = 2;
+        s.wait_before_retry_secs = 5;
+        s.config["journey_budget_ms"] = serde_json::json!(300_000);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+
+        // 3 attempts x 300s + 2 gaps x 5s = 910s.
+        // Durations, not millisecond counts, for the two headline numbers.
+        assert!(err.contains("15m10s"), "worst case as a duration: {err}");
+        assert!(
+            err.contains("14m check budget"),
+            "limit as a duration: {err}"
+        );
+        // The remedy precedes the arithmetic.
+        let fix_at = err.find("To fix it").expect("names a fix");
+        let detail_at = err.find("Detail:").expect("keeps the arithmetic");
+        assert!(fix_at < detail_at, "remedy must come first: {err}");
+        // `retries` is offered before the field the UI cannot reach.
+        let retries_at = err.find("lower retries").expect("offers retries");
+        let budget_at = err
+            .find("journey_budget_ms")
+            .expect("still names the budget");
+        assert!(retries_at < budget_at, "reachable lever first: {err}");
+    }
+
+    /// Two browser/device combos with the web form's own default `retries: 1`
+    /// and the server default budget land at 2 x (2 x 300s + 5s) = 1210s, past
+    /// the 840s check budget — so "Chromium desktop + Chromium mobile" cannot be
+    /// saved without the author first discovering they must set retries to 0.
+    ///
+    /// Asserted here so that changing any of the three defaults has to confront
+    /// which configurations are savable, rather than shifting it silently.
+    ///
+    /// Measures against the BUDGET, not the lease: validation moved to the
+    /// budget so a check the probe's function timeout will kill is rejected at
+    /// save time rather than failing in production.
+    #[test]
+    fn two_combos_at_default_retries_exceed_the_budget() {
+        let lease_ms = DEFAULT_MAX_CHECK_BUDGET_SECS * 1_000;
+        assert_eq!(
+            worst_case_run_ms(DEFAULT_JOURNEY_BUDGET_MS, 2, 1, 5),
+            1_210_000
+        );
+        assert!(worst_case_run_ms(DEFAULT_JOURNEY_BUDGET_MS, 2, 1, 5) > lease_ms);
+        // Dropping retries to 0 is the lever the form actually offers, and it
+        // brings the same two combos back inside the lease.
+        assert!(worst_case_run_ms(DEFAULT_JOURNEY_BUDGET_MS, 2, 0, 5) <= lease_ms);
     }
 
     #[test]

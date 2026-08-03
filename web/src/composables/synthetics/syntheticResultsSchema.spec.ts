@@ -38,6 +38,7 @@ import {
   mapHistogram,
   deriveKpiFromHistogram,
   mapRun,
+  evidenceOriginTs,
   evidenceSeverity,
   indexEvidenceByStep,
   stepOwnDetail,
@@ -937,6 +938,23 @@ const evidenceEv = (over: Partial<EvidenceEvent>): EvidenceEvent => ({
   durationMs: null,
   firstParty: true,
   ...over,
+});
+
+describe("evidence origin", () => {
+  it("takes the earliest instant, whatever order the events arrive in", () => {
+    // Buckets are ranked worst-first, so the earliest event is rarely index 0.
+    expect(
+      evidenceOriginTs([evidenceEv({ ts: 900 }), evidenceEv({ ts: 100 }), evidenceEv({ ts: 500 })]),
+    ).toBe(100);
+  });
+
+  it("places an event where the work began, not where it landed", () => {
+    expect(evidenceOriginTs([evidenceEv({ ts: 5_000, initiatedTs: 1_000 })])).toBe(1_000);
+  });
+
+  it("has no origin for an empty bundle, rather than pretending to zero", () => {
+    expect(evidenceOriginTs([])).toBeNull();
+  });
 });
 
 describe("evidence severity ranking", () => {

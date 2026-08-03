@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <MonitorStatusTimeline
                     :segments="timelineSegments"
                     :is-browser="isBrowser"
+                    :truncated="timelineTruncated"
                     :fail-count="timelineFailCount"
                     :pass-count="timelinePassCount"
                     :mixed-count="timelineMixedCount"
@@ -1103,6 +1104,12 @@ import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import {
+  rollUpStatus,
+  tallyStatuses,
+  type AggregateStatus,
+  type StatusTally,
+} from "@/utils/synthetics/rollUpStatus";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -1313,33 +1320,48 @@ async function handleEmptyStateAction(id: string) {
   }
 
   if (id === "trigger-run") {
-    if (runTriggerLoading.value) return;
-    runTriggerLoading.value = true;
-    const dismiss = toast({
-      variant: "loading",
-      message: t("synthetics.toast.triggeringSingle", { name: props.monitorName }),
-      timeout: 0,
+    await triggerRun();
+  }
+}
+
+/**
+ * Run this monitor once, now.
+ *
+ * Lives here — not in the page shell — because this is where the org, folder
+ * and monitor id already are, and where `refresh` is emitted. The page header
+ * calls it through `defineExpose`; duplicating the service call up there is
+ * what would let the two drift.
+ */
+async function triggerRun() {
+  if (runTriggerLoading.value) return;
+  runTriggerLoading.value = true;
+  const dismiss = toast({
+    variant: "loading",
+    message: t("synthetics.toast.triggeringSingle", { name: props.monitorName }),
+    timeout: 0,
+  });
+  try {
+    await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderName.value);
+    dismiss();
+    // "Queued", not "Done": the API enqueues a job, and a browser run takes tens
+    // of seconds to land in the results stream. The refresh below fires
+    // immediately and will NOT contain this run, so a success message claiming
+    // otherwise sends the user hunting for a row that cannot be there yet.
+    toast({
+      variant: "success",
+      message: t("synthetics.toast.triggerSuccessSingle", { name: props.monitorName }),
     });
-    try {
-      await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderName.value);
-      dismiss();
-      toast({
-        variant: "success",
-        message: t("synthetics.toast.triggerSuccessSingle", { name: props.monitorName }),
-      });
-      // Emit refresh so parent reloads data
-      emit("refresh");
-    } catch (err: any) {
-      dismiss();
-      toast({
-        variant: "error",
-        message:
-          err?.response?.data?.message ||
-          t("synthetics.toast.triggerFailedSingle", { name: props.monitorName }),
-      });
-    } finally {
-      runTriggerLoading.value = false;
-    }
+    emit("refresh");
+  } catch (err: any) {
+    dismiss();
+    toast({
+      variant: "error",
+      message:
+        err?.response?.data?.message ||
+        t("synthetics.toast.triggerFailedSingle", { name: props.monitorName }),
+    });
+  } finally {
+    runTriggerLoading.value = false;
   }
 }
 
@@ -1520,23 +1542,30 @@ const kpiCards = computed<KpiCard[]>(() => {
             : "0.0%",
         valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
-      {
-        // D4 — the denominator is EXECUTIONS, the grain `totalRuns` and the
-        // runs list both use. Dividing by scheduled runs instead would be
-        // smaller by the location × browser × device fan-out and inflate this
-        // several-fold.
-        key: "flaky-rate",
-        label: t("synthetics.runs.flakyRate"),
-        // "—" at retries = 0, never "0.0%". A check that cannot retry cannot be
-        // seen to recover, so a zero here would read as "nothing is flaky" when
-        // the truth is "flakiness was never measurable".
-        value: !retriesEnabled.value
-          ? "—"
-          : k.totalRuns > 0
-            ? ((k.flakyExecutions / k.totalRuns) * 100).toFixed(1) + "%"
-            : "0.0%",
-        valueClass: k.flakyExecutions > 0 ? "text-status-warning-text!" : undefined,
-      },
+      // Flaky rate is only measurable when retries are on — a check that cannot
+      // retry cannot be seen to recover. Rather than burn the slot on a
+      // permanent "—", hand it to Warning runs, which is always meaningful and
+      // was otherwise absent from the live card set entirely: with retries off,
+      // a monitor could badge every row "Warning" in the table below while no
+      // KPI card mentioned warnings at all.
+      retriesEnabled.value
+        ? {
+            // D4 — the denominator is EXECUTIONS, the grain `totalRuns` and the
+            // runs list both use. Dividing by scheduled runs instead would be
+            // smaller by the location × browser × device fan-out and inflate
+            // this several-fold.
+            key: "flaky-rate",
+            label: t("synthetics.runs.flakyRate"),
+            value:
+              k.totalRuns > 0 ? ((k.flakyExecutions / k.totalRuns) * 100).toFixed(1) + "%" : "0.0%",
+            valueClass: k.flakyExecutions > 0 ? "text-status-warning-text!" : undefined,
+          }
+        : {
+            key: "warning-runs",
+            label: t("synthetics.runs.warningRuns"),
+            value: String(k.warningRuns),
+            valueClass: k.warningRuns > 0 ? "text-status-warning-text!" : undefined,
+          },
       {
         key: "failed-runs",
         label: t("synthetics.results.failedRuns"),
@@ -1603,12 +1632,15 @@ interface TimelineExecution {
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
+  status: AggregateStatus;
   color: string;
   title: string;
   /** Epoch ms of the first execution in this logical run. */
   timestampMs: number;
   executions: TimelineExecution[];
+  /** Bucket counts for the tooltip header. Computed once, here, so the segment
+   * title and the tooltip cannot disagree about the same run. */
+  tally: StatusTally;
 }
 
 // ── Status timeline ──────────────────────────────────────────────────────
@@ -1632,16 +1664,9 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
 
   return groupOrder.map((runId) => {
     const executions = groupMap.get(runId)!;
-    const allPass = executions.every((e) => e.status === "pass" || e.status === "warning");
-    const allFail = executions.every((e) => e.status === "fail" || e.status === "error");
-    const allWarning = executions.every((e) => e.status === "warning");
-    const status: TimelineSegment["status"] = allPass
-      ? allWarning
-        ? "all-warning"
-        : "all-pass"
-      : allFail
-        ? "all-fail"
-        : "mixed";
+    const statuses = executions.map((e) => e.status);
+    const status = rollUpStatus(statuses);
+    const tally = tallyStatuses(statuses);
 
     const color =
       status === "all-pass"
@@ -1652,21 +1677,20 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
             ? "bg-badge-error-solid-bg/80"
             : "bg-badge-orange-solid-bg/80";
 
-    const passCount = executions.filter(
-      (e) => e.status === "pass" || e.status === "warning",
-    ).length;
-    const failCount = executions.length - passCount;
     const title =
       status === "all-pass"
-        ? t("synthetics.runs.timelineAllPassed", { count: executions.length })
+        ? t("synthetics.runs.timelineAllPassed", { count: tally.total })
         : status === "all-warning"
-          ? t("synthetics.runs.timelineAllWarning", { count: executions.length })
+          ? t("synthetics.runs.timelineAllWarning", { count: tally.total })
           : status === "all-fail"
-            ? t("synthetics.runs.timelineAllFailed", { count: executions.length })
+            ? t("synthetics.runs.timelineAllFailed", { count: tally.total })
             : t("synthetics.runs.timelineMixed", {
-                passed: passCount,
-                failed: failCount,
-                total: executions.length,
+                // `passed` here is "not failed", matching the mixed-run wording
+                // ("N of M passed"). Warnings are healthy runs with a caveat, and
+                // the tooltip breaks them out separately.
+                passed: tally.passed + tally.warning,
+                failed: tally.failed,
+                total: tally.total,
               });
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
@@ -1692,9 +1716,18 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
       title,
       timestampMs: executions[0]?.scheduledTs || 0,
       executions: execDetails,
+      tally,
     };
   });
 });
+
+/**
+ * The runs list hit its query cap, so the timeline shows only the most recent
+ * slice of the window while the KPI cards above it aggregate the whole thing.
+ * Surfaced in the timeline footer — silent truncation reads as complete
+ * coverage, and then the two disagree with no explanation.
+ */
+const timelineTruncated = computed(() => !!synthetics.runsTruncated?.value);
 
 const timelineFailCount = computed(() =>
   String(timelineSegments.value.filter((s) => s.status === "all-fail").length),
@@ -2536,5 +2569,5 @@ async function refresh(startTime?: number, endTime?: number) {
   ]);
 }
 
-defineExpose({ refresh });
+defineExpose({ refresh, triggerRun, runTriggerLoading });
 </script>
