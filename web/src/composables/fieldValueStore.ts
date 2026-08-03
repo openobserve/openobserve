@@ -316,13 +316,19 @@ export const requestFieldValues = async (
         .map((entry: any) => String(entry?.zo_sql_key ?? ""))
         .filter((value: string) => value.length > 0);
 
-      if (values.length)
+      if (values.length) {
+        // The read cache is filled HERE, synchronously, so the next keystroke
+        // is local. captureFromValuesApi persists to IndexedDB on
+        // requestIdleCallback — up to two seconds away, and observed in the app
+        // as a list still showing field names long after the values had
+        // arrived. Persistence can wait; the next lookup cannot.
+        setCacheEntry(key, values);
         captureFromValuesApi(
           ctx,
           fieldName,
           values.map((value) => ({ key: value })),
         );
-      else suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
+      } else suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
 
       return values;
     } catch {

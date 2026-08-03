@@ -23,7 +23,8 @@ import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
 import useStreams from "../useStreams";
 import useValuesWebSocket from "./useValuesWebSocket";
 import queryService from "@/services/search";
-import metricsService from "@/services/metrics";
+import streamService from "@/services/stream";
+import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import logsUtils from "../useLogs/logsUtils";
 import {
   buildSQLChartQuery,
@@ -1406,72 +1407,74 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     processExtractedFields(extractedFields, autoSelectChartType);
   };
 
-  // Fetch available labels and their values for PromQL builder
+  // Columns a metrics stream carries that are not labels. `value` is the
+  // sample, `_timestamp` the clock, `__hash__` internal, and `__name__` the
+  // metric itself.
+  const NON_LABEL_COLUMNS = new Set(["value", "_timestamp", "__hash__", "__name__"]);
+
+  /**
+   * The labels a metric has, for the builder's label picker.
+   *
+   * From the stream SCHEMA, not from every series. A metrics stream is named
+   * for its metric, so its columns ARE its labels — and the schema is metadata:
+   * measured at 1699 bytes and 4ms against 11778 bytes and 49ms for the series
+   * call, which also grows with series count where this does not.
+   */
   const fetchPromQLLabels = async (metric: string) => {
     if (!metric || !dashboardPanelData.meta.promql) return;
 
-    // Update shared meta
     dashboardPanelData.meta.promql.loadingLabels = true;
-
     try {
-      // Use the panel's selected time range; fall back to the last 24h.
-      const timestamps = dashboardPanelData.meta.dateTime;
-      const hasRange =
-        timestamps?.start_time &&
-        timestamps?.end_time &&
-        timestamps.start_time != "Invalid Date" &&
-        timestamps.end_time != "Invalid Date";
-      const endTime = hasRange
-        ? new Date(timestamps.end_time.toISOString()).getTime() * 1000 // microseconds
-        : Math.floor(Date.now() * 1000); // microseconds
-      const startTime = hasRange
-        ? new Date(timestamps.start_time.toISOString()).getTime() * 1000 // microseconds
-        : endTime - 24 * 60 * 60 * 1000000; // 24 hours ago in microseconds
-
-      const response = await metricsService.get_promql_series({
-        org_identifier: store.state.selectedOrganization.identifier,
-        labels: `{__name__="${metric}"}`,
-        start_time: startTime,
-        end_time: endTime,
-      });
-
-      if (response.data && response.data.data && response.data.data.length > 0) {
-        // Extract all unique label keys and their values from the series
-        const labelSet = new Set<string>();
-        const valuesMap = new Map<string, Set<string>>();
-
-        response.data.data.forEach((series: any) => {
-          Object.keys(series).forEach((key) => {
-            if (key !== "__name__") {
-              labelSet.add(key);
-
-              // Collect all values for this label key
-              if (!valuesMap.has(key)) {
-                valuesMap.set(key, new Set<string>());
-              }
-              valuesMap.get(key)!.add(series[key]);
-            }
-          });
-        });
-
-        // Save to shared meta
-        dashboardPanelData.meta.promql.availableLabels = Array.from(labelSet).sort();
-
-        // Convert Sets to sorted arrays and store in the map
-        const newLabelValuesMap = new Map<string, string[]>();
-        valuesMap.forEach((valueSet, labelKey) => {
-          newLabelValuesMap.set(labelKey, Array.from(valueSet).sort());
-        });
-        dashboardPanelData.meta.promql.labelValuesMap = newLabelValuesMap;
-      } else {
-        dashboardPanelData.meta.promql.availableLabels = [];
-        dashboardPanelData.meta.promql.labelValuesMap = new Map();
-      }
+      const response: any = await streamService.schema(
+        store.state.selectedOrganization.identifier,
+        metric,
+        "metrics",
+      );
+      const columns = response?.data?.schema ?? response?.data?.uds_schema ?? [];
+      dashboardPanelData.meta.promql.availableLabels = columns
+        .map((column: any) => column?.name)
+        .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name))
+        .sort();
     } catch (error) {
       dashboardPanelData.meta.promql.availableLabels = [];
-      dashboardPanelData.meta.promql.labelValuesMap = new Map();
     } finally {
       dashboardPanelData.meta.promql.loadingLabels = false;
+    }
+  };
+
+  /**
+   * The values of ONE label, fetched when a user actually filters on it.
+   *
+   * Deliberately not a bulk request. Asking `_values` for all eighteen labels
+   * of a metric at once measured 330ms — seven times the series call it
+   * replaces — because it runs one distinct-value aggregation per field. Asking
+   * for the one label in front of the user is ~20ms, and most labels are never
+   * asked for at all.
+   *
+   * Reads the same cache the query editor's completion fills, under the same
+   * key, so a label completed there is already warm here and the reverse.
+   */
+  const fetchPromQLLabelValues = async (metric: string, label: string) => {
+    if (!metric || !label || !dashboardPanelData.meta.promql) return;
+    if (dashboardPanelData.meta.promql.labelValuesMap?.has(label)) return;
+
+    const ctx = {
+      org: store.state.selectedOrganization.identifier,
+      streamType: "metrics",
+      streamName: metric,
+    };
+
+    try {
+      let values = await getFieldValuesForSuggestion(ctx, label);
+      if (!values.length) values = await requestFieldValues(ctx, label);
+
+      // Replaced rather than mutated: the map is read through a computed, and
+      // Map mutations do not trigger one.
+      const next = new Map(dashboardPanelData.meta.promql.labelValuesMap ?? []);
+      next.set(label, values);
+      dashboardPanelData.meta.promql.labelValuesMap = next;
+    } catch (error) {
+      // A failed lookup leaves the labels that already resolved alone.
     }
   };
 
@@ -1537,6 +1540,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     getDefaultDashboardPanelData,
     getStreamNameFromStreamAlias,
     fetchPromQLLabels,
+    fetchPromQLLabelValues,
   };
 };
 export default useDashboardPanelData;

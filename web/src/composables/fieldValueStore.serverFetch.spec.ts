@@ -150,6 +150,26 @@ describe("requestFieldValues — asking the server", () => {
   });
 });
 
+describe("requestFieldValues — how soon the values are usable", () => {
+  it("makes them readable before the background write lands", async () => {
+    // The IndexedDB write is scheduled on requestIdleCallback, so persistence
+    // arrives whenever the browser is idle. The NEXT KEYSTROKE cannot wait for
+    // that: observed in the app, the list still showed field names two and a
+    // half seconds after the fetch had returned. The read cache is filled
+    // directly so the following lookup is local and immediate, and the write
+    // still happens for the next session.
+    const store = await freshStore();
+    await expect(store.getFieldValuesForSuggestion(ctx, "environment")).resolves.toEqual([]);
+
+    await store.requestFieldValues(ctx, "environment");
+    // Deliberately NOT settling: this is the state one keystroke later.
+    await expect(store.getFieldValuesForSuggestion(ctx, "environment")).resolves.toEqual([
+      "development",
+      "staging",
+    ]);
+  });
+});
+
 describe("requestFieldValues — not asking twice", () => {
   it("makes ONE request when several editors ask at once", async () => {
     // Every keystroke re-invokes the provider. Without this, a slow endpoint
