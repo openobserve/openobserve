@@ -181,6 +181,7 @@
   },
   {
     "testfolder": "Dashboards-Charts",
+    "_comment": "Dashboard panel tests are grouped by feature so each shard stays under the ephemeral-runner endurance window. A single combined 16-spec shard ran ~40 min and got reclaimed mid-run ('runner lost communication'). Add new specs to the shard of the feature they cover.",
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
@@ -208,6 +209,7 @@
   },
   {
     "testfolder": "Dashboards-Tables",
+    "_comment": "Owns the pagination and pivot-table specs (previously their own single-spec shards) \u2014 keep them here.",
     "actual_folder": "Dashboards",
     "browser": "chrome",
     "run_files": [
@@ -312,6 +314,7 @@
   },
   {
     "testfolder": "RUM",
+    "_comment": "The RUM ingest/token/sourcemaps routes are part of the standard (OSS) router (src/api/http/src/handler/http/router/mod.rs), so these specs run against the OSS binary. Ingestion-auth negative cases live in the API suite (tests/api-testing/tests/rum).",
     "actual_folder": "RUM",
     "browser": "chrome",
     "run_files": [
@@ -326,6 +329,7 @@
   },
   {
     "testfolder": "RUM-Token",
+    "_comment": "rum-token.spec.js RESETS the org RUM token; running it beside the dataflow specs (workers run files in parallel) would 401 their in-flight SDK beacons. Own shard = own isolated instance \u2014 do NOT merge back into RUM.",
     "actual_folder": "RUM",
     "browser": "chrome",
     "run_files": [
