@@ -10533,6 +10533,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hashbrown 0.16.1",
+ "hashlink 0.11.0",
  "infra",
  "itertools 0.14.0",
  "log",

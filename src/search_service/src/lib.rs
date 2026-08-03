@@ -45,13 +45,9 @@ use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::report_request_usage_stats;
 #[cfg(feature = "enterprise")]
 use {
-    crate::partition::aggregate::prepare_streaming_aggregate,
     config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM},
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
-    o2_enterprise::enterprise::{
-        common::config::get_config as get_o2_config,
-        search::{TaskStatus, datafusion::distributed_plan::streaming_aggs_exec},
-    },
+    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
     std::collections::HashSet,
     tracing::info_span,
 };
@@ -59,13 +55,13 @@ use {
 use crate::{
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     partition::{
-        cpu_cores::estimated_secs, generate_partitions, settings::calculate_partition_settings,
-        sql_context::PartitionSqlContext, stream_files::collect_stream_files,
+        aggregate::prepare_streaming_aggregate, cpu_cores::estimated_secs, generate_partitions,
+        settings::calculate_partition_settings, sql_context::PartitionSqlContext,
+        stream_files::collect_stream_files,
     },
 };
 
 pub mod cache;
-#[cfg(feature = "enterprise")]
 pub mod cardinality;
 pub mod cluster;
 pub mod file_list;
@@ -83,7 +79,11 @@ pub mod streaming;
 pub mod super_cluster;
 pub mod work_group;
 
-use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
+use ::search::{
+    bloom_pruner,
+    datafusion::{self, distributed_plan::streaming_aggs_exec},
+    index, inspector, sql, tantivy, utils,
+};
 use searcher::Searcher;
 
 /// The result of search in cluster
@@ -315,7 +315,6 @@ pub async fn search(
             Ok(res)
         }
         Err(e) => {
-            #[cfg(feature = "enterprise")]
             if let Some(streaming_id) = in_req.query.streaming_id.as_ref() {
                 streaming_aggs_exec::remove_cache(streaming_id)
             }
@@ -661,18 +660,15 @@ pub async fn search_partition(
         }
     }
 
-    #[cfg(feature = "enterprise")]
-    {
-        let (streaming_aggs, streaming_id, cache_strategy) =
-            prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
-        resp.streaming_output = streaming_aggs;
-        resp.streaming_aggs = streaming_aggs;
-        resp.streaming_id = streaming_id;
+    let (streaming_aggs, streaming_id, cache_strategy) =
+        prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
+    resp.streaming_output = streaming_aggs;
+    resp.streaming_aggs = streaming_aggs;
+    resp.streaming_id = streaming_id;
 
-        if let Some(strategy) = cache_strategy {
-            resp.partitions = strategy.to_time_partitions(ctx.sql_order_by);
-            return Ok(resp);
-        }
+    if let Some(strategy) = cache_strategy {
+        resp.partitions = strategy.to_time_partitions(ctx.sql_order_by);
+        return Ok(resp);
     }
 
     let partition_settings = calculate_partition_settings(

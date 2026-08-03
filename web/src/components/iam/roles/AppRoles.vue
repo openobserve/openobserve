@@ -90,6 +90,8 @@ import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
 import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
+import usersService from "@/services/users";
+import config from "@/aws-exports";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -178,14 +180,58 @@ const editRole = (role: any) => {
 };
 
 const loading = ref(false);
+
+// `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
+// its name. The one fact worth surfacing — is anyone actually in this role — comes
+// from the batched user→roles map (a single request for the whole org), not from N
+// per-role lookups. Enterprise-only endpoint: on the community edition it 403s and
+// we simply render no member counts.
+const roleUserCounts = ref<Record<string, number> | null>(null);
+
+const loadRoleUserCounts = async () => {
+  if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+  try {
+    const res = await usersService.getAllUserRoles(store.state.selectedOrganization.identifier);
+    const counts: Record<string, number> = {};
+    // Response is a map of user email -> role list.
+    Object.values(res.data ?? {}).forEach((roles: any) => {
+      (Array.isArray(roles) ? roles : []).forEach((role: any) => {
+        const key = String(role ?? "").trim();
+        if (!key) return;
+        counts[key] = (counts[key] ?? 0) + 1;
+      });
+    });
+    roleUserCounts.value = counts;
+  } catch {
+    // Silent: member counts are context. The list stays fully usable without them.
+    roleUserCounts.value = null;
+  }
+};
+
+// Patch the counts onto rows already on screen. null (not 0) while the map is
+// unavailable, so "unknown" and "nobody holds this role" stay distinguishable.
+const applyRoleUserCounts = () => {
+  const counts = roleUserCounts.value;
+  rolesState.roles = rolesState.roles.map((role: any) => ({
+    ...role,
+    user_count: counts ? (counts[role.role_name] ?? 0) : null,
+  }));
+  updateTable();
+};
+
 const setupRoles = async () => {
   loading.value = true;
   await getRoles(store.state.selectedOrganization.identifier)
     .then((res) => {
       rolesState.roles = res.data.map((role: string) => ({
         role_name: role,
+        user_count: null,
       }));
       updateTable();
+      // Fire-and-forget: the roles list renders immediately and the member counts
+      // (a second request) fill in when they land. Awaiting here would hold the
+      // whole table hostage to a secondary, enterprise-only endpoint.
+      void loadRoleUserCounts().then(applyRoleUserCounts);
     })
     .catch((err) => {
       console.log(err);
