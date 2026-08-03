@@ -305,6 +305,20 @@ export class LogsPage {
         this.dashboardPanelTable = '[data-test="dashboard-panel-table"]';
         // Composite: any of the three indicates the build/visualize tab finished initial render.
         this.buildInitIndicator = `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`;
+        // Composite: a *painted* chart — either an echarts canvas or a rendered table panel.
+        // Scoped with :visible because the logs histogram keeps its own (hidden) chart-renderer
+        // in the DOM while the Visualize tab is active.
+        this.renderedChartIndicator = `${this.chartRenderer} canvas:visible, ${this.dashboardPanelTable}:visible`;
+
+        // ===== VISUALIZE ERROR PANEL (DashboardErrors.vue) =====
+        // Rendered only when errorData.errors is non-empty (v-if), so count 0 == no errors.
+        this.dashboardError = '[data-test="dashboard-error"]';
+        this.dashboardErrorsListItem = '[data-test="dashboard-errors-list-item"]';
+        // Error text thrown by convertPanelData() for builder-mode panels with empty x/y
+        // (web/src/utils/dashboard/convertPanelData.ts).
+        this.requiredFieldsErrorText = 'Please select required fields to render the chart';
+        // logs.index.selectStarNotSupportedForVisualization (en-US.json)
+        this.selectStarNotSupportedToastText = 'Select * query is not supported for visualization';
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
@@ -9409,6 +9423,163 @@ export class LogsPage {
     async expectLiveModeStatusVisible() {
         await expect(this.page.locator(this.liveModeToggleBtn)).toBeVisible({ timeout: 10000 });
         testLogger.info('Live mode refresh-interval button is visible');
+    }
+
+    // ===== LOGS VISUALIZE — CHART RENDER / ERROR ASSERTIONS (PR #13244, issue #12897) =====
+
+    /**
+     * Wait for the Visualize (Timechart) panel to actually PAINT a chart, then
+     * assert the "No Data" empty state is gone.
+     *
+     * This is the deterministic positive end-state that every negative assertion
+     * below must be sequenced after — never assert "no error" against a panel
+     * that has not finished rendering yet.
+     * @param {number} timeout - Max wait for the chart to paint (default 45000)
+     */
+    async expectVisualizeChartRendered(timeout = 45000) {
+        await expect(this.page.locator(this.renderedChartIndicator).first())
+            .toBeVisible({ timeout });
+        // `no-data` is a v-if empty state, so it is removed from the DOM once the
+        // panel has rows. toHaveCount(0) auto-retries, so a brief no-data flash
+        // while the first chunk streams in does not fail the assertion.
+        await expect(this.page.locator(this.noDataMessage)).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('Visualize chart is rendered (not the No Data state)');
+    }
+
+    /**
+     * Assert the Visualize errors panel (DashboardErrors.vue) is absent.
+     * The container is rendered behind `v-if="errors.length"`, and errors are only
+     * cleared by an explicit resetErrors() — i.e. an error raised at any point in
+     * the current run is still present when this runs. Call AFTER
+     * expectVisualizeChartRendered() so the panel has settled.
+     */
+    async expectNoDashboardErrors() {
+        await expect(this.page.locator(this.dashboardError)).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('No dashboard error panel is present');
+    }
+
+    /**
+     * Assert the false "Please select required fields to render the chart" error
+     * (convertPanelData's builder-mode guard) never landed in the errors panel.
+     * Targets the message specifically so an unrelated backend error still reports
+     * a meaningful failure via expectNoDashboardErrors().
+     */
+    async expectNoRequiredFieldsError() {
+        const errorItems = this.page.locator(this.dashboardErrorsListItem, {
+            hasText: this.requiredFieldsErrorText,
+        });
+        await expect(errorItems).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('No "required fields" error is present in the errors panel');
+    }
+
+    // ===== LOGS VISUALIZE — TOAST RECORDER =====
+
+    /**
+     * Install a toast recorder that survives navigation.
+     *
+     * Toasts auto-dismiss, so polling for one after the page has settled is
+     * inherently racy — the toast we are asserting the ABSENCE of may have come
+     * and gone. Instead this attaches a MutationObserver that records every
+     * `[data-test="o-toast-message"]` text into `window.__o2RecordedToasts`, and
+     * registers it as an init script so it is re-installed at document-start on
+     * every subsequent navigation (including `page.reload()`). The assertion then
+     * inspects the recorded log after a deterministic positive end-state.
+     *
+     * Call this BEFORE the navigation/reload under test.
+     */
+    async startToastRecorder() {
+        const installer = () => {
+            if (window.__o2ToastRecorderInstalled) return;
+            window.__o2ToastRecorderInstalled = true;
+            window.__o2RecordedToasts = [];
+            const SELECTOR = '[data-test="o-toast-message"]';
+            const scan = () => {
+                document.querySelectorAll(SELECTOR).forEach((el) => {
+                    const text = (el.textContent || '').trim();
+                    if (text && !window.__o2RecordedToasts.includes(text)) {
+                        window.__o2RecordedToasts.push(text);
+                    }
+                });
+            };
+            const start = () => {
+                scan();
+                // characterData is required too: Vue inserts the toast node first and
+                // fills its text on a later tick, so childList alone can miss the text.
+                new MutationObserver(scan).observe(document.documentElement, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                });
+            };
+            if (document.documentElement) {
+                start();
+            } else {
+                document.addEventListener('DOMContentLoaded', start);
+            }
+        };
+        await this.page.addInitScript(installer);
+        // Also install on the CURRENT document — addInitScript only affects future loads.
+        await this.page.evaluate(installer).catch(() => {});
+        testLogger.info('Toast recorder installed');
+    }
+
+    /**
+     * Read every toast message recorded since startToastRecorder().
+     * @returns {Promise<string[]>}
+     */
+    async getRecordedToastMessages() {
+        return await this.page.evaluate(() => window.__o2RecordedToasts ?? []);
+    }
+
+    /**
+     * Assert no recorded toast contains the given text.
+     * @param {string} text - Substring that must not appear in any recorded toast
+     */
+    async expectNoToastContaining(text) {
+        const messages = await this.getRecordedToastMessages();
+        const matches = messages.filter((m) => m.includes(text));
+        expect(
+            matches,
+            `Expected no toast containing "${text}". Recorded toasts: ${JSON.stringify(messages)}`
+        ).toEqual([]);
+        testLogger.info(`No toast containing "${text}" was emitted`);
+    }
+
+    /**
+     * Assert the "Select * query is not supported for visualization" toast was
+     * never emitted (the symptom of the `select * from "undefined"` page-load race).
+     */
+    async expectNoSelectStarVisualizationToast() {
+        await this.expectNoToastContaining(this.selectStarNotSupportedToastText);
+    }
+
+    // ===== LOGS VISUALIZE — URL STATE =====
+
+    /**
+     * Wait until the URL carries the Visualize tab state, so a subsequent
+     * page.reload() actually exercises URL restoration instead of reloading a URL
+     * that has not been synced yet (updateUrlQueryParams runs asynchronously after
+     * the chart renders).
+     * @param {{ requireVisualizationData?: boolean, timeout?: number }} options
+     */
+    async waitForVisualizeUrlState({ requireVisualizationData = true, timeout = 20000 } = {}) {
+        await expect
+            .poll(
+                () => {
+                    const url = this.page.url();
+                    const hasToggle = url.includes('logs_visualize_toggle=visualize');
+                    const hasConfig =
+                        !requireVisualizationData || url.includes('visualization_data=');
+                    return hasToggle && hasConfig;
+                },
+                {
+                    timeout,
+                    message:
+                        'URL never picked up logs_visualize_toggle=visualize / visualization_data',
+                }
+            )
+            .toBe(true);
+        testLogger.info('URL carries the visualize tab state');
     }
 
     /**
