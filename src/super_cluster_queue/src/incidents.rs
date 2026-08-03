@@ -80,6 +80,7 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
                 &incident_id,
                 &alert_id,
                 &alert_name,
+                "internal",
                 alert_fired_at,
                 &correlation_reason,
             )

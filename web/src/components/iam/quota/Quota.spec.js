@@ -113,7 +113,7 @@ const mountQuota = async (routeQuery = {}) => {
         NoOrganizationSelected: { template: '<div data-test="no-org-selected" />' },
         NoData: { template: '<div data-test="no-data" />' },
         AppTabs: { template: '<div data-test="app-tabs-stub" />' },
-        QTablePagination: { template: '<div data-test="pagination-stub" />' },
+        Pagination: { template: '<div data-test="pagination-stub" />' },
       },
     },
   });

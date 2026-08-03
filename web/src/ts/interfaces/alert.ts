@@ -147,3 +147,61 @@ export interface DestinationPayload {
 export interface DestinationData extends Destination {
   "#"?: number | string;
 }
+
+/** One `key=value` pair of a multi-alert group's label set. */
+export interface AlertGroupLabel {
+  name: string;
+  value: string;
+}
+
+/**
+ * One tracked group of a multi-alert (alerts_2.md §5.4).
+ *
+ * `group_key` — not the rendered `group_labels` — is the identity: the labels
+ * string is display-only and is ambiguous once a value contains a separator.
+ */
+export interface AlertGroup {
+  group_key: string;
+  group_labels?: string;
+  labels?: AlertGroupLabel[];
+  level?: string;
+  level_since?: number;
+  last_outcome?: string;
+  last_outcome_at?: number;
+  last_seen?: number;
+  silenced_until?: number;
+  last_notified_level?: string;
+}
+
+/**
+ * Response of `GET /alerts/{id}/groups`.
+ *
+ * The counts are computed BEFORE the M-6 cap truncates, so they cannot be
+ * re-derived from `list` — past the cap `list` is a truncated view. Each count
+ * carries its own exactness marker because the two diverge: a full fetch page
+ * that still reached healthy groups has seen every firing group, so
+ * `groups_firing` stays exact while `groups_observed` does not.
+ */
+export interface AlertGroupsResponse {
+  list: AlertGroup[];
+  groups_observed?: number;
+  groups_firing?: number;
+  groups_observed_is_lower_bound?: boolean;
+  groups_firing_is_lower_bound?: boolean;
+  capped: boolean;
+  group_cap: number;
+}
+
+/** One per-group level/outcome change (M-8's durable history source). */
+export interface AlertGroupTransition {
+  group_key: string;
+  group_labels?: string;
+  from_level?: string;
+  to_level?: string;
+  from_outcome?: string;
+  to_outcome: string;
+  at: number;
+  /** Absent where nothing was observed — a vanished group has no reading, and
+   *  rendering 0 would read as a real measurement. */
+  value?: number;
+}

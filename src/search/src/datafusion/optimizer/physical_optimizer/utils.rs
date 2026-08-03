@@ -17,7 +17,10 @@ use std::sync::Arc;
 
 use config::{TIMESTAMP_COL_NAME, meta::inverted_index::UNKNOWN_NAME};
 use datafusion::{
-    common::{Result, tree_node::TreeNode},
+    common::{
+        Result,
+        tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
+    },
     error::DataFusionError,
     logical_expr::Operator,
     physical_expr::{
@@ -27,6 +30,7 @@ use datafusion::{
     },
     physical_plan::{
         ExecutionPlan,
+        aggregates::{AggregateExec, AggregateMode},
         expressions::{BinaryExpr, CastExpr, lit},
     },
     scalar::ScalarValue,
@@ -35,6 +39,39 @@ use datafusion::{
 pub fn is_aggregate_exec(plan: &Arc<dyn ExecutionPlan>) -> bool {
     plan.exists(|plan| Ok(plan.name() == "AggregateExec"))
         .unwrap_or(false)
+}
+
+/// Get the first final aggregate plan from bottom to top.
+pub(crate) fn get_final_aggregate_plan(plan: Arc<dyn ExecutionPlan>) -> Option<AggregateExec> {
+    let mut visitor = FinalAggregateVisitor::default();
+    let _ = plan.visit(&mut visitor);
+    visitor
+        .plan
+        .map(|plan| plan.downcast_ref::<AggregateExec>().unwrap().clone())
+}
+
+#[derive(Default)]
+struct FinalAggregateVisitor {
+    plan: Option<Arc<dyn ExecutionPlan>>,
+}
+
+impl<'n> TreeNodeVisitor<'n> for FinalAggregateVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        let Some(aggregate) = node.downcast_ref::<AggregateExec>() else {
+            return Ok(TreeNodeRecursion::Continue);
+        };
+        if matches!(
+            aggregate.mode(),
+            AggregateMode::Final | AggregateMode::FinalPartitioned
+        ) {
+            self.plan = Some(node.clone());
+            Ok(TreeNodeRecursion::Stop)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
+        }
+    }
 }
 
 pub fn extract_string_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<String> {

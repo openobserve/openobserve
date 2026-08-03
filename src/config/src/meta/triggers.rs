@@ -38,6 +38,16 @@ pub enum TriggerModule {
     QueryRecommendations,
     Backfill,
     AnomalyDetection,
+    // APPEND ONLY. The implicit discriminant is the value stored in
+    // `scheduled_jobs.module` (this enum is persisted via `sqlx::Type` +
+    // `#[repr(i32)]`, not by name), so inserting a variant above this line
+    // silently remaps every existing row to a different module.
+    /// SLI ingest — one job per enabled SLO, cadence = its slice interval.
+    Slo,
+    /// Bulk historical fill. Its own lane, because a bulk scan sharing a
+    /// concurrency budget with latency-sensitive incremental passes would
+    /// starve them (§6b.9).
+    SloBackfill,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -49,6 +59,8 @@ impl std::fmt::Display for TriggerModule {
             Self::QueryRecommendations => write!(f, "query_recommendations"),
             Self::Backfill => write!(f, "backfill"),
             Self::AnomalyDetection => write!(f, "anomaly_detection"),
+            Self::Slo => write!(f, "slo"),
+            Self::SloBackfill => write!(f, "slo_backfill"),
         }
     }
 }
@@ -99,6 +111,20 @@ pub struct ScheduledTriggerData {
     pub last_satisfied_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backfill_job: Option<BackfillJob>,
+    // ── Multi-level silence (alerts_2.md §7.1) ──────────────────────────────
+    // For alerts WITH a warning threshold, silence stops suppressing
+    // *evaluation* and suppresses only *delivery* — otherwise a
+    // Warning→Critical escalation during a silence window can never be
+    // observed. Single-level alerts keep the legacy behaviour (next_run_at is
+    // pushed forward) and never set these.
+    /// Deliver nothing until this timestamp, unless the level escalates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_silenced_until: Option<i64>,
+    /// Severity of the last DELIVERED notification (`AlertLevel::to_i32`).
+    /// Escalation is measured against this, not against the previous
+    /// evaluation — otherwise a flap down and back up would re-notify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_notified_level: Option<i32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -165,6 +191,23 @@ mod tests {
             TriggerModule::AnomalyDetection.to_string(),
             "anomaly_detection"
         );
+        assert_eq!(TriggerModule::Slo.to_string(), "slo");
+        assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
+    }
+
+    /// The discriminant IS the stored value. A variant inserted above an
+    /// existing one would remap every `scheduled_jobs` row to a different
+    /// module — silently, with no migration to catch it.
+    #[test]
+    fn trigger_module_discriminants_are_pinned() {
+        assert_eq!(TriggerModule::Report as i32, 0);
+        assert_eq!(TriggerModule::Alert as i32, 1);
+        assert_eq!(TriggerModule::DerivedStream as i32, 2);
+        assert_eq!(TriggerModule::QueryRecommendations as i32, 3);
+        assert_eq!(TriggerModule::Backfill as i32, 4);
+        assert_eq!(TriggerModule::AnomalyDetection as i32, 5);
+        assert_eq!(TriggerModule::Slo as i32, 6);
+        assert_eq!(TriggerModule::SloBackfill as i32, 7);
     }
 
     #[test]
@@ -174,6 +217,8 @@ mod tests {
             tolerance: 42,
             last_satisfied_at: Some(999),
             backfill_job: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
         };
         data.reset();
         assert!(data.period_end_time.is_none());
@@ -197,6 +242,8 @@ mod tests {
             tolerance: 10,
             last_satisfied_at: Some(9_999_999),
             backfill_job: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
         };
         let json = data.to_json_string();
         let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
@@ -357,6 +404,8 @@ mod tests {
             period_end_time: Some(500),
             tolerance: 5,
             last_satisfied_at: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
             backfill_job: Some(BackfillJob {
                 current_position: 42,
                 deletion_status: DeletionStatus::Pending,

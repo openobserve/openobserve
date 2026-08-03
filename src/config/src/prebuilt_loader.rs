@@ -117,10 +117,10 @@ pub const PREBUILT_TEMPLATE_PREFIX: &str = "prebuilt_";
 /// `prebuilt_<type>` where `<type>` is a registered prebuilt destination type
 /// (slack, opsgenie, servicenow, ...).
 ///
-/// Lives next to `get_prebuilt_template` so the public API surface
-/// (`handler::http::models`), the service-layer guards
-/// (`service::alerts::templates`), and any future caller all derive the
-/// "is system template" answer from the same source of truth.
+/// Lives next to `get_prebuilt_template` so the API models
+/// (`openobserve_api_management::models`), the service-layer guards
+/// (`openobserve_core::alerts::templates`), and any future caller all derive
+/// the "is system template" answer from the same source of truth.
 ///
 /// User-created templates whose names happen to start with `prebuilt_` but
 /// don't match a registered type stay freely editable and deletable.

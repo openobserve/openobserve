@@ -182,6 +182,9 @@ const sizeClasses = computed(() => {
     case "xl":
       // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "w-[min(800px,100vw)]";
+    case "xxl":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
+      return "w-[min(1000px,100vw)]";
     case "full":
       return "w-screen";
     default:

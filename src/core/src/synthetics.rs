@@ -35,6 +35,33 @@ pub struct CheckNotification {
     pub job_count: i64,
     pub error: Option<String>,
     pub checked_at: i64,
+    /// This message closes an incident rather than opening one.
+    ///
+    /// Mandatory once `cooldown_mins` exists: with a cooldown, silence no
+    /// longer means "recovered", it means "possibly still broken and inside
+    /// the window". A recovery message is the only thing that closes it.
+    pub recovery: bool,
+    /// How many runs in a row had failed when this fired. 0 on a recovery.
+    pub consecutive_failures: i32,
+    /// The run recovered by retrying. Informational, not an incident.
+    pub flaky: bool,
+    /// The target is reachable but degrading — a certificate inside its warning
+    /// window, or a failing SFTP probe on a host that authenticated.
+    ///
+    /// Kept distinct from `flaky` because they arrive as the same `warning`
+    /// status: a flaky run fixed itself and needs no action, a degrading one
+    /// will not fix itself and needs action before it becomes an outage.
+    /// Why the run was a warning, straight from the probe: `cert_expiring`,
+    /// `sftp_degraded`, `flaky`. `None` from a probe too old to report one, in
+    /// which case the message stays generic rather than guessing.
+    pub status_reason: Option<String>,
+    pub degraded: bool,
+    /// Locations that did not pass, worst first.
+    ///
+    /// Previously absent entirely, so a six-location check with one broken
+    /// region could only say "the check is failing" and the reader had to open
+    /// the UI to find out where.
+    pub failing_locations: Vec<String>,
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -44,7 +71,13 @@ pub struct CheckNotification {
 /// HTTP webhooks, an HTML card for email, plain text for SNS.
 #[cfg(feature = "enterprise")]
 pub async fn notify_check_result(n: CheckNotification) {
-    if n.status == "passed" || n.status == "up" {
+    // A passing run is worth sending exactly once: when it ends an incident
+    // somebody was already told about. Otherwise it is a confirmation nobody
+    // asked for.
+    //
+    // A flaky run reports as `warning`, not `passed`, so it is not caught here —
+    // the decision to send it was already made upstream against `cooldown_mins`.
+    if !n.recovery && (n.status == "passed" || n.status == "up") {
         return;
     }
 
@@ -66,12 +99,38 @@ pub async fn notify_check_result(n: CheckNotification) {
                     DestinationType::Http(_) => build_slack_json(&n),
                 };
 
-                let subject = format!(
-                    "[OpenObserve Synthetics] {} {} is {}",
-                    status_emoji(&n.status),
-                    n.monitor_name,
-                    n.status.to_uppercase()
-                );
+                let subject = if n.recovery {
+                    format!(
+                        "[OpenObserve Synthetics] ✅ {} has RECOVERED",
+                        n.monitor_name
+                    )
+                } else if n.degraded {
+                    // Not "is WARNING": the point of the message is that this needs
+                    // action before it becomes an outage. Named where we know the
+                    // condition, because the subject is the line that decides
+                    // whether anyone opens the alert — and "CERTIFICATE EXPIRING"
+                    // gets renewed where a generic "DEGRADED" gets skimmed.
+                    match n.status_reason.as_deref() {
+                        Some("cert_expiring") => format!(
+                            "[OpenObserve Synthetics] 🟡 {} — CERTIFICATE EXPIRING SOON",
+                            n.monitor_name
+                        ),
+                        Some("sftp_degraded") => format!(
+                            "[OpenObserve Synthetics] 🟡 {} — SFTP DEGRADED",
+                            n.monitor_name
+                        ),
+                        _ => format!("[OpenObserve Synthetics] 🟡 {} is DEGRADED", n.monitor_name),
+                    }
+                } else if n.flaky {
+                    format!("[OpenObserve Synthetics] 🔁 {} is FLAKY", n.monitor_name)
+                } else {
+                    format!(
+                        "[OpenObserve Synthetics] {} {} is {}",
+                        status_emoji(&n.status),
+                        n.monitor_name,
+                        n.status.to_uppercase()
+                    )
+                };
                 if let Err(e) =
                     crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
                         .await
@@ -92,6 +151,7 @@ pub async fn notify_check_result(n: CheckNotification) {
 #[cfg(feature = "enterprise")]
 fn status_emoji(status: &str) -> &'static str {
     match status {
+        "recovered" => "✅",
         "failed" | "down" => "🔴",
         "warning" => "🟡",
         "error" => "⚠️",
@@ -102,6 +162,37 @@ fn status_emoji(status: &str) -> &'static str {
 /// What the status means, in operator language — differs per status.
 #[cfg(feature = "enterprise")]
 fn status_headline(n: &CheckNotification) -> String {
+    if n.recovery {
+        return format!("{} has recovered", n.monitor_name);
+    }
+    // `warning` covers two unrelated things, and they need opposite responses:
+    // a flaky run already fixed itself, a degrading target will not.
+    if n.degraded {
+        // Name the condition. "Degrading" is true but not actionable, and the
+        // reader's next step differs entirely: renew a certificate, or go and look
+        // at an SFTP subsystem. QA reported the generic case as the bug — an
+        // expiring certificate that read as "passed only after retries (flaky)".
+        return match n.status_reason.as_deref() {
+            Some("cert_expiring") => format!(
+                "{} — the TLS certificate is expiring soon, renew it before it lapses",
+                n.monitor_name
+            ),
+            Some("sftp_degraded") => format!(
+                "{} connects and authenticates, but its SFTP subsystem is failing",
+                n.monitor_name
+            ),
+            _ => format!(
+                "{} is reachable but degrading — this needs attention before it fails",
+                n.monitor_name
+            ),
+        };
+    }
+    if n.flaky {
+        return format!(
+            "{} passed only after retries (flaky) — it recovered on its own",
+            n.monitor_name
+        );
+    }
     match n.status.as_str() {
         "warning" => format!("{} passed only after retries (flaky)", n.monitor_name),
         "error" => format!(
@@ -140,6 +231,25 @@ fn run_url(n: &CheckNotification) -> String {
     )
 }
 
+#[cfg(feature = "enterprise")]
+/// "2 of 6: mumbai, frankfurt" — or just the count when we could not attribute.
+///
+/// Answers "which region is broken", which the message previously could not: it
+/// carried only how many locations were checked, so a one-of-six failure and a
+/// six-of-six outage read identically.
+fn locations_line(n: &CheckNotification) -> String {
+    let total = if n.job_count > 0 { n.job_count } else { 1 };
+    if n.failing_locations.is_empty() {
+        return total.to_string();
+    }
+    format!(
+        "{} of {}: {}",
+        n.failing_locations.len(),
+        total,
+        n.failing_locations.join(", ")
+    )
+}
+
 /// Slack-compatible webhook payload (also renders fine in Teams/Discord-style
 /// webhooks that accept a `text` field).
 #[cfg(feature = "enterprise")]
@@ -150,10 +260,7 @@ fn build_slack_json(n: &CheckNotification) -> String {
         String::new(),
         format!("*Monitor:* {} ({})", n.monitor_name, n.monitor_type),
         format!("*Target:* {}", n.target),
-        format!(
-            "*Locations checked:* {}",
-            if n.job_count > 0 { n.job_count } else { 1 }
-        ),
+        format!("*Locations:* {}", locations_line(n)),
     ];
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("*Error:* ```{e}```"));
@@ -174,10 +281,7 @@ fn build_plain_text(n: &CheckNotification) -> String {
         format!("Monitor: {} ({})", n.monitor_name, n.monitor_type),
         format!("Target: {}", n.target),
         format!("Status: {}", n.status),
-        format!(
-            "Locations checked: {}",
-            if n.job_count > 0 { n.job_count } else { 1 }
-        ),
+        format!("Locations: {}", locations_line(n)),
     ];
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("Error: {e}"));
@@ -191,10 +295,14 @@ fn build_plain_text(n: &CheckNotification) -> String {
 #[cfg(feature = "enterprise")]
 fn build_email_html(n: &CheckNotification) -> String {
     // TODO: update with a better template for all the checks
-    let color = match n.status.as_str() {
-        "warning" => "#b58105",
-        "error" => "#b45309",
-        _ => "#c62828",
+    let color = if n.recovery {
+        "#2e7d32"
+    } else {
+        match n.status.as_str() {
+            "warning" => "#b58105",
+            "error" => "#b45309",
+            _ => "#c62828",
+        }
     };
     let error_row = match n.error.as_deref().filter(|e| !e.is_empty()) {
         Some(e) => format!(
@@ -214,7 +322,7 @@ fn build_email_html(n: &CheckNotification) -> String {
         <td style="padding:6px 12px;">{target}</td></tr>
     <tr><td style="padding:6px 12px;color:#666;">Status</td>
         <td style="padding:6px 12px;font-weight:bold;color:{color};">{status}</td></tr>
-    <tr><td style="padding:6px 12px;color:#666;">Locations checked</td>
+    <tr><td style="padding:6px 12px;color:#666;">Locations</td>
         <td style="padding:6px 12px;">{jobs}</td></tr>
     <tr><td style="padding:6px 12px;color:#666;">Time</td>
         <td style="padding:6px 12px;">{checked_at}</td></tr>
@@ -230,7 +338,7 @@ fn build_email_html(n: &CheckNotification) -> String {
         mtype = html_escape(&n.monitor_type),
         target = html_escape(&n.target),
         status = n.status.to_uppercase(),
-        jobs = if n.job_count > 0 { n.job_count } else { 1 },
+        jobs = html_escape(&locations_line(n)),
         checked_at = checked_at_utc(n.checked_at),
         url = run_url(n),
     )

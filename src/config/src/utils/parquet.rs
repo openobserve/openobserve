@@ -34,6 +34,7 @@ use parquet::{
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
+use serde::{Deserialize, Serialize};
 use vortex::{
     VortexSessionDefault,
     array::{ArrayRef, VortexSessionExecute},
@@ -44,7 +45,31 @@ use vortex::{
     session::VortexSession,
 };
 
-use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
+use crate::{FileFormat, config::*, ider, meta::stream::FileMeta, utils::json};
+
+/// Key of the vortex metadata segment carrying the o2 [`FileMeta`].
+pub const VORTEX_FILE_META_KEY: &str = "o2_file_meta";
+
+/// Same four fields [`new_parquet_writer`] writes into the parquet footer.
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct VortexFileMeta {
+    min_ts: i64,
+    max_ts: i64,
+    records: i64,
+    original_size: i64,
+}
+
+/// Encode `metadata` for the [`VORTEX_FILE_META_KEY`] segment.
+pub fn encode_vortex_file_meta(metadata: &FileMeta) -> Vec<u8> {
+    json::to_vec(&VortexFileMeta {
+        min_ts: metadata.min_ts,
+        max_ts: metadata.max_ts,
+        records: metadata.records,
+        original_size: metadata.original_size,
+    })
+    .expect("file meta is always serializable")
+}
 
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
@@ -494,6 +519,31 @@ mod tests {
         assert_eq!(read_metadata.max_ts, metadata.max_ts);
         assert_eq!(read_metadata.records, metadata.records);
         assert_eq!(read_metadata.original_size, metadata.original_size);
+    }
+
+    #[test]
+    fn test_encode_decode_vortex_file_meta() {
+        let metadata = FileMeta {
+            min_ts: -1,
+            max_ts: i64::MAX,
+            records: 7,
+            original_size: 8,
+            compressed_size: 9,
+            index_size: 10,
+            bloom_ver: 11,
+            flattened: true,
+        };
+        let decoded: VortexFileMeta =
+            json::from_slice(&encode_vortex_file_meta(&metadata)).unwrap();
+        assert_eq!(decoded.min_ts, metadata.min_ts);
+        assert_eq!(decoded.max_ts, metadata.max_ts);
+        assert_eq!(decoded.records, metadata.records);
+        assert_eq!(decoded.original_size, metadata.original_size);
+
+        // unknown and missing keys are tolerated
+        let decoded: VortexFileMeta = json::from_slice(br#"{"min_ts":5,"future":true}"#).unwrap();
+        assert_eq!(decoded.min_ts, 5);
+        assert_eq!(decoded.max_ts, 0);
     }
 
     #[test]

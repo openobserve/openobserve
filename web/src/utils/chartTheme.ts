@@ -123,6 +123,9 @@ const FALLBACKS: Record<string, string> = {
   "--color-trace-span-35": "#3B82F6",
   // Metric-panel text default (contrast fallback when a panel has no background).
   "--color-chart-metric-text": "#000000",
+  // Alert threshold marklines (light values from semantic.css / base.css).
+  "--color-status-error-text": "#cc3645",
+  "--color-status-warning-text": "#e56d17",
 };
 
 /**

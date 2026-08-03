@@ -295,6 +295,47 @@ pub async fn update_incident(
 }
 
 #[cfg(feature = "enterprise")]
+/// GetExternalAlertPayload
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetExternalAlertPayload",
+    summary = "Get the raw payload of an external alert",
+    description = "Retrieves the original, unmodified webhook payload received for an external alert event. Used to inspect exactly what a source system (Grafana, Alertmanager, etc.) sent.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("external_alert_id" = String, Path, description = "External alert ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ()),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get the raw payload of an external alert", "category": "alerts"}))
+    )
+)]
+pub async fn get_external_alert_payload(
+    Path((org_id, external_alert_id)): Path<(String, String)>,
+) -> Response {
+    match infra::table::external_alerts::get_by_id(&org_id, &external_alert_id).await {
+        Ok(Some(record)) => MetaHttpResponse::json(serde_json::json!({
+            "id": record.id,
+            "detected_source": record.detected_source,
+            "source_url": record.source_url,
+            "first_seen_at": record.first_seen_at,
+            "last_seen_at": record.last_seen_at,
+            "last_payload": record.last_payload,
+        })),
+        Ok(None) => MetaHttpResponse::not_found("External alert not found"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
 /// GetIncidentStats
 #[utoipa::path(
     get,
@@ -964,6 +1005,33 @@ pub async fn list_incidents(_path: Path<String>, _query: Query<ListIncidentsQuer
     )
 )]
 pub async fn get_incident(_path: Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetExternalAlertPayload",
+    summary = "Get the raw payload of an external alert",
+    description = "Retrieves the original webhook payload for an external alert event. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("external_alert_id" = String, Path, description = "External alert ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ()),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get the raw payload of an external alert", "category": "alerts"}))
+    )
+)]
+pub async fn get_external_alert_payload(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 

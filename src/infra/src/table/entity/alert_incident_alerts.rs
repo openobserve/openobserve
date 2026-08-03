@@ -28,6 +28,7 @@ pub struct Model {
     pub alert_fired_at: i64,
 
     pub alert_name: String,
+    pub alert_kind: String,
     /// service_discovery, trace_based, scope_match, workload_match, alert_id
     pub correlation_reason: Option<String>,
     pub created_at: i64,
@@ -62,6 +63,7 @@ mod tests {
             alert_id: "alert-1".to_string(),
             alert_fired_at: 1000,
             alert_name: "High Error Rate".to_string(),
+            alert_kind: "internal".to_string(),
             correlation_reason: Some("service_discovery".to_string()),
             created_at: 1000,
         };

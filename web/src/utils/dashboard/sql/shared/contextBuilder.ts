@@ -131,9 +131,13 @@ export function buildSQLContext(
           xAxis: markLine.type == "xAxis" ? markLine.value : null,
           yAxis: markLine.type == "yAxis" ? markLine.value : null,
           label: {
+            // The alert preview passes show_label:false — its lines are
+            // colour-coded, and a text label clips at the chart top.
+            show: markLine.show_label !== false,
             formatter: markLine.name ? "{b}:{c}" : "{c}",
             position: "insideEndTop",
           },
+          ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),
         };
       }) ?? []
     );

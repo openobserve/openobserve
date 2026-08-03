@@ -518,7 +518,10 @@ mod tests {
         let job = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap();
 
         assert_eq!(job.target_scope, TargetScope::Trace);
-        assert_eq!(job.trace_config.unwrap().idle_window_secs, 120);
+        assert_eq!(
+            job.trace_config.unwrap().idle_window_secs,
+            infra::table::online_eval_jobs::DEFAULT_TRACE_IDLE_WINDOW_SECS
+        );
         assert!(job.session_config.is_none());
     }
 
@@ -539,7 +542,10 @@ mod tests {
         let job = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap();
 
         assert_eq!(job.target_scope, TargetScope::Session);
-        assert_eq!(job.session_config.unwrap().idle_window_secs, 120);
+        assert_eq!(
+            job.session_config.unwrap().idle_window_secs,
+            infra::table::online_eval_jobs::DEFAULT_SESSION_IDLE_WINDOW_SECS
+        );
         assert!(job.trace_config.is_none());
     }
 
@@ -712,13 +718,13 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_job_request_body_rejects_idle_window_below_scheduler_poll_interval() {
+    fn test_eval_job_request_body_rejects_a_non_positive_idle_window() {
         let json = r#"{
             "name": "j",
             "stream": "traces",
             "streamType": "traces",
             "targetScope": "trace",
-            "traceConfig": { "idleWindowSecs": 44, "maxAgeSecs": 1800 },
+            "traceConfig": { "idleWindowSecs": 0, "maxAgeSecs": 1800 },
             "filterCondition": {},
             "scorers": ["scorer-1"],
             "samplingMode": "all",
@@ -728,7 +734,7 @@ mod tests {
         let body: EvalJobRequestBody = serde_json::from_str(json).unwrap();
         let err = infra::table::online_eval_jobs::OnlineEvalJob::try_from(body).unwrap_err();
 
-        assert_eq!(err, "Completion idle window must be at least 45 seconds");
+        assert_eq!(err, "Completion idle window must be at least 1 second");
     }
 
     #[test]

@@ -38,8 +38,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
     service::{
         ingestion::get_thread_id,
         logs::{self, otlp::handle_request},

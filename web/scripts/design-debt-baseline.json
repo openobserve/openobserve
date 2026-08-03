@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawVarInComponent": 103
+    "rawVarInComponent": 101
   },
   "files": {
     "components/alerts/AlertInsightsContextMenu.vue": {
@@ -50,9 +50,6 @@
     },
     "plugins/logs/SearchBar.vue": {
       "rawVarInComponent": 1
-    },
-    "plugins/logs/TenstackTable.vue": {
-      "rawVarInComponent": 2
     },
     "plugins/traces/ThreadToolCalls.vue": {
       "rawVarInComponent": 6

@@ -21,10 +21,10 @@ use datafusion::{
     execution::FunctionRegistry,
     physical_plan::ExecutionPlan,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::agg_topk_exec::AggregateTopkExec;
 use prost::Message;
 use proto::cluster_rpc;
+
+use crate::datafusion::distributed_plan::aggregate_topk_exec::AggregateTopkExec;
 
 pub fn try_decode(
     node: cluster_rpc::AggregateTopkExecNode,

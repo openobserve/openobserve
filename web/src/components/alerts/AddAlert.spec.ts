@@ -184,18 +184,35 @@ describe("AddAlert (OForm owner)", () => {
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
     });
 
-    it("blocks save when only the name is missing", async () => {
+    it("blocks save when the name is missing and there is nothing to auto-name it after", async () => {
+      // With no stream chosen the generator has nothing to say, so the name
+      // stays genuinely empty and the schema rule is what stops the save.
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
       seedValidScheduled(form);
-      form.setFieldValue("name", ""); // clear name
+      form.setFieldValue("stream_name", "");
+      form.setFieldValue("name", "");
 
       await form.handleSubmit();
       await flushPromises();
 
       expect(form.state.isValid).toBe(false);
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+    });
+
+    it("auto-names a cleared alert rather than blocking, once a stream is chosen", async () => {
+      // A create-mode alert can no longer reach save nameless: clearing the
+      // field re-arms the generator, which fills it from the stream. The schema
+      // rule above is the backstop for the case where it has nothing to offer.
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      form.setFieldValue("name", "");
+      await flushPromises();
+
+      expect(form.state.values.name).toBe("_rundata_alert");
     });
 
     it("blocks save when the name contains unsupported characters (§4 restore)", async () => {

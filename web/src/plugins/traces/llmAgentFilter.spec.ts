@@ -58,15 +58,13 @@ describe("llmAgentFilter", () => {
     expect(where).toContain("gen_ai_agent_env = 'production'");
   });
 
-  it("builds a session-membership filter that keeps full matching sessions", () => {
-    expect(buildAgentSessionFilter(agentWithId, "default")).toBe(
-      `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "default" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)`,
-    );
+  it("builds a direct agent predicate for session selection", () => {
+    expect(buildAgentSessionFilter(agentWithId, "default")).toBe(`gen_ai_agent_id = 'agent-123'`);
   });
 
-  it("supports a custom session field for session-membership filters", () => {
+  it("keeps the same predicate when the backend uses a custom session field", () => {
     expect(buildAgentSessionFilter(agentWithId, "default", "llm_session_id")).toBe(
-      `llm_session_id IN (SELECT llm_session_id FROM "default" WHERE llm_session_id IS NOT NULL AND llm_session_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY llm_session_id)`,
+      `gen_ai_agent_id = 'agent-123'`,
     );
   });
 
