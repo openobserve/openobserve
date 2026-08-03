@@ -17,18 +17,18 @@
  * The PromQL vocabulary: every aggregation, function, modifier and word-shaped
  * operator the language has, with Prometheus's own one-line description.
  *
- * GENERATED, not written. Snapshot of Prometheus's own term tables v0.311.3
- * (Apache-2.0), taken with scripts/generate-promql-terms.mjs — the one place
- * that names the package, because it is the thing you install to regenerate.
+ * SNAPSHOT, not hand-written: taken from the term tables the Prometheus project
+ * publishes for its own query editor (v0.311.3, Apache-2.0). A snapshot rather
+ * than an import because that package requires an unrelated editor library at
+ * module scope — for a require it never uses — which dragged ~376 KB of that
+ * library's runtime into every route touching PromQL. This app runs on monaco,
+ * exclusively, and so does its bundle.
  *
- * A snapshot and not an import for one reason: that package's terms module
- * requires an unrelated editor library at module scope — for a require it never
- * actually uses — which dragged ~376 KB of that library's runtime into every
- * route touching PromQL. This app runs on monaco, and now so does its bundle,
- * exclusively.
- *
- * To refresh after a Prometheus release: install the package, run the script,
- * commit the diff. The data is inert — labels and prose, no behaviour.
+ * To refresh after a Prometheus release: the generator that produced this file
+ * is in git history — `git log --diff-filter=D -- web/scripts/generate-promql-terms.mjs`
+ * — and it is twenty lines. Editing this file by hand is equally fine: the data
+ * is inert, labels and prose with no behaviour, and promqlCompletion.spec.ts
+ * guards the shape either way.
  */
 
 export interface PromqlTerm {
