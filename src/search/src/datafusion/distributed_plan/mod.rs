@@ -25,6 +25,7 @@ use datafusion::{
 
 use crate::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 
+pub mod aggregate_topk_exec;
 pub mod broadcast_join_exec;
 pub mod codec;
 mod common;

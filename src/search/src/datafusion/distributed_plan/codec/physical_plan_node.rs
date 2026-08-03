@@ -23,15 +23,14 @@ use datafusion::{
 };
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
-    agg_topk_exec::AggregateTopkExec, streaming_aggs_exec::exec::StreamingAggsExec,
-};
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::exec::StreamingAggsExec;
 use prost::Message;
 use proto::cluster_rpc;
 
 use crate::datafusion::{
     distributed_plan::{
-        empty_exec::NewEmptyExec, enrichment_exec::EnrichmentExec, tmp_exec::TmpExec,
+        aggregate_topk_exec::AggregateTopkExec, empty_exec::NewEmptyExec,
+        enrichment_exec::EnrichmentExec, tmp_exec::TmpExec,
     },
     plan::deduplication_exec::DeduplicationExec,
 };
@@ -59,7 +58,6 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             Some(cluster_rpc::physical_plan_node::Plan::DeduplicationExec(node)) => {
                 super::deduplication_exec::try_decode(node, inputs, ctx)
             }
-            #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(node)) => {
                 super::aggregate_topk_exec::try_decode(node, inputs, ctx)
             }
@@ -105,6 +103,8 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::empty_exec::try_encode(node, buf)
         } else if node.downcast_ref::<DeduplicationExec>().is_some() {
             super::deduplication_exec::try_encode(node, buf)
+        } else if node.downcast_ref::<AggregateTopkExec>().is_some() {
+            super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.downcast_ref::<TmpExec>().is_some() {
             super::tmp_exec::try_encode(node, buf)
         } else if node.downcast_ref::<EnrichmentExec>().is_some() {

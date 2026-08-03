@@ -64,3 +64,11 @@ utoipa.workspace = true
 vortex = { workspace = true }
 vortex-btrblocks = { workspace = true }
 vortex-datafusion = { workspace = true }
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
+peak_alloc = "0.3"
+
+[[bench]]
+name = "agg_topk_memory_comparison"
+harness = false
