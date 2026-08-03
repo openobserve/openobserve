@@ -34,20 +34,22 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 use proto::cluster_rpc::{self, KvItem};
-#[cfg(feature = "enterprise")]
-use {
-    crate::datafusion::optimizer::physical_optimizer::broadcast_join::broadcast_join_rewrite,
-    crate::datafusion::optimizer::physical_optimizer::enrichment::enrichment_broadcast_join_rewrite,
-    crate::datafusion::optimizer::physical_optimizer::enrichment::should_use_enrichment_broadcast_join,
-    o2_enterprise::enterprise::search::datafusion::optimizer::broadcast_join::should_use_broadcast_join,
-};
 
 use crate::{
     datafusion::{
         distributed_plan::{
             empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan_exec::RemoteScanExec,
         },
-        optimizer::{context::RemoteScanContext, utils::is_place_holder_or_empty},
+        optimizer::{
+            context::RemoteScanContext,
+            physical_optimizer::{
+                broadcast_join::{broadcast_join_rewrite, should_use_broadcast_join},
+                enrichment::{
+                    enrichment_broadcast_join_rewrite, should_use_enrichment_broadcast_join,
+                },
+            },
+            utils::is_place_holder_or_empty,
+        },
     },
     sql::Sql,
 };
@@ -160,7 +162,6 @@ impl PhysicalOptimizerRule for RemoteScanRule {
             return Ok(plan);
         }
 
-        #[cfg(feature = "enterprise")]
         if config::get_config()
             .common
             .feature_enrichment_broadcast_join_enabled
@@ -169,7 +170,6 @@ impl PhysicalOptimizerRule for RemoteScanRule {
             return enrichment_broadcast_join_rewrite(plan, self.remote_scan_nodes.clone());
         }
 
-        #[cfg(feature = "enterprise")]
         if config::get_config().common.feature_broadcast_join_enabled
             && should_use_broadcast_join(&plan)
         {
