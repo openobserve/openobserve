@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import useSyntheticsRecorder from "./useSyntheticsRecorder";
@@ -53,6 +66,9 @@ function emitStreamEvent(payload: Record<string, unknown>) {
     }),
   );
 }
+
+/** Mirrors REPLAY_TIMEOUT_MS in the composable — the replay watchdog window. */
+const REPLAY_TIMEOUT_MS = 15 * 60 * 1000;
 
 /** Let the 500 ms probe delay + any pending microtasks settle. */
 async function settleProbeDelay() {
@@ -129,14 +145,15 @@ describe("useSyntheticsRecorder", () => {
       // Verify the command was posted correctly
       const cmd = getLastCommand();
       expect(cmd).toMatchObject({ action: "startRecording", targetUrl: "https://app.test/login" });
+      // The field existed on the command type and was never populated, so every
+      // recording silently fell back to Playwright's `data-testid`.
+      expect(cmd.testIdAttr).toBe("data-test");
 
       // Stream steps
-      const browserSteps: WireStep[] = [
-        { id: "s1", action: "click", selector: "#go", selector_type: "css" },
-      ];
+      const browserSteps: WireStep[] = [{ id: "s1", action: "click", selector: "#go" }];
       emitStreamEvent({ method: "setActions", browserSteps });
       expect(r.liveSteps.value).toHaveLength(1);
-      expect(r.liveSteps.value[0].selectorType).toBe("CSS");
+      expect(r.liveSteps.value[0].selector).toBe("#go");
 
       emitStreamEvent({ method: "recordingStarted", tabId: 9, url: "https://app.test/next" });
       expect(r.currentUrl.value).toBe("https://app.test/next");
@@ -191,6 +208,32 @@ describe("useSyntheticsRecorder", () => {
       expect(r.isRecording.value).toBe(false);
       expect(r.error.value).toBe("Failed to start recording.");
     });
+  });
+
+  it("sends the configured test-id attribute when one is given", async () => {
+    const r = useSyntheticsRecorder();
+    const promise = r.startRecording("https://app.test", "data-qa");
+
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await promise;
+
+    // An application on data-qa/data-cy/data-pw produced NO test-attribute
+    // candidates before this — upstream's hardcoded fallback list covers only
+    // data-testid, data-test-id and data-test, so their strongest attribute
+    // was stored as plain css, rank 3, behind text.
+    expect(getLastCommand().testIdAttr).toBe("data-qa");
+  });
+
+  it("falls back to the O2 default when no attribute is given", async () => {
+    const r = useSyntheticsRecorder();
+    const promise = r.startRecording("https://app.test", "");
+
+    await settleProbeDelay();
+    respondToLastCommand({ success: true });
+    await promise;
+
+    expect(getLastCommand().testIdAttr).toBe("data-test");
   });
 
   // ── stopRecording ──────────────────────────────────────────────────────
@@ -341,13 +384,49 @@ describe("useSyntheticsRecorder", () => {
       expect(sentCmd).toMatchObject({ action: "stopReplay" });
     });
 
-    it("should return null when the command times out", async () => {
+    it("should stay running past the one-shot command timeout while steps stream in", async () => {
+      // Regression: a real journey takes far longer than COMMAND_TIMEOUT_MS.
+      // The extension only answers the `replay` command once the whole journey
+      // has finished, so a blanket short timeout made the UI fall back to
+      // "idle" a few steps in while the extension kept replaying.
+      const journey: WireStep[] = [
+        { id: "s1", action: "navigate", url: "https://x.test" },
+        { id: "s2", action: "click", selector: "#login" },
+        { id: "s3", action: "click", selector: "#logout" },
+      ];
+      const r = useSyntheticsRecorder();
+      const promise = r.replay(journey);
+
+      await settleProbeDelay();
+
+      // Two steps land inside the first four seconds.
+      await vi.advanceTimersByTimeAsync(2000);
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s1", passed: true, duration_ms: 900 });
+      await vi.advanceTimersByTimeAsync(2000);
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s2", passed: true, duration_ms: 800 });
+
+      // Past the one-shot timeout the replay is still in flight.
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(r.replayPhase.value).toBe("running");
+      expect(r.isReplaying.value).toBe(true);
+
+      // The extension finally answers, 30s in.
+      await vi.advanceTimersByTimeAsync(21000);
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s3", passed: true, duration_ms: 700 });
+      respondToLastCommand({ success: true, passed: true });
+
+      expect(await promise).toEqual({ success: true, passed: true });
+      expect(r.replayPhase.value).toBe("passed");
+      expect(r.isReplaying.value).toBe(false);
+      expect(r.stepResults.size).toBe(3);
+    });
+
+    it("should give up when the extension never answers the replay command", async () => {
       const r = useSyntheticsRecorder();
       const promise = r.replay(steps);
 
-      // Let probe delay + command timeout fire
       await settleProbeDelay();
-      await vi.advanceTimersByTimeAsync(4000);
+      await vi.advanceTimersByTimeAsync(REPLAY_TIMEOUT_MS);
 
       const res = await promise;
       expect(res).toBeNull();

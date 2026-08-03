@@ -20,14 +20,13 @@ use config::{
     metrics,
     utils::json,
 };
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, traces};
 use search_service as SearchService;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
-use super::TraceDetail;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -35,6 +34,25 @@ use crate::{
     },
     search::error_utils::map_error_to_http_response,
 };
+
+/// Session-list pagination deliberately avoids an exact count query because
+/// counting every distinct session is more expensive than fetching one page.
+/// `total` is therefore a lower bound while `has_more` is true, and becomes
+/// exact on the final page.
+#[derive(Serialize)]
+struct LatestSessionsResponse {
+    took: usize,
+    total: usize,
+    from: i64,
+    size: i64,
+    hits: Vec<json::Value>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    trace_id: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    function_error: String,
+    has_more: bool,
+    total_is_exact: bool,
+}
 
 /// GetLatestSessions
 ///
@@ -63,7 +81,9 @@ use crate::{
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
             "took": 155,
-            "total": 2,
+            "total": 11,
+            "has_more": true,
+            "total_is_exact": false,
             "from": 0,
             "size": 10,
             "hits": [
@@ -166,10 +186,12 @@ pub async fn get_latest_sessions(
 
     let from = query
         .get("from")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+        .max(0);
     let size = query
         .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
+        .map_or(10, |v| v.parse::<i64>().unwrap_or(10))
+        .max(1);
     let mut start_time = query
         .get("start_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -202,14 +224,10 @@ pub async fn get_latest_sessions(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    // session_id may appear on the first span only or on all spans of a trace.
-    // gen_ai_*/llm_* fields may be on different spans than session_id.
-    // So we must: get session→trace_id mapping first, then query by trace_id
-    // (which captures ALL spans) to get accurate usage totals.
-    //
-    // Use ValidatedLlmSchema (Tier 1) for column-name resolution and optional
-    // field detection. Session handler keeps its own SQL shape (Phase 1 groups
-    // by session_id; Phase 2 queries by trace_id; ordering is done in Rust).
+    // Session list aggregation assumes the session id is present on every span.
+    // Page by session id first, then aggregate only those sessions. This avoids
+    // materializing every trace id while keeping expensive summary aggregation
+    // after pagination.
     let stream_type = StreamType::Traces;
     let schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
@@ -224,7 +242,7 @@ pub async fn get_latest_sessions(
                 // all required LLM fields pass, we cannot run a session query
                 // without something to group by.
                 if s.field_with_name(v.columns.session_id).is_err() {
-                    return MetaHttpResponse::json(PaginatedResponse {
+                    return MetaHttpResponse::json(LatestSessionsResponse {
                         took: 0,
                         total: 0,
                         from,
@@ -232,6 +250,8 @@ pub async fn get_latest_sessions(
                         hits: vec![],
                         trace_id,
                         function_error: String::new(),
+                        has_more: false,
+                        total_is_exact: true,
                     });
                 }
                 Some(v)
@@ -243,7 +263,7 @@ pub async fn get_latest_sessions(
     let validated = match validated {
         Some(v) => v,
         None => {
-            return MetaHttpResponse::json(PaginatedResponse {
+            return MetaHttpResponse::json(LatestSessionsResponse {
                 took: 0,
                 total: 0,
                 from,
@@ -251,33 +271,21 @@ pub async fn get_latest_sessions(
                 hits: vec![],
                 trace_id,
                 function_error: String::new(),
+                has_more: false,
+                total_is_exact: true,
             });
         }
     };
-    let session_id_col = validated.columns.session_id;
+    let query_sql = build_latest_session_page_sql(&stream_name, &filter, &validated);
     let user_id_opt = Some(user_id.to_string());
-
-    // Phase 1: Get paginated session list with trace_ids per session
-    let session_filter = if filter.is_empty() {
-        format!("{session_id_col} IS NOT NULL AND {session_id_col} != ''")
-    } else {
-        format!("{session_id_col} IS NOT NULL AND {session_id_col} != '' AND {filter}")
-    };
-    let query_sql = format!(
-        "SELECT {session_id_col}, \
-        min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-        array_agg(DISTINCT trace_id) as trace_ids \
-        FROM \"{stream_name}\" \
-        WHERE {session_filter} \
-        GROUP BY {session_id_col} \
-        ORDER BY zo_sql_timestamp DESC"
-    );
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql,
             from,
-            size,
+            // Fetch one extra grouped session to determine whether a next page
+            // exists without running a full distinct-session count query.
+            size: size.saturating_add(1),
             start_time,
             end_time,
             ..Default::default()
@@ -288,7 +296,7 @@ pub async fn get_latest_sessions(
         ..Default::default()
     };
 
-    let resp_search = match SearchService::cache::search(
+    let resp_page = match SearchService::cache::search(
         &trace_id,
         &org_id,
         stream_type,
@@ -325,158 +333,41 @@ pub async fn get_latest_sessions(
                     "",
                 ])
                 .inc();
-            log::error!("get sessions latest data error: {err:?}");
+            log::error!("get sessions latest page error: {err:?}");
             return map_error_to_http_response(&err, Some(trace_id));
         }
     };
-    if resp_search.hits.is_empty() {
-        return MetaHttpResponse::json(resp_search);
-    }
-
-    // Parse session_id -> trace_ids from Phase 1 results
-    let (session_ids, session_trace_ids) =
-        parse_session_trace_ids(&resp_search.hits, session_id_col);
-
-    // Collect all unique trace_ids across sessions
-    let all_trace_ids: Vec<String> = session_trace_ids
-        .values()
-        .flat_map(|ids| ids.iter().cloned())
-        .collect::<hashbrown::HashSet<String>>()
-        .into_iter()
+    let mut session_ids: Vec<String> = resp_page
+        .hits
+        .iter()
+        .filter_map(|hit| hit.get("session_id").and_then(|value| value.as_str()))
+        .map(String::from)
         .collect();
-
-    if all_trace_ids.is_empty() {
-        return MetaHttpResponse::json(PaginatedResponse {
-            took: 0,
-            total: 0,
+    let has_more = session_ids.len() > size as usize;
+    session_ids.truncate(size as usize);
+    let pagination_total = from as usize + session_ids.len() + usize::from(has_more);
+    if session_ids.is_empty() {
+        return MetaHttpResponse::json(LatestSessionsResponse {
+            took: start.elapsed().as_millis() as usize,
+            total: pagination_total,
             from,
             size,
             hits: vec![],
             trace_id,
-            function_error: String::new(),
+            function_error: range_error,
+            has_more,
+            total_is_exact: !has_more,
         });
     }
-    // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
-    // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
-    // Trace IDs originate from ingested data and could contain injected SQL if not validated.
-    let sanitized_ids: Vec<String> = all_trace_ids
-        .iter()
-        .map(|tid| {
-            tid.chars()
-                .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-                .collect::<String>()
-        })
-        .filter(|tid| !tid.is_empty())
-        .collect();
-    let trace_ids_sql = sanitized_ids.join("','");
 
-    // Build Phase 2 SQL using ValidatedLlmSchema for column names and optional
-    // field presence (the session handler keeps its own SQL shape).
-    let query_sql = if validated.has_gen_ai {
-        let first_msg_clause = if validated.has_input_messages {
-            "FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '')".to_string()
-        } else {
-            "''".to_string()
-        };
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        let cache_read_tokens_expr = optional_sum_expr(
-            validated.has_cache_read_input_tokens,
-            "gen_ai_usage_cache_read_input_tokens",
-            "gen_ai_usage_cache_read_input_tokens",
-        );
-        let cache_creation_tokens_expr = optional_sum_expr(
-            validated.has_cache_creation_input_tokens,
-            "gen_ai_usage_cache_creation_input_tokens",
-            "gen_ai_usage_cache_creation_input_tokens",
-        );
-        let cost_cache_read_expr = optional_sum_expr(
-            validated.has_cost_cache_read_input,
-            "gen_ai_usage_cost_cache_read_input",
-            "gen_ai_usage_cost_cache_read_input",
-        );
-        let cost_cache_creation_expr = optional_sum_expr(
-            validated.has_cost_cache_creation_input,
-            "gen_ai_usage_cost_cache_creation_input",
-            "gen_ai_usage_cost_cache_creation_input",
-        );
-        let cost_estimated_without_cache_expr = optional_sum_expr(
-            validated.has_cost_estimated_without_cache,
-            "gen_ai_usage_cost_estimated_without_cache",
-            "gen_ai_usage_cost_estimated_without_cache",
-        );
-        let cost_cache_read_savings_expr = optional_sum_expr(
-            validated.has_cost_cache_read_savings,
-            "gen_ai_usage_cost_cache_read_savings",
-            "gen_ai_usage_cost_cache_read_savings",
-        );
-        let cost_net_cache_impact_expr = optional_sum_expr(
-            validated.has_cost_net_cache_impact,
-            "gen_ai_usage_cost_net_cache_impact",
-            "gen_ai_usage_cost_net_cache_impact",
-        );
-        format!(
-            "SELECT trace_id, \
-            max(user_id) as user_id,
-            min(start_time) as trace_start_time, \
-            max(end_time) as trace_end_time, \
-            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
-            {total_tokens_expr}, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            {cache_read_tokens_expr}, \
-            {cache_creation_tokens_expr}, \
-            {cost_cache_read_expr}, \
-            {cost_cache_creation_expr}, \
-            {cost_estimated_without_cache_expr}, \
-            {cost_cache_read_savings_expr}, \
-            {cost_net_cache_impact_expr}, \
-            sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-            {first_msg_clause} as gen_ai_input_messages \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
-    } else {
-        let first_msg_clause = if validated.has_input_messages {
-            "FIRST_VALUE(llm_input ORDER BY start_time ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '')".to_string()
-        } else {
-            "''".to_string()
-        };
-        let total_tokens_expr = if validated.has_total_tokens {
-            "sum(llm_usage_tokens_total) as gen_ai_usage_details_total"
-        } else {
-            "0 as gen_ai_usage_details_total"
-        };
-        format!(
-            "SELECT trace_id, \
-            max(llm_user_id) as user_id,
-            min(start_time) as trace_start_time, \
-            max(end_time) as trace_end_time, \
-            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
-            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
-            {total_tokens_expr}, \
-            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
-            sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-            {first_msg_clause} as gen_ai_input_messages \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
-    };
-    req.query.sql = query_sql;
+    req.query.sql = build_latest_sessions_sql(&stream_name, &session_ids, &validated);
     req.query.from = 0;
-    req.query.size = all_trace_ids.len() as i64;
-
-    let mut trace_details: HashMap<String, TraceDetail> = HashMap::new();
-    let resp = match SearchService::cache::search(
+    req.query.size = session_ids.len() as i64;
+    let resp_summary = match SearchService::cache::search(
         &trace_id,
         &org_id,
         stream_type,
-        user_id_opt.clone(),
+        user_id_opt,
         &req,
         "".to_string(),
         false,
@@ -509,74 +400,11 @@ pub async fn get_latest_sessions(
                     "",
                 ])
                 .inc();
-            log::error!("get sessions trace details error: {err:?}");
+            log::error!("get sessions latest summary error: {err:?}");
             return map_error_to_http_response(&err, Some(trace_id));
         }
     };
-    for item in resp.hits {
-        let tid = match item.get("trace_id").and_then(|v| v.as_str()) {
-            Some(s) => s.to_string(),
-            None => continue,
-        };
-        let first_user_message = item
-            .get("gen_ai_input_messages")
-            .and_then(|value| extract_first_user_message(value, 400));
-        trace_details.insert(
-            tid,
-            TraceDetail {
-                start_time: json::get_int_value(item.get("trace_start_time").unwrap_or_default()),
-                end_time: json::get_int_value(item.get("trace_end_time").unwrap_or_default()),
-                gen_ai_usage_input_tokens: json::get_int_value(
-                    item.get("gen_ai_usage_details_input").unwrap_or_default(),
-                ),
-                gen_ai_usage_output_tokens: json::get_int_value(
-                    item.get("gen_ai_usage_details_output").unwrap_or_default(),
-                ),
-                gen_ai_usage_total_tokens: json::get_int_value(
-                    item.get("gen_ai_usage_details_total").unwrap_or_default(),
-                ),
-                gen_ai_usage_cost: json::get_float_value(
-                    item.get("gen_ai_usage_cost_details").unwrap_or_default(),
-                ),
-                gen_ai_usage_cache_read_input_tokens: json::get_int_value(
-                    item.get("gen_ai_usage_cache_read_input_tokens")
-                        .unwrap_or_default(),
-                ),
-                gen_ai_usage_cache_creation_input_tokens: json::get_int_value(
-                    item.get("gen_ai_usage_cache_creation_input_tokens")
-                        .unwrap_or_default(),
-                ),
-                gen_ai_usage_cost_cache_read_input: json::get_float_value(
-                    item.get("gen_ai_usage_cost_cache_read_input")
-                        .unwrap_or_default(),
-                ),
-                gen_ai_usage_cost_cache_creation_input: json::get_float_value(
-                    item.get("gen_ai_usage_cost_cache_creation_input")
-                        .unwrap_or_default(),
-                ),
-                gen_ai_usage_cost_estimated_without_cache: json::get_float_value(
-                    item.get("gen_ai_usage_cost_estimated_without_cache")
-                        .unwrap_or_default(),
-                ),
-                gen_ai_usage_cost_cache_read_savings: json::get_float_value(
-                    item.get("gen_ai_usage_cost_cache_read_savings")
-                        .unwrap_or_default(),
-                ),
-                gen_ai_usage_cost_net_cache_impact: json::get_float_value(
-                    item.get("gen_ai_usage_cost_net_cache_impact")
-                        .unwrap_or_default(),
-                ),
-                error_count: json::get_int_value(item.get("error_count").unwrap_or_default()),
-                user_id: item
-                    .get("user_id")
-                    .and_then(|v| v.as_str().map(String::from)),
-                first_user_message,
-            },
-        );
-    }
-
-    // Aggregate per session from trace details
-    let sessions_data = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
+    let sessions_data = normalize_latest_session_hits(resp_summary.hits, &session_ids);
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -600,17 +428,16 @@ pub async fn get_latest_sessions(
         ])
         .inc();
 
-    MetaHttpResponse::json(PaginatedResponse {
+    MetaHttpResponse::json(LatestSessionsResponse {
         took: (time * 1000.0) as usize,
-        total: sessions_data.len(),
+        total: pagination_total,
         from,
         size,
-        hits: sessions_data
-            .into_iter()
-            .map(|v| json::to_value(v).unwrap())
-            .collect(),
+        hits: sessions_data,
         trace_id,
         function_error: range_error,
+        has_more,
+        total_is_exact: !has_more,
     })
 }
 
@@ -784,7 +611,8 @@ pub async fn get_session_details(
     let use_cache = get_use_cache_from_request(&query);
     let user_id_opt = Some(user_id.to_string());
 
-    let query_sql = traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id);
+    let query_sql =
+        traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id, None);
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1336,6 +1164,237 @@ fn optional_sum_expr(has_field: bool, column: &str, alias: &str) -> String {
     }
 }
 
+/// Older clients wrapped the agent predicate in a same-stream session
+/// membership subquery. Inside the grouped page query that becomes an
+/// unsupported `InSubquery` expression, while its inner WHERE clause has the
+/// exact membership semantics we need. Only unwrap the narrow legacy shape;
+/// leave every other filter untouched.
+fn normalize_latest_session_filter(
+    filter: &str,
+    stream_name: &str,
+    session_id_col: &str,
+) -> String {
+    let trimmed = filter.trim();
+    let normalized_outer = trimmed.to_ascii_lowercase();
+    let outer_prefix = format!("{} in (", session_id_col.to_ascii_lowercase());
+    if !normalized_outer.starts_with(&outer_prefix) || !trimmed.ends_with(')') {
+        return trimmed.to_string();
+    }
+
+    let inner = &trimmed[outer_prefix.len()..trimmed.len() - 1];
+    let normalized_inner = inner
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase();
+    let session_id_col = session_id_col.to_ascii_lowercase();
+    let stream_name = stream_name.to_ascii_lowercase();
+    let quoted_prefix = format!("select {session_id_col} from \"{stream_name}\" where ");
+    let bare_prefix = format!("select {session_id_col} from {stream_name} where ");
+    let group_suffix = format!(" group by {session_id_col}");
+    if !(normalized_inner.starts_with(&quoted_prefix) || normalized_inner.starts_with(&bare_prefix))
+        || !normalized_inner.ends_with(&group_suffix)
+    {
+        return trimmed.to_string();
+    }
+
+    search::sql::visitor::pickup_where::pickup_where(inner)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| trimmed.to_string())
+}
+
+fn build_latest_session_page_sql(
+    stream_name: &str,
+    filter: &str,
+    validated: &super::schema_compat::ValidatedLlmSchema,
+) -> String {
+    let session_id_col = validated.columns.session_id;
+    let filter = normalize_latest_session_filter(filter, stream_name, session_id_col);
+    let membership_filter = if filter.is_empty() {
+        String::new()
+    } else {
+        format!(" HAVING max(CASE WHEN {filter} THEN 1 ELSE 0 END) = 1")
+    };
+    format!(
+        "SELECT {session_id_col} as session_id, \
+         max(end_time) as session_last_activity \
+         FROM \"{stream_name}\" \
+         WHERE {session_id_col} IS NOT NULL AND {session_id_col} != '' \
+         GROUP BY {session_id_col}{membership_filter} \
+         ORDER BY session_last_activity DESC, session_id DESC"
+    )
+}
+
+fn build_latest_sessions_sql(
+    stream_name: &str,
+    session_ids: &[String],
+    validated: &super::schema_compat::ValidatedLlmSchema,
+) -> String {
+    let session_id_col = validated.columns.session_id;
+    // Trace ingestion normalizes OTEL `user.id` to the stored `user_id`
+    // column. Keep the legacy schema's explicit `llm_user_id` name.
+    let user_id_col = if validated.has_gen_ai {
+        "user_id"
+    } else {
+        validated.columns.user_id
+    };
+    let session_ids_sql = session_ids
+        .iter()
+        .map(|session_id| format!("'{}'", session_id.replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let (input_tokens_col, output_tokens_col, total_tokens_col, cost_col, input_messages_col) =
+        if validated.has_gen_ai {
+            (
+                "gen_ai_usage_input_tokens",
+                "gen_ai_usage_output_tokens",
+                "gen_ai_usage_total_tokens",
+                "gen_ai_usage_cost",
+                "gen_ai_input_messages",
+            )
+        } else {
+            (
+                "llm_usage_tokens_input",
+                "llm_usage_tokens_output",
+                "llm_usage_tokens_total",
+                "llm_usage_cost_total",
+                "llm_input",
+            )
+        };
+
+    let total_tokens_expr = optional_sum_expr(
+        validated.has_total_tokens,
+        total_tokens_col,
+        "gen_ai_usage_total_tokens",
+    );
+    let first_message_expr = if validated.has_input_messages {
+        format!(
+            "FIRST_VALUE({input_messages_col} ORDER BY start_time ASC) \
+             FILTER (WHERE {input_messages_col} IS NOT NULL AND {input_messages_col} != '') \
+             as gen_ai_input_messages"
+        )
+    } else {
+        "'' as gen_ai_input_messages".to_string()
+    };
+
+    let cache_read_tokens_expr = optional_sum_expr(
+        validated.has_cache_read_input_tokens,
+        "gen_ai_usage_cache_read_input_tokens",
+        "gen_ai_usage_cache_read_input_tokens",
+    );
+    let cache_creation_tokens_expr = optional_sum_expr(
+        validated.has_cache_creation_input_tokens,
+        "gen_ai_usage_cache_creation_input_tokens",
+        "gen_ai_usage_cache_creation_input_tokens",
+    );
+    let cost_cache_read_expr = optional_sum_expr(
+        validated.has_cost_cache_read_input,
+        "gen_ai_usage_cost_cache_read_input",
+        "gen_ai_usage_cost_cache_read_input",
+    );
+    let cost_cache_creation_expr = optional_sum_expr(
+        validated.has_cost_cache_creation_input,
+        "gen_ai_usage_cost_cache_creation_input",
+        "gen_ai_usage_cost_cache_creation_input",
+    );
+    let cost_estimated_without_cache_expr = optional_sum_expr(
+        validated.has_cost_estimated_without_cache,
+        "gen_ai_usage_cost_estimated_without_cache",
+        "gen_ai_usage_cost_estimated_without_cache",
+    );
+    let cost_cache_read_savings_expr = optional_sum_expr(
+        validated.has_cost_cache_read_savings,
+        "gen_ai_usage_cost_cache_read_savings",
+        "gen_ai_usage_cost_cache_read_savings",
+    );
+    let cost_net_cache_impact_expr = optional_sum_expr(
+        validated.has_cost_net_cache_impact,
+        "gen_ai_usage_cost_net_cache_impact",
+        "gen_ai_usage_cost_net_cache_impact",
+    );
+
+    format!(
+        "SELECT {session_id_col} as session_id, \
+         min(start_time) as start_time, \
+         max(end_time) as end_time, \
+         CASE WHEN max(end_time) > min(start_time) \
+              THEN max(end_time) - min(start_time) ELSE 0 END as duration, \
+         count(DISTINCT trace_id) as trace_count, \
+         sum({input_tokens_col}) as gen_ai_usage_input_tokens, \
+         sum({output_tokens_col}) as gen_ai_usage_output_tokens, \
+         {total_tokens_expr}, \
+         sum({cost_col}) as gen_ai_usage_cost, \
+         {cache_read_tokens_expr}, \
+         {cache_creation_tokens_expr}, \
+         {cost_cache_read_expr}, \
+         {cost_cache_creation_expr}, \
+         {cost_estimated_without_cache_expr}, \
+         {cost_cache_read_savings_expr}, \
+         {cost_net_cache_impact_expr}, \
+         sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
+         array_agg(DISTINCT {user_id_col}) \
+             FILTER (WHERE {user_id_col} IS NOT NULL AND {user_id_col} != '') as user_ids, \
+         {first_message_expr} \
+         FROM \"{stream_name}\" \
+         WHERE {session_id_col} IN ({session_ids_sql}) \
+         GROUP BY {session_id_col}"
+    )
+}
+
+fn normalize_latest_session_hits(
+    mut hits: Vec<json::Value>,
+    session_ids: &[String],
+) -> Vec<json::Value> {
+    for hit in &mut hits {
+        let first_user_message = hit
+            .get("gen_ai_input_messages")
+            .and_then(|value| extract_first_user_message(value, 400));
+        let Some(hit) = hit.as_object_mut() else {
+            continue;
+        };
+
+        hit.remove("zo_sql_timestamp");
+        hit.remove("gen_ai_input_messages");
+        hit.insert(
+            "first_user_message".to_string(),
+            first_user_message.map_or(json::Value::Null, json::Value::String),
+        );
+
+        if let Some(json::Value::Array(user_ids)) = hit.get_mut("user_ids") {
+            user_ids.retain(|value| value.as_str().is_some_and(|value| !value.is_empty()));
+            user_ids.sort_by(|left, right| left.as_str().cmp(&right.as_str()));
+            user_ids.dedup();
+        }
+    }
+    let page_order: HashMap<&str, usize> = session_ids
+        .iter()
+        .enumerate()
+        .map(|(index, session_id)| (session_id.as_str(), index))
+        .collect();
+    // Both phases use the latest span end_time across the full session.
+    // Keep the explicit final sort because distributed aggregation does not
+    // guarantee phase 2 row order. Preserve phase 1 order as a deterministic
+    // tie-breaker for sessions with the same last activity time.
+    hits.sort_by(|left, right| {
+        let last_activity =
+            |hit: &json::Value| json::get_int_value(hit.get("end_time").unwrap_or_default());
+        let page_index = |hit: &json::Value| {
+            hit.get("session_id")
+                .and_then(|value| value.as_str())
+                .and_then(|session_id| page_order.get(session_id))
+                .copied()
+                .unwrap_or(usize::MAX)
+        };
+
+        last_activity(right)
+            .cmp(&last_activity(left))
+            .then_with(|| page_index(left).cmp(&page_index(right)))
+    });
+    hits
+}
+
 #[derive(Debug, Serialize)]
 struct SessionTraceResponseItem {
     trace_id: String,
@@ -1480,163 +1539,6 @@ fn extract_first_user_message(value: &json::Value, max_len: usize) -> Option<Str
     }
 }
 
-#[derive(Debug, Serialize)]
-struct SessionDetails {
-    session_id: String,
-    start_time: i64,
-    end_time: i64,
-    duration: i64,
-    trace_count: u16,
-    gen_ai_usage_input_tokens: i64,
-    gen_ai_usage_output_tokens: i64,
-    gen_ai_usage_total_tokens: i64,
-    gen_ai_usage_cost: f64,
-    gen_ai_usage_cache_read_input_tokens: i64,
-    gen_ai_usage_cache_creation_input_tokens: i64,
-    gen_ai_usage_cost_cache_read_input: f64,
-    gen_ai_usage_cost_cache_creation_input: f64,
-    gen_ai_usage_cost_estimated_without_cache: f64,
-    gen_ai_usage_cost_cache_read_savings: f64,
-    gen_ai_usage_cost_net_cache_impact: f64,
-    error_count: i64,
-    user_ids: Vec<String>,
-    first_user_message: Option<String>,
-}
-
-impl SessionDetails {
-    fn from_trace_details(session_id: String, trace_count: usize, details: &[TraceDetail]) -> Self {
-        let mut start_time: i64 = 0;
-        let mut end_time: i64 = 0;
-        let mut usage_input: i64 = 0;
-        let mut usage_output: i64 = 0;
-        let mut usage_total: i64 = 0;
-        let mut cost_total: f64 = 0.0;
-        let mut cache_read_tokens: i64 = 0;
-        let mut cache_creation_tokens: i64 = 0;
-        let mut cost_cache_read: f64 = 0.0;
-        let mut cost_cache_creation: f64 = 0.0;
-        let mut cost_estimated_without_cache: f64 = 0.0;
-        let mut cost_cache_read_savings: f64 = 0.0;
-        let mut cost_net_cache_impact: f64 = 0.0;
-        let mut error_count: i64 = 0;
-        let mut user_ids: HashSet<String> = HashSet::with_capacity(details.len());
-        let mut first_user_message: Option<String> = None;
-        let mut earliest_user_msg_time: i64 = 0;
-        for detail in details {
-            if start_time == 0 || detail.start_time < start_time {
-                start_time = detail.start_time;
-            }
-            if detail.end_time > end_time {
-                end_time = detail.end_time;
-            }
-            usage_input += detail.gen_ai_usage_input_tokens;
-            usage_output += detail.gen_ai_usage_output_tokens;
-            usage_total += detail.gen_ai_usage_total_tokens;
-            cost_total += detail.gen_ai_usage_cost;
-            cache_read_tokens += detail.gen_ai_usage_cache_read_input_tokens;
-            cache_creation_tokens += detail.gen_ai_usage_cache_creation_input_tokens;
-            cost_cache_read += detail.gen_ai_usage_cost_cache_read_input;
-            cost_cache_creation += detail.gen_ai_usage_cost_cache_creation_input;
-            cost_estimated_without_cache += detail.gen_ai_usage_cost_estimated_without_cache;
-            cost_cache_read_savings += detail.gen_ai_usage_cost_cache_read_savings;
-            cost_net_cache_impact += detail.gen_ai_usage_cost_net_cache_impact;
-            error_count += detail.error_count;
-            if let Some(ref uid) = detail.user_id {
-                user_ids.insert(uid.clone());
-            }
-            if let Some(ref msg) = detail.first_user_message
-                && (first_user_message.is_none()
-                    || (detail.start_time != 0 && detail.start_time < earliest_user_msg_time)
-                    || earliest_user_msg_time == 0)
-            {
-                first_user_message = Some(msg.clone());
-                earliest_user_msg_time = detail.start_time;
-            }
-        }
-        let duration = if end_time > start_time {
-            end_time - start_time
-        } else {
-            0
-        };
-        // HashSet → Vec produces non-deterministic order; sort so callers
-        // (and tests) see a stable result.
-        let mut user_ids: Vec<String> = user_ids.into_iter().collect();
-        user_ids.sort();
-        SessionDetails {
-            session_id,
-            start_time,
-            end_time,
-            duration,
-            trace_count: trace_count as u16,
-            gen_ai_usage_input_tokens: usage_input,
-            gen_ai_usage_output_tokens: usage_output,
-            gen_ai_usage_total_tokens: usage_total,
-            gen_ai_usage_cost: cost_total,
-            gen_ai_usage_cache_read_input_tokens: cache_read_tokens,
-            gen_ai_usage_cache_creation_input_tokens: cache_creation_tokens,
-            gen_ai_usage_cost_cache_read_input: cost_cache_read,
-            gen_ai_usage_cost_cache_creation_input: cost_cache_creation,
-            gen_ai_usage_cost_estimated_without_cache: cost_estimated_without_cache,
-            gen_ai_usage_cost_cache_read_savings: cost_cache_read_savings,
-            gen_ai_usage_cost_net_cache_impact: cost_net_cache_impact,
-            error_count,
-            user_ids,
-            first_user_message,
-        }
-    }
-}
-
-fn parse_session_trace_ids(
-    hits: &[json::Value],
-    session_id_col: &str,
-) -> (Vec<String>, HashMap<String, Vec<String>>) {
-    let mut session_trace_ids: HashMap<String, Vec<String>> = HashMap::with_capacity(hits.len());
-    let mut session_ids: Vec<String> = Vec::with_capacity(hits.len());
-    for item in hits {
-        let session_id = match item.get(session_id_col).and_then(|v| v.as_str()) {
-            Some(s) => s.to_string(),
-            None => continue,
-        };
-        let trace_ids: Vec<String> = item
-            .get("trace_ids")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        session_ids.push(session_id.clone());
-        session_trace_ids.insert(session_id, trace_ids);
-    }
-    (session_ids, session_trace_ids)
-}
-
-fn aggregate_sessions(
-    session_ids: &[String],
-    session_trace_ids: &HashMap<String, Vec<String>>,
-    trace_details: &HashMap<String, TraceDetail>,
-) -> Vec<SessionDetails> {
-    let mut sessions_data: Vec<SessionDetails> = Vec::with_capacity(session_ids.len());
-    for session_id in session_ids {
-        let trace_ids = match session_trace_ids.get(session_id) {
-            Some(ids) => ids,
-            None => continue,
-        };
-        let details: Vec<TraceDetail> = trace_ids
-            .iter()
-            .filter_map(|tid| trace_details.get(tid).cloned())
-            .collect();
-        sessions_data.push(SessionDetails::from_trace_details(
-            session_id.clone(),
-            trace_ids.len(),
-            &details,
-        ));
-    }
-    sessions_data.sort_by_key(|k| std::cmp::Reverse(k.start_time));
-    sessions_data
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -1706,436 +1608,107 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_session_trace_ids_empty() {
-        let (ids, map) = parse_session_trace_ids(&[], "gen_ai_conversation_id");
-        assert!(ids.is_empty());
-        assert!(map.is_empty());
+    fn latest_sessions_sql_pages_then_aggregates_by_session_id() {
+        let mut validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        validated.has_input_messages = true;
+        validated.has_total_tokens = true;
+        validated.has_cache_read_input_tokens = true;
+        let filter = "gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM \"bench_traces\" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-123' GROUP BY gen_ai_conversation_id)";
+        let page_sql = build_latest_session_page_sql("bench_traces", filter, &validated);
+        let sql = build_latest_sessions_sql(
+            "bench_traces",
+            &["session-1".to_string(), "session'2".to_string()],
+            &validated,
+        );
+
+        assert!(!page_sql.contains("IN (SELECT"));
+        assert!(!page_sql.contains("trace_id"));
+        assert!(page_sql.contains("max(end_time) as session_last_activity"));
+        assert!(page_sql.contains("gen_ai_agent_id = 'agent-123'"));
+        assert!(page_sql.contains("HAVING max(CASE WHEN"));
+        assert!(page_sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
+        assert!(!page_sql.contains("min(start_time) as session_start_time"));
+        assert!(sql.contains("count(DISTINCT trace_id) as trace_count"));
+        assert!(sql.contains("GROUP BY gen_ai_conversation_id"));
+        assert!(sql.contains("gen_ai_conversation_id IN ('session-1','session''2')"));
+        assert!(sql.contains("sum(gen_ai_usage_input_tokens) as gen_ai_usage_input_tokens"));
+        assert!(sql.contains("sum(gen_ai_usage_total_tokens) as gen_ai_usage_total_tokens"));
+        assert!(sql.contains("array_agg(DISTINCT user_id)"));
+        assert!(sql.contains("FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC)"));
+        assert!(!sql.contains("array_agg(DISTINCT trace_id)"));
+        assert!(!sql.contains("WHERE trace_id IN"));
     }
 
     #[test]
-    fn test_parse_session_trace_ids_basic() {
+    fn latest_session_page_sql_without_filter_has_no_membership_having() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let sql = build_latest_session_page_sql("bench_traces", "", &validated);
+
+        assert!(
+            sql.contains(
+                "WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != ''"
+            )
+        );
+        assert!(!sql.contains("HAVING"));
+        assert!(sql.contains("ORDER BY session_last_activity DESC, session_id DESC"));
+    }
+
+    #[test]
+    fn latest_session_page_sql_keeps_unrelated_subqueries_unchanged() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let filter = "gen_ai_conversation_id IN (SELECT other_id FROM other_stream WHERE active = true GROUP BY other_id)";
+        let sql = build_latest_session_page_sql("bench_traces", filter, &validated);
+
+        assert!(sql.contains(filter));
+    }
+
+    #[test]
+    fn latest_sessions_sql_keeps_legacy_aliases_and_optional_defaults() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
+        let sql =
+            build_latest_sessions_sql("legacy_traces", &["session-1".to_string()], &validated);
+
+        assert!(sql.contains("llm_session_id as session_id"));
+        assert!(sql.contains("sum(llm_usage_tokens_input) as gen_ai_usage_input_tokens"));
+        assert!(sql.contains("sum(llm_usage_cost_total) as gen_ai_usage_cost"));
+        assert!(sql.contains("0 as gen_ai_usage_total_tokens"));
+        assert!(sql.contains("0 as gen_ai_usage_cache_read_input_tokens"));
+        assert!(sql.contains("'' as gen_ai_input_messages"));
+    }
+
+    #[test]
+    fn normalize_latest_sessions_removes_internal_fields_and_stabilizes_users() {
         let hits = vec![
-            json!({"gen_ai_conversation_id": "sess-1", "trace_ids": ["t1", "t2"]}),
-            json!({"gen_ai_conversation_id": "sess-2", "trace_ids": ["t3"]}),
+            json!({
+                "session_id": "session-1",
+                "start_time": 100,
+                "end_time": 300,
+                "zo_sql_timestamp": 300,
+                "gen_ai_input_messages": [
+                    {"role": "assistant", "content": "hi"},
+                    {"role": "user", "content": "show me the weather"}
+                ],
+                "user_ids": ["zeta", "alpha", "zeta", ""]
+            }),
+            json!({
+                "session_id": "session-2",
+                "start_time": 200,
+                "end_time": 250,
+                "zo_sql_timestamp": 200,
+                "gen_ai_input_messages": [],
+                "user_ids": []
+            }),
         ];
-        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
-        assert_eq!(ids, vec!["sess-1", "sess-2"]);
-        assert_eq!(
-            map.get("sess-1").unwrap(),
-            &vec!["t1".to_string(), "t2".to_string()]
+
+        let normalized = normalize_latest_session_hits(
+            hits,
+            &["session-2".to_string(), "session-1".to_string()],
         );
-        assert_eq!(map.get("sess-2").unwrap(), &vec!["t3".to_string()]);
-    }
-
-    #[test]
-    fn test_parse_session_trace_ids_skips_missing_col() {
-        let hits = vec![
-            json!({"other": "value"}),
-            json!({"gen_ai_conversation_id": "sess-1", "trace_ids": ["t1"]}),
-        ];
-        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
-        assert_eq!(ids.len(), 1);
-        assert!(map.contains_key("sess-1"));
-    }
-
-    #[test]
-    fn test_parse_session_trace_ids_no_trace_ids_array() {
-        let hits = vec![json!({"gen_ai_conversation_id": "sess-1"})];
-        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
-        assert_eq!(ids, vec!["sess-1"]);
-        assert!(map.get("sess-1").unwrap().is_empty());
-    }
-
-    #[test]
-    fn test_aggregate_sessions_empty() {
-        let result = aggregate_sessions(&[], &HashMap::new(), &HashMap::new());
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_aggregate_sessions_single_session_two_traces() {
-        let session_ids = vec!["sess-1".to_string()];
-        let mut session_trace_ids = HashMap::new();
-        session_trace_ids.insert(
-            "sess-1".to_string(),
-            vec!["t1".to_string(), "t2".to_string()],
-        );
-        let mut trace_details = HashMap::new();
-        trace_details.insert(
-            "t1".to_string(),
-            TraceDetail {
-                start_time: 1000,
-                end_time: 2000,
-                gen_ai_usage_input_tokens: 100,
-                gen_ai_usage_output_tokens: 50,
-                gen_ai_usage_total_tokens: 150,
-                gen_ai_usage_cost: 0.01,
-                error_count: 0,
-                user_id: None,
-                ..Default::default()
-            },
-        );
-        trace_details.insert(
-            "t2".to_string(),
-            TraceDetail {
-                start_time: 1500,
-                end_time: 3000,
-                gen_ai_usage_input_tokens: 200,
-                gen_ai_usage_output_tokens: 100,
-                gen_ai_usage_total_tokens: 300,
-                gen_ai_usage_cost: 0.02,
-                error_count: 0,
-                user_id: None,
-                ..Default::default()
-            },
-        );
-
-        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
-        assert_eq!(result.len(), 1);
-        let s = &result[0];
-        assert_eq!(s.session_id, "sess-1");
-        assert_eq!(s.start_time, 1000);
-        assert_eq!(s.end_time, 3000);
-        assert_eq!(s.duration, 2000);
-        assert_eq!(s.trace_count, 2);
-        assert_eq!(s.gen_ai_usage_input_tokens, 300);
-        assert_eq!(s.gen_ai_usage_output_tokens, 150);
-        assert_eq!(s.gen_ai_usage_total_tokens, 450);
-        assert!((s.gen_ai_usage_cost - 0.03).abs() < 1e-10);
-        assert_eq!(s.error_count, 0);
-    }
-
-    #[test]
-    fn test_aggregate_sessions_sorted_descending_by_start_time() {
-        let session_ids = vec!["sess-1".to_string(), "sess-2".to_string()];
-        let mut session_trace_ids = HashMap::new();
-        session_trace_ids.insert("sess-1".to_string(), vec!["t1".to_string()]);
-        session_trace_ids.insert("sess-2".to_string(), vec!["t2".to_string()]);
-        let mut trace_details = HashMap::new();
-        trace_details.insert(
-            "t1".to_string(),
-            TraceDetail {
-                start_time: 1000,
-                end_time: 2000,
-                gen_ai_usage_input_tokens: 0,
-                gen_ai_usage_output_tokens: 0,
-                gen_ai_usage_total_tokens: 0,
-                gen_ai_usage_cost: 0.0,
-                error_count: 0,
-                user_id: None,
-                ..Default::default()
-            },
-        );
-        trace_details.insert(
-            "t2".to_string(),
-            TraceDetail {
-                start_time: 5000,
-                end_time: 6000,
-                gen_ai_usage_input_tokens: 0,
-                gen_ai_usage_output_tokens: 0,
-                gen_ai_usage_total_tokens: 0,
-                gen_ai_usage_cost: 0.0,
-                error_count: 0,
-                user_id: None,
-                ..Default::default()
-            },
-        );
-
-        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
-        assert_eq!(result.len(), 2);
-        assert!(result[0].start_time >= result[1].start_time);
-    }
-
-    #[test]
-    fn test_aggregate_sessions_missing_trace_detail() {
-        let session_ids = vec!["sess-1".to_string()];
-        let mut session_trace_ids = HashMap::new();
-        session_trace_ids.insert("sess-1".to_string(), vec!["missing".to_string()]);
-
-        let result = aggregate_sessions(&session_ids, &session_trace_ids, &HashMap::new());
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].start_time, 0);
-        assert_eq!(result[0].trace_count, 1);
-        assert_eq!(result[0].duration, 0);
-    }
-
-    #[test]
-    fn test_aggregate_sessions_duration_zero_when_times_equal() {
-        let session_ids = vec!["sess-1".to_string()];
-        let mut session_trace_ids = HashMap::new();
-        session_trace_ids.insert("sess-1".to_string(), vec!["t1".to_string()]);
-        let mut trace_details = HashMap::new();
-        trace_details.insert(
-            "t1".to_string(),
-            TraceDetail {
-                start_time: 1000,
-                end_time: 1000,
-                gen_ai_usage_input_tokens: 0,
-                gen_ai_usage_output_tokens: 0,
-                gen_ai_usage_total_tokens: 0,
-                gen_ai_usage_cost: 0.0,
-                error_count: 0,
-                user_id: None,
-                ..Default::default()
-            },
-        );
-
-        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
-        assert_eq!(result[0].duration, 0);
-    }
-
-    #[test]
-    fn test_aggregate_sessions_start_time_uses_earliest() {
-        let session_ids = vec!["sess-1".to_string()];
-        let mut session_trace_ids = HashMap::new();
-        session_trace_ids.insert(
-            "sess-1".to_string(),
-            vec!["t1".to_string(), "t2".to_string(), "t3".to_string()],
-        );
-        let mut trace_details = HashMap::new();
-        for (id, start) in [("t1", 500i64), ("t2", 100i64), ("t3", 300i64)] {
-            trace_details.insert(
-                id.to_string(),
-                TraceDetail {
-                    start_time: start,
-                    end_time: start + 100,
-                    gen_ai_usage_input_tokens: 0,
-                    gen_ai_usage_output_tokens: 0,
-                    gen_ai_usage_total_tokens: 0,
-                    gen_ai_usage_cost: 0.0,
-                    error_count: 0,
-                    user_id: None,
-                    ..Default::default()
-                },
-            );
-        }
-
-        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
-        assert_eq!(result[0].start_time, 100);
-        assert_eq!(result[0].end_time, 600); // max(500+100, 100+100, 300+100)
-    }
-
-    #[test]
-    fn test_aggregate_sessions_error_count_across_traces() {
-        let session_ids = vec!["sess-1".to_string()];
-        let mut session_trace_ids = HashMap::new();
-        session_trace_ids.insert(
-            "sess-1".to_string(),
-            vec!["t1".to_string(), "t2".to_string()],
-        );
-        let mut trace_details = HashMap::new();
-        trace_details.insert(
-            "t1".to_string(),
-            TraceDetail {
-                start_time: 1000,
-                end_time: 2000,
-                gen_ai_usage_input_tokens: 0,
-                gen_ai_usage_output_tokens: 0,
-                gen_ai_usage_total_tokens: 0,
-                gen_ai_usage_cost: 0.0,
-                error_count: 3,
-                user_id: None,
-                ..Default::default()
-            },
-        );
-        trace_details.insert(
-            "t2".to_string(),
-            TraceDetail {
-                start_time: 1500,
-                end_time: 3000,
-                gen_ai_usage_input_tokens: 0,
-                gen_ai_usage_output_tokens: 0,
-                gen_ai_usage_total_tokens: 0,
-                gen_ai_usage_cost: 0.0,
-                error_count: 2,
-                user_id: None,
-                ..Default::default()
-            },
-        );
-
-        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].error_count, 5);
-    }
-
-    #[test]
-    fn test_from_trace_details_empty() {
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 0, &[]);
-        assert_eq!(session.session_id, "sess-1");
-        assert_eq!(session.start_time, 0);
-        assert_eq!(session.end_time, 0);
-        assert_eq!(session.duration, 0);
-        assert_eq!(session.trace_count, 0);
-        assert_eq!(session.gen_ai_usage_input_tokens, 0);
-        assert_eq!(session.gen_ai_usage_output_tokens, 0);
-        assert_eq!(session.gen_ai_usage_total_tokens, 0);
-        assert_eq!(session.gen_ai_usage_cost, 0.0);
-        assert_eq!(session.error_count, 0);
-        assert!(session.user_ids.is_empty());
-        assert!(session.first_user_message.is_none());
-    }
-
-    #[test]
-    fn test_from_trace_details_single_trace() {
-        let details = vec![TraceDetail {
-            start_time: 1000,
-            end_time: 2000,
-            gen_ai_usage_input_tokens: 10,
-            gen_ai_usage_output_tokens: 20,
-            gen_ai_usage_total_tokens: 30,
-            gen_ai_usage_cost: 0.05,
-            error_count: 1,
-            ..Default::default()
-        }];
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 1, &details);
-        assert_eq!(session.session_id, "sess-1");
-        assert_eq!(session.start_time, 1000);
-        assert_eq!(session.end_time, 2000);
-        assert_eq!(session.duration, 1000);
-        assert_eq!(session.trace_count, 1);
-        assert_eq!(session.gen_ai_usage_input_tokens, 10);
-        assert_eq!(session.gen_ai_usage_output_tokens, 20);
-        assert_eq!(session.gen_ai_usage_total_tokens, 30);
-        assert!((session.gen_ai_usage_cost - 0.05).abs() < 1e-10);
-        assert_eq!(session.error_count, 1);
-    }
-
-    #[test]
-    fn test_from_trace_details_with_user_ids() {
-        let details = vec![
-            TraceDetail {
-                start_time: 1000,
-                end_time: 2000,
-                user_id: Some("user-a".to_string()),
-                ..Default::default()
-            },
-            TraceDetail {
-                start_time: 1500,
-                end_time: 3000,
-                user_id: Some("user-b".to_string()),
-                ..Default::default()
-            },
-        ];
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
-        assert_eq!(session.trace_count, 2);
-        assert_eq!(session.start_time, 1000);
-        assert_eq!(session.end_time, 3000);
-        assert_eq!(session.user_ids, vec!["user-a", "user-b"]);
-    }
-
-    #[test]
-    fn test_from_trace_details_user_ids_sorted() {
-        // user_ids are collected into a HashSet; ensure the final Vec is sorted
-        // so output is deterministic regardless of hash iteration order.
-        let details: Vec<TraceDetail> = ["zeta", "alpha", "mike", "bravo"]
-            .iter()
-            .enumerate()
-            .map(|(i, uid)| TraceDetail {
-                start_time: 1000 + i as i64,
-                end_time: 2000 + i as i64,
-                user_id: Some((*uid).to_string()),
-                ..Default::default()
-            })
-            .collect();
-        let session =
-            SessionDetails::from_trace_details("sess-1".to_string(), details.len(), &details);
-        assert_eq!(session.user_ids, vec!["alpha", "bravo", "mike", "zeta"]);
-    }
-
-    #[test]
-    fn test_from_trace_details_user_ids_deduplicated() {
-        let details = vec![
-            TraceDetail {
-                start_time: 1000,
-                end_time: 2000,
-                user_id: Some("user-a".to_string()),
-                ..Default::default()
-            },
-            TraceDetail {
-                start_time: 1500,
-                end_time: 3000,
-                user_id: Some("user-a".to_string()),
-                ..Default::default()
-            },
-            TraceDetail {
-                start_time: 2000,
-                end_time: 4000,
-                user_id: Some("user-b".to_string()),
-                ..Default::default()
-            },
-        ];
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 3, &details);
-        assert_eq!(session.user_ids, vec!["user-a", "user-b"]);
-    }
-
-    #[test]
-    fn test_from_trace_details_skips_none_user_ids() {
-        let details = vec![
-            TraceDetail {
-                start_time: 1000,
-                end_time: 2000,
-                user_id: Some("user-a".to_string()),
-                ..Default::default()
-            },
-            TraceDetail {
-                start_time: 1500,
-                end_time: 3000,
-                user_id: None,
-                ..Default::default()
-            },
-        ];
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
-        assert_eq!(session.user_ids, vec!["user-a"]);
-    }
-
-    #[test]
-    fn test_from_trace_details_trace_count_independent_of_details_len() {
-        let details = vec![];
-        // trace_count can be larger than details.len() (e.g. traces not found in DB)
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 5, &details);
-        assert_eq!(session.trace_count, 5);
-        assert_eq!(session.start_time, 0);
-        assert_eq!(session.end_time, 0);
-    }
-
-    #[test]
-    fn test_from_trace_details_first_user_message_from_earliest_trace() {
-        let details = vec![
-            TraceDetail {
-                start_time: 2000,
-                end_time: 3000,
-                first_user_message: Some("what is the weather".to_string()),
-                ..Default::default()
-            },
-            TraceDetail {
-                start_time: 1000, // earliest
-                end_time: 2000,
-                first_user_message: Some("hello".to_string()),
-                ..Default::default()
-            },
-        ];
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
-        assert_eq!(session.first_user_message, Some("hello".to_string()));
-    }
-
-    #[test]
-    fn test_from_trace_details_first_user_message_skips_zero_start_time() {
-        let details = vec![
-            TraceDetail {
-                start_time: 0, // no start_time, skipped
-                end_time: 2000,
-                first_user_message: Some("zero time msg".to_string()),
-                ..Default::default()
-            },
-            TraceDetail {
-                start_time: 1000,
-                end_time: 2000,
-                first_user_message: Some("real msg".to_string()),
-                ..Default::default()
-            },
-        ];
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
-        assert_eq!(session.first_user_message, Some("real msg".to_string()));
+        assert_eq!(normalized[0]["session_id"], "session-1");
+        assert_eq!(normalized[0]["first_user_message"], "show me the weather");
+        assert_eq!(normalized[0]["user_ids"], json!(["alpha", "zeta"]));
+        assert!(normalized[0].get("zo_sql_timestamp").is_none());
+        assert!(normalized[0].get("gen_ai_input_messages").is_none());
     }
 
     #[test]

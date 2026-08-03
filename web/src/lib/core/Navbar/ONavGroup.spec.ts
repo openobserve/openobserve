@@ -191,4 +191,107 @@ describe("ONavGroup", () => {
     await flushPromises();
     expect(flyout().exists()).toBe(false);
   });
+
+  // Exactly one row may be active. Destinations/Templates are SIBLINGS of
+  // Alerts, not sub-pages, so their paths are top-level and flat — that is what
+  // keeps them unambiguous. The deepest-match rule below is the second line of
+  // defence for genuinely nested sections.
+  describe("active state across sibling sections", () => {
+    const reliabilityChildren: SubnavChild[] = [
+      { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertList" },
+      { titleKey: "alert_destinations.header", icon: "location-on", name: "alertDestinations" },
+      { titleKey: "alert_templates.header", icon: "description", name: "alertTemplates" },
+    ];
+
+    function makeReliabilityRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/alerts", name: "alertList", component: { template: "<div />" } },
+          {
+            path: "/alert-destinations",
+            name: "alertDestinations",
+            component: { template: "<div />" },
+          },
+          {
+            path: "/alert-templates",
+            name: "alertTemplates",
+            component: { template: "<div />" },
+          },
+          // A real drill-down under Alerts — this one SHOULD mark Alerts.
+          {
+            path: "/alerts/detail/:id",
+            name: "alertDetail",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+    }
+
+    async function mountAt(path: string, children = reliabilityChildren) {
+      const router = makeReliabilityRouter();
+      router.push(path);
+      await router.isReady();
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "reliability",
+          title: "Reliability",
+          icon: "shield",
+          children,
+          parentItem: {
+            link: "/alerts",
+            title: "Reliability",
+            icon: "shield",
+            name: "alertList",
+          },
+        },
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return w;
+    }
+
+    function activeNames(w: VueWrapper): string[] {
+      return w
+        .findAll('[data-test^="nav-group-item-"]')
+        .filter((el) => el.attributes("aria-current") === "page")
+        .map((el) => el.attributes("data-test")!.replace("nav-group-item-", ""));
+    }
+
+    it("marks only Notification Destinations on /alert-destinations", async () => {
+      wrapper = await mountAt("/alert-destinations");
+      expect(activeNames(wrapper)).toEqual(["alertDestinations"]);
+    });
+
+    it("marks only Templates on /alert-templates", async () => {
+      wrapper = await mountAt("/alert-templates");
+      expect(activeNames(wrapper)).toEqual(["alertTemplates"]);
+    });
+
+    it("marks only Alerts on /alerts", async () => {
+      wrapper = await mountAt("/alerts");
+      expect(activeNames(wrapper)).toEqual(["alertList"]);
+    });
+
+    it("attributes an alert drill-down to Alerts", async () => {
+      wrapper = await mountAt("/alerts/detail/abc");
+      expect(activeNames(wrapper)).toEqual(["alertList"]);
+    });
+
+    // Guard for any future section that IS nested under a sibling: the deepest
+    // matching path wins, so the ancestor no longer lights up alongside it.
+    it("gives a nested section to itself, not to its ancestor", async () => {
+      wrapper = await mountAt("/alerts/detail/abc", [
+        { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertList" },
+        { titleKey: "menu.alerts", icon: "shield-alert-outline", name: "alertDetail" },
+      ]);
+      expect(activeNames(wrapper)).toEqual(["alertDetail"]);
+    });
+  });
 });

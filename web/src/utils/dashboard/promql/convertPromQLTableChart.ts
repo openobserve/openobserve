@@ -111,8 +111,13 @@ export class TableConverter implements PromQLChartConverter {
       return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
     };
 
+    // `mono` on the timestamp and value columns matches the rule the SQL table
+    // converters already apply (`isNumber || isTimestamp`) and the monospace
+    // cells in logs and traces, so digits line up column-to-column. Label
+    // columns hold free text and stay in the sans face.
     const makeTimestampColumn = (sticky = false): any => ({
       ...baseColumn("timestamp", "Timestamp", "left"),
+      mono: true,
       ...(sticky ? { sticky, headerClasses: "sticky-column", classes: "sticky-column" } : {}),
     });
 
@@ -126,6 +131,7 @@ export class TableConverter implements PromQLChartConverter {
 
     const makeValueColumn = (name: string, label: string): any => ({
       ...baseColumn(name, label, "right"),
+      mono: true,
       format: valueFormat(name.toLowerCase()),
     });
 

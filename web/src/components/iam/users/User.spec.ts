@@ -156,8 +156,8 @@ const NoDataStub = {
   template: `<div class="no-data-stub" />`,
 };
 
-const QTablePaginationStub = {
-  name: "QTablePagination",
+const PaginationStub = {
+  name: "Pagination",
   props: ["scope", "resultTotal", "perPageOptions", "position"],
   emits: ["update:changeRecordPerPage"],
   template: `<div class="table-pagination-stub" />`,
@@ -174,7 +174,7 @@ const mountUser = () =>
         AddUser: AddUserStub,
         MemberInvitation: MemberInvitationStub,
         NoData: NoDataStub,
-        QTablePagination: QTablePaginationStub,
+        Pagination: PaginationStub,
         OIcon: { template: "<i />" },
         OButton: {
           props: ["variant", "size", "disabled", "loading"],

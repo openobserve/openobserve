@@ -285,7 +285,7 @@ pub struct TriggerStatus {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TriggerStatusSearchResult {
     pub module: usage::TriggerDataType,
-    pub status: usage::TriggerDataStatus,
+    pub status: usage::RunOutcome,
 }
 
 impl TriggerStatus {
@@ -302,10 +302,15 @@ impl TriggerStatus {
         for result in results {
             if result.module == module {
                 match result.status {
-                    usage::TriggerDataStatus::Completed
-                    | usage::TriggerDataStatus::ConditionNotSatisfied => status.healthy += 1,
-                    usage::TriggerDataStatus::Failed => status.failed += 1,
-                    usage::TriggerDataStatus::Skipped => status.warning += 1,
+                    // Health = did the evaluation run cleanly. A firing alert
+                    // is a healthy trigger; a failed delivery is not.
+                    usage::RunOutcome::Firing
+                    | usage::RunOutcome::Normal
+                    | usage::RunOutcome::Succeeded => status.healthy += 1,
+                    usage::RunOutcome::Error | usage::RunOutcome::NotifyFailed => {
+                        status.failed += 1
+                    }
+                    usage::RunOutcome::Skipped => status.warning += 1,
                 }
             }
         }
@@ -1141,11 +1146,11 @@ mod tests {
         let results = vec![
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::Completed,
+                status: usage::RunOutcome::Firing,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::ConditionNotSatisfied,
+                status: usage::RunOutcome::Normal,
             },
         ];
 
@@ -1162,15 +1167,15 @@ mod tests {
         let results = vec![
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Completed,
+                status: usage::RunOutcome::Firing,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
         ];
 
@@ -1186,15 +1191,15 @@ mod tests {
         let results = vec![
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::Completed,
+                status: usage::RunOutcome::Firing,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::Skipped,
+                status: usage::RunOutcome::Skipped,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::Skipped,
+                status: usage::RunOutcome::Skipped,
             },
         ];
 
@@ -1211,19 +1216,19 @@ mod tests {
         let results = vec![
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Completed,
+                status: usage::RunOutcome::Firing,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Skipped,
+                status: usage::RunOutcome::Skipped,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::ConditionNotSatisfied,
+                status: usage::RunOutcome::Normal,
             },
         ];
 
@@ -1251,15 +1256,15 @@ mod tests {
         let results = vec![
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::Completed,
+                status: usage::RunOutcome::Firing,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
         ];
 
@@ -1276,11 +1281,11 @@ mod tests {
         let results = vec![
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Completed,
+                status: usage::RunOutcome::Firing,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
         ];
 
@@ -1298,15 +1303,15 @@ mod tests {
         let results = vec![
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::Alert,
-                status: usage::TriggerDataStatus::Failed,
+                status: usage::RunOutcome::Error,
             },
         ];
 
@@ -1322,11 +1327,11 @@ mod tests {
         let results = vec![
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::Skipped,
+                status: usage::RunOutcome::Skipped,
             },
             TriggerStatusSearchResult {
                 module: usage::TriggerDataType::DerivedStream,
-                status: usage::TriggerDataStatus::Skipped,
+                status: usage::RunOutcome::Skipped,
             },
         ];
 

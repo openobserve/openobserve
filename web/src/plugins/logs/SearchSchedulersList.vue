@@ -34,6 +34,7 @@
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           :frame="false"
+          class="search-scheduler-otable"
           data-test="search-scheduler-table"
           :data="dataToBeLoaded"
           :columns="columnsToBeRendered"
@@ -107,7 +108,7 @@
             />
           </template>
           <template #expansion="{ row }">
-            <div class="app-tabs-schedule-list h-fit w-fit px-4 py-0">
+            <div class="app-tabs-schedule-list h-fit w-fit px-4 py-2">
               <AppTabs
                 data-test="expanded-list-tabs"
                 class="mr-3"
@@ -895,6 +896,12 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* keep(lib-override:otable): the shared expanded-row fill greys out the whole
+   detail panel; keep it on the normal cell surface like the rest of the list. */
+.search-scheduler-otable :deep([data-test^="o2-table-expanded-row-"]) {
+  background-color: var(--color-table-cell-bg);
+}
+
 /* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
    v-html, so these can't be template utilities. Every colour but .mtk1 comes
    from Monaco's own global stylesheet; .mtk1 is its default-text token, which

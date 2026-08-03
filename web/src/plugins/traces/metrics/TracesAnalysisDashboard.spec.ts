@@ -234,35 +234,6 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
         OButton: OButtonStub,
         OTabs: OTabsStub,
         OTab: OTabStub,
-        QIcon: { template: "<span />" },
-        QBtn: {
-          template: '<button @click="$emit(\'click\')" v-bind="$attrs"><slot /></button>',
-          emits: ["click"],
-          props: ["icon", "label", "color", "size", "dense", "round", "flat", "outline", "noCaps"],
-        },
-        QTooltip: { template: "<span />" },
-        QSplitter: {
-          template:
-            '<div><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-          props: ["modelValue", "limits"],
-          emits: ["update:modelValue"],
-        },
-        QList: { template: "<ul><slot /></ul>" },
-        QItem: { template: "<li><slot /></li>" },
-        QItemSection: { template: "<div><slot /></div>" },
-        QItemLabel: { template: "<span><slot /></span>" },
-        QCheckbox: {
-          template:
-            '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', !modelValue)" />',
-          props: ["modelValue", "color", "size", "dense"],
-          emits: ["update:modelValue"],
-        },
-        QInput: {
-          template:
-            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-          props: ["modelValue", "dense", "borderless", "placeholder", "clearable"],
-          emits: ["update:modelValue"],
-        },
         // Heavy custom child — already mocked at module level
         RenderDashboardCharts: {
           template: '<div data-test="render-dashboard-charts"></div>',

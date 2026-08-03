@@ -1533,7 +1533,7 @@ class AnomalyDetectionPage {
         await this.page.waitForTimeout(3000);
 
         // Search for anomaly alert in validation stream
-        let logTableCell = this.page.locator('[data-test="log-table-column-0-source"]');
+        let logTableCell = this.page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]');
         let logCount = await logTableCell.count();
 
         if (logCount === 0) {

@@ -135,7 +135,7 @@ describe("ONavbar", () => {
       );
     });
 
-    it("keeps Alerts and Reports as separate top-level links", () => {
+    it("collapses Alerts into Reliability and leaves Reports a separate link", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
@@ -144,9 +144,15 @@ describe("ONavbar", () => {
         ],
       });
 
-      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(true);
+      // Alerts brings Destinations/Templates with it, so it is a group tile
+      // rather than a bare link; Dashboards is absent so Reports stays a link.
+      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(false);
+      const reliability = wrapper.find('[data-test="nav-group-reliability"]');
+      expect(reliability.exists()).toBe(true);
+      expect(reliability.attributes("data-children")).toBe(
+        "alertList,alertDestinations,alertTemplates",
+      );
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="nav-group-monitoring"]').exists()).toBe(false);
     });
 
     it("renders IAM / Management / AI as plain links (no submenu)", () => {

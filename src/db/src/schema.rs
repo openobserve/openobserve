@@ -215,6 +215,11 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
         Field::new("gen_ai_provider_name", DataType::Utf8, true),
         Field::new("gen_ai_agent_name", DataType::Utf8, true),
         Field::new("gen_ai_agent_id", DataType::Utf8, true),
+        // Canonical env/version columns the agent registry writes back onto
+        // spans; must be provisioned (and UDS-listed) so version-scoped agent
+        // queries never hit "No field named" on LLM streams.
+        Field::new("gen_ai_agent_env", DataType::Utf8, true),
+        Field::new("gen_ai_agent_version", DataType::Utf8, true),
         Field::new("gen_ai_input_messages", DataType::Utf8, true),
         Field::new("gen_ai_output_messages", DataType::Utf8, true),
         Field::new("gen_ai_system_instructions", DataType::Utf8, true),
@@ -830,6 +835,8 @@ mod tests {
         assert!(fields.contains(&"gen_ai_usage_cache_read_input_tokens".to_string()));
         assert!(fields.contains(&"gen_ai_usage_cache_creation_input_tokens".to_string()));
         assert!(fields.contains(&"gen_ai_usage_cost_net_cache_impact".to_string()));
+        assert!(fields.contains(&"gen_ai_agent_env".to_string()));
+        assert!(fields.contains(&"gen_ai_agent_version".to_string()));
         assert!(fields.contains(&O2_INGEST_TS_COL_NAME.to_string()));
     }
 

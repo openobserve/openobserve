@@ -163,6 +163,46 @@ pub static INGEST_PARQUET_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+/// Checks waiting to be leased, per location and pool.
+///
+/// The other half of queue-lag visibility. A result record carries `scheduled_ts`
+/// and `started_ts`, so the delay of work that RAN is already derivable — but a
+/// check nobody leased produces no record at all, so the backlog it sits in is
+/// invisible from the results side by construction. Without this, "the queue is
+/// backed up" and "concurrency fixed it" are both unfalsifiable.
+pub static SYNTHETICS_PENDING_JOBS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "synthetics_pending_jobs",
+            "Number of synthetics checks pending lease.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["location", "pool"],
+    )
+    .expect("Metric created")
+});
+
+/// Age of the oldest check still waiting, in seconds, per location and pool.
+///
+/// Reported alongside the count because they fail differently: a large count that
+/// drains every tick is throughput, while a small count whose oldest entry keeps
+/// ageing is a location that has stopped being served at all — one agent down, or
+/// no agent ever polling that pool. The count alone cannot tell those apart.
+pub static SYNTHETICS_OLDEST_PENDING_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "synthetics_oldest_pending_age_seconds",
+            "Age of the oldest synthetics check pending lease, in seconds.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["location", "pool"],
+    )
+    .expect("Metric created")
+});
+
 pub static INGEST_PACK_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -1952,6 +1992,71 @@ pub static QUEUE_OLDEST_MESSAGE_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static EVAL_SCHEDULER_PENDING_TARGETS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "eval_scheduler_pending_targets",
+            "Current in-flight (pending) evaluation targets tracked by the eval scheduler, summed across the organization's streams",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static EVAL_SCHEDULER_PENDING_MEMORY_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "eval_scheduler_pending_memory_bytes",
+            "Accounted bytes of pending evaluation targets, and the configured limit (state=used, limit)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["state"],
+    )
+    .expect("Metric created")
+});
+
+pub static EVAL_SCHEDULER_FORCED_READY_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "eval_scheduler_forced_ready_total",
+            "Total pending evaluation targets force-evaluated early because the pending memory budget was exceeded",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static EVAL_SCHEDULER_EVICTED_EVIDENCE_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "eval_scheduler_evicted_evidence_total",
+            "Evaluation evidence dropped by pending-memory budget enforcement (kind=orphan: unbound session evidence whose session evaluation may be lost until a restart replays it; kind=binding: trace-to-session bindings). Sustained increases mean the budget does not match the workload",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "kind"],
+    )
+    .expect("Metric created")
+});
+
+pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "eval_scheduler_watermark_lag_seconds",
+            "Lag in seconds between the eval scheduler scan cursor and the committed (persisted) watermark, worst case across the organization's streams",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1984,6 +2089,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_PARQUET_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_PENDING_JOBS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_PACK_FILES.clone()))
@@ -2452,6 +2563,22 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(QUEUE_OLDEST_MESSAGE_AGE_SECONDS.clone()))
         .expect("Metric registered");
+    // eval scheduler pending-target metrics
+    registry
+        .register(Box::new(EVAL_SCHEDULER_PENDING_TARGETS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(EVAL_SCHEDULER_PENDING_MEMORY_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(EVAL_SCHEDULER_FORCED_READY_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(EVAL_SCHEDULER_EVICTED_EVIDENCE_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
+        .expect("Metric registered");
 }
 
 pub fn create_const_labels() -> HashMap<String, String> {
@@ -2569,6 +2696,8 @@ mod tests {
         let _ = INGEST_ERRORS.clone();
         let _ = INGEST_WAL_USED_BYTES.clone();
         let _ = INGEST_PARQUET_FILES.clone();
+        let _ = SYNTHETICS_PENDING_JOBS.clone();
+        let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
         let _ = INGEST_PACK_FILES.clone();
         let _ = INGEST_PACK_SEGMENTS.clone();
         let _ = INGEST_WAL_WRITE_BYTES.clone();

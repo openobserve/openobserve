@@ -116,13 +116,8 @@ describe("SearchSchedulersList Component", () => {
           store: mockStore,
         },
         stubs: {
-          QPage: true,
-          QTable: true,
           QTr: true,
           QTd: true,
-          QBtn: true,
-          QIcon: true,
-          QToggle: true,
           DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {

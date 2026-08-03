@@ -811,6 +811,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- ════════════ STEPS ════════════ -->
           <OTabPanel name="steps">
             <div class="mx-auto flex flex-col gap-2">
+              <!--
+                P2a — the tally takes the newest N executions, so on a busy check
+                it describes a window far shorter than the one the picker shows.
+                A 1-minute check across 2 locations x 4 browser/device combos
+                produces 11 520 executions a day: a 5000-row cap is about ten
+                hours of a "last 7 days" selection. The numbers were right; the
+                label was wrong, and silently so.
+              -->
+              <p
+                v-if="!stepsLoading && stepsCoverage.truncated"
+                class="text-text-secondary px-2 text-xs"
+                data-test="monitor-runs-steps-coverage"
+              >
+                {{
+                  t("synthetics.runs.stepsWindowTruncated", {
+                    count: stepsCoverage.executions,
+                    from: fmtTimestamp(stepsCoverage.fromMs),
+                    to: fmtTimestamp(stepsCoverage.toMs),
+                  })
+                }}
+              </p>
               <!-- Loading skeleton -->
               <template v-if="stepsLoading || !stepsHasLoadedOnce">
                 <div class="grid grid-cols-2 gap-2">
@@ -1043,7 +1064,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -1135,12 +1156,22 @@ interface Props {
   /** Check type ("browser" | "http" | etc.) — provided by the parent after it
    * fetches the check. Controls the tabs grid layout and step analysis visibility. */
   checkType?: string;
+  /** The check's configured retry count.
+   *
+   * At 0 the probe never retries, so no run can ever be observed as flaky and
+   * `retry_step_ids` is never written. The tiles must read "—", not "0.0%":
+   * a zero is a measurement, and this is the absence of one. */
+  retries?: number;
 }
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
   lastTriggeredAt: 0,
   checkType: "browser",
+  retries: 0,
 });
+
+/** Whether flakiness is observable at all for this check. */
+const retriesEnabled = computed(() => props.retries > 0);
 
 // ── Synthetic results composable ──────────────────────────────────────────
 const synthetics = useSyntheticResults();
@@ -1482,14 +1513,29 @@ const kpiCards = computed<KpiCard[]>(() => {
       {
         key: "retry-rate",
         label: t("synthetics.runs.retryRate"),
-        value: k.totalRuns > 0 ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%" : "0.0%",
+        value: !retriesEnabled.value
+          ? "—"
+          : k.totalRuns > 0
+            ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
+            : "0.0%",
         valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
       {
-        key: "warning-runs",
-        label: t("synthetics.runs.warningRuns"),
-        value: String(k.warningRuns),
-        valueClass: k.warningRuns > 0 ? "text-status-warning-text!" : undefined,
+        // D4 — the denominator is EXECUTIONS, the grain `totalRuns` and the
+        // runs list both use. Dividing by scheduled runs instead would be
+        // smaller by the location × browser × device fan-out and inflate this
+        // several-fold.
+        key: "flaky-rate",
+        label: t("synthetics.runs.flakyRate"),
+        // "—" at retries = 0, never "0.0%". A check that cannot retry cannot be
+        // seen to recover, so a zero here would read as "nothing is flaky" when
+        // the truth is "flakiness was never measurable".
+        value: !retriesEnabled.value
+          ? "—"
+          : k.totalRuns > 0
+            ? ((k.flakyExecutions / k.totalRuns) * 100).toFixed(1) + "%"
+            : "0.0%",
+        valueClass: k.flakyExecutions > 0 ? "text-status-warning-text!" : undefined,
       },
       {
         key: "failed-runs",
@@ -2133,6 +2179,24 @@ const runColumns = computed<OTableColumnDef[]>(() => {
 
 // ── Steps: real data from composable ────────────────────────────────────
 const stepGroupsData = computed(() => synthetics.stepStats.value.stepGroups);
+/** What the tally actually covered, so the panel can say so when the row cap
+ *  bound rather than the selected time range (P2a). */
+const stepsCoverage = computed(
+  () =>
+    synthetics.stepStats.value.coverage ?? {
+      executions: 0,
+      fromMs: 0,
+      toMs: 0,
+      // Absent coverage means "this result predates the field", which is not
+      // evidence the window was truncated. The banner stays hidden.
+      truncated: false,
+    },
+);
+
+/** Epoch ms as a local timestamp, matching the other stamps on this page. */
+function fmtTimestamp(ms: number): string {
+  return ms > 0 ? new Date(ms).toLocaleString() : "—";
+}
 
 // ── Display helpers for step analysis ────────────────────────────────────
 
@@ -2436,11 +2500,40 @@ function openRun(row: { id: number }) {
   emit("open-run", String(row.id), "");
 }
 
+// ── Steps tab — loaded lazily ────────────────────────────────────────────
+//
+// The step aggregation walks the REST /runs payload and is the heaviest query
+// the page issues, so it runs only when the Steps tab is actually in view. Two
+// triggers, and nothing else: opening the tab, and a new time window while the
+// tab is open. A window change with the tab closed just marks the aggregation
+// stale so the next visit refetches.
+
+/** Whether `stepStats` was computed over the window in `timeRangeMicros`. */
+const stepsMatchWindow = ref(false);
+
+async function loadSteps() {
+  const tr = timeRangeMicros.value;
+  if (!tr) return;
+  stepsMatchWindow.value = true;
+  await synthetics.fetchSteps(props.monitorId, tr.startTime, tr.endTime);
+}
+
+watch(activeTab, (tab) => {
+  if (tab === "steps" && !stepsMatchWindow.value) void loadSteps();
+});
+
 // ── Public API — parent drives all (re)loads ─────────────────────────────
 async function refresh(startTime?: number, endTime?: number) {
   if (!startTime || !endTime) return;
   timeRangeMicros.value = { startTime, endTime };
-  await synthetics.fetchAll(props.monitorId, startTime, endTime);
+  // The new window invalidates whatever the Steps tab is holding. Refetch right
+  // away if it is the open tab — this is also the path the steps error-state
+  // retry button takes — otherwise defer to the next time it is opened.
+  stepsMatchWindow.value = false;
+  await Promise.all([
+    synthetics.fetchAll(props.monitorId, startTime, endTime),
+    activeTab.value === "steps" ? loadSteps() : Promise.resolve(),
+  ]);
 }
 
 defineExpose({ refresh });

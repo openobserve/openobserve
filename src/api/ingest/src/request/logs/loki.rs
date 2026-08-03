@@ -27,8 +27,10 @@ use prost::Message;
 use proto::loki_rpc;
 
 use crate::{
-    common::meta::loki::{LokiError, LokiPushRequest},
-    request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        loki::{LokiError, LokiPushRequest},
+    },
     service::{ingestion::get_thread_id, logs},
 };
 

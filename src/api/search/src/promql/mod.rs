@@ -735,8 +735,8 @@ pub async fn metadata(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("match[]" = String, Query, description = "<series_selector>: Series selector argument that selects the series to return"),
-        ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp"),
-        ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp"),
+        ("start" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp, optional, defaults to 24 hours before end"),
+        ("end" = Option<String>, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, optional, defaults to now"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
@@ -763,7 +763,7 @@ pub async fn metadata(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get Prometheus series, must have start and end time", "category": "metrics"}))
+        ("x-o2-mcp" = json!({"description": "Get Prometheus series, start and end time are optional (default: last 24 hours)", "category": "metrics"}))
     )
 )]
 pub async fn series_get(
