@@ -25,6 +25,7 @@ use datafusion::{
 
 use crate::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 
+pub mod broadcast_join_exec;
 pub mod codec;
 mod common;
 mod decoder_stream;
@@ -35,8 +36,10 @@ pub mod enrich_exec;
 #[cfg(feature = "enterprise")]
 pub mod enrichment_exec;
 pub mod node;
+mod once_async;
 pub mod remote_scan_exec;
 pub mod rewrite;
+pub mod tmp_exec;
 
 mod utils;
 
