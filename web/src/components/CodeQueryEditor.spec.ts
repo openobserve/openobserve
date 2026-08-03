@@ -84,6 +84,10 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     CompletionItemInsertTextRule: { None: 0, KeepWhitespace: 1, InsertAsSnippet: 4 },
     register: vi.fn(),
     setMonarchTokensProvider: vi.fn(),
+    // The promql branch of setupEditor calls this immediately after
+    // setMonarchTokensProvider. Missing, it throws mid-setup — swallowed,
+    // because the vitest config sets dangerouslyIgnoreUnhandledErrors.
+    setLanguageConfiguration: vi.fn(),
     registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
     // setupEditor registers all three providers in a row. The mock predates the
     // signature-help and hover ones, so it was a `.mock` short of the component
@@ -163,6 +167,29 @@ describe("CodeQueryEditor", () => {
     });
     vi.clearAllMocks();
   });
+
+  /**
+   * setupEditor looks its host up with `document.getElementById(props.editorId)`
+   * and, on a miss, retries five times on a 100ms timer before giving up —
+   * WITHOUT ever reaching addCommand. Three describes used to fake that lookup
+   * with a `vi.spyOn(document, "getElementById")` installed per mount and
+   * restored in afterEach, which made "does this mount find its element" depend
+   * on mock lifecycle while ~50 mounts from earlier describes were still
+   * polling on their own timers. The result was bimodal: the tests either
+   * finished in ~52ms or hung past any timeout, which is exactly the shape the
+   * nine flaky failures had (they also reproduce on a clean origin/main).
+   *
+   * A real element carrying the real id removes the question — every lookup,
+   * from any mount, finds it.
+   */
+  const attachEditorHost = (id = "test-editor") => {
+    const existing = document.getElementById(id);
+    if (existing) return existing;
+    const host = document.createElement("div");
+    host.id = id;
+    document.body.appendChild(host);
+    return host;
+  };
 
   const createWrapper = (props: any = {}) => {
     return mount(CodeQueryEditor, {
@@ -515,15 +542,13 @@ describe("CodeQueryEditor", () => {
 
   describe("Ctrl+Enter / Cmd+Enter keyboard shortcut", () => {
     let shortcutWrapper: ReturnType<typeof mount> | null = null;
-    let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
 
     // Spy on document.getElementById so setupEditor finds the editor element
     // without needing the component attached to document. This bypasses the
     // 100ms retry-loop setTimeout. Then use vi.waitFor to poll until the
     // async setupEditor chain (dynamic imports + loadMonaco) fully completes.
     const mountAndSetup = async (props: any = {}) => {
-      const fakeEditorEl = document.createElement("div");
-      getElementByIdSpy = vi.spyOn(document, "getElementById").mockReturnValue(fakeEditorEl);
+      attachEditorHost();
 
       shortcutWrapper = mount(CodeQueryEditor, {
         props: {
@@ -544,7 +569,6 @@ describe("CodeQueryEditor", () => {
     };
 
     afterEach(() => {
-      getElementByIdSpy?.mockRestore();
       shortcutWrapper?.unmount();
       shortcutWrapper = null;
     });
@@ -577,14 +601,12 @@ describe("CodeQueryEditor", () => {
   // Tests for the bug fix: setValue must coerce null/undefined to "" so Monaco's
   // "Illegal argument" error can't surface when switching query modes (PromQL → SQL).
   describe("when query becomes null/undefined (PromQL -> SQL switch)", () => {
-    let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
     let shortcutWrapper: ReturnType<typeof mount> | null = null;
 
     // Mount the component and wait for the async setupEditor to complete so that
     // editorObj is fully initialised and the exposed setValue is wired to mockEditorObj.
     const mountAndSetup = async (props: any = {}) => {
-      const fakeEditorEl = document.createElement("div");
-      getElementByIdSpy = vi.spyOn(document, "getElementById").mockReturnValue(fakeEditorEl);
+      attachEditorHost();
 
       shortcutWrapper = mount(CodeQueryEditor, {
         props: {
@@ -605,7 +627,6 @@ describe("CodeQueryEditor", () => {
     };
 
     afterEach(() => {
-      getElementByIdSpy?.mockRestore();
       shortcutWrapper?.unmount();
       shortcutWrapper = null;
     });
@@ -685,11 +706,7 @@ describe("CodeQueryEditor", () => {
   // When a parent passes an explicit empty array (e.g. effectiveSuggestions during
   // value context), the Monaco provider must return no function suggestions.
   describe("suggestions prop — function suggestions gated by null vs []", () => {
-    let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
-
-    afterEach(() => {
-      getElementByIdSpy?.mockRestore();
-    });
+    afterEach(() => {});
 
     // Snapshot the registerCompletionItemProvider call count before mounting,
     // then wait for our mount to push a new call. Using a baseline (instead of
@@ -701,8 +718,7 @@ describe("CodeQueryEditor", () => {
       const registerFn = vi.mocked(monacoApi.languages.registerCompletionItemProvider);
       const baselineIndex = registerFn.mock.calls.length;
 
-      const fakeEl = document.createElement("div");
-      getElementByIdSpy = vi.spyOn(document, "getElementById").mockReturnValue(fakeEl);
+      attachEditorHost();
       mount(CodeQueryEditor, {
         props: {
           editorId: "test-editor",
