@@ -55,7 +55,17 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LocatorComposeDialog from "./LocatorComposeDialog.vue";
 
-const props = defineProps<{ locator: StepLocator }>();
+const props = defineProps<{
+  locator: StepLocator;
+  /**
+   * The host's save-time "this step names no element" error.
+   *
+   * It can only ever be set in the empty state — `stepIsMissingTarget` is exactly
+   * `candidates.length === 0` — so the author's own input is its only sensible
+   * home, and it renders there rather than as a message floating over the block.
+   */
+  errorMessage?: string;
+}>();
 const emit = defineEmits<{ "update:locator": [value: StepLocator] }>();
 
 const { t } = useI18n();
@@ -175,6 +185,48 @@ function addOwn() {
   if (!value) return;
   if (append({ kind: deriveLocatorKind(value), value, origin: "authored" })) draft.value = "";
 }
+
+/**
+ * Text typed into the input but not yet in the list.
+ *
+ * This is the state that produced the block's worst failure: an author types a
+ * locator, saves, and is told the step names no element while the locator they
+ * typed is on screen in front of them. The draft is local to this component, so
+ * nothing above it could ever see the difference between "typed but not added"
+ * and "left blank" — which is why the save-time error read as a malfunction.
+ *
+ * **Adding is always explicit** — Enter or the + button, never blur. Committing on
+ * focus loss would mean clicking a row's delete, or tabbing past the field, silently
+ * appends whatever was half-typed, and the list is evidence a later healing pass
+ * compares against: a row nobody meant to add is worse than a draft nobody added.
+ * So the two messages below carry the whole job — they name the pending draft
+ * rather than letting the save report it as an absence.
+ */
+const hasPendingDraft = computed(() => !!draft.value.trim());
+
+/**
+ * The message under the input.
+ *
+ * A pending draft and the host's error are true at the same time in exactly the
+ * case above, and only one of them says what to do next — so the draft hint takes
+ * the error's place rather than sitting beside it. It keeps the error styling:
+ * the condition still blocks the save.
+ *
+ * With blur deliberately not committing, this is the only thing standing between
+ * an author and the original silent failure, so it must never be softened into a
+ * hint that sits alongside a contradictory error.
+ */
+const inputErrorMessage = computed(() => {
+  if (!props.errorMessage) return "";
+  return hasPendingDraft.value ? t("synthetics.journey.locatorDraftPending") : props.errorMessage;
+});
+
+/** The same sentence before anything is wrong — teaching the model, not rescuing it. */
+const inputHelpText = computed(() =>
+  !inputErrorMessage.value && hasPendingDraft.value
+    ? t("synthetics.journey.locatorDraftPending")
+    : "",
+);
 
 function onCombine(built: { value: string; from: CompositePart[] }) {
   // Appended, then dragged into place. Combining never destroys the evidence it
@@ -361,15 +413,16 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
 
       <!-- The author's own entry, after every recorded one. It APPENDS rather
          than overriding: the row can then be dragged wherever they want it. -->
-      <div class="flex w-full items-end gap-2 pt-2">
+      <div class="flex w-full items-start gap-2 pt-2">
         <!-- Read from the value, not chosen: `kind` labels a locator, it does not
            parse it, so a picker that only set `kind` would store a contradiction. -->
-        <OTooltip :content="t('synthetics.journey.locatorDerivedKindHelp')" class="mb-2">
+        <OTooltip :content="t('synthetics.journey.locatorDerivedKindHelp')">
           <OBadge
             variant="default"
             size="sm"
             :class="!draft.trim() ? 'invisible!' : ''"
             data-test="synthetics-journey-step-locator-derived-kind"
+            class="mt-6!"
           >
             {{ t(`synthetics.journey.locatorKind.${draftKind}`) }}
           </OBadge>
@@ -388,6 +441,9 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
               : t('synthetics.journey.locatorOverridePlaceholder')
           "
           :required="isEmpty"
+          :error="!!inputErrorMessage"
+          :error-message="inputErrorMessage"
+          :help-text="inputHelpText"
           class="flex-1"
           data-test="synthetics-journey-step-locator-override-input"
           @keyup.enter="addOwn"
@@ -396,7 +452,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
         <OButton
           variant="outline"
           size="sm"
-          class="shrink-0"
+          class="mt-5 shrink-0"
           :disabled="!draft.trim()"
           icon-left="add"
           :aria-label="t('synthetics.journey.locatorOverrideApply')"

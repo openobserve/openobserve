@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // ── Replay state machine ──────────────────────────────────────────────────────
-export type ReplayPhase = "idle" | "running" | "passed" | "failed" | "stopped";
+// `stopping` is the interval between the user pressing Stop and the extension
+// confirming it: the run is no longer advancing but is not yet torn down, so the
+// UI must neither offer Re-run nor claim the journey has stopped.
+export type ReplayPhase = "idle" | "running" | "stopping" | "passed" | "failed" | "stopped";
 
 /** Machine-readable error from the extension's replay pipeline. */
 export interface StructuredError {
