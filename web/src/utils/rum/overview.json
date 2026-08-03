@@ -10,6 +10,7 @@
     {
       "id": "Panel_Section_Health",
       "type": "html",
+      "o2SectionHeader": true,
       "title": "Health at a glance",
       "description": "",
       "htmlContent": "",
@@ -276,6 +277,7 @@
     {
       "id": "Panel_Section_Stability",
       "type": "html",
+      "o2SectionHeader": true,
       "title": "App stability",
       "description": "",
       "htmlContent": "",
@@ -551,6 +553,7 @@
     {
       "id": "Panel_Section_Rendering",
       "type": "html",
+      "o2SectionHeader": true,
       "title": "Rendering & responsiveness",
       "description": "",
       "htmlContent": "",
@@ -830,6 +833,7 @@
     {
       "id": "Panel_Section_WebVitals",
       "type": "html",
+      "o2SectionHeader": true,
       "title": "Web Vitals",
       "description": "",
       "htmlContent": "",

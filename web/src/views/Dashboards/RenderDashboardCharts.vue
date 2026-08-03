@@ -138,10 +138,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
             class="grid-stack-item gridBackground rounded-default border-border-default! bg-transparent!"
+            :class="{ 'panel-section-header': isSectionHeader(item) }"
           >
             <div class="grid-stack-item-content">
+              <!-- A section heading LABELS the panels below it — it is a layout element,
+                   not a panel. Rendering it through PanelContainer gave it the full card
+                   treatment (outer border, title bar with its own bottom rule, and an empty
+                   body where the chart would go), so the heading read as a broken tile.
+                   Emit the bare heading instead; the CSS below strips the grid item's card
+                   border to match. -->
+              <h2
+                v-if="isSectionHeader(item)"
+                class="flex h-full items-end truncate"
+                :data-test="`dashboard-section-header-${item.id}`"
+              >
+                {{ item.title }}
+              </h2>
               <!-- Panel with Panel-Level Variables -->
-              <div class="panel-with-variables flex h-full flex-col">
+              <div v-else class="panel-with-variables flex h-full flex-col">
                 <!-- Original Panel Container -->
 
                 <PanelContainer
@@ -899,6 +913,14 @@ export default defineComponent({
       return 0;
     };
 
+    /**
+     * True for panels authored as section headings — a full-width label that groups the
+     * panels beneath it (see the `o2SectionHeader` flag in the RUM Performance dashboard
+     * JSON). They carry no query and no content, so they render as a bare heading rather
+     * than as a panel card.
+     */
+    const isSectionHeader = (panelData) => panelData?.o2SectionHeader === true;
+
     // Get minimum height based on panel type for optimal display
     const getMinimumHeight = (type) => {
       switch (type) {
@@ -1540,6 +1562,7 @@ export default defineComponent({
       getPanelLayout,
       getMinimumHeight,
       getMinimumWidth,
+      isSectionHeader,
       variablesData,
       variablesDataUpdated,
       gridStackContainer,
@@ -1615,6 +1638,14 @@ export default defineComponent({
   border-radius: 0.375rem;
   overflow: visible;
   box-shadow: none;
+}
+
+/* Section headings label the panels below them, so they must not carry the card chrome
+   every other grid item gets. Specificity: this selector adds one class over the rule
+   above, so it wins without `!important`. */
+.displayDiv :deep(.grid-stack-item.panel-section-header .grid-stack-item-content) {
+  border: none;
+  border-radius: 0;
 }
 
 /* GridStack theme overrides */
