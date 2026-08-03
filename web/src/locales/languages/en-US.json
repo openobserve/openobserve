@@ -2259,6 +2259,7 @@
       "linkError": "Unable To Link Alerts."
     },
     "chooseTrigger": "Choose a Trigger",
+    "edgeDeleteHint": "Press Backspace / Delete To Remove The Edge",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
