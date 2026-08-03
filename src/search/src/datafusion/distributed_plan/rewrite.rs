@@ -28,11 +28,13 @@ use datafusion::{
         union::UnionExec,
     },
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::metadata_count_exec::MetadataCountExec;
 
 use crate::{
-    datafusion::plan::tantivy_optimize_exec::TantivyOptimizeExec, index::IndexCondition,
+    datafusion::{
+        distributed_plan::metadata_count_exec::MetadataCountExec,
+        plan::tantivy_optimize_exec::TantivyOptimizeExec,
+    },
+    index::IndexCondition,
     types::QueryParams,
 };
 
@@ -68,9 +70,7 @@ pub struct AggregateOptimizeRewriter {
     file_list: Vec<FileKey>,
     index_condition: Option<IndexCondition>,
     index_optimize_mode: Option<IndexOptimizeMode>,
-    #[allow(unused)]
     metadata_records: i64,
-    #[allow(unused)]
     metadata_files: usize,
 }
 
@@ -105,7 +105,6 @@ impl AggregateOptimizeRewriter {
         ))
     }
 
-    #[cfg(feature = "enterprise")]
     fn metadata_count_exec(&self, schema: SchemaRef) -> Result<Arc<dyn ExecutionPlan>> {
         Ok(Arc::new(MetadataCountExec::new(
             schema,
@@ -117,7 +116,6 @@ impl AggregateOptimizeRewriter {
     fn additional_inputs(&mut self, schema: SchemaRef) -> Result<Vec<Arc<dyn ExecutionPlan>>> {
         let mut inputs = Vec::new();
 
-        #[cfg(feature = "enterprise")]
         if self.metadata_records > 0 {
             inputs.push(self.metadata_count_exec(schema.clone())?);
         }
@@ -153,9 +151,7 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
-    #[cfg(feature = "enterprise")]
-    use config::meta::stream::FileMeta;
-    use config::meta::stream::{FileKey, StreamType};
+    use config::meta::stream::{FileKey, FileMeta, StreamType};
     use datafusion::{
         common::Result,
         functions_aggregate::count::count_udaf,
@@ -208,7 +204,6 @@ mod tests {
         )?))
     }
 
-    #[cfg(feature = "enterprise")]
     #[test]
     fn test_aggregate_optimize_rewrite_combines_metadata_and_tantivy_inputs() -> Result<()> {
         let plan = partial_count_exec()?;

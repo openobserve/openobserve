@@ -22,9 +22,10 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 use datafusion_proto::{convert_required, protobuf::proto_error};
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::tmp_exec::TmpExec;
 use prost::Message;
 use proto::cluster_rpc;
+
+use crate::datafusion::distributed_plan::tmp_exec::TmpExec;
 
 pub fn try_decode(
     node: cluster_rpc::TmpExecNode,
