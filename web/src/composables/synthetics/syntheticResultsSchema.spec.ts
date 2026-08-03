@@ -22,7 +22,6 @@ import {
   aggregateStepStats,
   bucketInterval,
   buildHistogramSql,
-  buildHistogramSql,
   buildLastRunSql,
   buildRunsSql,
   buildRunsWithStepsSql,
@@ -1289,6 +1288,75 @@ describe("stepOwnDetail locator ladder", () => {
     );
     expect(d?.candidatesTried).toHaveLength(1);
     expect(d?.candidatesTried[0].outcome).toBe("used_as_primary");
+  });
+});
+
+describe("step-stream query builders", () => {
+  const MON = "3HORp1V1zqa1CxwYYXzp6ohP2UA";
+
+  it("aggregates over the WHOLE window — no LIMIT", () => {
+    // The entire point of B10. The old path capped at 5000 execution rows, so on
+    // the busiest check measured (18 079 executions / 7 days) it described 4.0 of
+    // the 7 days and reported a 33.7% fail rate as 56.3%. A LIMIT creeping back
+    // in here restores that silently — the numbers stay plausible, just wrong.
+    const sql = buildStepAggregateSql(MON);
+    expect(sql).not.toContain("LIMIT");
+    expect(sql).toContain(`FROM "synthetics_step_results"`);
+    expect(sql).toContain("GROUP BY step_id");
+    // `kind` is populated with 'step' only today, but the column exists so
+    // protocol assertions can share this stream later without a grain migration.
+    // Without this filter the tab would silently start counting them.
+    expect(sql).toContain("kind = 'step'");
+  });
+
+  it("selects every column the Steps table renders, plus the window bounds", () => {
+    const sql = buildStepAggregateSql(MON);
+    for (const col of [
+      "executions",
+      "failures",
+      "flaky",
+      "avg_duration_ms",
+      "p95_duration_ms",
+      "max_duration_ms",
+      "step_index",
+      // Coverage reads these; deriving them from the capped sparkline reported a
+      // 7-day range as the newest ~100 minutes.
+      "first_ts",
+      "last_ts",
+    ]) {
+      expect(sql).toContain(col);
+    }
+    // Percentiles do not compose across groups, so p95 must come from a query
+    // grouped only by the dimension it is reported at.
+    expect(sql).toContain("approx_percentile_cont(duration_ms, 0.95)");
+  });
+
+  it("groups the dimension query by both axes and counts only", () => {
+    // Counts compose, so one query answers browserStats and locationStats by
+    // folding the same rows twice. A percentile here would not be foldable.
+    const sql = buildStepDimensionSql(MON);
+    expect(sql).toContain("GROUP BY step_id, engine, location");
+    expect(sql).not.toContain("approx_percentile_cont");
+    expect(sql).toContain("kind = 'step'");
+  });
+
+  it("bounds the sparkline, and only the sparkline", () => {
+    // "The last N runs" is this query's definition rather than a truncation, so
+    // its cap is correct where the aggregate's would not be.
+    const sql = buildStepSparklineSql(MON, 2000);
+    expect(sql).toContain("LIMIT 2000");
+    expect(sql).toContain("ORDER BY _timestamp DESC");
+    expect(sql).toContain("failed_in_prior_attempt");
+  });
+
+  it("escapes the monitor id in all three", () => {
+    for (const sql of [
+      buildStepAggregateSql("mon'1"),
+      buildStepDimensionSql("mon'1"),
+      buildStepSparklineSql("mon'1"),
+    ]) {
+      expect(sql).toContain("synthetics_id = 'mon''1'");
+    }
   });
 });
 
