@@ -367,6 +367,37 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return allStreams.find((field: any) => field.streamAlias == streamAlias)?.stream;
   };
 
+  /**
+   * The panel's window in the microseconds the values API expects, or null when
+   * it is not usable yet.
+   *
+   * `meta.dateTime` starts out as `{start_time: "", end_time: ""}` and only
+   * becomes Dates once the host page's date picker has run. Reading it
+   * unguarded throws — `""?.toISOString()` does not short-circuit, because `""`
+   * is not nullish — and so does `toISOString()` on an unparseable date. Both
+   * used to land in the callers' catch and surface "Something went wrong!" for
+   * a lookup the user never asked to fail.
+   *
+   * Every page that drives this composable stores `new Date(startTime)` with
+   * `startTime` already in microseconds, so `getTime()` returns microseconds.
+   * That is the same number the `new Date(d.toISOString()).getTime()` round
+   * trip this replaces produced.
+   */
+  const getFilterValuesTimeRange = () => {
+    const range: any = dashboardPanelData?.meta?.dateTime;
+    const start = range?.["start_time"];
+    const end = range?.["end_time"];
+    if (typeof start?.getTime !== "function" || typeof end?.getTime !== "function") {
+      return null;
+    }
+    const start_time = start.getTime();
+    const end_time = end.getTime();
+    if (!Number.isFinite(start_time) || !Number.isFinite(end_time)) {
+      return null;
+    }
+    return { start_time, end_time };
+  };
+
   const addFilteredItem = async (row: { name: string; streamAlias?: string; stream: string }) => {
     const currentQuery =
       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
@@ -396,14 +427,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.meta.filterValue = [];
     }
 
+    // The condition is what the user asked for and is already in place; the
+    // value list is a convenience. If any of the three things the request needs
+    // is missing there is nothing to ask for — `_values_stream` answers 400,
+    // not an empty result, to a payload with a null field, a missing stream or
+    // an unset range.
+    const timeRange = getFilterValuesTimeRange();
+    if (!row?.name || !row?.stream || !timeRange) {
+      return;
+    }
+
     try {
       const queryReq = {
         org_identifier: store.state.selectedOrganization.identifier,
         stream_name: row.stream,
-        start_time: new Date(
-          dashboardPanelData.meta.dateTime["start_time"].toISOString(),
-        ).getTime(),
-        end_time: new Date(dashboardPanelData.meta.dateTime["end_time"].toISOString()).getTime(),
+        ...timeRange,
         fields: [row.name],
         size: 100,
         type: currentQuery.fields.stream_type,
@@ -424,19 +462,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const loadFilterItem = async (row: { field: string; streamAlias?: string }) => {
+    // Called on every change of a filter's column, including the one the ✕
+    // beside "Select Field" makes: it sets the column to `{}`, which used to
+    // produce `fields: [undefined]` and, once JSON.stringify turned that into
+    // `[null]`, a 400 from the server. A cleared column has nothing to look up.
+    // Same for a stream alias that matches nothing — `.find(…)?.stream` is
+    // undefined, and the key disappears from the payload entirely.
+    const streamName = row?.streamAlias
+      ? getStreamNameFromStreamAlias(row.streamAlias)
+      : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream;
+    const timeRange = getFilterValuesTimeRange();
+    if (!row?.field || !streamName || !timeRange) {
+      return;
+    }
+
     try {
       const queryReq = {
         org_identifier: store.state.selectedOrganization.identifier,
-        stream_name: row.streamAlias
-          ? getStreamNameFromStreamAlias(row.streamAlias)
-          : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-              .stream,
-        start_time: new Date(
-          dashboardPanelData?.meta?.dateTime?.["start_time"]?.toISOString(),
-        ).getTime(),
-        end_time: new Date(
-          dashboardPanelData?.meta?.dateTime?.["end_time"]?.toISOString(),
-        ).getTime(),
+        stream_name: streamName,
+        ...timeRange,
         fields: [row.field],
         size: 100,
         type: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields

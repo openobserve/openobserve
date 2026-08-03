@@ -4618,6 +4618,9 @@ describe("useDashboardPanel", () => {
 
       vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
 
+      // loadFilterItem sends nothing without a stream to read the field from,
+      // so the error path is only reachable once one is selected.
+      panel.dashboardPanelData.data.queries[0].fields.stream = "test_stream";
       const row = { field: "test_field" };
 
       try {
@@ -4632,11 +4635,21 @@ describe("useDashboardPanel", () => {
     it("should cover loadFilterItem with streamAlias parameter", async () => {
       vi.mocked(mockValuesWebSocket.fetchFieldValues).mockResolvedValueOnce({});
 
+      // An alias only resolves against the query's joins. Without one it used
+      // to send `stream_name: undefined`, which the server answers with
+      // "missing field `stream_name`" — so the alias under test has to exist.
+      panel.dashboardPanelData.data.queries[0].joins = [
+        { stream: "aliased_stream", streamAlias: "stream_alias" },
+      ];
       const row = { field: "test_field", streamAlias: "stream_alias" };
 
       await panel.loadFilterItem(row);
 
       expect(mockValuesWebSocket.fetchFieldValues).toHaveBeenCalled();
+      expect(mockValuesWebSocket.fetchFieldValues.mock.calls[0][0]).toMatchObject({
+        stream_name: "aliased_stream",
+        fields: ["test_field"],
+      });
     });
 
     it("should cover resetAggregationFunction for html chart type preserving stream", () => {
