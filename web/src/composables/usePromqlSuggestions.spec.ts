@@ -58,9 +58,15 @@ describe("usePromqlSuggestions Composable - Comprehensive Coverage", () => {
   });
 
   // Test 3: autoCompletePromqlKeywords initialization
-  it("should initialize autoCompletePromqlKeywords as empty array", () => {
+  it("should initialize autoCompletePromqlKeywords with the catalog", () => {
+    // Was "as empty array", and empty was the bug: the list is only filled by
+    // getSuggestions, which runs on a query update, so Ctrl+Space on a freshly
+    // opened PromQL editor offered nothing at all until the user typed a
+    // character. See "has the catalog ready before the first keystroke" below —
+    // that test and this one describe the same value, so leaving this one
+    // asserting 0 would have made the suite unsatisfiable by construction.
     expect(Array.isArray(composable.autoCompletePromqlKeywords.value)).toBe(true);
-    expect(composable.autoCompletePromqlKeywords.value.length).toBe(0);
+    expect(composable.autoCompletePromqlKeywords.value.length).toBeGreaterThan(90);
   });
 
   // Test 4: metricKeywords initialization
@@ -558,5 +564,97 @@ describe("usePromqlSuggestions Composable - Comprehensive Coverage", () => {
     // Current implementation will find first match
     expect(result.metricName).toBe("http_requests");
     expect(result.label.hasLabels).toBe(true);
+  });
+});
+
+// ─── tmp/code.md item 18 (section E) — the catalog behind these keywords ─────
+// The seven-function hardcode is replaced by the upstream-derived catalog in
+// utils/query/promqlCompletion.ts. The composable's job is unchanged: offer the
+// catalog when it has nothing better, and get out of the way when it does.
+//
+// The catalog's CONTENT is asserted in promqlCompletion.spec.ts; what belongs
+// here is that the composable actually serves it, and that the context
+// switching it already does still wins.
+
+describe("PromQL catalog reaches the editor", () => {
+  let c: ReturnType<typeof usePromqlSuggestions>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    c = usePromqlSuggestions();
+  });
+
+  const offered = () => c.autoCompletePromqlKeywords.value as any[];
+
+  it("offers far more than the seven that were hardcoded", async () => {
+    await c.updatePromqlKeywords([]);
+    expect(offered().length).toBeGreaterThan(90);
+  });
+
+  it("offers the functions users reported missing", async () => {
+    await c.updatePromqlKeywords([]);
+    const labels = offered().map((k: any) => k.label);
+    for (const fn of ["irate", "increase", "delta", "label_replace", "clamp_max", "quantile"]) {
+      expect(labels, `missing ${fn}`).toContain(fn);
+    }
+  });
+
+  it("offers the grouping modifiers", async () => {
+    await c.updatePromqlKeywords([]);
+    const labels = offered().map((k: any) => k.label);
+    for (const kw of ["by", "without", "on", "ignoring"]) {
+      expect(labels, `missing ${kw}`).toContain(kw);
+    }
+  });
+
+  it("keeps functions and modifiers on different kinds", async () => {
+    await c.updatePromqlKeywords([]);
+    const byLabel = (l: string) => offered().find((k: any) => k.label === l);
+    expect(byLabel("rate").kind).toBe("Function");
+    expect(byLabel("by").kind).not.toBe("Function");
+  });
+
+  it("still appends the metric names, and does not bury them", async () => {
+    // Metrics are this language's fields. Replacing the hardcode must not drop
+    // them — and the ORDER is the point, which an earlier draft of this test
+    // claimed in its name and never asserted: 107 catalog entries in front of
+    // the metric the user came to type is the same as not offering it.
+    c.updateMetricKeywords([{ label: "http_requests_total", type: "counter" }]);
+    await c.updatePromqlKeywords([]);
+    const metric = offered().find((k: any) => String(k.label).startsWith("http_requests_total"));
+    expect(metric, "the metric was dropped").toBeTruthy();
+    const firstFunction = offered().find((k: any) => k.kind === "Function");
+    // Both must carry a lane. Comparing `sortText ?? ""` instead would let the
+    // metric win by having no sortText at all — an ordering that holds by
+    // accident and breaks the moment someone gives it one.
+    expect(metric.sortText, "the metric carries no sort lane").toBeTruthy();
+    expect(firstFunction.sortText, "the function carries no sort lane").toBeTruthy();
+    expect(metric.sortText < firstFunction.sortText).toBe(true);
+  });
+
+  // Caller-supplied lists replacing the catalog outright is already covered by
+  // "should update keywords with provided data" above; not duplicated here.
+
+  it("never leaves the editor with an empty list", async () => {
+    // getSuggestions clears the list before deciding what to show, and two of
+    // its branches return without refilling it — an untracked cursor is one.
+    // Eager initialisation alone does not cover this: the list starts full,
+    // then a single suggestion pass empties it again.
+    const fresh = usePromqlSuggestions();
+    fresh.autoCompleteData.value.query = "up";
+    fresh.autoCompleteData.value.position.cursorIndex = -1;
+    await fresh.getSuggestions();
+    expect((fresh.autoCompletePromqlKeywords.value as any[]).length).toBeGreaterThan(90);
+  });
+
+  it("has the catalog ready before the first keystroke", async () => {
+    // getSuggestions is what fills this list today, and getSuggestions only
+    // runs on a query update — so a freshly opened PromQL editor has an EMPTY
+    // list, and Ctrl+Space on it produces nothing until the user types a
+    // character. That is the same shape as the SLO bug (the helper worked,
+    // nobody had called it) and it is exactly the state a user is in when a
+    // placeholder invites them to press Ctrl+Space.
+    const fresh = usePromqlSuggestions();
+    expect((fresh.autoCompletePromqlKeywords.value as any[]).length).toBeGreaterThan(90);
   });
 });

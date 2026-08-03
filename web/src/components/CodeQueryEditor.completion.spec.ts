@@ -19,8 +19,12 @@ import { createStore } from "vuex";
 // permanently unreachable from tests — which is why the provider specs below
 // were previously skipped.
 let modelSeq = 0;
-const makeModel = () => ({
-  getValue: vi.fn(() => ""),
+const makeModel = (initialValue = "") => ({
+  // Returns what the editor was created with, as a real model does. A stub that
+  // always answers "" makes anything reading model.getValue() — the
+  // double-quote scan, for one — untestable: the assertion passes because the
+  // model is empty, not because the code is right.
+  getValue: vi.fn(() => initialValue),
   setValue: vi.fn(),
   getLineCount: vi.fn(() => 1),
   getLineLength: vi.fn(() => 0),
@@ -74,11 +78,11 @@ vi.mock("monaco-editor/esm/vs/editor/editor.all.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   default: {},
   editor: {
-    create: vi.fn(() => {
+    create: vi.fn((_el: any, options: any = {}) => {
       // A fresh editor AND model per call, as real monaco does. Sharing one
       // stub makes a per-language singleton provider impossible to test: it
       // distinguishes editors by model.
-      const stub = makeEditorStub(makeModel());
+      const stub = makeEditorStub(makeModel(options?.value ?? ""));
       createdEditors.push(stub);
       Object.assign(mockEditorObj, stub);
       return stub;
@@ -111,6 +115,11 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   },
   KeyMod: { CtrlCmd: 1 },
   KeyCode: { Enter: 13 },
+  // Real values from monaco-editor/esm/vs/editor/editor.api. Omitting this
+  // made validateDoubleQuotes throw on `monaco.MarkerSeverity.Warning` the
+  // moment it found anything to report, so it published NOTHING and looked
+  // like a component that simply never ran its validation.
+  MarkerSeverity: { Hint: 1, Info: 2, Warning: 4, Error: 8 },
 }));
 
 // Mock dynamic imports
@@ -878,5 +887,111 @@ describe("numeric columns rank first inside a numeric aggregate", () => {
     // never fires must be observably different here.
     const labels = await completionsAt("numeric-rank-b", "SELECT ");
     expect(labels.indexOf("availability_zone")).toBeLessThan(labels.indexOf("value"));
+  });
+});
+
+// ─── tmp/code.md section E — hiding the popup ────────────────────────────────
+// disableSuggestionPopup synthesizes an Escape KeyboardEvent and dispatches it
+// at the container div. Monaco has a command for this — the same one this file
+// already calls four lines later to hide the widget — and a synthetic key event
+// is a guess about monaco's internal key handling that nothing verifies. It
+// also reaches anything else listening for Escape on the way up.
+describe("hiding the suggestion popup uses monaco's own command", () => {
+  const store7 = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  it("triggers hideSuggestWidget and synthesizes no key event", { timeout: 30000 }, async () => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const before = createFn.mock.calls.length;
+
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
+    const wrapper = mount(CodeQueryEditor, {
+      props: { editorId: "hide-popup", language: "sql", query: "" },
+      global: { plugins: [store7] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+
+    const editor = createdEditors.at(-1)!;
+    editor.trigger.mockClear();
+    const dispatched: Event[] = [];
+    const dispatchSpy = vi
+      .spyOn(HTMLElement.prototype, "dispatchEvent")
+      .mockImplementation(function (this: HTMLElement, e: Event) {
+        dispatched.push(e);
+        return true;
+      });
+
+    try {
+      (wrapper.vm as any).disableSuggestionPopup();
+    } finally {
+      dispatchSpy.mockRestore();
+    }
+
+    expect(
+      editor.trigger.mock.calls.some((c: any[]) => c[1] === "hideSuggestWidget"),
+      "the widget was never asked to hide through monaco's command",
+    ).toBe(true);
+    expect(
+      dispatched.filter((e) => e.type === "keydown"),
+      "a synthetic key event was still dispatched",
+    ).toEqual([]);
+  });
+});
+
+
+// ─── tmp/code.md section E — the double-quote warning is WIRED ───────────────
+// doubleQuoteWarnings.spec.ts proves the scan itself. This proves the editor
+// calls it — the gap that shipped three times in this workstream (Alerts bound
+// the wrong list, the SLO form never triggered the catalog load, Traces omitted
+// a prop), every one of them a correct helper nobody had wired up.
+describe("double-quote warnings reach the model", () => {
+  const store8 = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  const markersFor = async (query: string, editorId: string) => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const setMarkers = vi.mocked((api.editor as any).setModelMarkers);
+    const before = createFn.mock.calls.length;
+    setMarkers.mockClear();
+
+    spy = vi.spyOn(document, "getElementById").mockImplementation(() => document.createElement("div"));
+    mount(CodeQueryEditor, {
+      props: { editorId, language: "sql", query },
+      global: { plugins: [store8] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+    // Give the tail of setupEditor a chance to run after create resolves.
+    await vi.waitFor(
+      () => expect(setMarkers.mock.calls.length).toBeGreaterThan(0),
+      { timeout: 15000, interval: 25 },
+    );
+    const calls = setMarkers.mock.calls.filter((c: any[]) => c[1] === "dq-validation");
+    return calls.at(-1)?.[2] ?? null;
+  };
+
+  it("publishes a marker for a double-quoted value", { timeout: 30000 }, async () => {
+    const markers = await markersFor(`SELECT * FROM t WHERE level = "error"`, "dq-real");
+    expect(markers, "the validation never ran at all").not.toBeNull();
+    expect(markers.length).toBe(1);
+    expect(markers[0].message).toMatch(/single quotes/i);
+  });
+
+  it("publishes NOTHING for the same text inside a comment", { timeout: 30000 }, async () => {
+    // The reported defect: a warning on SQL that is not SQL.
+    const markers = await markersFor(`-- level = "error"\nSELECT * FROM t`, "dq-comment");
+    expect(markers, "the validation never ran at all").not.toBeNull();
+    expect(markers).toEqual([]);
   });
 });
