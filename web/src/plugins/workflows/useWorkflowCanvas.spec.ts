@@ -79,12 +79,13 @@ describe("loadWorkflowRun — history run response mapping", () => {
     workflowObj.testRun.result = null;
   });
 
-  it("maps errors.data (array) to a node-keyed map and node_map to nodeInputs", async () => {
+  it("maps errors.data (array) to a node-keyed map and input_map to the inputs map", async () => {
     const envelope = [{ meta: { alert_name: "t" }, data: [{ a: 1 }] }];
     mockRun.mockResolvedValue({
       data: {
         errors: { run_id: "r1", data: [{ node_id: "n2", error: ["boom"] }] },
-        data: { complete: envelope, node_map: { n2: envelope } },
+        // input_map = per-node input for ALL nodes (same shape as a Test run)
+        data: { input_map: { n1: envelope, n2: envelope, n3: envelope }, node_map: { n2: envelope } },
       },
     });
 
@@ -96,13 +97,21 @@ describe("loadWorkflowRun — history run response mapping", () => {
     expect(res.runId).toBe("r1");
     // array -> keyed map, in the { error_count, errors: [[msg]] } badge shape
     expect(res.errors.n2).toEqual({ error_count: 1, errors: [["boom"]] });
-    // per-node input carried through verbatim (the {meta,data} envelope)
-    expect(res.nodeInputs.n2).toEqual(envelope);
-    expect(res.fullInput).toEqual(envelope);
+    // per-node input stored under `inputs` (drives Input + derived Output + badges)
+    expect(res.inputs).toEqual({ n1: envelope, n2: envelope, n3: envelope });
     // every node counts as "ran"; n3 is downstream of the errored n2 -> blocked
     expect(res.ranNodeIds).toEqual(["n1", "n2", "n3"]);
     expect(res.blockedNodeIds).toContain("n3");
     expect(res.blockedNodeIds).not.toContain("n2");
+  });
+
+  it("falls back to node_map for older runs that lack input_map", async () => {
+    const envelope = [{ meta: {}, data: [{ a: 1 }] }];
+    mockRun.mockResolvedValue({
+      data: { errors: { data: [] }, data: { node_map: { n2: envelope } } },
+    });
+    await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1b" });
+    expect((workflowObj.testRun.result as any).inputs).toEqual({ n2: envelope });
   });
 
   it("normalizes a non-array error field into a single-message list", async () => {

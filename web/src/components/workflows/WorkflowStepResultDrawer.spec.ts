@@ -369,7 +369,7 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("is hidden in history mode (a past run can't seed a new test)", () => {
       setup({ result: okResult(), input: "" });
-      workflowObj.testRun.result = { ...okResult(), mode: "history", nodeInputs: { f1: [rec(2)] } } as any;
+      workflowObj.testRun.result = { ...okResult(), mode: "history" } as any;
       const wrapper = mountDrawer();
       expect(useInputBtn(wrapper).exists()).toBe(false);
       expect(useOutputBtn(wrapper).exists()).toBe(false);
@@ -441,27 +441,37 @@ describe("WorkflowStepResultDrawer", () => {
   });
 
   describe("history mode (read-only past run)", () => {
+    // History carries the SAME per-node `inputs` map as a Test run — the drawer
+    // renders Input/Output for every node, just read-only (no Replay).
     const historyResult = () => ({
       errors: { f1: { error_count: 1, errors: [["boom"]] } },
+      inputs: { t1: [rec(1)], f1: [{ meta: { alert_name: "a" }, data: [{ x: 1 }] }], d1: [rec(3)] },
       ranNodeIds: ["t1", "f1", "d1"],
       blockedNodeIds: ["d1"],
       mode: "history",
       runId: "r1",
-      nodeInputs: { f1: [{ meta: { alert_name: "a" }, data: [{ x: 1 }] }] },
     });
 
-    it("shows the per-node captured input, read-only", () => {
+    it("shows the per-node input, read-only", () => {
       setup({ result: historyResult() });
       const editor = inputEditor(mountDrawer());
       expect(editor.props("readOnly")).toBe(true);
-      expect(editor.props("query")).toBe(
-        JSON.stringify([{ meta: { alert_name: "a" }, data: [{ x: 1 }] }], null, 2),
-      );
+      expect(JSON.parse(editor.props("query"))).toEqual([
+        { meta: { alert_name: "a" }, data: [{ x: 1 }] },
+      ]);
     });
 
-    it("hides Replay (a past run is read-only)", () => {
+    it("derives Output for a NON-error node too (not just error nodes)", () => {
+      // f1 -> d1: f1's output == d1's input.
       setup({ result: historyResult() });
-      expect(replayBtn(mountDrawer()).exists()).toBe(false);
+      expect(JSON.parse(outputEditor(mountDrawer()).props("query"))).toEqual([rec(3)]);
+    });
+
+    it("hides Replay and Use-as-input (a past run is read-only)", () => {
+      setup({ result: historyResult() });
+      const wrapper = mountDrawer();
+      expect(replayBtn(wrapper).exists()).toBe(false);
+      expect(useInputBtn(wrapper).exists()).toBe(false);
     });
 
     it("still shows the error output for the past run", () => {

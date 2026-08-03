@@ -375,19 +375,14 @@ const seedInputFromRun = () => {
 };
 // Seed synchronously so the editor is populated on first paint (not a tick later);
 // the watch + onMounted below re-seed if the selected node changes while open.
-if (!isHistory.value) seedInputFromRun();
+// Both Test and History runs carry the same per-node `inputs` map, so the Input is
+// seeded the same way for both — history just renders it read-only (no Replay).
+seedInputFromRun();
 
-// History mode: the per-node input captured for this run (node_map[nodeId]),
-// pretty-printed and read-only.
-const nodeInputText = computed<string>(() => {
-  const v = result.value?.nodeInputs?.[nodeId.value];
-  return v == null ? "" : JSON.stringify(v, null, 2);
-});
-
-// What the Input editor shows: read-only per-node input for a past run, else the
-// editable central input. The setter no-ops in history mode.
+// What the Input editor shows. In history it's read-only (the editor's :read-only
+// binding), so the setter no-ops.
 const inputModel = computed<string>({
-  get: () => (isHistory.value ? nodeInputText.value : editableInput.value),
+  get: () => editableInput.value,
   set: (val: string) => {
     if (!isHistory.value) editableInput.value = val;
   },
@@ -406,13 +401,11 @@ const parsedReplayInput = computed<any[] | null>(() => {
 });
 const inputInvalid = computed(() => parsedReplayInput.value === null);
 
-// Did records actually reach this node on the last run? Based on what the backend
+// Did records actually reach this node on the run? Based on what the backend
 // captured (not the editable buffer), so it stays stable if the user clears the
 // editor. When false, the Input pane shows an empty state instead of a blank
 // editor, and Replay is disabled (there's nothing here to re-run).
-const receivedRecords = computed(() =>
-  isHistory.value ? !!nodeInputText.value : nodeTestInput(nodeId.value) != null,
-);
+const receivedRecords = computed(() => nodeTestInput(nodeId.value) != null);
 
 // OUTPUT = per outgoing edge, the records the downstream node received (== what
 // this node emitted on that branch). Empty array => terminal node (a sink) with
@@ -525,14 +518,11 @@ const toggleFullscreen = () => {
 const onFullscreenChange = () => {
   isFullscreen.value = document.fullscreenElement === ioContainerRef.value;
 };
-// Seed the Input editor with this node's actual received records when the drawer
-// opens, and re-seed if the selected node changes while open. History mode reads
-// its own read-only per-node input, so only seed for a live Test run.
-watch(nodeId, () => {
-  if (!isHistory.value) seedInputFromRun();
-});
+// Seed the Input editor with this node's received records when the drawer opens,
+// and re-seed if the selected node changes while open (both Test and History).
+watch(nodeId, seedInputFromRun);
 onMounted(() => {
-  if (!isHistory.value) seedInputFromRun();
+  seedInputFromRun();
   document.addEventListener("fullscreenchange", onFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onFullscreenChange);
 });
