@@ -74,13 +74,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @dblclick="canManage ? startRename(tab) : undefined"
               >{{ tab?.name }}</span
             >
-            <!-- Editable affordance: fades in on tab hover; clicking it renames.
-                 Kept in flow (reserves its slot) so hovering never shifts tabs. -->
+            <!-- Editable affordance: always present as a faint pencil (so the
+                 slot never reads as empty space) that brightens on tab hover;
+                 clicking it renames. Same pattern as OInlineEdit's pencil. -->
             <OIcon
               v-if="canManage"
               name="edit"
               size="sm"
-              class="text-text-secondary shrink-0 cursor-pointer opacity-0 transition-opacity duration-150 group-hover:opacity-70"
+              class="text-text-secondary shrink-0 cursor-pointer opacity-40 transition-opacity duration-150 group-hover:opacity-100"
               :data-test="`dashboard-tab-${tab.tabId}-rename-btn`"
               @click.stop="startRename(tab)"
               @mousedown.stop
