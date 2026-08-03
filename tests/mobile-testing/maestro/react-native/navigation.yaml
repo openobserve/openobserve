@@ -1,0 +1,14 @@
+# Drives O2RumTester across screens to exercise view + action tracking.
+appId: com.o2rumtester
+---
+- launchApp:
+    clearState: false
+- assertVisible: "O2 RUM Tester"
+- tapOn: "Go to Details →"
+- assertVisible: "Details"
+- tapOn: "Custom action (tap)"
+- tapOn: "← Back to Home"
+- assertVisible: "O2 RUM Tester"
+- tapOn: "Go to Checkout form →"
+- assertVisible: "Checkout (masking test)"
+- tapOn: "← Back to Home"

@@ -1,0 +1,12 @@
+# Drives O2RumTester to the Checkout form (email/card/password) and dwells so
+# Session Replay records the PII screen — the UI spec then asserts it is masked.
+appId: com.o2rumtester
+---
+- launchApp:
+    clearState: false
+- assertVisible: "O2 RUM Tester"
+- tapOn: "Go to Checkout form →"
+- assertVisible: "Checkout (masking test)"
+- tapOn: "Place order"
+- waitForAnimationToEnd:
+    timeout: 5000

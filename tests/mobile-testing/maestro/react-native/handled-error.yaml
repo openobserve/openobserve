@@ -1,0 +1,8 @@
+# Drives O2RumTester: report a handled JS error via the SDK (A5).
+appId: com.o2rumtester
+---
+- launchApp:
+    clearState: false
+- assertVisible: "O2 RUM Tester"
+- tapOn: "Trigger handled error"
+- assertVisible: "handled error reported to RUM"

@@ -1,0 +1,22 @@
+const { defineConfig } = require('@playwright/test');
+require('dotenv').config({ path: __dirname + '/.env' });
+
+// One emulator + shared app state → serialize. Flows + async ingestion need long timeouts.
+module.exports = defineConfig({
+  testDir: './specs',
+  timeout: 6 * 60 * 1000,
+  expect: { timeout: 30000 },
+  fullyParallel: false,
+  workers: 1,
+  retries: 1, // absorb transient network drops to the internal dev instance
+  reporter: [['list'], ['html', { open: 'never' }]],
+  use: {
+    baseURL: process.env.OO_URL,
+    actionTimeout: 20000, // no single action may hang the whole test
+    navigationTimeout: 60000,
+    ignoreHTTPSErrors: true,
+    screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
+  },
+  projects: [{ name: 'rn-android', testMatch: /rn-android\..*\.spec\.js/ }],
+});
