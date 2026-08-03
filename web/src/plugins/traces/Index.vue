@@ -2240,7 +2240,7 @@ useShortcuts([
     handler: () => {
       // The traces query editor is Monaco — focus its inner textarea.
       const el = document.querySelector<HTMLElement>(
-        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea, [data-test="logs-search-bar"] .cm-editor',
+        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
       );
       el?.focus();
     },

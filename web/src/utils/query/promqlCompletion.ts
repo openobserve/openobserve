@@ -21,27 +21,31 @@
  * `increase`, `label_replace`, most of the *_over_time family and every
  * grouping modifier were simply undiscoverable.
  *
- * The list is not hand-maintained here either. It is derived from the term
- * tables in @prometheus-io/codemirror-promql: Prometheus's own vocabulary,
- * carrying a one-line description per term, and versioned with the upstream
- * package rather than with our memory of what Prometheus added last release.
- * monaco-promql (already a dependency, already used here for the tokenizer)
- * builds its keyword list from exactly these tables.
+ * The list is not hand-maintained here either. It reads promqlTerms.ts —
+ * Prometheus's own vocabulary with a one-line description per term, generated
+ * by scripts/generate-promql-terms.mjs and refreshed by re-running it, not by
+ * remembering what Prometheus added last release.
  *
- * Registering monaco-promql's own completion provider would have been the
- * shorter path and is the wrong one: it labels EVERY term `Keyword`, so
- * functions get the keyword glyph — the icon complaint this workstream started
- * from, reintroduced in a second language.
+ * Snapshotted rather than imported: the upstream package that publishes those
+ * tables requires an unrelated editor library at module scope — for a require
+ * it never uses — which dragged ~376 KB of that library's runtime into every
+ * route touching PromQL. This app runs on monaco, and only monaco.
+ *
+ * The vendored grammar's own completion provider would have been the shorter
+ * path and is the wrong one: it labels EVERY term `Keyword`, so functions get
+ * the keyword glyph — the icon complaint this workstream started from,
+ * reintroduced in a second language.
  */
 
 import {
-  aggregateOpModifierTerms,
-  aggregateOpTerms,
-  atModifierTerms,
-  binOpModifierTerms,
-  binOpTerms,
-  functionIdentifierTerms,
-} from "@prometheus-io/codemirror-promql/dist/cjs/complete/promql.terms";
+  AGGREGATION_MODIFIER_TERMS,
+  AGGREGATION_TERMS,
+  AT_MODIFIER_TERMS,
+  BINARY_MODIFIER_TERMS,
+  BINARY_OPERATOR_TERMS,
+  FUNCTION_TERMS,
+  type PromqlTerm,
+} from "./promqlTerms";
 import { SORT_LANE, type CompletionKindName } from "./sqlCompletion";
 
 /** Shaped like SqlCompletionEntry so both languages feed one item builder. */
@@ -53,14 +57,6 @@ export interface PromqlCompletionEntry {
   detail?: string;
   documentation?: string;
   sortText?: string;
-}
-
-/** One upstream term. `info` is the human description; `detail` the group. */
-interface PromqlTerm {
-  label: string;
-  detail?: string;
-  info?: string;
-  type?: string;
 }
 
 /**
@@ -100,12 +96,8 @@ const byLabel = (a: PromqlCompletionEntry, b: PromqlCompletionEntry) =>
  * someone typing, whatever Prometheus's grammar calls them.
  */
 export const PROMQL_FUNCTIONS: PromqlCompletionEntry[] = [
-  ...(aggregateOpTerms as PromqlTerm[]).map((t) =>
-    toEntry(t, "Function", SORT_LANE.function, "aggregation"),
-  ),
-  ...(functionIdentifierTerms as PromqlTerm[]).map((t) =>
-    toEntry(t, "Function", SORT_LANE.function, "function"),
-  ),
+  ...AGGREGATION_TERMS.map((t) => toEntry(t, "Function", SORT_LANE.function, "aggregation")),
+  ...FUNCTION_TERMS.map((t) => toEntry(t, "Function", SORT_LANE.function, "function")),
 ].sort(byLabel);
 
 /**
@@ -116,10 +108,10 @@ export const PROMQL_FUNCTIONS: PromqlCompletionEntry[] = [
  * and `atan2` are words, so they stay.
  */
 export const PROMQL_KEYWORDS: PromqlCompletionEntry[] = [
-  ...(aggregateOpModifierTerms as PromqlTerm[]),
-  ...(binOpModifierTerms as PromqlTerm[]),
-  ...(atModifierTerms as PromqlTerm[]),
-  ...(binOpTerms as PromqlTerm[]).filter((t) => /^[a-z_][a-z0-9_]*$/i.test(t.label)),
+  ...AGGREGATION_MODIFIER_TERMS,
+  ...BINARY_MODIFIER_TERMS,
+  ...AT_MODIFIER_TERMS,
+  ...BINARY_OPERATOR_TERMS.filter((t) => /^[a-z_][a-z0-9_]*$/i.test(t.label)),
 ]
   .map((t) => toEntry(t, "Keyword", SORT_LANE.clause, "modifier"))
   .sort(byLabel);

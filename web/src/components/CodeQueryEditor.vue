@@ -413,7 +413,7 @@ export default defineComponent({
       if (props.language === "promql") {
         monaco.languages.register({ id: "promql" });
 
-        // Official monaco-promql grammar, verbatim — without a tokenizer the
+        // The vendored PromQL grammar — without a tokenizer the
         // query renders monochrome (#9779, #9793).
         const promql = await loadPromqlLanguage();
         monaco.languages.setMonarchTokensProvider("promql", promql.language as any);
