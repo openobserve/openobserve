@@ -9553,6 +9553,48 @@ export class LogsPage {
         await this.expectNoToastContaining(this.selectStarNotSupportedToastText);
     }
 
+    /**
+     * Assert a toast containing the given text WAS emitted since startToastRecorder().
+     * Polls because the toast arrives asynchronously after the triggering action.
+     * @param {string} text - Substring expected in one of the recorded toasts.
+     */
+    async expectToastContaining(text, timeout = 15000) {
+        await expect
+            .poll(
+                async () => (await this.getRecordedToastMessages()).some((m) => m.includes(text)),
+                {
+                    timeout,
+                    message: `Expected a toast containing "${text}" but none was emitted`,
+                }
+            )
+            .toBe(true);
+        testLogger.info(`Toast containing "${text}" was emitted`);
+    }
+
+    /**
+     * Assert the "Select * query is not supported for visualization" toast WAS emitted.
+     */
+    async expectSelectStarVisualizationToast() {
+        await this.expectToastContaining(this.selectStarNotSupportedToastText);
+    }
+
+    /**
+     * Read `quick_mode_enabled` from the instance /config endpoint.
+     * isSelectStarForTable() short-circuits to false when this is off, so the
+     * SELECT * table guard simply does not apply on such an instance.
+     * @returns {Promise<boolean>}
+     */
+    async isQuickModeEnabledOnInstance() {
+        return await this.page
+            .evaluate(async () => {
+                const res = await fetch('/config');
+                if (!res.ok) return false;
+                const cfg = await res.json();
+                return cfg.quick_mode_enabled === true;
+            })
+            .catch(() => false);
+    }
+
     // ===== LOGS VISUALIZE — URL STATE =====
 
     /**
@@ -9562,7 +9604,11 @@ export class LogsPage {
      * the chart renders).
      * @param {{ requireVisualizationData?: boolean, timeout?: number }} options
      */
-    async waitForVisualizeUrlState({ requireVisualizationData = true, timeout = 20000 } = {}) {
+    async waitForVisualizeUrlState({
+        requireVisualizationData = true,
+        requireFunctionContent = false,
+        timeout = 20000,
+    } = {}) {
         await expect
             .poll(
                 () => {
@@ -9570,16 +9616,59 @@ export class LogsPage {
                     const hasToggle = url.includes('logs_visualize_toggle=visualize');
                     const hasConfig =
                         !requireVisualizationData || url.includes('visualization_data=');
-                    return hasToggle && hasConfig;
+                    // functionContent is only written when transformType === "function"
+                    // AND tempFunctionContent is non-empty, so requiring it proves a VRL
+                    // body really is part of the restorable state before we reload.
+                    const hasVrl = !requireFunctionContent || url.includes('functionContent=');
+                    return hasToggle && hasConfig && hasVrl;
                 },
                 {
                     timeout,
                     message:
-                        'URL never picked up logs_visualize_toggle=visualize / visualization_data',
+                        'URL never picked up logs_visualize_toggle=visualize / visualization_data' +
+                        (requireFunctionContent ? ' / functionContent' : ''),
                 }
             )
             .toBe(true);
         testLogger.info('URL carries the visualize tab state');
+    }
+
+    /**
+     * Decode the `visualization_data` URL param (base64-encoded JSON written by
+     * updateUrlQueryParams from dashboardPanelData). After a reload the app
+     * regenerates this param from its restored in-memory state, so comparing the
+     * pre- and post-reload payloads proves the restore actually repopulated the
+     * panel — not merely that the query string survived.
+     * @returns {Promise<object|null>} Decoded payload, or null if absent/unparsable.
+     */
+    async getVisualizationDataFromUrl() {
+        const raw = new URL(this.page.url()).searchParams.get('visualization_data');
+        if (!raw) return null;
+        try {
+            // URLSearchParams decodes a literal '+' as a space, and standard base64
+            // uses '+', so put those back before decoding.
+            const normalized = raw.replace(/ /g, '+');
+            return JSON.parse(Buffer.from(normalized, 'base64').toString('utf8'));
+        } catch (error) {
+            testLogger.warn(`Could not decode visualization_data: ${error.message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Assert the VRL (transform) editor currently contains the given text.
+     * Monaco virtualises long documents, but the short one-line functions these
+     * tests use are always fully materialised in the DOM.
+     * @param {string} text - Substring expected in the editor.
+     */
+    async expectVrlEditorContains(text) {
+        await expect
+            .poll(async () => await this.getVrlEditorContent(), {
+                timeout: 15000,
+                message: `VRL editor never contained "${text}"`,
+            })
+            .toContain(text);
+        testLogger.info(`VRL editor contains "${text}"`);
     }
 
     /**

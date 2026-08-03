@@ -5,6 +5,10 @@ const logData = require("../../fixtures/log.json");
 const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
+// VRL body used by the transform-editor test. Matches the convention in
+// dashboards/visualize-vrl.spec.js (`.vrl=100`).
+const VRL_FUNCTION = '.vrl=100';
+
 // ----- Helpers -----
 
 async function ingestTestData(page) {
@@ -361,6 +365,11 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     //    watcher settles, so reloading earlier would not exercise URL restoration.
     await pm.logsPage.waitForVisualizeUrlState();
 
+    // Capture the panel payload the app wrote for this configured state.
+    const configBeforeReload = await pm.logsPage.getVisualizationDataFromUrl();
+    expect(configBeforeReload, 'visualization_data should be present before reload').toBeTruthy();
+    expect(configBeforeReload.type).toBe('h-bar');
+
     // 5. Start recording toasts, then refresh the URL.
     await pm.logsPage.startToastRecorder();
     await page.reload();
@@ -371,6 +380,19 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     await pm.logsPage.expectVisualizeTabContentVisible();
     await pm.logsPage.verifyChartTypeSelected('h-bar');
     await pm.logsPage.expectVisualizeChartRendered();
+
+    // 6b. Chart CONFIG (not just type) survived. After load the app rewrites
+    //     visualization_data from its restored in-memory panel, so an equal payload
+    //     proves restoreVisualizationFromUrlOnLoad() repopulated the config — a URL
+    //     that merely survived untouched could not produce this.
+    await expect
+      .poll(async () => (await pm.logsPage.getVisualizationDataFromUrl())?.type, {
+        timeout: 20000,
+        message: 'visualization_data was not rewritten after reload',
+      })
+      .toBe('h-bar');
+    const configAfterReload = await pm.logsPage.getVisualizationDataFromUrl();
+    expect(configAfterReload.config).toEqual(configBeforeReload.config);
 
     // 7. (a) no "Select * query is not supported for visualization" toast, and no
     //    spurious required-fields error / error panel.
@@ -435,8 +457,12 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     await pm.logsPage.verifyChartTypeSelected('area');
     await pm.logsPage.expectVisualizeChartRendered();
 
-    // 3. Gate on the URL sync, then reload with toast recording active.
+    // 3. Gate on the URL sync, capture the payload, then reload with toast recording.
     await pm.logsPage.waitForVisualizeUrlState();
+    const areaConfigBeforeReload = await pm.logsPage.getVisualizationDataFromUrl();
+    expect(areaConfigBeforeReload, 'visualization_data should be present before reload').toBeTruthy();
+    expect(areaConfigBeforeReload.type).toBe('area');
+
     await pm.logsPage.startToastRecorder();
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
@@ -445,6 +471,16 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     await pm.logsPage.expectVisualizeTabContentVisible();
     await pm.logsPage.verifyChartTypeSelected('area');
     await pm.logsPage.expectVisualizeChartRendered();
+
+    // 4b. Config survived the restore, not just the chart type (see test above).
+    await expect
+      .poll(async () => (await pm.logsPage.getVisualizationDataFromUrl())?.type, {
+        timeout: 20000,
+        message: 'visualization_data was not rewritten after reload',
+      })
+      .toBe('area');
+    const areaConfigAfterReload = await pm.logsPage.getVisualizationDataFromUrl();
+    expect(areaConfigAfterReload.config).toEqual(areaConfigBeforeReload.config);
 
     // 5. No error toast and no error panel after the restore.
     await pm.logsPage.expectNoSelectStarVisualizationToast();
@@ -459,9 +495,14 @@ test.describe("Logs Visualization State Persistence testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing VRL variant of the URL-refresh restore');
 
-    // 1. Enable the transform (VRL) editor and enter a function.
+    // 1. Enable the transform (VRL) editor and enter a real function body. Typing
+    //    is what sets tempFunctionContent — without it transformType/content stay
+    //    empty, no functionContent lands in the URL, and this degrades into a
+    //    duplicate of the plain-reload test.
     await pm.logsPage.toggleVrlEditor();
     await pm.logsPage.clickVrlEditor();
+    await pm.logsPage.typeInVrlEditor(VRL_FUNCTION);
+    await pm.logsPage.expectVrlEditorContains(VRL_FUNCTION);
 
     // 2. Re-run the search so the VRL function is part of the current query state.
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
@@ -471,17 +512,19 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     await pm.logsPage.expectVisualizeTabContentVisible();
     await pm.logsPage.expectVisualizeChartRendered();
 
-    // 4. Gate on the URL sync, then reload with toast recording active. The VRL body
-    //    is persisted in the URL as `functionContent`, so the reload really does
-    //    restore a VRL-carrying visualize state.
-    await pm.logsPage.waitForVisualizeUrlState();
+    // 4. Gate on the URL sync INCLUDING functionContent — that param is only written
+    //    when transformType === "function" and the body is non-empty, so reaching
+    //    this line proves the reload will genuinely restore a VRL-carrying state.
+    await pm.logsPage.waitForVisualizeUrlState({ requireFunctionContent: true });
     await pm.logsPage.startToastRecorder();
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
 
-    // 5. Positive end-state: chart repainted after the VRL-carrying restore.
+    // 5. Positive end-state: chart repainted after the VRL-carrying restore, and the
+    //    VRL body itself came back (useLogs restores tempFunctionContent from the URL).
     await pm.logsPage.expectVisualizeTabContentVisible();
     await pm.logsPage.expectVisualizeChartRendered();
+    await pm.logsPage.expectVrlEditorContains(VRL_FUNCTION);
 
     // 6. No error toast and no error panel after the restore.
     await pm.logsPage.expectNoSelectStarVisualizationToast();
@@ -518,6 +561,95 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     testLogger.info('Toggle round-trip completed with zero required-fields errors');
   });
 
+  // ---------------------------------------------------------------------------
+  // SELECT * handling — the behaviour change this PR introduced alongside the
+  // two defect fixes. The old code blocked SELECT * for EVERY chart type before
+  // the chart type was even finalised. The fix replaces that with
+  // isSelectStarForTable(): only the table chart is blocked (it renders the raw
+  // query columns), while histogram-based charts (line/bar/area/scatter) render
+  // histogram(_timestamp)/count(*) and legitimately ignore the SELECT columns.
+  //
+  // isSelectStarForTable() also requires zoConfig.quick_mode_enabled — when that
+  // is off it short-circuits to false and the guard does not apply at all, so
+  // both tests assert that precondition instead of silently passing.
+  // ---------------------------------------------------------------------------
+
+  test("should block a table chart on a SELECT * query and revert the chart type", {
+    tag: ['@logs-visualize-persistence', '@all', '@logs', '@P0']
+  }, async ({ page }) => {
+    testLogger.info('Testing SELECT * table guard (toast + chart type revert)');
+
+    // 0. The guard only exists when quick mode is enabled on the instance.
+    test.skip(
+      !(await pm.logsPage.isQuickModeEnabledOnInstance()),
+      'quick_mode_enabled is off — isSelectStarForTable() short-circuits to false'
+    );
+
+    // 1. SQL mode with an explicit SELECT * — in SQL mode
+    //    getEffectiveVisualizeQuery() returns the raw query, so this is
+    //    deterministically a select-all (quick mode cannot rewrite it).
+    await pm.logsPage.enableSQLMode();
+    await pm.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
+    await pm.logsPage.applyQueryAndWaitForSearchResponse();
+
+    // 2. Open Visualize — a histogram chart type is selected by default and must render.
+    await pm.logsPage.clickVisualizeToggle();
+    await pm.logsPage.expectVisualizeTabContentVisible();
+    await pm.logsPage.expectVisualizeChartRendered();
+
+    // 3. Record the chart type the panel settled on; the revert must return to it.
+    const typeBeforeTable = await pm.logsPage.waitForChartTypeStabilized();
+    expect(typeBeforeTable, 'a chart type should be selected before switching').toBeTruthy();
+    expect(typeBeforeTable).not.toBe('table');
+
+    // 4. Attempt to switch to the table chart with the recorder armed.
+    await pm.logsPage.startToastRecorder();
+    await pm.logsPage.selectChartType('table');
+
+    // 5. The guard fires: toast shown AND the chart type reverts to the previous one.
+    await pm.logsPage.expectSelectStarVisualizationToast();
+    await pm.logsPage.verifyChartTypeSelected('table', false);
+    await pm.logsPage.verifyChartTypeSelected(typeBeforeTable);
+
+    testLogger.info(`SELECT * table guard fired and reverted to "${typeBeforeTable}"`);
+  });
+
+  test("should allow a histogram chart on a SELECT * query without the SELECT * toast", {
+    tag: ['@logs-visualize-persistence', '@all', '@logs', '@P0']
+  }, async ({ page }) => {
+    testLogger.info('Testing SELECT * is allowed for histogram-based charts');
+
+    // 0. Same precondition as the table test, so the pair always moves together.
+    test.skip(
+      !(await pm.logsPage.isQuickModeEnabledOnInstance()),
+      'quick_mode_enabled is off — isSelectStarForTable() short-circuits to false'
+    );
+
+    // 1. Same SELECT * query that blocks the table chart above.
+    await pm.logsPage.enableSQLMode();
+    await pm.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
+    await pm.logsPage.applyQueryAndWaitForSearchResponse();
+
+    // 2. Arm the recorder BEFORE entering Visualize — the pre-fix code emitted the
+    //    toast on entry, ahead of any chart-type choice, so recording from here is
+    //    what makes this fail on the unfixed build.
+    await pm.logsPage.startToastRecorder();
+    await pm.logsPage.clickVisualizeToggle();
+    await pm.logsPage.expectVisualizeTabContentVisible();
+    await pm.logsPage.expectVisualizeChartRendered();
+
+    // 3. Explicitly pick a histogram-based chart type and confirm it renders.
+    await pm.logsPage.selectChartType('line');
+    await pm.logsPage.verifyChartTypeSelected('line');
+    await pm.logsPage.expectVisualizeChartRendered();
+
+    // 4. No SELECT * toast at any point, and no error panel.
+    await pm.logsPage.expectNoSelectStarVisualizationToast();
+    await pm.logsPage.expectNoDashboardErrors();
+
+    testLogger.info('SELECT * rendered on a line chart with no toast');
+  });
+
   test("should not emit the SELECT * toast when opening the Visualize tab with no stream in the URL", {
     tag: ['@logs-visualize-persistence', '@all', '@logs', '@P2']
   }, async ({ page }) => {
@@ -535,11 +667,13 @@ test.describe("Logs Visualization State Persistence testcases", () => {
     );
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-    // 3. Positive end-state: the Visualize tab finished loading. A No Data placeholder
-    //    is legitimate here (there is nothing to chart), so this deliberately uses the
-    //    tab-content check rather than expectVisualizeChartRendered().
+    // 3. Positive end-state: the Visualize tab really is the active tab. A No Data
+    //    placeholder is legitimate here (there is nothing to chart), so this uses the
+    //    tab-content check rather than expectVisualizeChartRendered() — but it is
+    //    paired with expectLogsSearchResultNotVisible() so a page that silently failed
+    //    to restore the tab cannot pass on the toast-absence assertion alone.
     await pm.logsPage.expectVisualizeTabContentVisible();
-    await pm.logsPage.waitForChartTypeStabilized();
+    await pm.logsPage.expectLogsSearchResultNotVisible();
 
     // 4. The SELECT * toast must never have been emitted during that load.
     await pm.logsPage.expectNoSelectStarVisualizationToast();
