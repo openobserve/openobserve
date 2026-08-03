@@ -567,6 +567,14 @@ describe("CreateDestinationForm", () => {
       w.unmount();
     });
 
+    it("hides the stepper header (single-step flow)", () => {
+      const forced = createWrapper({ forcedType: "custom" });
+      expect(forced.findComponent({ name: "OStepper" }).props("hideHeader")).toBe(true);
+      forced.unmount();
+      // ...and the default (no forcedType) keeps the header.
+      expect(wrapper.findComponent({ name: "OStepper" }).props("hideHeader")).toBe(false);
+    });
+
     it("resetForm keeps it on step 2 when the type is forced", async () => {
       const w = createWrapper({ forcedType: "custom" });
       w.vm.resetForm();

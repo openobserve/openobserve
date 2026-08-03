@@ -31,6 +31,14 @@ export interface OStepperProps {
    * orientations. Default: false.
    */
   expanded?: boolean;
+  /**
+   * Hide the horizontal step header (the indicator/title progress bar), rendering
+   * only the active step's panel. Use when the flow is effectively single-step so
+   * the stepper chrome is just noise (e.g. a create form that skips its first
+   * step). Vertical orientation has no separate header, so this is a no-op there.
+   * Default: false.
+   */
+  hideHeader?: boolean;
 }
 
 export interface OStepperEmits {

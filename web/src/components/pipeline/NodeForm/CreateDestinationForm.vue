@@ -28,7 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            footer below stays full-width so its top border lines up with the
            full-width page header (matching the other destination forms). -->
       <div class="w-full max-w-[50vw]">
-        <OStepper v-model="step" ref="stepper" animated>
+        <!-- When the type is forced (step 1 skipped), the stepper is effectively a
+             single step, so hide its header — the progress bar would just be noise. -->
+        <OStepper v-model="step" ref="stepper" animated :hide-header="!!forcedType">
           <!-- Step 1: Choose Destination Type. When the type is forced, it stays in
                the header as a done step but is NOT navigable — there's no going back. -->
           <OStep
