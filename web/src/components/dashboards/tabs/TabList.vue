@@ -40,18 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
+        <!-- Display and edit share ONE row: name/input on the left, an
+             always-present pencil on the right. The name and the input carry the
+             same box (px-0.5), and the pencil stays in flow while editing (just
+             hidden), so switching between them never changes the tab's width. -->
         <div class="group flex w-full flex-nowrap items-center gap-1">
-          <!-- Rename in place: double-click the name (or the hover pencil) to edit
-               it. The input reads as the tab label itself — transparent, inherits
-               the tab's text, auto-sizes — and carries NO underline of its own: the
-               tab is active while editing, so OTabs' own active indicator provides
-               the single line beneath it. Enter/blur saves, Escape reverts. Pointer
-               and key events are stopped so they don't reach the tab trigger
-               (select) or Reka's arrow-key roving. -->
           <!-- Auto-size the input to its text via an invisible sizer sharing the
-               input's grid cell, so the field is exactly as wide as the name (no
-               trailing gap). `size="1"` neutralises the input's default ~20ch
-               intrinsic width so the sizer alone drives the max-content column. -->
+               input's grid cell, so the field is exactly as wide as the name.
+               `size="1"` neutralises the input's default ~20ch intrinsic width so
+               the sizer alone drives the max-content column. -->
           <span
             v-if="editingTabId === tab.tabId"
             class="grid grid-cols-[minmax(0,max-content)] items-center"
@@ -78,29 +75,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @blur="commitRename(tab)"
             />
           </span>
-          <template v-else>
-            <span
-              class="w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-              :title="tab?.name"
-              :data-test="`dashboard-tab-${tab.tabId}-name`"
-              :data-test-tab-name="tab?.name"
-              @dblclick="canManage ? startRename(tab) : undefined"
-              >{{ tab?.name }}</span
-            >
-            <!-- Editable affordance: always present as a faint pencil (so the
-                 slot never reads as empty space) that brightens on tab hover;
-                 clicking it renames. Same pattern as OInlineEdit's pencil. -->
-            <OIcon
-              v-if="canManage"
-              name="edit"
-              size="sm"
-              class="text-text-secondary shrink-0 cursor-pointer opacity-40 transition-opacity duration-150 group-hover:opacity-100"
-              :data-test="`dashboard-tab-${tab.tabId}-rename-btn`"
-              @click.stop="startRename(tab)"
-              @mousedown.stop
-              @dblclick.stop
-            />
-          </template>
+          <span
+            v-else
+            class="w-full min-w-0 overflow-hidden px-0.5 text-ellipsis whitespace-nowrap"
+            :title="tab?.name"
+            :data-test="`dashboard-tab-${tab.tabId}-name`"
+            :data-test-tab-name="tab?.name"
+            @dblclick="canManage ? startRename(tab) : undefined"
+            >{{ tab?.name }}</span
+          >
+          <!-- Editable affordance: a faint pencil that brightens on tab hover and
+               renames on click. Rendered in BOTH modes (hidden, not removed, while
+               editing) so its width is always reserved and the tab never resizes
+               when you enter or leave edit mode. -->
+          <OIcon
+            v-if="canManage"
+            name="edit"
+            size="sm"
+            class="text-text-secondary shrink-0 cursor-pointer transition-opacity duration-150"
+            :class="
+              editingTabId === tab.tabId ? 'invisible' : 'opacity-40 group-hover:opacity-100'
+            "
+            :data-test="`dashboard-tab-${tab.tabId}-rename-btn`"
+            @click.stop="startRename(tab)"
+            @mousedown.stop
+            @dblclick.stop
+          />
         </div>
       </OTab>
     </OTabs>
