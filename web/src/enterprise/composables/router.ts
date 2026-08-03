@@ -29,6 +29,7 @@ const AISessionsPage = () => import("@/enterprise/views/AIObservability/Sessions
 const AIAgentGraphPage = () => import("@/enterprise/views/AIObservability/AgentGraphPage.vue");
 const AIAgentBehaviorPage = () =>
   import("@/enterprise/views/AIObservability/AgentBehaviorPage.vue");
+const AIDatasetsPage = () => import("@/enterprise/views/AIObservability/DatasetsPage.vue");
 // Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
 // AI menu item active) instead of the Traces session-details route.
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
@@ -103,6 +104,12 @@ const useEnvRoutes = () => {
           name: "aiAgentBehavior",
           component: AIAgentBehaviorPage,
           meta: { title: "Agent Behavior", keepAlive: false },
+        },
+        {
+          path: "datasets",
+          name: "aiDatasets",
+          component: AIDatasetsPage,
+          meta: { title: "Datasets", keepAlive: false },
         },
         {
           path: "evaluations",
