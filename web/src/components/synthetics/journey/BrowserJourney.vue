@@ -781,7 +781,7 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
-      class="mx-3"
+      class="mx-2!"
     />
 
     <!-- Zero test attributes across a whole recording is a misconfiguration,
@@ -790,13 +790,13 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
-      class="mx-3"
+      class="mx-2!"
     />
 
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-3 mb-3 flex flex-col gap-3 border py-3"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-2! mb-3 flex flex-col gap-3 border py-3"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
@@ -869,7 +869,12 @@ function openChromeExtensions() {
       data-test="synthetics-journey-preflight-warning"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="error_outline" size="sm" class="text-badge-warning-ol-text" aria-hidden="true" />
+        <OIcon
+          name="error_outline"
+          size="sm"
+          class="text-badge-warning-ol-text"
+          aria-hidden="true"
+        />
         <span class="text-text-heading text-sm font-semibold">
           {{
             blockedReason === "in-progress"
@@ -975,7 +980,7 @@ function openChromeExtensions() {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="rounded-default border-badge-error-ol-border/30 mb-3 flex items-start gap-2 border bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
+      class="rounded-default border-badge-error-ol-border/30 mx-2 mb-3 flex items-start gap-2 border bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >
@@ -1006,7 +1011,7 @@ function openChromeExtensions() {
     <!-- Replay stopped banner -->
     <div
       v-else-if="replayPhase === 'stopped'"
-      class="rounded-default bg-surface-subtle border-border-default mb-3 flex items-center gap-2 border px-3 py-2"
+      class="rounded-default bg-surface-subtle border-border-default mx-2 mb-3 flex items-center gap-2 border px-3 py-2"
       role="status"
       data-test="synthetics-journey-stopped-banner"
     >
@@ -1039,7 +1044,7 @@ function openChromeExtensions() {
     <!-- Recorder error (extension missing / failed to start) -->
     <div
       v-if="recordingError && !isRecording"
-      class="rounded-default bg-status-error-bg text-status-error-text mb-3 flex items-center gap-2 px-3 py-2 text-sm"
+      class="rounded-default bg-status-error-bg text-status-error-text mx-2 mb-3 flex items-center gap-2 px-3 py-2 text-sm"
       role="alert"
       data-test="synthetics-journey-record-error"
     >
@@ -1051,7 +1056,7 @@ function openChromeExtensions() {
     <template v-if="isRecording">
       <!-- Recording banner with current URL + controls -->
       <div
-        class="rounded-default bg-status-error-bg border-border-default mb-3 flex items-center gap-3 border px-3 py-2"
+        class="rounded-default bg-status-error-bg border-border-default mx-2 mb-3 flex items-center gap-3 border px-3 py-2"
       >
         <span class="flex items-center gap-1.5">
           <span
