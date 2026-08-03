@@ -180,8 +180,15 @@ const {
   openTriggerPicker,
 } = useWorkflowCanvas();
 
-const { onNodesInitialized, setViewport, viewport, dimensions, findNode, getSelectedEdges, removeEdges } =
-  useVueFlow();
+const {
+  onNodesInitialized,
+  setViewport,
+  viewport,
+  dimensions,
+  findNode,
+  getSelectedEdges,
+  removeEdges,
+} = useVueFlow();
 
 const vueFlowRef = ref<any>(null);
 // Read-only inspection canvas (the Runs view) — disables node drag/connect and,

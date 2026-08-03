@@ -85,7 +85,10 @@ describe("loadWorkflowRun — history run response mapping", () => {
       data: {
         errors: { run_id: "r1", data: [{ node_id: "n2", error: ["boom"] }] },
         // input_map = per-node input for ALL nodes (same shape as a Test run)
-        data: { input_map: { n1: envelope, n2: envelope, n3: envelope }, error_node_map: { n2: envelope } },
+        data: {
+          input_map: { n1: envelope, n2: envelope, n3: envelope },
+          error_node_map: { n2: envelope },
+        },
       },
     });
 

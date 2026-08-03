@@ -179,7 +179,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex shrink-0 flex-col gap-1.5 overflow-auto p-2.5"
                 :class="{ 'flex-1': !hasForwardedRecords }"
               >
-                <div v-if="showSectionHeadings" class="text-status-error-text text-xs font-semibold">
+                <div
+                  v-if="showSectionHeadings"
+                  class="text-status-error-text text-xs font-semibold"
+                >
                   {{ t("workflow.test.stepResult.errorHeading") }}
                 </div>
                 <div
@@ -358,8 +361,7 @@ const deepUnwrapJson = (value: any): any => {
   }
   return value;
 };
-const prettyRecords = (records: any): string =>
-  JSON.stringify(deepUnwrapJson(records), null, 2);
+const prettyRecords = (records: any): string => JSON.stringify(deepUnwrapJson(records), null, 2);
 
 // Test mode: the Input editor shows the records THIS node actually received on
 // the last run (from the backend `inputs` map), editable so Replay can re-run
@@ -474,9 +476,7 @@ const showSectionHeadings = computed(() => showError.value && hasForwardedRecord
 // same container pattern as the Input pane.
 const outputIsEmpty = computed(() => !showError.value && !hasForwardedRecords.value);
 const outputEmptyMessage = computed(() =>
-  isTerminal.value
-    ? t("workflow.test.stepResult.destinationNoRecords")
-    : emptyOutputMessage.value,
+  isTerminal.value ? t("workflow.test.stepResult.destinationNoRecords") : emptyOutputMessage.value,
 );
 
 // Output copy = the error text (if any) + the forwarded records.

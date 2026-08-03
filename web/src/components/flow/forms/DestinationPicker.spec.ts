@@ -208,9 +208,9 @@ describe("DestinationPicker", () => {
     const wrapper = createWrapper({ forcedType: "custom" });
     await flushPromises();
     await wrapper.find(".o-switch").trigger("click"); // into create mode
-    expect(
-      wrapper.findComponent({ name: "CreateDestinationForm" }).props("forcedType"),
-    ).toBe("custom");
+    expect(wrapper.findComponent({ name: "CreateDestinationForm" }).props("forcedType")).toBe(
+      "custom",
+    );
   });
 
   it("refetches when toggling out of create mode", async () => {

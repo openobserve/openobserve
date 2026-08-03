@@ -615,11 +615,9 @@ const buildCreateDefaults = (): DestinationForm => {
     headers: getDefaultHeaders(type).map((h) => ({ key: h.key, value: h.value })),
     metadata: {},
     destination_type: type,
-    url_endpoint:
-      type === "openobserve" ? "/api/default/default/_json" : endpointForType(type),
+    url_endpoint: type === "openobserve" ? "/api/default/default/_json" : endpointForType(type),
     method: "post",
-    output_format:
-      type === "splunk" ? "nestedevent" : type === "elasticsearch" ? "esbulk" : "json",
+    output_format: type === "splunk" ? "nestedevent" : type === "elasticsearch" ? "esbulk" : "json",
     esbulk_index: type === "elasticsearch" ? "default" : "",
     separator: "",
     org: "default",

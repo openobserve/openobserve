@@ -158,8 +158,10 @@ const mountDrawer = () =>
   mount(WorkflowStepResultDrawer, { global: globalConfig, attachTo: document.body });
 
 const editors = (w: any) => w.findAllComponents(CodeQueryEditorStub as any);
-const inputEditor = (w: any) => editors(w).find((e: any) => e.props("editorId") === "workflow-step-input");
-const outputEditor = (w: any) => editors(w).find((e: any) => e.props("editorId") === "workflow-step-output");
+const inputEditor = (w: any) =>
+  editors(w).find((e: any) => e.props("editorId") === "workflow-step-input");
+const outputEditor = (w: any) =>
+  editors(w).find((e: any) => e.props("editorId") === "workflow-step-output");
 const statusBadge = (w: any) => w.find('[data-test="workflow-step-result-status"]');
 const replayBtn = (w: any) => w.find('[data-test="workflow-step-replay-btn"]');
 const useInputBtn = (w: any) => w.find('[data-test="workflow-step-use-input-as-test"]');
@@ -183,7 +185,12 @@ describe("WorkflowStepResultDrawer", () => {
     it("truncates a long title at 30 chars with an ellipsis", () => {
       setup({
         nodeId: "f1",
-        nodes: [{ id: "f1", data: { node_type: "function", name: "a_really_long_vrl_function_name_here" } }],
+        nodes: [
+          {
+            id: "f1",
+            data: { node_type: "function", name: "a_really_long_vrl_function_name_here" },
+          },
+        ],
       });
       const title = mountDrawer().find(".o-drawer").attributes("data-title")!;
       expect(title).toHaveLength(31);
@@ -217,7 +224,15 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("No Records (default) when the node ran but got nothing (absent from inputs)", () => {
       // d1 reachable but not in inputs -> the condition/function above filtered all.
-      setup({ nodeId: "d1", result: { errors: {}, inputs: { t1: [rec(1)], f1: [rec(2)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] } });
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
       const badge = statusBadge(mountDrawer());
       expect(badge.attributes("data-variant")).toBe("default-soft");
       expect(badge.text()).toBe(t("workflow.test.stepResult.status.skipped"));
@@ -237,7 +252,15 @@ describe("WorkflowStepResultDrawer", () => {
     });
 
     it("shows an empty state (not a blank editor) when 0 records reached the node", () => {
-      setup({ nodeId: "d1", result: { errors: {}, inputs: { t1: [rec(1)], f1: [rec(2)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] } });
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
       const wrapper = mountDrawer();
       expect(inputEditor(wrapper)).toBeUndefined(); // no input editor rendered
       expect(wrapper.find('[data-test="workflow-step-result-no-input"]').text()).toBe(
@@ -247,7 +270,12 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("unwraps a JSON-stringified `data` field for readability", () => {
       const flat = { meta_alert_name: "a", data: '[{"x":9}]' };
-      setup({ nodeId: "d1", result: { errors: {}, inputs: { d1: [flat] }, ranNodeIds: ["d1"], blockedNodeIds: [] }, nodes: [{ id: "d1", data: { node_type: "destination", destination_id: "sink-a" } }], edges: [] });
+      setup({
+        nodeId: "d1",
+        result: { errors: {}, inputs: { d1: [flat] }, ranNodeIds: ["d1"], blockedNodeIds: [] },
+        nodes: [{ id: "d1", data: { node_type: "destination", destination_id: "sink-a" } }],
+        edges: [],
+      });
       const parsed = JSON.parse(inputEditor(mountDrawer()).props("query"));
       expect(parsed[0].data).toEqual([{ x: 9 }]); // parsed, not the escaped string
     });
@@ -285,7 +313,12 @@ describe("WorkflowStepResultDrawer", () => {
           { source: "t1", target: "f1" },
           { source: "t1", target: "d1" },
         ],
-        result: { errors: {}, inputs: { t1: [rec(1)], f1: [rec(2)], d1: [rec(3)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] },
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)], d1: [rec(3)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
       });
       const wrapper = mountDrawer();
       const out = JSON.parse(outputEditor(wrapper).props("query"));
@@ -293,9 +326,9 @@ describe("WorkflowStepResultDrawer", () => {
       expect(keys).toHaveLength(2);
       expect(keys.every((k) => k.startsWith("→ "))).toBe(true);
       // fan-out DOES keep a caption per branch (to tell them apart)
-      expect(wrapper.findAll('[data-test="workflow-step-result-output-branch-label"]')).toHaveLength(
-        2,
-      );
+      expect(
+        wrapper.findAll('[data-test="workflow-step-result-output-branch-label"]'),
+      ).toHaveLength(2);
     });
 
     it("errored node: shows the error message(s) AND the records it forwarded", () => {
@@ -313,16 +346,30 @@ describe("WorkflowStepResultDrawer", () => {
     it("errored terminal: shows the error alone (a failed send has no output)", () => {
       setup({
         nodeId: "d1",
-        result: { errors: { d1: { error_count: 1, errors: [["send failed"]] } }, inputs: { d1: [rec(3)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] },
+        result: {
+          errors: { d1: { error_count: 1, errors: [["send failed"]] } },
+          inputs: { d1: [rec(3)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
       });
       const wrapper = mountDrawer();
-      expect(wrapper.find('[data-test="workflow-step-result-error-line"]').text()).toBe("send failed");
+      expect(wrapper.find('[data-test="workflow-step-result-error-line"]').text()).toBe(
+        "send failed",
+      );
       expect(outputEditor(wrapper)).toBeUndefined();
     });
 
     it("filtered non-terminal: centered empty state, no editor", () => {
       // f1 forwarded nothing to d1 -> f1's output is empty.
-      setup({ result: { errors: {}, inputs: { t1: [rec(1)], f1: [rec(2)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] } });
+      setup({
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
       const wrapper = mountDrawer();
       expect(outputEditor(wrapper)).toBeUndefined();
       expect(wrapper.find('[data-test="workflow-step-result-output-empty"]').exists()).toBe(true);
@@ -331,9 +378,17 @@ describe("WorkflowStepResultDrawer", () => {
     it("condition that matched nothing explains why in the empty state", () => {
       setup({
         nodeId: "c1",
-        nodes: [{ id: "c1", data: { node_type: "condition" } }, { id: "d1", data: { node_type: "destination", destination_id: "s" } }],
+        nodes: [
+          { id: "c1", data: { node_type: "condition" } },
+          { id: "d1", data: { node_type: "destination", destination_id: "s" } },
+        ],
         edges: [{ source: "c1", target: "d1" }],
-        result: { errors: {}, inputs: { c1: [rec(1)] }, ranNodeIds: ["c1", "d1"], blockedNodeIds: [] },
+        result: {
+          errors: {},
+          inputs: { c1: [rec(1)] },
+          ranNodeIds: ["c1", "d1"],
+          blockedNodeIds: [],
+        },
       });
       expect(mountDrawer().find('[data-test="workflow-step-result-output-empty"]').text()).toBe(
         t("workflow.test.stepResult.conditionNoMatch"),
@@ -341,7 +396,15 @@ describe("WorkflowStepResultDrawer", () => {
     });
 
     it("terminal with 0 records: 'nothing was sent', not a false send", () => {
-      setup({ nodeId: "d1", result: { errors: {}, inputs: { t1: [rec(1)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] } });
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
       expect(mountDrawer().find('[data-test="workflow-step-result-output-empty"]').text()).toBe(
         t("workflow.test.stepResult.destinationNoRecords"),
       );
@@ -367,12 +430,22 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("disables + explains when the pane has no records", () => {
       // d1 got nothing -> both input and output empty.
-      setup({ nodeId: "d1", result: { errors: {}, inputs: { t1: [rec(1)], f1: [rec(2)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] } });
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
       const wrapper = mountDrawer();
       expect(useInputBtn(wrapper).attributes("disabled")).toBeDefined();
       expect(useOutputBtn(wrapper).attributes("disabled")).toBeDefined();
       expect(tooltipFor(wrapper, t("workflow.test.stepResult.useAsTestInputNoInput"))).toBeTruthy();
-      expect(tooltipFor(wrapper, t("workflow.test.stepResult.useAsTestInputNoOutput"))).toBeTruthy();
+      expect(
+        tooltipFor(wrapper, t("workflow.test.stepResult.useAsTestInputNoOutput")),
+      ).toBeTruthy();
     });
 
     it("is ALSO available in history mode — it drops the user into a fresh test", async () => {
@@ -445,7 +518,15 @@ describe("WorkflowStepResultDrawer", () => {
     });
 
     it("is disabled when no records reached the node (nothing to replay)", () => {
-      setup({ nodeId: "d1", result: { errors: {}, inputs: { t1: [rec(1)], f1: [rec(2)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] } });
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
       expect(replayBtn(mountDrawer()).attributes("disabled")).toBeDefined();
     });
 
@@ -490,7 +571,9 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("still shows the error output for the past run", () => {
       setup({ result: historyResult() });
-      expect(mountDrawer().find('[data-test="workflow-step-result-error-line"]').text()).toBe("boom");
+      expect(mountDrawer().find('[data-test="workflow-step-result-error-line"]').text()).toBe(
+        "boom",
+      );
     });
   });
 
@@ -525,7 +608,8 @@ describe("WorkflowStepResultDrawer", () => {
   });
 
   describe("fullscreen", () => {
-    const fsButtons = (w: any) => w.findAll(`[title="${t("workflow.test.stepResult.enterFullscreen")}"]`);
+    const fsButtons = (w: any) =>
+      w.findAll(`[title="${t("workflow.test.stepResult.enterFullscreen")}"]`);
 
     it("toggles the Input+Output container as one unit", async () => {
       const wrapper = mountDrawer();
