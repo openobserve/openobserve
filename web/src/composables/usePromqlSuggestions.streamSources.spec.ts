@@ -167,14 +167,18 @@ describe("label NAMES come from the stream schema", () => {
     }
   });
 
-  it("keeps inserting a label ready to be matched", async () => {
-    // Existing behaviour worth not losing: the insertion leaves the cursor at
-    // an `=`, because a bare label name is not a filter.
+  it("inserts the bare label name, without an operator", async () => {
+    // An earlier draft of this file inserted `service=` and called it
+    // "existing behaviour worth not losing". It was neither: the branch this
+    // replaced inserted the bare name, and appending the operator collides
+    // with the habit of typing `=` yourself — `service==` matches nothing and
+    // offers nothing, because monaco does not dedupe the operator. Caught by
+    // the Dashboards PromQL e2e, which types the `=` exactly as a user would.
     const c = await freshComposable();
     atLabelName(c, "cpu_utilization_percent{");
     await c.getSuggestions();
     await flushPromises();
-    expect(offered(c).find((k) => k.label === "service")?.insertText).toBe("service=");
+    expect(offered(c).find((k) => k.label === "service")?.insertText).toBe("service");
   });
 
   it("does not offer a label the query already filters on", async () => {

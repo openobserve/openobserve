@@ -262,9 +262,14 @@ const usePromqlSuggestions = () => {
               .map((name) => ({
                 label: name,
                 kind: "Variable",
-                // A bare label name is not a filter; leave the cursor at the
-                // operator.
-                insertText: `${name}=`,
+                // The bare name, without an `=`.
+                //
+                // Appending the operator reads like a convenience, but the
+                // habit it collides with is typing `=` yourself: accepting
+                // `environment` and then typing `=` gives `environment==`,
+                // which matches nothing and offers nothing. Monaco does not
+                // dedupe the operator, so the safe insert is the name alone.
+                insertText: name,
               })),
             { contextual: true },
           );
