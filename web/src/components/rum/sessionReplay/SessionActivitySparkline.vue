@@ -136,6 +136,7 @@ onMounted(() => {
       }
     },
     // Prefetch slightly ahead of the fold so scrolling feels instant.
+    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
     { rootMargin: "200px 0px" },
   );
   observer.observe(rootEl.value);

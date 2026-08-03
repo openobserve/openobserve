@@ -26,10 +26,12 @@ const logoSrc = computed(() =>
   <header class="welcome-hero flex max-w-[44rem] flex-col items-center gap-2.5 text-center">
     <div class="welcome-hero__row flex items-center gap-3.5">
       <div class="welcome-hero__logo-wrap relative inline-flex">
+        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
         <span
           class="welcome-hero__logo-halo pointer-events-none absolute inset-[-1.125rem] z-0 rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] blur-[14px]"
           aria-hidden="true"
         ></span>
+        <!-- eslint-enable local/no-hardcoded-px -->
         <img :src="logoSrc" alt="O2 Assistant" class="welcome-hero__logo relative z-1 h-14 w-14" />
       </div>
 

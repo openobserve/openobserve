@@ -35,10 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 w-full flex-1 flex-col">
       <div class="min-h-0 w-full flex-1 px-2.5 pt-1 pb-2.5">
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <div
           class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 64rem">
             <div class="create-report-form">
               <div data-test="add-action-script-name-input-wrapper" class="report-name-input pt-3">

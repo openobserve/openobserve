@@ -1043,6 +1043,7 @@ export default defineComponent({
     this.rowData = newObj;
   },
 });
+/* eslint-disable local/no-hardcoded-px -- covers the style block below: the px there are 1px table cell dividers — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>

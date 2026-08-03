@@ -149,11 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
+  <!-- eslint-disable local/no-hardcoded-px -- zero length: 0px collapses the bar entirely, so there is nothing for rem to scale -->
   <div
     class="flex flex-1 flex-col overflow-hidden"
     :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''"
     data-test="dashboard-query"
   >
+    <!-- eslint-enable local/no-hardcoded-px -->
     <div class="flex h-full w-full flex-col">
       <div class="flex h-full w-full flex-col">
         <div class="flex h-full">

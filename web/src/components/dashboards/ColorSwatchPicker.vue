@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-wrap items-center gap-1.5" :data-test="dataTest">
     <!-- None — checkerboard tint with a diagonal strike -->
+    <!-- eslint-disable local/no-hardcoded-px -- repeating-gradient stop geometry: the checkerboard tint is a fixed-size texture, not a text-relative length -->
     <button
       type="button"
       class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_2px,transparent_2px,transparent_6px)] p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
@@ -27,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="dataTest ? `${dataTest}-none` : undefined"
       @click.stop="select(null)"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <span class="bg-status-negative absolute inset-x-px top-1/2 h-px origin-center -rotate-45" />
     </button>
 

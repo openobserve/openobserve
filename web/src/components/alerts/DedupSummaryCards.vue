@@ -17,10 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="dedup-summary-cards" class="dedup-summary-cards mb-4 grid grid-cols-4 gap-4">
     <!-- Card 1: Total Alerts -->
+    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
     <OCard
       data-test="total-alerts-card"
       class="border-border-default border transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <OCardSection class="p-4">
         <div data-test="total-alerts-value" class="text-2xl font-semibold">
           {{ summary.total_alerts }}
@@ -30,10 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCard>
 
     <!-- Card 2: Alerts with Dedup -->
+    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
     <OCard
       data-test="alerts-with-dedup-card"
       class="border-border-default border transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <OCardSection class="p-4">
         <div class="flex items-center gap-2">
           <div data-test="alerts-with-dedup-value" class="text-2xl font-semibold">
@@ -53,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCard>
 
     <!-- Card 3: Suppression Rate -->
+    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
     <OCard
       data-test="suppression-rate-card"
       class="border-border-default border transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
@@ -61,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'bg-status-warning-bg': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5,
       }"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <OCardSection class="p-4">
         <div
           data-test="suppression-rate-value"
@@ -96,10 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCard>
 
     <!-- Card 4: Pending Batches -->
+    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
     <OCard
       data-test="pending-batches-card"
       class="border-border-default border transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <OCardSection class="p-4">
         <div class="flex items-center gap-2">
           <div data-test="pending-batches-value" class="text-2xl font-semibold">

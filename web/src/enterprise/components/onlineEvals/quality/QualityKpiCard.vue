@@ -1,3 +1,4 @@
+<!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
 <template>
   <div
     :class="[
@@ -12,6 +13,7 @@
     @keydown.enter.prevent="activate"
     @keydown.space.prevent="activate"
   >
+    <!-- eslint-enable local/no-hardcoded-px -->
     <div class="flex flex-col gap-1">
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->

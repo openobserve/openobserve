@@ -280,6 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Query Editor -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
                   class="flex flex-col"
@@ -287,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <DashboardQueryEditor />
                 </div>
               </div>
@@ -560,6 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Query Editor for custom chart -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
                   class="flex flex-col"
@@ -567,6 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <DashboardQueryEditor />
                 </div>
               </div>
@@ -841,6 +845,7 @@ const contentHeight = computed(() => {
     case "logs":
       return "calc(100% - 2.25rem)";
     case "build":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "calc(100vh - var(--navbar-height) - 24px)";
     default:
       return "100%";
@@ -861,7 +866,9 @@ const chartAreaStyle = computed(() => {
     return {};
   }
   return {
+    // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
     height: "calc(100vh - var(--navbar-height) - 464px)",
+    // eslint-disable-next-line local/no-hardcoded-px -- zero length: 0px is the absence of a size, so there is nothing for rem to scale
     marginTop: "0px",
   };
 });

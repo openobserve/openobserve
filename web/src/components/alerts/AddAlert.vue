@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ isAnomalyMode ? t("alerts.anomalyName") : t("alerts.incidents.alertName") }}
                   <span class="text-text-body">*</span>
                 </div>
+                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormInput
                   v-if="!isAnomalyMode"
                   ref="step1Ref"
@@ -102,12 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :placeholder="t('alerts.alertNamePlaceholder')"
                   class="topbar-name-input h-7! min-h-7! max-w-37.5 min-w-30 text-sm @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <!-- Anomaly name binds the SAME `name` field as the alert name, not
                    `anomalyConfig.name`: a bare OInput has no field for the schema
                    to paint, so a blank name could only ever toast. useAlertForm's
                    formData.name → anomalyConfig.name watcher still feeds the value
                    saveAnomalyDetection reads, and anomaly edit-load already seeds
                    it via setF("name", data.name). -->
+                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormInput
                   v-else
                   ref="anomalyNameRef"
@@ -116,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :placeholder="t('alerts.anomalyNamePlaceholder')"
                   class="topbar-name-input h-7! min-h-7! max-w-37.5 min-w-30 text-sm @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
 
               <!-- Folder -->
@@ -154,6 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
                 </div>
+                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormSelect
                   ref="streamTypeRef"
                   name="stream_type"
@@ -164,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="beingUpdated || anomalyEditMode"
                   @update:model-value="onStreamTypeChange"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
 
               <!-- Stream Name -->
@@ -171,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
+                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormSelect
                   ref="streamNameRef"
                   name="stream_name"
@@ -181,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                   @update:model-value="updateStreamFields($event)"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <OTooltip
                   v-if="!formData.stream_type"
                   :content="t('alerts.selectStreamTypeFirst')"
@@ -192,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.alertType") }}
                 </div>
+                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormSelect
                   data-test="add-alert-type-select-dropdown"
                   name="is_real_time"
@@ -200,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
                   :searchable="false"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
             </div>
           </div>

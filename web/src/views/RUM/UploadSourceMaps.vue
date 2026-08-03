@@ -30,10 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="bg-card-glass-bg mb-[0.675rem] flex-1 overflow-auto overflow-y-auto p-6"
         style="height: calc(100vh - 172px)"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div class="mx-auto max-w-300">
           <!-- Input Fields -->
           <div class="mb-6 grid grid-cols-1 gap-4">

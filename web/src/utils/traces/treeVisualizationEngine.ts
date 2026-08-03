@@ -365,6 +365,7 @@ export function createTreeVisualizationEngine() {
     const tooltipEl = document.createElement("div");
 
     // Exact styling from Service Graph implementation
+    /* eslint-disable local/no-hardcoded-px -- raw cssText string for the ECharts tooltip chrome: blur radius, hairline border and fixed tooltip metrics are optical, not text-relative, and must stay identical to the Service Graph tooltip */
     tooltipEl.style.cssText = `
       position: absolute; pointer-events: none; z-index: 9999;
       background: ${isDarkMode ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
@@ -376,6 +377,7 @@ export function createTreeVisualizationEngine() {
       letter-spacing: 0.01em; white-space: nowrap; display: none;
       color: ${isDarkMode ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.82)"};
     `;
+    /* eslint-enable local/no-hardcoded-px */
 
     if (!chartDom.style.position || chartDom.style.position === "static") {
       chartDom.style.position = "relative";
@@ -395,7 +397,9 @@ export function createTreeVisualizationEngine() {
       // Make visible but positioned off-screen to measure dimensions
       tooltipEl.style.visibility = "hidden";
       tooltipEl.style.display = "block";
+      // eslint-disable-next-line local/no-hardcoded-px -- zero-length origin reset before off-screen measurement; a zero offset has no scale to convert
       tooltipEl.style.left = "0px";
+      // eslint-disable-next-line local/no-hardcoded-px -- zero-length origin reset before off-screen measurement; a zero offset has no scale to convert
       tooltipEl.style.top = "0px";
 
       // Now we can get accurate dimensions

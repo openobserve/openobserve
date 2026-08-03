@@ -61,9 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Theme list for the active mode. Selecting a row applies it immediately;
          the applied row is highlighted rather than carrying an Apply button. -->
+    <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <OCardSection class="max-h-[calc(100vh-100px)] overflow-y-auto px-2 py-2">
       <ul class="m-0 flex list-none flex-col gap-2 p-0">
         <li v-for="theme in predefinedThemes" :key="theme.id">
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — focus ring and inset selection ring widths must not scale with text -->
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
@@ -77,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
             @click="applyTheme(theme, mode)"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <span
               class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"
               :style="swatchStyle(theme[mode])"
@@ -100,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Custom Color — clicking the row opens the color picker -->
         <li>
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — focus ring and inset selection ring widths must not scale with text -->
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
@@ -113,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             aria-label="Pick a custom theme color"
             @click="openColorPicker(mode)"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
               class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"

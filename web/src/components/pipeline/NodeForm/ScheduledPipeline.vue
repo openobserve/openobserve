@@ -424,6 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 class="threshould-input"
                                 data-test="scheduled-pipeline-threshold-operator-select"
                               >
+                                <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
@@ -432,7 +433,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     border: 1px solid var(--color-border-subtle);
                                   "
                                 />
+                                <!-- eslint-enable local/no-hardcoded-px -->
                               </div>
+                              <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
                               <div
                                 class="flex items-center"
                                 style="
@@ -440,6 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   border-left: none;
                                 "
                               >
+                                <!-- eslint-enable local/no-hardcoded-px -->
                                 <div
                                   style="width: 5.5625rem; margin-left: 0 !important"
                                   class="silence-notification-input"
@@ -724,10 +728,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div class="border-border-default flex h-full w-full flex-col border-l">
+              <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
               <div
                 class="w-full flex-1 overflow-auto"
                 style="height: calc(100vh - 200px) !important"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <div class="query-editor-container scheduled-pipelines">
                   <span @click.stop="expandState.query = !expandState.query">
                     <FullViewContainer
@@ -737,6 +743,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                   <div class="relative">
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <UnifiedQueryEditor
                       v-show="expandState.query"
                       data-test="scheduled-pipeline-sql-editor"
@@ -759,6 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @blur="onBlurQueryEditor"
                       editor-height="calc(100vh - 190px)"
                     />
+                    <!-- eslint-enable local/no-hardcoded-px -->
                     <div
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pl-[2.15rem] select-none"
@@ -779,6 +787,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="mt-1"
                       />
                     </span>
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <div
                       v-if="loading && expandState.output && tab == 'sql'"
                       style="height: calc(100vh - 190px) !important"
@@ -804,6 +813,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="rows.length == 0 && expandState.output && tab == 'sql'"
                       style="height: calc(100vh - 236px) !important"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <h6
                         v-if="selectedStreamName == ''"
                         data-test="logs-search-no-stream-selected-text"
@@ -889,6 +899,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- query-eidtor-part -->
       </div>
 
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="ml-2 w-1/4 max-w-full"
         v-if="store.state.isAiChatEnabled"
@@ -901,6 +912,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aiChatInputContext="aiChatInputContext"
           :appendMode="aiChatAppendMode"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>

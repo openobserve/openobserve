@@ -1,5 +1,7 @@
+<!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
 <template>
   <div style="width: 60vw; height: calc(100vh - 59px)" :class="'bg-surface-base'">
+    <!-- eslint-enable local/no-hardcoded-px -->
     <div class="flex flex-nowrap items-center justify-between px-4 py-2">
       <div class="flex items-center">
         <div class="col-auto"></div>
@@ -40,6 +42,7 @@
               clearable
             />
           </div>
+          <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
           <div style="height: calc(100vh - 130px)" class="overflow-y-auto">
             <div class="pattern-list-wrapper">
               <OCollapsible
@@ -121,6 +124,7 @@
       </div>
       <OSeparator vertical />
       <!-- here we will have the right side section -->
+      <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div class="flex w-[75%] flex-col" style="height: calc(100vh - 59px)">
         <div class="flex-1 overflow-y-auto pt-3">
           <div
@@ -334,10 +338,12 @@
                         :placeholder="t('regex_patterns.output_string_placeholder')"
                         :rows="5"
                       />
+                      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
                       <div
                         v-else
                         class="bg-surface-base flex h-27.75 flex-col items-center justify-center [border-bottom:1px_solid_var(--color-border-default)] [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)]"
                       >
+                        <!-- eslint-enable local/no-hardcoded-px -->
                         <div v-if="!testLoading && outputString.length === 0">
                           <OIcon name="lightbulb" size="md" class="text-icon-color" />
                           <span class="text-text-secondary text-center text-xs font-[400]">

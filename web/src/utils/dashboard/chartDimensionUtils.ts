@@ -15,6 +15,7 @@ let measureTextCtx: CanvasRenderingContext2D | null | undefined;
  * @param {string} fontSize - The font size of the text.
  * @return {number} The width of the text in pixels.
  */
+// eslint-disable-next-line local/no-hardcoded-px -- detached canvas resolves rem against the 16px default, not the document root, so rem would measure wrong
 export const calculateWidthText = (text: string, fontSize: string = "12px"): number => {
   if (!text) return 0;
 
@@ -29,6 +30,7 @@ export const calculateWidthText = (text: string, fontSize: string = "12px"): num
   if (measureTextCtx) {
     // Must match the family ECharts renders axis labels with (set globally by
     // registerO2EChartsTheme), otherwise nameGap/width come out wrong.
+    // eslint-disable-next-line local/no-hardcoded-px -- detached canvas resolves rem against the 16px default, not the document root, so rem would measure wrong
     measureTextCtx.font = canvasFont(fontSize || "12px", "sans");
     return Math.ceil(measureTextCtx.measureText(String(text)).width);
   }

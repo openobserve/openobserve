@@ -60,6 +60,7 @@
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
              every .monaco-editor app-wide. The focus-border is left off so this
              editor stays borderless like the others. -->
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <CodeQueryEditor
           v-model:query="unflattendData"
           ref="queryEditorRef"
@@ -68,6 +69,7 @@
           :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="pl-3">

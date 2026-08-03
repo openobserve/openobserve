@@ -8,7 +8,19 @@ import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatti
 import cypress from "eslint-plugin-cypress";
 import fs from "fs";
 import css from "@eslint/css";
-import { PX_FILE_ALLOWLIST, PX_LITERAL, pxIsAllowed, maskCommentsForPx } from "./scripts/px-rules.mjs";
+// `px(?![a-zA-Z0-9])`, not `px\b`: `_` is a word char and Tailwind uses `_` for the
+// space inside arbitrary values, so `\b` would skip the first value of `p-[8px_12px]`.
+const PX_LITERAL = /(?<![a-zA-Z0-9.])(\d+(?:\.\d+)?)px(?![a-zA-Z0-9])/g;
+
+// Blanks comment BODIES, preserving offsets so reported locations stay correct — a px
+// named in a comment (token annotation, or a disable reason) must not itself report.
+const maskCommentsForPx = (text) => {
+  const blank = (m) => m.replace(/[^\n]/g, " ");
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, blank)
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, (m, p) => p + blank(m.slice(p.length)));
+};
 
 // Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
 // file's raw text — catches Tailwind arbitrary-value usages in templates
@@ -75,8 +87,9 @@ const noLegacyO2Tokens = {
 };
 
 // ── no-hardcoded-px ────────────────────────────────────────────────────────
-// Sizing is authored in rem. Rules live in scripts/px-rules.mjs; this is their only
-// consumer, covering .vue, .ts and .css (the .css block below supplies the language).
+// Sizing is authored in rem (WCAG 1.4.4); 1rem = 16px. No exemption list — a sanctioned
+// px carries `eslint-disable-next-line local/no-hardcoded-px -- <reason>` at the site, so
+// ESLint reports it once it stops being needed. Placement rules: SKILL.md §3.
 const noHardcodedPx = {
   rules: {
     "no-hardcoded-px": {
@@ -86,11 +99,8 @@ const noHardcodedPx = {
       },
       create(context) {
         const filename = (context.filename ?? context.getFilename() ?? "").replace(/\\/g, "/");
+        // Spec files legitimately assert on literal px strings.
         if (/\.spec\.|\.test\.|\/tests?\//.test(filename)) return {};
-        if (
-          PX_FILE_ALLOWLIST.some((p) => (p.endsWith("/") ? filename.includes(p) : filename.endsWith(p)))
-        )
-          return {};
         const scan = () => {
           const sourceCode = context.sourceCode ?? context.getSourceCode();
           const text = sourceCode.getText();
@@ -98,7 +108,6 @@ const noHardcodedPx = {
           let match;
           PX_LITERAL.lastIndex = 0;
           while ((match = PX_LITERAL.exec(masked))) {
-            if (pxIsAllowed(text, match.index, match[1])) continue;
             const px = parseFloat(match[1]);
             const asRem = parseFloat((px / 16).toFixed(6));
             const scale = px / 4;
@@ -108,7 +117,7 @@ const noHardcodedPx = {
                 start: sourceCode.getLocFromIndex(match.index),
                 end: sourceCode.getLocFromIndex(match.index + match[0].length),
               },
-              message: `Hardcoded ${match[0]}. Size in rem: use ${asRem}rem${hint}. If px is genuinely required (hairline, shadow/ring width, query condition, IntersectionObserver rootMargin, user-facing copy, SVG dimension attribute, canvas/ECharts/email consumer), add a context rule to pxIsAllowed() in scripts/px-rules.mjs — prefer that over a whole-file PX_FILE_ALLOWLIST entry.`,
+              message: `Hardcoded ${match[0]}. Size in rem: use ${asRem}rem${hint}. If px is genuinely required (hairline, shadow/ring width, query condition, IntersectionObserver rootMargin, user-facing copy, SVG dimension attribute, canvas/ECharts/email consumer), add \`// eslint-disable-next-line local/no-hardcoded-px -- <why px is correct here>\` at the site.`,
             });
           }
         };

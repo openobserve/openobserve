@@ -154,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pr-8 transition-opacity duration-200"
           :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
         >
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <button
             class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
             :tabindex="svcScrollCanLeft ? 0 : -1"
@@ -161,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="t('overview.scrollLeft')"
             @click="scrollServices(-1)"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
                 d="M15 18l-6-6 6-6"
@@ -253,6 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent pl-8 transition-opacity duration-200"
           :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
         >
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <button
             class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
             :tabindex="svcScrollCanRight ? 0 : -1"
@@ -260,6 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="t('overview.scrollRight')"
             @click="scrollServices(1)"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path
                 d="M9 18l6-6-6-6"

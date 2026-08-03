@@ -672,10 +672,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            internal scroll. Each card caps its list at a max-height and only
            scrolls internally when it genuinely overflows. The rail sticks to the
            top and never exceeds the viewport. -->
+            <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
             <aside
               class="sticky top-0 flex max-h-[calc(100vh-2.6rem-68px-1.25rem)] flex-col gap-2.5 self-start overflow-y-auto pb-2.5"
               data-test="session-rail"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
               <div
                 class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
@@ -1072,6 +1074,7 @@ function cacheInputDenominator(d: SessionDetail): number {
 // Errors uses a variant (red when > 50% error rate); every other tile is neutral.
 function kpiCardClass(variant?: "danger"): string {
   const base =
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling this hover elevation shadow with text makes it bloom
     "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
   if (variant === "danger")
     return `${base} bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))] border-[color-mix(in_srgb,var(--color-error-500)_35%,var(--color-border-default))]`;
@@ -1731,6 +1734,8 @@ function formatTokens(n: number): string {
 }
 
 onMounted(load);
+
+/* eslint-disable local/no-hardcoded-px -- covers the style block below (a comment inside style is not honoured): its 1px values are hairlines — a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped lang="scss">

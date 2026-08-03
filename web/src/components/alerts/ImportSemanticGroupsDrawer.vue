@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Groups List -->
+        <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <div class="max-h-[calc(100vh-400px)] overflow-y-auto">
           <!-- Additions -->
           <div v-if="diffData.additions.length > 0" class="mb-3">

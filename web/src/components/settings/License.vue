@@ -295,9 +295,11 @@
 
             <div class="mt-3 flex flex-col gap-2">
               <!-- Summary Message -->
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur radius with text makes the frosting bloom -->
               <div
                 class="ingestion-summary-compact rounded-default relative overflow-hidden border border-solid border-[rgba(99,102,241,0.2)] px-3.5 py-3 [backdrop-filter:blur(10px)] dark:border-[rgba(99,102,241,0.3)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)]"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <div class="summary-text-compact text-compact text-sm leading-[1.6] text-inherit">
                   <!-- Line 1: License Info -->
                   <div class="mb-2 flex items-center gap-2">

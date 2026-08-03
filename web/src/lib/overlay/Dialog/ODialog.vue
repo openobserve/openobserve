@@ -181,18 +181,24 @@ const sizeClasses = computed(() => {
   }
   switch (props.size) {
     case "xs":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "max-w-[min(320px,calc(100vw-2rem))] w-full";
     case "sm":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "max-w-[min(480px,calc(100vw-2rem))] w-full";
     case "md":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "max-w-[min(640px,calc(100vw-2rem))] w-full";
     case "lg":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "max-w-[min(800px,calc(100vw-2rem))] w-full";
     case "xl":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "max-w-[min(1024px,calc(100vw-2rem))] w-full";
     case "full":
       return "w-screen h-screen max-w-none rounded-none";
     default:
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "max-w-[min(640px,calc(100vw-2rem))] w-full";
   }
 });
@@ -518,6 +524,7 @@ watch(internalOpen, (open) => {
         <!-- overflow-x-hidden prevents horizontal scrollbar when content is wider than dialog -->
         <!-- full-size: flex-1 so the body fills the remaining viewport height; content manages its own scroll -->
         <!-- non-full: no flex-1 — panel height = content height (capped at max-h), footer flows below body -->
+        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling these scroll-shadow insets with text makes elevation bloom -->
         <div
           ref="bodyRef"
           :class="[
@@ -533,6 +540,7 @@ watch(internalOpen, (open) => {
               '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <slot />
         </div>
 

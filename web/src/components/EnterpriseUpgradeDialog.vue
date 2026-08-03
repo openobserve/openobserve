@@ -56,9 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="hero-panel relative flex min-h-0 [flex:0_0_35%] flex-col overflow-y-auto bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 text-white max-[56.25rem]:min-h-100 max-[56.25rem]:flex-none"
         >
           <div class="m-auto flex w-full max-w-100 flex-1 flex-col items-center justify-center">
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
             <div
               class="rounded-default mb-6 flex h-20 w-20 items-center justify-center bg-[rgba(255,255,255,0.15)] backdrop-blur-[10px]"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
@@ -89,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow and blur with text makes elevation bloom -->
                 <div
                   data-test="enterprise-upgrade-offer-badge"
                   class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)] backdrop-blur-[10px]"
@@ -97,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dialogConfig.isLicensed,
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <OIcon
                     v-if="!dialogConfig.showUsageIndicator"
                     :name="dialogConfig.badgeIcon"
@@ -109,10 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur with text makes elevation bloom -->
             <div
               v-if="dialogConfig.isLicensed"
               class="rounded-default mb-6 w-full border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.1)] p-4 backdrop-blur-[10px]"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
                 <OSkeleton
@@ -142,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="flex w-full flex-col gap-3">
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — shadow offsets/blurs and the 1px active-press nudge must not scale with text -->
               <OButton
                 v-if="dialogConfig.showPrimaryButton"
                 variant="on-dark-primary"
@@ -150,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="enterprise-upgrade-download-btn"
                 class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] text-[var(--color-theme-accent)]! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
                   <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />

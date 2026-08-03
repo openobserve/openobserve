@@ -27,6 +27,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-button-primary text-button-primary-foreground",
     "enabled:hover:bg-button-primary-hover",
     "enabled:active:bg-button-primary-active",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-primary-hover",
     "disabled:bg-button-primary-disabled disabled:text-button-primary-foreground",
   ].join(" "),
@@ -34,6 +35,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-button-secondary text-button-secondary-foreground",
     "enabled:hover:bg-button-secondary-hover",
     "enabled:active:bg-button-secondary-active",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-secondary-focus-ring",
     "disabled:bg-button-secondary-disabled disabled:text-text-disabled",
   ].join(" "),
@@ -41,6 +43,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-outline-text border border-button-outline-border",
     "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
     "enabled:active:bg-button-outline-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-outline-hover-border",
     "disabled:opacity-50",
   ].join(" "),
@@ -48,6 +51,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-text border-0",
     "enabled:hover:bg-button-ghost-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
     "disabled:text-text-disabled",
   ].join(" "),
@@ -55,6 +59,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-primary-text border-0",
     "enabled:hover:bg-button-ghost-primary-hover-bg",
     "enabled:active:bg-button-ghost-primary-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:text-text-disabled",
   ].join(" "),
@@ -62,6 +67,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-muted-text border-0",
     "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
     "enabled:active:bg-button-ghost-muted-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-muted-focus-ring",
     "disabled:text-text-disabled",
   ].join(" "),
@@ -69,6 +75,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-subtle-text border-0 opacity-60",
     "enabled:hover:opacity-100 enabled:hover:bg-button-ghost-subtle-hover-bg",
     "enabled:active:bg-button-ghost-subtle-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-subtle-focus-ring",
     "disabled:text-text-disabled disabled:opacity-30",
   ].join(" "),
@@ -76,6 +83,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-destructive-text border-0",
     "enabled:hover:bg-button-ghost-destructive-hover-bg",
     "enabled:active:bg-button-ghost-destructive-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-destructive-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
@@ -83,6 +91,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-success-text border-0",
     "enabled:hover:bg-button-ghost-success-hover-bg",
     "enabled:active:bg-button-ghost-success-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-success-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
@@ -90,6 +99,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-button-destructive text-button-destructive-foreground",
     "enabled:hover:bg-button-destructive-hover",
     "enabled:active:bg-button-destructive-hover",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-destructive-hover",
     "disabled:opacity-60",
   ].join(" "),
@@ -97,6 +107,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-warning-text border-0",
     "enabled:hover:bg-button-ghost-warning-hover-bg",
     "enabled:active:bg-button-ghost-warning-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-warning-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
@@ -104,6 +115,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-button-warning text-button-warning-foreground border border-button-warning-border",
     "enabled:hover:bg-button-warning-hover",
     "enabled:active:bg-button-warning-active",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-warning-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
@@ -113,6 +125,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-inherit border-0",
     "enabled:hover:bg-button-ghost-hover-bg",
     "enabled:active:bg-button-ghost-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -122,6 +135,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-destructive-text border border-button-ghost-destructive-text",
     "enabled:hover:bg-button-ghost-destructive-hover-bg",
     "enabled:active:bg-button-ghost-destructive-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-destructive-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -131,6 +145,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-muted-text border-0",
     "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
     "enabled:active:bg-button-ghost-muted-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-muted-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -139,6 +154,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-button-primary text-button-primary-foreground",
     "enabled:hover:bg-button-primary-hover",
     "enabled:active:bg-button-primary-active",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-primary-hover",
     "disabled:bg-button-primary-disabled disabled:text-button-primary-foreground",
   ].join(" "),
@@ -147,14 +163,17 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-surface-panel text-button-ghost-text border border-border-default",
     "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover",
     "enabled:active:bg-button-ghost-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
   // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
     "bg-[image:var(--color-gradient-ai)] text-white border-0",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow), not layout — scaling it with text makes elevation bloom
     "enabled:hover:shadow-[0_4px_12px_rgba(139,92,246,0.4)]",
     "enabled:active:opacity-90",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-ai-accent",
     "disabled:opacity-40",
   ].join(" "),
@@ -163,6 +182,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-white text-button-on-dark-primary-text font-bold border-0 shadow-md",
     "enabled:hover:shadow-lg",
     "enabled:active:opacity-90",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-white/50",
     "disabled:opacity-50",
   ].join(" "),
@@ -171,6 +191,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-white border-2 border-white/30",
     "enabled:hover:bg-white/10 enabled:hover:border-white/50",
     "enabled:active:opacity-90",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-white/50",
     "disabled:opacity-50",
   ].join(" "),
@@ -212,6 +233,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-button-ghost-primary-active-bg text-button-ghost-primary-text border border-button-outline-hover-border",
     "enabled:hover:bg-button-ghost-primary-active-bg enabled:hover:border-button-outline-hover-border",
     "enabled:active:bg-button-ghost-primary-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-primary-focus-ring",
     "disabled:opacity-50",
   ].join(" "),
@@ -221,6 +243,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-button-ghost-muted-text border border-dashed border-button-outline-border",
     "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover enabled:hover:text-button-ghost-text",
     "enabled:active:bg-button-ghost-active-bg",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (focus ring width), not layout — scaling it with text makes the ring bloom
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
     "disabled:opacity-50",
   ].join(" "),

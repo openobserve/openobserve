@@ -223,6 +223,7 @@ export function wireframeStyle(w: Wireframe): Record<string, string> {
     style["align-items"] = "center";
     style["justify-content"] = "center";
     style.color = "rgba(0,0,0,0.4)";
+    // eslint-disable-next-line local/no-hardcoded-px -- replays a recording measured in device pixels; scaling would distort it
     style["font-size"] = "10px";
   }
   return style;

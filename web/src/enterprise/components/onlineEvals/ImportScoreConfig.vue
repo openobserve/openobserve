@@ -225,12 +225,14 @@ const dataTypeOptions = [
   { label: "Boolean", value: "boolean" },
 ];
 
+/* eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent */
 const editorHeights = computed(() => ({
   urlEditor: "calc(100vh - 266px)",
   fileEditor: "calc(100vh - 296px)",
   outputContainer: "calc(100vh - 130px)",
   errorReport: "calc(100vh - 192px)",
 }));
+/* eslint-enable local/no-hardcoded-px */
 
 const orgId = computed(() => props.orgId);
 

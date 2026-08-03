@@ -284,9 +284,13 @@ export default defineComponent({
     editorHeights: {
       type: Object,
       default: () => ({
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         urlEditor: "calc(100vh - 286px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         fileEditor: "calc(100vh - 290px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         outputContainer: "calc(100vh - 130px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         errorReport: "calc(100vh - 192px)", // Default for management pages
       }),
     },

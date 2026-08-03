@@ -147,6 +147,7 @@
         </template>
         <template #right>
           <!-- o2 ai context add button in the test function -->
+          <!-- eslint-disable local/no-hardcoded-px -- imageWidth/imageHeight are forwarded to an HTML dimension attribute, which takes a bare integer -->
           <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24px"
@@ -159,6 +160,7 @@
               min-height: 2rem !important;
             "
           />
+          <!-- eslint-enable local/no-hardcoded-px -->
         </template>
       </FullViewContainer>
       <div
@@ -166,6 +168,7 @@
         class="relative"
         data-test="test-function-input-editor-section"
       >
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <QueryEditor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
@@ -175,6 +178,7 @@
           v-model:query="inputEvents"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
     <div class="mt-2">
@@ -226,6 +230,7 @@
             {{ outputMessage }}
           </div>
         </div>
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <QueryEditor
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
@@ -236,6 +241,7 @@
           language="json"
           read-only
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>
@@ -786,6 +792,7 @@ defineExpose({
   sendToAiChat,
   store,
 });
+/* eslint-disable local/no-hardcoded-px -- the style block below uses a 1px hairline margin: a 1-device-pixel offset must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>

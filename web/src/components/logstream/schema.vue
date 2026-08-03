@@ -308,10 +308,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </OCardSection>
                         <!-- Main Content (Scrollable if necessary) -->
+                        <!-- eslint-disable local/no-hardcoded-px -- zero length: 0px is the absence of a size, so there is nothing for rem to scale -->
                         <OCardSection
                           class="mb-0.5 flex-1 overflow-y-auto p-0"
                           style="padding: 0px 1rem 0px 1rem"
                         >
+                          <!-- eslint-enable local/no-hardcoded-px -->
                           <OForm :form="newSchemaFieldsForm" @keyup="onAddFieldsKeyup">
                             <StreamFieldsInputs
                               form-field-name="newSchemaFields"

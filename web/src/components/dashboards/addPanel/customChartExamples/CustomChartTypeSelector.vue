@@ -116,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="chartIndex"
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow offset/blur with text makes elevation bloom -->
                 <OCard
                   class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                   :class="{
@@ -125,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <OCardSection class="p-2">
                     <div
                       class="bg-surface-subtle rounded-default flex h-37.5 w-full items-center justify-center overflow-hidden"

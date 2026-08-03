@@ -359,12 +359,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon size="xs" name="chevron-right" />
 
                 <!-- Submenu — absolutely positioned to the left of parent dropdown -->
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this dropdown elevation shadow with text makes it bloom -->
                 <div
                   v-if="showLanguageSubmenu"
                   class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
                   data-test="language-dropdown-item"
                   @click.stop
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <button
                     v-for="lang in langList"
                     :key="lang.code"

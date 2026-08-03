@@ -114,12 +114,14 @@ const cellStyle = computed(() => {
     base.position = "sticky";
     base.left = `${pinOffset.value}px`;
     base.zIndex = 1;
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
     base.boxShadow = "2px 0 4px -2px var(--color-border-default)";
   }
   if (isPinned.value === "right") {
     base.position = "sticky";
     base.right = `${pinOffset.value}px`;
     base.zIndex = 1;
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
     base.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
   }
   const extra = props.getCellStyle?.({

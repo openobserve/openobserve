@@ -94,6 +94,7 @@ const metadataRows = computed(() =>
     <OCard data-test="traces-db-span-details-metadata-grid">
       <OCardSection class="px-0! py-0!">
         <div class="flex flex-wrap gap-2">
+          <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
           <span
             v-for="row in metadataRows"
             :key="row.key"
@@ -105,6 +106,7 @@ const metadataRows = computed(() =>
               color: var(--color-text-heading);
             "
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <span class="text-text-secondary">{{ row.label }}:</span>
             <span class="break-all">{{ row.value }}</span>
           </span>

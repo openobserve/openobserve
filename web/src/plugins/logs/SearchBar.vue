@@ -911,6 +911,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ t("search.cancel") }}</OButton
                 >
                 <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
@@ -940,6 +941,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : handleRunQueryFn()
                   "
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   {{
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? t("search.generateQuery")
@@ -949,6 +951,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
+                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                     <OButton
                       variant="ghost"
                       size="icon-xs"
@@ -963,6 +966,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <OIcon name="arrow-drop-down" size="sm" />
                     </OButton>
                   </template>
@@ -996,6 +1000,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ t("search.cancel") }}</OButton
                 >
                 <!-- Main action button -->
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
@@ -1026,6 +1031,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : handleRunQueryFn()
                   "
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   {{
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? t("search.generateQuery")
@@ -1035,6 +1041,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
+                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                     <OButton
                       variant="ghost"
                       size="icon-xs"
@@ -1049,6 +1056,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <OIcon name="arrow-drop-down" size="sm" />
                     </OButton>
                   </template>
@@ -1105,6 +1113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("search.cancel") }}</OButton
               >
               <!-- Main action button: "Ask AI" when NL detected but AI bar not open, otherwise "Run Query" -->
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
               <OButton
                 v-else
                 data-test="logs-search-bar-refresh-btn"
@@ -1141,6 +1150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !searchObj.data.stream.selectedStream.length)
                 "
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <OTooltip
                   v-if="
                     searchObj.meta.liveMode &&
@@ -1173,6 +1183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" align="end" side="bottom">
                 <template #trigger>
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                   <OButton
                     variant="ghost"
                     size="icon-xs"
@@ -1193,6 +1204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'rounded-default',
                     ]"
                   >
+                    <!-- eslint-enable local/no-hardcoded-px -->
                     <OIcon name="arrow-drop-down" size="sm" />
                   </OButton>
                 </template>
@@ -1284,6 +1296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="editorFullscreenStyle"
     >
       <!-- Expand / collapse button — always top-right of the full editor area -->
+      <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
       <OButton
         :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
         data-test="logs-query-editor-full_screen-btn"
@@ -1292,6 +1305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="toggleEditorFullscreen"
         class="rounded-default absolute! top-[0.1875rem] right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [border:1px_solid_var(--color-card-glass-border)]!"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
       <div class="flex h-full w-full min-w-0 flex-col">

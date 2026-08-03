@@ -374,6 +374,7 @@ const getTimeRangeValue = (dateTime: any) => {
     return `${startDateTime} - ${endDateTime}`;
   }
 };
+/* eslint-disable local/no-hardcoded-px -- covers the style block below: the .rum-tabs border is a hairline, a 1-device-pixel rule that must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>

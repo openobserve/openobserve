@@ -596,6 +596,7 @@ export default defineComponent({
     };
   },
 });
+/* eslint-disable local/no-hardcoded-px -- the style block below spaces rows by 1px: hairline: a 1-device-pixel gap must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>

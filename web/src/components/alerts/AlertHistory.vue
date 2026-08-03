@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <OTable
           data-test="alert-history-table"
           :data="rows"
@@ -99,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @pagination-change="onPaginationChange"
           @sort-change="onSortChange"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <template #empty>
             <div class="h-screen w-full">
               <NoData />

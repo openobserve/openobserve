@@ -229,9 +229,11 @@ export class BarConverter implements PromQLChartConverter {
     // the last category label centers under the final tick and spills half
     // its width past the plot edge — reserve that much on the right
     const lastCategory = String(categories[categories.length - 1] ?? "");
+    /* eslint-disable local/no-hardcoded-px -- detached canvas resolves rem against the 16px default, not the document root, so rem would measure wrong */
     const rightInset = isHorizontal
       ? "4%"
       : Math.max(20, Math.ceil(calculateWidthText(lastCategory, "12px") / 2) + 6);
+    /* eslint-enable local/no-hardcoded-px */
     return {
       series,
       ...axisConfig,

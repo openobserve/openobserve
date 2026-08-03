@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
 <template>
   <div
     v-if="visible"
@@ -23,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click.stop
     data-test="traces-metrics-context-menu"
   >
+    <!-- eslint-enable local/no-hardcoded-px -->
     <div
       class="text-compact text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 transition-colors select-none"
       @click="handleMenuItemClick('gte')"

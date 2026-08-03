@@ -93,10 +93,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Recent Errors Section -->
+            <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
             <div
               v-if="claimParserFunction"
               class="rounded-default bg-surface-subtle border-l-status-negative border-l-[3px] p-4"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <div class="mb-2 flex items-center">
                 <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
                 <div>

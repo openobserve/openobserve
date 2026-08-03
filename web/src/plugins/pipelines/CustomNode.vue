@@ -363,6 +363,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   );
   return node ? node.icon : undefined;
 }
+/* eslint-disable local/no-hardcoded-px -- the style block below sets a node's border-width: structural border width, not a text-relative dimension */
 </script>
 
 <template>

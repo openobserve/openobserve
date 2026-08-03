@@ -822,6 +822,7 @@ const columnStyle = (
   kind: "header" | "col",
 ): Record<string, string> => {
   const id = kind === "header" ? entry?.id : entry?.column?.columnDef?.id;
+  // eslint-disable-next-line local/no-hardcoded-px -- unit-conversion operator on a unitless value
   const size = `calc(var(--${kind}-${id}-size) * 1px)`;
 
   let style: Record<string, string>;
@@ -938,6 +939,7 @@ const skelTdStyle = (header: any, c: number): Record<string, string> => {
   const colId = header.column.id;
   const isStretchSource = colId === "source" && !header.column.getCanResize();
   if (isStretchSource) return { flex: "1 1 0", minWidth: "0" };
+  // eslint-disable-next-line local/no-hardcoded-px -- unit-conversion operator on a unitless value
   const w = `calc(var(--col-${colId}-size) * 1px)`;
   if (!props.defaultColumns && c === headers.value.length - 1) {
     return { flex: "1 1 auto", minWidth: w, width: "auto", overflow: "hidden" };

@@ -340,6 +340,7 @@ export default defineComponent({
     PinnedDashboardTab,
   },
 });
+/* eslint-disable local/no-hardcoded-px -- covers the style block below: the 1px box-shadow offsets on .unified-input-box:focus-within are an optical effect, not layout — scaling them with text makes the elevation bloom */
 </script>
 
 <style scoped>

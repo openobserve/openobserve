@@ -432,6 +432,7 @@ function fireConfetti() {
   };
   confettiRaf = requestAnimationFrame(frame);
 }
+/* eslint-disable local/no-hardcoded-px -- covers the style block below: every px there is a 1px border or a 1px optical nudge — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>

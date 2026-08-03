@@ -15,11 +15,13 @@ limitations under the License. -->
 <template>
   <div data-test="destination-test-result" class="mt-3">
     <!-- Success State -->
+    <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
       class="rounded-default border-status-positive flex gap-3 border-l-[3px] border-solid bg-[rgba(76,175,80,0.08)] px-4 py-3 dark:bg-[rgba(76,175,80,0.12)]"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <div class="text-status-positive shrink-0 pt-0.5">
         <OIcon name="check-circle" size="md" />
       </div>
@@ -47,11 +49,13 @@ limitations under the License. -->
     </div>
 
     <!-- Failure State -->
+    <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
       class="rounded-default border-status-negative flex gap-3 border-l-[3px] border-solid bg-[rgba(244,67,54,0.08)] px-4 py-3 dark:bg-[rgba(244,67,54,0.12)]"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <div class="text-status-negative shrink-0 pt-0.5">
         <OIcon name="error" size="md" />
       </div>
@@ -155,11 +159,13 @@ limitations under the License. -->
     </div>
 
     <!-- Loading State -->
+    <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"
       class="rounded-default border-theme-accent flex gap-3 border-l-[3px] border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <div class="text-theme-accent shrink-0 pt-0.5">
         <OSpinner size="xs" />
       </div>

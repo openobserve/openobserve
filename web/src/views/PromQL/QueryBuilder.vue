@@ -1,3 +1,4 @@
+<!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
 <template>
   <OPageLayout
     class="h-[calc(100vh-50px)]!"
@@ -7,6 +8,7 @@
     icon="query-stats"
     scroll
   >
+    <!-- eslint-enable local/no-hardcoded-px -->
     <div class="mx-auto max-w-350 py-2.5">
       <OCard>
         <OCardSection role="body">

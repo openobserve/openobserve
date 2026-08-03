@@ -1029,6 +1029,7 @@ watch(
   },
   { deep: true },
 );
+/* eslint-disable local/no-hardcoded-px -- style block below: the 1px chip border is a hairline that must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>

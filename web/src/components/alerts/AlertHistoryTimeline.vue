@@ -413,6 +413,8 @@ function formatDuration(ms: number): string {
   if (h) return `${h}h`;
   return `${m}m`;
 }
+
+/* eslint-disable local/no-hardcoded-px -- covers the style block below (a comment inside style is not honoured): its 1px values are hairlines — a 1-device-pixel hatch stripe and inset ring must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped>

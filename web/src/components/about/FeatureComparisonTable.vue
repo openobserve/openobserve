@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
     <div class="grid grid-cols-3 gap-5 pt-4">
+      <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
       <div
         v-for="ed in editionList"
         :key="ed.id"
@@ -57,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg rounded-default border-card-glass-border relative flex flex-col border p-6 max-[1024px]:p-4"
         :class="{ 'border-accent border-2 pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <!-- Your Plan badge (floats above the card top border) -->
         <div
           v-if="buildType === ed.id"
@@ -154,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body font-semibold">{{ ed.support }}</span>
             </div>
           </div>
+          <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
           <a
             v-if="ed.ctaUrl"
             :href="ed.ctaUrl"
@@ -162,8 +165,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test-cta="action"
             class="rounded-default text-accent hover:border-accent block w-full cursor-pointer border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))]"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             {{ ed.ctaLabel }}
           </a>
+          <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
           <button
             v-else
             data-test="feature-comparison-table-cta-btn"
@@ -171,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border-[1.5px] border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
             disabled
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             {{ ed.ctaLabel }}
           </button>
         </div>

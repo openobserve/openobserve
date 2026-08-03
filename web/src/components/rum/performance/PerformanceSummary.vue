@@ -18,10 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="relative-position">
+    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
       class="max-h-[calc(100vh-200px)] min-h-0! overflow-y-auto"
       :class="isLoading.length ? 'invisible' : 'visible'"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <RenderDashboardCharts
         ref="performanceChartsRef"
         :viewOnly="true"

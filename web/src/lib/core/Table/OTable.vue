@@ -831,6 +831,7 @@ defineExpose({
     return table.getRowModel().rows.map((r) => r.original);
   },
 });
+/* eslint-disable local/no-hardcoded-px -- the two px sites below cannot carry a narrower directive (one sits inside a multi-line :style expression, one inside the style block): the pinned-column boxShadow is an optical effect, not layout — scaling it with text makes elevation bloom — and the 1px row divider is a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>

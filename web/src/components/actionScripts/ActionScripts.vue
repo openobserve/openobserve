@@ -200,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showForm = false"
     >
       <template #header-left>
+        <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
         <div
           data-test="add-action-back-btn"
           class="flex cursor-pointer items-center justify-center"
@@ -207,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="showForm = false"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </template>

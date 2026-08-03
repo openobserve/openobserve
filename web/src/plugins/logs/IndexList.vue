@@ -1906,6 +1906,7 @@ export default defineComponent({
     };
   },
 });
+/* eslint-disable local/no-hardcoded-px -- style block below: the 1px row gap and 1px toggle border are hairlines that must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped>

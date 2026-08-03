@@ -115,6 +115,7 @@ const offsetLabel = (event: any) => {
 
 const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
+/* eslint-disable local/no-hardcoded-px -- style block below: the 1px timeline rail and 1px dot border are hairlines that must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped lang="scss">

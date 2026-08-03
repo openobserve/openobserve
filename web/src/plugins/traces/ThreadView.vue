@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="props.showSummary"
       class="thread-summary bg-surface-base border-border-default flex flex-wrap items-center gap-[0.4rem] border-b px-4 py-2"
     >
+      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]! px-2.5! py-0! text-xs!"
@@ -39,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t('traces.threadView.llmSteps', { n: summary.turnCount })
         "
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
@@ -49,10 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </OTag>
 
+      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]! px-2.5! py-0! text-xs!"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <template #icon><OIcon name="build" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
@@ -63,10 +67,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </OTag>
 
+      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]! px-2.5! py-0! text-xs!"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
@@ -77,10 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
+      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-l-success-600! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
@@ -91,12 +99,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
+      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
         class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs! dark:border-l-(--color-purple-400)!"
         :title="summary.dominantModel"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <template #icon><OIcon name="bolt" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
@@ -107,11 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </OTag>
 
+      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
         class="thread-chip thread-chip--error bg-surface-base! border-border-default rounded-default! text-text-body! border-l-error-600! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
@@ -147,10 +159,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
       <!-- System prompt (global — identical across traces in a session). -->
+      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
       <div
         v-if="head.systemPrompt"
         class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base mb-4 overflow-hidden border border-l-[3px] dark:border-l-(--color-purple-400)"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div
           class="thread-system__head flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
           @click="showSystemFull = !showSystemFull"
@@ -535,6 +549,7 @@ function formatTime(ns: number): string {
   const ss = String(d.getSeconds()).padStart(2, "0");
   return `${hh}:${mm}:${ss}`;
 }
+/* eslint-disable local/no-hardcoded-px -- the style block below uses 1px borders: hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped lang="scss">

@@ -300,6 +300,7 @@ onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
 // --- backdrop ---------------------------------------------------------------
 const showBackdrop = computed(() => props.backdrop ?? size.value !== "inline");
 const dotGridStyle =
+  // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
   "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
   "background-size: 1.875rem 1.875rem;" +
   "-webkit-mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);" +

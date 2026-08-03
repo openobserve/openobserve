@@ -18,6 +18,7 @@ import { PrebuiltConfig } from "./types";
  * Email prebuilt destination configuration
  * Uses HTML email template for rich formatting
  */
+/* eslint-disable local/no-hardcoded-px -- standalone HTML email document: rem resolves against the recipient's mail client */
 export const emailTemplate = {
   name: "prebuilt_email",
   body: `<!DOCTYPE html>
@@ -97,6 +98,7 @@ export const emailTemplate = {
   title: "OpenObserve Alert Notification",
   isDefault: false,
 };
+/* eslint-enable local/no-hardcoded-px */
 
 export const emailConfig: PrebuiltConfig = {
   templateName: "prebuilt_email",

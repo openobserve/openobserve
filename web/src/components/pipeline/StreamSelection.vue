@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
+      <!-- eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
       <div class="bg-separator w-full" style="height: 1px" />
 
       <!-- Inline form — the Save button lives inside the <OForm>, so Enter submits

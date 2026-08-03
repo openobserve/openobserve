@@ -174,6 +174,7 @@ function formatDuration(ns: number): string {
   if (ms < 60_000) return (ms / 1000).toFixed(2) + "s";
   return (ms / 60_000).toFixed(2) + "m";
 }
+/* eslint-disable local/no-hardcoded-px -- the style block below only uses px for hairlines: 1-device-pixel borders and a 1px shadow offset must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped lang="scss">

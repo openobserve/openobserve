@@ -1032,6 +1032,7 @@ export default defineComponent({
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
       const isDarkInit = isDark.value;
+      /* eslint-disable local/no-hardcoded-px -- raw cssText string for the ECharts tooltip chrome: backdrop blur, hairline border and drop shadow are optical effects, not text-relative lengths */
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
         background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
@@ -1043,6 +1044,7 @@ export default defineComponent({
         box-shadow: 0 12px 40px rgba(0,0,0,${isDarkInit ? "0.5" : "0.14"}), 0 1px 0 rgba(255,255,255,${isDarkInit ? "0.04" : "0"}) inset;
         overflow: hidden;
       `;
+      /* eslint-enable local/no-hardcoded-px */
       const chartDom = chart.getDom();
       if (!chartDom.style.position || chartDom.style.position === "static") {
         chartDom.style.position = "relative";

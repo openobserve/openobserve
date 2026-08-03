@@ -231,6 +231,7 @@ function copyVar(name: string) {
 }
 
 defineExpose({ applyTemplate, previewTemplate });
+/* eslint-disable local/no-hardcoded-px -- the style block below uses only 1px borders: hairlines, a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>

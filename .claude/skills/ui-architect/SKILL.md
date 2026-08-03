@@ -9,10 +9,10 @@ description: >-
   equivalent exists, (3) no hardcoded px anywhere — including inside
   Tailwind class arbitrary values ([320px]) — size with rem/%/vh/vw or Tailwind's
   rem-based scale (1rem = 16px, so px/16 = rem and px/4 = the Tailwind step;
-  enforced by the local/no-hardcoded-px eslint rule, with a documented exemption
-  list for the positions where px is genuinely correct — hairlines, shadow/ring
-  widths, query conditions, IntersectionObserver rootMargin, user-facing copy,
-  canvas/email consumers) in web/scripts/px-rules.mjs;
+  enforced by the local/no-hardcoded-px eslint rule; where px is genuinely correct
+  — hairlines, shadow/ring widths, query conditions, IntersectionObserver
+  rootMargin, user-facing copy, canvas/email consumers — annotate the site with
+  an eslint-disable-next-line carrying a `-- <reason>`, never a side-file exemption);
   and corner radius uses only the two-tier scale rounded-default
   (4px controls) / rounded-surface (12px surfaces) / rounded-full — never
   rounded-[..] or the retired rounded-sm/md/lg/xl, (4) no scoped-CSS blocks and no
@@ -80,18 +80,28 @@ read it once, it is the backbone of everything below.
 3. **No hardcoded `px`** — size with `rem` / `%` / `vh` / `vw`, or Tailwind's
    rem-based scale. This applies **inside class arbitrary values too** (`w-[320px]`,
    `text-[13px]`, `gap-[6px]` are all banned — convert to `rem`).
-   **CI-enforced by `local/no-hardcoded-px`** (eslint), run by `lint:ci` over
-   `src/**/*.{vue,ts,css}`. It reports line:column with the rem value and the Tailwind
-   step, and surfaces in the editor as you type. Rules: `web/scripts/px-rules.mjs`.
+   **CI-enforced by `local/no-hardcoded-px`** (eslint, defined in `web/eslint.config.js`),
+   run by `lint:ci` over `src/**/*.{vue,ts,css}`. It reports line:column with the rem value
+   and the Tailwind step, and surfaces in the editor as you type.
    - **Conversion:** `1rem = 16px` (the app sets no `html { font-size }`, so root is
      the browser default). So `px ÷ 16` → rem, and `px ÷ 4` → the Tailwind scale
      step: `300px` → `18.75rem` → `w-75`. Fractional steps are valid (`w-62.5`).
    - **`px` IS correct in these positions — do NOT "fix" them.** rem there is either
-     wrong or does not resolve at all. Exemptions live in `px-rules.mjs` and are judged
-     **per-occurrence** from the surrounding context, so the rest of the file stays
-     checked. `PX_FILE_ALLOWLIST` disables the rule for a whole file and is a last resort
-     (4 files) — if you need a new exemption, add a context rule to `pxIsAllowed()`, not
-     a file entry.
+     wrong or does not resolve at all. The rule holds **no exemption list**: annotate the
+     site instead, and say why.
+     ```js
+     // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin
+     // parses px/% only — a rem value throws SyntaxError
+     { rootMargin: "200px 0px" },
+     ```
+     The `-- <reason>` is required, not decoration: it is the only record of why, and
+     ESLint flags the directive once it stops suppressing anything, so a stale exemption
+     surfaces instead of lingering. Where a plain next-line directive will not fit:
+     wrap a **multi-line opening tag** in `<!-- eslint-disable … -->` / `<!-- eslint-enable … -->`
+     (a comment inside the tag is invalid markup); for px in a **`<style>` block** put the
+     directive in `<script>` (comments inside `<style>` are not surfaced to ESLint, but a
+     directive applies to end of file); for a **multi-line template literal** use a block
+     disable/enable around the statement.
      | Position | Why px |
      | --- | --- |
      | Hairlines and sub-pixel geometry `≤1.5px` (borders, dividers, rings, half-hairline offsets, gradient dot radii) | A 1-device-pixel rule must not scale with text, or it anti-aliases into a smear — or drops out entirely — at non-integer zoom and DPR |

@@ -731,6 +731,7 @@ export default defineComponent({
             emit(entry.isIntersecting ? "visible" : "hidden", props.card);
           }
         },
+        // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
         { rootMargin: "100% 0px" },
       );
       observer.observe(root.value);

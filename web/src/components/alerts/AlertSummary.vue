@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-show="showScrollToBottom"
       class="pointer-events-none absolute right-5 bottom-5 z-1000 transition-all duration-300"
     >
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this floating button's elevation shadow with text makes it bloom -->
       <OButton
         round
         variant="ghost"
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="scroll-to-bottom-btn border-theme-accent! text-theme-accent! pointer-events-auto border-2! bg-[rgba(255,255,255,0.95)]! shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-all duration-300 ease-[ease] hover:scale-110 hover:bg-white! hover:opacity-80 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:scale-100 dark:bg-[rgba(30,30,30,0.9)]! dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80"
         @click="scrollToBottomSmooth"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <OIcon name="arrow-downward" size="sm" />
         <OTooltip content="Scroll to bottom" side="top" />
       </OButton>

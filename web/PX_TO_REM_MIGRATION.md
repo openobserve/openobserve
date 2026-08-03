@@ -19,20 +19,28 @@
 > `local/no-hardcoded-px` (`eslint.config.js`) enforces px across **every** file type:
 > `.vue`, `.ts` and `.css` (the last via the `@eslint/css` language plugin, with
 > `tolerant: true` so Tailwind v4 syntax like `--color-*: initial` and `@custom-variant`
-> parses). Run by `lint:ci` over `src/**/*.{vue,ts,css}`. Rules live in
-> `scripts/px-rules.mjs`, imported by the rule so there is a single definition.
+> parses). Run by `lint:ci` over `src/**/*.{vue,ts,css}`.
 >
-> - **Exemptions are per-occurrence, not per-file.** `pxIsAllowed()` judges each px from
->   its surrounding context (hairline, shadow/ring width, query condition, `rootMargin`,
->   user-facing copy, SVG dimension attribute, canvas measurement helper, ECharts
->   `extraCssText` / `*_STYLE` constant, `calc()` mixing vh/vw). `PX_FILE_ALLOWLIST` is a
->   deliberate last resort — **4 files** where *every* px is unresolvable and no context
->   rule can express why: the HTML email document, the canvas-rendered trace tree,
->   gridstack's numeric `cellHeight`, and mobile session-replay device pixels. A file
->   listed there gets NO px checking, so **prefer adding a context rule over an entry**.
->   An earlier directory-scoped form (`utils/dashboard/`, `composables/dashboard/`) blanked
->   104 files and hid a real miss — `FIELD_FUNCTION_MENU_WIDTH` was still `771px` while the
->   sibling components had already moved to `48.1875rem`.
+> - **The rule has NO exemption logic — every sanctioned px is annotated at the site.**
+>   It flags every px literal; each deliberate one carries
+>   `eslint-disable-next-line local/no-hardcoded-px -- <why px is correct here>`, so the
+>   justification is read alongside the code instead of being inferred by a regex in a
+>   side file. **~350 directives across 161 files** cover all 699 sanctioned px.
+>   Two properties this buys that the old `scripts/px-rules.mjs` could not:
+>   ESLint reports a directive that is **no longer needed**, so exemptions cannot go
+>   stale unnoticed; and an exemption can never be **wider than intended**, because it
+>   names the line it applies to rather than matching a pattern that might also match
+>   somewhere else. (The predecessor made both mistakes: a whole-directory allowlist
+>   blanked 104 files and hid a real miss — `FIELD_FUNCTION_MENU_WIDTH` was still `771px`
+>   while its sibling components had moved to `48.1875rem` — and a `*Style` pattern
+>   silently swallowed any `camelStyle` local.)
+> - **Placement**, for the positions where a plain next-line directive will not fit:
+>   px inside a **multi-line opening tag** needs
+>   `<!-- eslint-disable … -->` / `<!-- eslint-enable … -->` around the element, because a
+>   comment inside the tag is invalid markup; px inside a **`<style>` block** needs the
+>   directive placed in `<script>`, because comments inside `<style>` are not surfaced to
+>   ESLint while a directive's effect runs to end of file; px inside a **multi-line
+>   template literal** needs a block disable/enable around the statement.
 > - The design-consistency ratchet carries **no px category at all**. It briefly did,
 >   and that was a mistake: a counter cannot catch a swap (remove one px, add another —
 >   count unchanged, CI passes), it reports a per-file number instead of a location, and
@@ -503,11 +511,9 @@ described is a fixed layout constant that does not scale with font-size:
 Two independent reasons to keep px here: the statement stays **true**, and readers do not think
 in rem — "30px" communicates a size, "1.875rem" does not.
 
-This is the rendered-string sibling of Z1 (comments). Z1 is handled by `maskCommentsForPx()`;
-this category is handled by a `px-rules.mjs` exemption covering text-bearing attributes
-(`content`, `placeholder`, `label`, `title`, `aria-label`, …) and template text nodes. The
-exemption is deliberately narrow — px inside an unclosed `<tag …` still reports, so
-`<div style="width: 300px">` is unaffected.
+This is the rendered-string sibling of Z1 (comments). Z1 is handled by `maskCommentsForPx()` in
+the rule; this category is annotated at the site with an `eslint-disable-next-line … -- user-facing
+copy` directive, so the next reader sees that the px is part of a sentence rather than a size.
 
 > Prefer spelling the unit out (`"1 unit = 30 pixels"`) in new copy: it reads better and needs
 > no exemption at all.
@@ -540,8 +546,9 @@ Like K1 (query conditions) this is a **threshold that decides when** something l
 rendered length, so it has no reason to track font-size. `%` is accepted if a viewport-relative
 prefetch distance is ever wanted (`MetricCard.vue` already uses `"100% 0px"`).
 
-Enforced by a `rootMargin` exemption in `scripts/px-rules.mjs` — without it the eslint rule
-reports the correct px as an error and pushes the next author straight back into the crash.
+Each of the four sites carries an `eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver
+rootMargin parses px/% only — a rem value throws` directive. The reason sits next to the call, so the
+next author reads *why* before "fixing" it back into the crash.
 
 ---
 

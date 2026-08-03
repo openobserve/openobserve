@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="raw">
           <div class="error-stacks">
             <template v-for="(stack, index) in error_stack" :key="stack">
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 v-if="index"
                 data-test="error-stack-trace-line"
@@ -56,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : '',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ stack }}
               </div>
             </template>

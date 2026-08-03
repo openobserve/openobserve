@@ -172,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex flex-nowrap">
               <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <QueryEditor
                   data-test="logs-vrl-function-editor"
                   editor-id="add-function-editor"
@@ -181,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:query="permissionsJsonValue"
                   style="height: calc(100vh - var(--navbar-height) - 295px)"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
               <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
                 <div class="flex items-center justify-between px-2">

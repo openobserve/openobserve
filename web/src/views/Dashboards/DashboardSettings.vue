@@ -138,6 +138,7 @@ export default defineComponent({
     };
   },
 });
+/* eslint-disable local/no-hardcoded-px -- the style block below draws a 1px splitter rule: hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>

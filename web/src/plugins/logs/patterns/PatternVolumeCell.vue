@@ -154,6 +154,7 @@ onMounted(() => {
         observer = null;
       }
     },
+    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
     { rootMargin: "200px 0px" },
   );
   observer.observe(rootEl.value);

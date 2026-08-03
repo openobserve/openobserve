@@ -129,6 +129,7 @@ function handleRangeChange(value: DateRange | undefined) {
     emit("update:endDate", fromIso(end.toString()));
   }
 }
+/* eslint-disable local/no-hardcoded-px -- the style block below draws a 1px dashed focus outline: hairline, a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>

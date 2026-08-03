@@ -474,6 +474,7 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling this marker glow with text makes elevation bloom
     return "bg-badge-orange-solid-bg! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
   }
   if (event.type === "error") {

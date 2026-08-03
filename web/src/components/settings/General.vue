@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                 <div
                   class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
                   :style="{ backgroundColor: customLightColor }"
@@ -99,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
                 <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.light")
@@ -114,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                 <div
                   class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
                   :style="{ backgroundColor: customDarkColor }"
@@ -123,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
                 <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.dark")

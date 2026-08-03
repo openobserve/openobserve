@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this menu drop shadow with text makes elevation bloom -->
 <template>
   <div
     class="context-menu bg-surface-overlay border-border-default rounded-default fixed z-9999 min-w-50 overflow-hidden border py-1 shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
@@ -21,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click.stop
     data-test="alert-insights-context-menu"
   >
+    <!-- eslint-enable local/no-hardcoded-px -->
     <div class="menu-header bg-surface-subtle text-text-secondary px-4 py-2 text-xs font-semibold">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>

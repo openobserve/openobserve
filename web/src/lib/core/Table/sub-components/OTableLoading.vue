@@ -90,12 +90,14 @@ const cellStyle = (col: Column<any, any>): Record<string, any> => {
     style.left = `${col.getStart?.("left") ?? 0}px`;
     style.zIndex = 1;
     style.background = "var(--color-table-cell-bg)";
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
     style.boxShadow = "2px 0 4px -2px var(--color-border-default)";
   } else if (pin === "right") {
     style.position = "sticky";
     style.right = `${col.getAfter?.("right") ?? 0}px`;
     style.zIndex = 1;
     style.background = "var(--color-table-cell-bg)";
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
     style.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
   }
   return style;

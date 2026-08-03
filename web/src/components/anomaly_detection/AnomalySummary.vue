@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-show="showScrollToBottom" class="pointer-events-none absolute right-5 bottom-5 z-1000">
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this drop shadow with text makes elevation bloom -->
       <OButton
         variant="ghost"
         size="icon-sm"
@@ -37,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <OIcon name="arrow-downward" size="sm" />
         <OTooltip content="Scroll to bottom" side="top" align="center" />
       </OButton>

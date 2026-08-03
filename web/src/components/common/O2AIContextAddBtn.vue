@@ -83,11 +83,13 @@ const props = defineProps({
   //this is for image height and width sometimes we need to change the size of the image
   imageHeight: {
     type: String,
+    // eslint-disable-next-line local/no-hardcoded-px -- forwarded to an HTML dimension attribute, which takes a bare integer
     default: "20px",
     required: false,
   },
   imageWidth: {
     type: String,
+    // eslint-disable-next-line local/no-hardcoded-px -- forwarded to an HTML dimension attribute, which takes a bare integer
     default: "20px",
     required: false,
   },

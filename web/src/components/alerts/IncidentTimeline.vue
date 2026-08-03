@@ -469,6 +469,7 @@ const getEventBadgeColor = (event: any): string => {
 const badgeStyle = (c: string) => {
   return {
     backgroundColor: `color-mix(in srgb, ${c} ${isDark.value ? "19%" : "8%"}, transparent)`,
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: `1px solid color-mix(in srgb, ${c} ${isDark.value ? "31%" : "19%"}, transparent)`,
     color: isDark.value ? "var(--color-grey-0)" : c,
   };
@@ -544,6 +545,7 @@ const getInlineEventText = (event: any): string => {
   const bold = (text: string) =>
     `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
   const severityBadge = (severity: string) =>
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     `<span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: var(--text-2xs); font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "31%" : "25%"}, transparent); color: ${isDark.value ? "var(--color-grey-0)" : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "38%" : "25%"}, transparent);">${esc(severity)}</span>`;
   const isSystemEvent = getUserId(event) === "System";
 

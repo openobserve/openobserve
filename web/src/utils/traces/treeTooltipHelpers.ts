@@ -210,6 +210,7 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
  */
 export const generateTracePatternTooltipContent = (metadata: any): string => {
   if (!metadata) {
+    /* eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
     return `
       <div style="
         font-family: var(--font-sans);
@@ -238,6 +239,7 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
         </div>
       </div>
     `;
+    /* eslint-enable local/no-hardcoded-px */
   }
 
   const {
@@ -252,6 +254,7 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
     errorRate = 0,
   } = metadata;
 
+  /* eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   return `
     <div style="
       font-family: var(--font-sans);
@@ -281,4 +284,5 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
       </div>
     </div>
   `;
+  /* eslint-enable local/no-hardcoded-px */
 };

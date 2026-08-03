@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Row-field headers: first <tr> only, rowspan all levels -->
             <template v-if="levelIdx === 0">
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <th
                 v-for="col in pivotRowColumns"
                 :key="'rh_' + col.name"
@@ -82,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="getStickyColumnStyle(col) as any"
                 @click="handlePivotSort(col.name)"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ col.label }}
                 <OIcon
                   :name="pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'"
@@ -94,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </th>
             </template>
             <!-- Pivot group / value headers -->
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <th
               v-for="(cell, cellIdx) in level.cells"
               :key="'c_' + levelIdx + '_' + cellIdx"
@@ -120,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               @click="cell._sortColumn && handlePivotSort(cell._sortColumn)"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               {{ cell.label }}
               <OIcon
                 v-if="level.isLeaf && cell._sortColumn"
@@ -170,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @start="(event) => handleDragStart(event)"
             @end="() => handleDragEnd()"
           >
+            <!-- eslint-disable local/no-hardcoded-px -- unit-conversion operator on a unitless value: the CSS var holds a bare number that calc() must multiply by 1px -->
             <th
               v-for="header in headerGroup.headers"
               :key="header.id"
@@ -190,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :data-test="`o2-table-th-${header.id}`"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <div
                 class="flex h-full w-full items-center"
                 :class="[
@@ -516,6 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handleDataRowClick(row.original, idx as number, $event)"
               @keydown="handleDataRowKeydown($event, row.original, idx as number)"
             >
+              <!-- eslint-disable local/no-hardcoded-px -- unit-conversion operator on a unitless value: the CSS var holds a bare number that calc() must multiply by 1px -->
               <td
                 v-for="cell in row.getVisibleCells()"
                 :key="cell.id"
@@ -549,6 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getStickyTotalColumnStyle((cell.column.columnDef.meta as any)?._col) as any,
                 ]"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <template
                   v-if="
                     !isPivotMergeHidden(row.original, (cell.column.columnDef.meta as any)?._col)
@@ -726,6 +734,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </td>
                 <template v-else>
+                  <!-- eslint-disable local/no-hardcoded-px -- unit-conversion operator on a unitless value: the CSS var holds a bare number that calc() must multiply by 1px -->
                   <td
                     v-for="(cell, cellIndex) in formattedRows[virtualRow.index].getVisibleCells()"
                     :key="cell.id"
@@ -779,6 +788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @mouseover="handleCellMouseOver(cell)"
                     @mouseleave="handleCellMouseLeave()"
                   >
+                    <!-- eslint-enable local/no-hardcoded-px -->
                     <div
                       class="flex h-full w-full items-center"
                       :class="[
@@ -886,6 +896,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                           />
                           <!-- Default value (dashboard: format fn; logs: renderValue) -->
+                          <!-- eslint-disable local/no-hardcoded-px -- unit-conversion operator on a unitless value: the CSS var holds a bare number that calc() must multiply by 1px -->
                           <span
                             data-test="dashboard-table-cell-value"
                             :style="{
@@ -903,6 +914,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ]"
                             v-else
                           >
+                            <!-- eslint-enable local/no-hardcoded-px -->
                             {{ getCellDisplayValue(cell) }}
                           </span>
                           <!-- Logs: AI context button -->
@@ -966,6 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </tbody>
 
         <!-- ── Dashboard: sticky grand-total row ──────────────────────────────── -->
+        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the sticky footer's elevation shadow with text makes it bloom -->
         <tfoot
           v-if="stickyTotalRow"
           style="
@@ -975,6 +988,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
           "
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <tr class="pivot-total-row pivot-sticky-total-row">
             <td
               v-for="col in (columns as any[]) || []"
@@ -1579,6 +1593,7 @@ const getStickyTotalColumnStyle = (col: any) => {
     "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "background-color": "var(--color-table-header-bg)",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling this sticky-column elevation shadow with text makes it bloom
     "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",
@@ -1602,6 +1617,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     "max-width": `${width}px`,
     // Opaque background so scrolled body content doesn't bleed through
     "background-color": "var(--color-sticky-col-header-bg)",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling this sticky-column elevation shadow with text makes it bloom
     "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",
@@ -1947,6 +1963,7 @@ const skelTdStyle = (header: any): Record<string, string> => {
   const colId = header.column.id;
   const isStretchSource = colId === "source" && !header.column.getCanResize();
   if (isStretchSource) return { flex: "1 1 0", minWidth: "0" };
+  // eslint-disable-next-line local/no-hardcoded-px -- unit-conversion operator on a unitless value: the CSS var holds a bare number that calc() must multiply by 1px
   const w = `calc(var(--col-${sanitizeCssId(colId)}-size) * 1px)`;
   return { width: w, minWidth: w, flexShrink: "0" };
 };

@@ -555,6 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </JsonPreview>
           </div>
           <!-- Table View -->
+          <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
           <div
             v-else
             class="tab-content-dynamic-height border-card-glass-border flex-1 overflow-hidden border-1 border-solid"
@@ -565,6 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="trace-details-sidebar-attributes-tenstack-table"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <TenstackTable
               :rows="attributesTableRows"
               :columns="attributesTableColumns"
@@ -619,6 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
             </div>
             <!-- TenstackTable for events -->
+            <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
             <div
               class="traces-events-table-container tab-content-dynamic-height border-card-glass-border rounded-default flex-1 overflow-hidden border-1 border-solid"
               :class="
@@ -628,6 +631,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               data-test="trace-details-sidebar-events-table"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <TenstackTable
                 :rows="spanDetails.events"
                 :columns="eventsTableColumns"
@@ -2030,6 +2034,7 @@ export default defineComponent({
     };
   },
 });
+/* eslint-disable local/no-hardcoded-px -- covers the style block below: the px there are 1px table cell dividers — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style lang="scss" scoped>

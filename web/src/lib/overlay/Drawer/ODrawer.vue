@@ -171,16 +171,21 @@ const sizeClasses = computed(() => {
   if (props.width) return "max-w-none";
   switch (props.size) {
     case "sm":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "w-[min(360px,100vw)]";
     case "md":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "w-[min(480px,100vw)]";
     case "lg":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "w-[min(640px,100vw)]";
     case "xl":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "w-[min(800px,100vw)]";
     case "full":
       return "w-screen";
     default:
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "w-[min(480px,100vw)]";
   }
 });
@@ -457,6 +462,7 @@ watch(internalOpen, (open) => {
 
         <!-- ── Content (scrollable body) ───────────────────── -->
         <!-- flex-1 + min-h-0: body fills remaining height so the footer always sticks to the bottom -->
+        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling these scroll-shadow insets with text makes elevation bloom -->
         <div
           ref="bodyRef"
           :class="[
@@ -470,6 +476,7 @@ watch(internalOpen, (open) => {
               '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <template v-if="!props.lazy || internalOpen">
             <slot />
           </template>

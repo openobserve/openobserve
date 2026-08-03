@@ -61,12 +61,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <Controls />
 
         <template #node-custom="{ data }">
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <Handle
             v-if="data.hasIncoming"
             type="target"
             :position="Position.Top"
             class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
           />
+          <!-- eslint-enable local/no-hardcoded-px -->
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <div
             class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[0.375rem_0.75rem] text-center shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 hover:[transform:translateY(-0.125rem)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
             :class="[
@@ -78,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
             @click="handleNodeClick(data.span_id)"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <div
               class="text-compact text-info max-w-40 overflow-hidden leading-[1.3] font-semibold break-words text-ellipsis whitespace-nowrap"
               :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
@@ -92,12 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-3xs mt-0.5 h-3.5 px-1"
             />
           </div>
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <Handle
             v-if="data.hasOutgoing"
             type="source"
             :position="Position.Bottom"
             class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
           />
+          <!-- eslint-enable local/no-hardcoded-px -->
         </template>
       </VueFlow>
     </div>

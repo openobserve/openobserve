@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- Loading state -->
+    <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
     <div
       v-if="isLoadingTranslation"
       data-test="rum-pretty-stack-trace-loading"
@@ -39,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="no-source-maps-container rounded-default flex flex-col items-center justify-center p-3 px-6 py-5 text-center"
       :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <OIcon name="code-off" size="lg" class="mb-2" />
       <div class="text-text-secondary mb-1 text-base font-medium">
         {{ t("rum.sourceMapsNotAvailable") }}
@@ -87,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-for="(stackTrace, traceIndex) in translatedStackTrace" :key="traceIndex">
         <!-- Error message -->
+        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
         <div
           v-if="stackTrace.error"
           class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] [box-shadow:0_1px_2px_rgba(0,0,0,0.05)]"
@@ -96,10 +99,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'border-color': borderColor,
           }"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           {{ stackTrace.error }}
         </div>
 
         <!-- First stack frame - expandable/collapsible -->
+        <!-- eslint-disable local/no-hardcoded-px -- structural border widths plus an optical box-shadow; neither is a text-relative dimension and scaling the shadow makes elevation bloom -->
         <div
           v-if="stackTrace.stack.length > 0"
           class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
@@ -112,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'background-color': backgroundColor,
           }"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <!-- Frame header - clickable -->
           <div
             class="frame-header hover:bg-surface-subtle cursor-pointer !px-4 px-3 !py-3 py-2 transition-all duration-200 ease-in-out"
@@ -156,10 +162,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Source code snippet with syntax highlighting -->
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
             <div
               class="source-code-box rounded-default h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
               :style="{ 'border-color': borderColor }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <CodeQueryEditor
                 :ref="(el: any) => setEditorRef(traceIndex, 0, el)"
                 :editor-id="`source-frame-${traceIndex}-0`"
@@ -173,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Remaining frames - collapsed by default -->
+        <!-- eslint-disable local/no-hardcoded-px -- structural border widths plus an optical box-shadow; neither is a text-relative dimension and scaling the shadow makes elevation bloom -->
         <div
           v-if="stackTrace.stack.length > 1"
           class="remaining-frames rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
@@ -191,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <OIcon name="expand-more" size="xs" class="mr-1" />
             <span class="text-text-secondary text-xs">
               {{
@@ -203,12 +213,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Collapsed frames - shown after clicking show more -->
           <div v-if="expandedTraces[traceIndex]">
+            <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
             <div
               v-for="(frame, frameIndex) in stackTrace.stack.slice(1)"
               :key="frameIndex + 1"
               class="collapsed-frame-wrapper"
               :style="{ 'border-top': `1px solid ${borderColor}` }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <!-- Frame header - clickable -->
               <div
                 class="collapsed-frame-header hover:bg-surface-subtle cursor-pointer !px-4 px-3 !py-2.5 py-1 transition-all duration-200 ease-in-out"
@@ -252,10 +264,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
 
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                 <div
                   class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
                   :style="{ 'border-color': borderColor }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <CodeQueryEditor
                     :ref="(el: any) => setEditorRef(traceIndex, frameIndex + 1, el)"
                     :editor-id="`source-frame-${traceIndex}-${frameIndex + 1}`"

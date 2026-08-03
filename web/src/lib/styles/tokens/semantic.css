@@ -282,5 +282,6 @@
 
 /* ── Layout aliases ── */
 :root {
+  /* eslint-disable-next-line local/no-hardcoded-px -- subtracted inside calc(100vh - var(--navbar-height) - …) expressions: mixed with vh, which tracks the window while rem tracks font-size; keep those expressions unit-consistent */
   --navbar-height: 36px;
 }

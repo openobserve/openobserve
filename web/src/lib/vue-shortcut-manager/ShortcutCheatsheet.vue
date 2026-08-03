@@ -124,11 +124,13 @@
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
                         >then</span
                       >
+                      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                       <kbd
                         v-else
                         class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                     </template>
                   </div>
                 </li>
@@ -181,11 +183,13 @@
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
                         >then</span
                       >
+                      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                       <kbd
                         v-else
                         class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
                         >{{ part }}</kbd
                       >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                     </template>
                   </div>
                 </li>
@@ -200,16 +204,20 @@
     <template #footer>
       <div class="text-2xs text-text-secondary flex items-center justify-between">
         <div class="flex flex-wrap items-center gap-1.5">
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <kbd
             class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
             >Esc</kbd
           >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>
+          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <kbd
             class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
             >?</kbd
           >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <span>{{ t("shortcuts.footerReopen") }}</span>
         </div>
         <div class="opacity-60">{{ t("shortcuts.footerMacHint") }}</div>

@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="depth in (spans as any[])[virtualRow.index]?.depth"
             :key="virtualRow.key + depth"
           >
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <div
               v-if="
                 depth === 1 ||
@@ -64,8 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 zIndex: 1,
               }"
             />
+            <!-- eslint-enable local/no-hardcoded-px -->
           </template>
           <!-- Horizontal stub from parent column to this badge -->
+          <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
           <div
             data-test="horizontal-segment"
             :style="{
@@ -80,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               zIndex: 1,
             }"
           />
+          <!-- eslint-enable local/no-hardcoded-px -->
         </template>
 
         <!-- Span row -->
@@ -149,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   {{ getChildCount((spans as any[])[virtualRow.index]) }}
+                  <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
                   <div
                     v-if="collapseMapping[(spans as any[])[virtualRow.index].spanId]"
                     data-test="vertical-segment"
@@ -162,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       zIndex: 1,
                     }"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
 
                 <div

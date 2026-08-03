@@ -1,3 +1,4 @@
+<!-- eslint-disable local/no-hardcoded-px -- focus ring: optical effect, not layout — scaling it with text makes the ring bloom -->
 <template>
   <div
     class="rich-text-input-wrapper rounded-default bg-surface-base border-border-default min-h-15 cursor-text border px-2 py-1 pb-2 transition-all duration-200 ease-in-out focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
@@ -9,6 +10,7 @@
     ]"
     @click="focusInput"
   >
+    <!-- eslint-enable local/no-hardcoded-px -->
     <div
       ref="editableDiv"
       class="rich-text-input text-text-body relative max-h-75 min-h-10 overflow-y-auto text-sm leading-[1.6] break-words whitespace-pre-wrap outline-none"

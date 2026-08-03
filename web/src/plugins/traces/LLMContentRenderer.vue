@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="messages-view"
             :class="shouldFillSingleJsonMessage && 'h-full'"
           >
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
@@ -64,6 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderRadius: '0.5rem',
               }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
@@ -71,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ roleLabel(msg.role) }}
               </div>
               <div
@@ -150,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="messages-view"
             :class="shouldFillSingleJsonMessage && 'h-full'"
           >
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
@@ -160,6 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderRadius: '0.5rem',
               }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
@@ -167,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ roleLabel(msg.role) }}
               </div>
               <div
@@ -657,6 +665,7 @@ const renderMarkdown = (content: string): string => {
   const markdownContent = toMarkdown(content);
   return DOMPurify.sanitize(marked.parse(markdownContent) as string);
 };
+/* eslint-disable local/no-hardcoded-px -- the style block below draws a 1px table rule: hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>

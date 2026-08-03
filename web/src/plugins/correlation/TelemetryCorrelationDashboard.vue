@@ -156,10 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Grouped metric list -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   class="dimension-list-container min-h-0 flex-1 overflow-y-auto px-1.5"
                   style="max-height: calc(100vh - 210px)"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <template
                     v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
                   >
@@ -608,10 +610,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Grouped metric list -->
+              <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
               <div
                 class="dimension-list-container min-h-0 flex-1 overflow-y-auto"
                 style="max-height: calc(100vh - 210px)"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <template
                   v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
                 >

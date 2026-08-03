@@ -2043,6 +2043,7 @@ export default defineComponent({
     },
   },
 });
+/* eslint-disable local/no-hardcoded-px -- hairline: the 1px rule and 1px row padding in the style block below are 1-device-pixel values that must not scale with text */
 </script>
 
 <style lang="scss" scoped>

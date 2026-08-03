@@ -62,6 +62,7 @@ const renderedSections = computed(() =>
     segments: renderCardSegments(s.body, subs.value),
   })),
 );
+/* eslint-disable local/no-hardcoded-px -- covers the style block below: the px there is a 1px border-top — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>

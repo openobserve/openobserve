@@ -13,6 +13,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
   <div
     class="grid w-full [grid-template-columns:repeat(4,minmax(0,1fr))] gap-3.5 max-[64rem]:[grid-template-columns:repeat(2,minmax(0,1fr))] max-[40rem]:[grid-template-columns:1fr]"
   >
+    <!-- eslint-disable local/no-hardcoded-px -- optical effect (box-shadow), not layout — scaling it with text makes elevation bloom -->
     <OCard
       v-for="card in CAPABILITY_CARDS"
       :key="card.id"
@@ -29,14 +30,19 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       @keydown.enter.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
       @keydown.space.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect (blur radius), not layout — scaling it with text makes the glow bloom -->
       <span
         class="capability-card__glow [-inset-px] rounded-default pointer-events-none absolute z-[-1] bg-[linear-gradient(135deg,rgba(var(--accent),0.45),rgba(var(--accent),0.05)_60%)] opacity-0 blur-[8px] transition-opacity duration-[250ms] ease-[ease] group-hover/card:opacity-100"
         aria-hidden="true"
       ></span>
+      <!-- eslint-enable local/no-hardcoded-px -->
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect (inset box-shadow ring), not layout — scaling it with text makes the ring bloom -->
       <div
         class="capability-card__icon rounded-default relative z-1 mb-2.5 inline-flex h-9.5 w-9.5 items-center justify-center shadow-[inset_0_0_0_1px_rgba(var(--accent),0.18)]"
         :class="card.iconBgClass"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />
       </div>
       <div

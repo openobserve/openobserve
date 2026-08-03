@@ -735,6 +735,7 @@ export default defineComponent({
       gridStackInstance = GridStack.init(
         {
           column: 192, // 192-column grid for fine-grained positioning
+          // eslint-disable-next-line local/no-hardcoded-px -- GridStack parses this itself and writes it into its own injected stylesheet, where no document root font-size resolves rem
           cellHeight: "17px", // Base cell height
           margin: 2, // Minimal margin between panels
           draggable: {
@@ -1589,6 +1590,7 @@ export default defineComponent({
     },
   },
 });
+/* eslint-disable local/no-hardcoded-px -- the style blocks below draw the 1px grid-item hairline border: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <!--

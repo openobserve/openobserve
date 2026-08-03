@@ -2220,6 +2220,7 @@ export default defineComponent({
         tics.push({
           value: Number(time.toFixed(2)),
           label: `${formatTimeWithSuffix(time * 1000)}`,
+          // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel offset that pulls the first tick onto the axis line; scaling it with text would misalign it
           left: i === 0 ? "-1px" : `${25 * i}%`,
         });
         time += quarterMs;

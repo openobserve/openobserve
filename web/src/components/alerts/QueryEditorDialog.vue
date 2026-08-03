@@ -26,12 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-left>
       <!-- Left: back + title + stream info -->
       <div class="flex items-center gap-2.5">
+        <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
         <div
           data-test="add-alert-back-btn"
           class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] opacity-60 transition-opacity hover:opacity-100"
           :title="t('common.goBack')"
           @click="closeDialog"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <span class="text-dialog-header-text block truncate text-lg font-semibold">{{

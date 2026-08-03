@@ -244,10 +244,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <strong>{{ t("pipeline_list.sql_query") }} : <span></span></strong>
               </div>
               <div class="flex items-start justify-center">
+                <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
                 <div
                   data-test="scheduled-pipeline-expanded-sql"
                   class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-[3px] p-2.5 whitespace-normal"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                 </div>
               </div>
@@ -425,11 +427,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="nodeErrorMessages(nodeError).length > 0"
               class="node-error-messages flex flex-col gap-2"
             >
+              <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
                 class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-[3px] p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ msg }}
               </div>
             </div>

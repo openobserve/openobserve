@@ -158,9 +158,11 @@ function onTickChange(newVal: CheckboxModelValue) {
              scanner drops any class containing a literal `+`, so `w-[calc(…+…)]`
              silently compiles to NOTHING. Subtracting a negative is the only form
              that survives extraction. Verified against the compiled stylesheet. -->
+        <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
         <span
           class="rounded-bl-default absolute top-0 left-[calc(-0.75rem_-_0.75px)] h-[calc(50%_-_-0.75px)] w-[calc(1.75rem_-_-0.75px)] border-b-[1.5px] border-l-[1.5px]"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </span>
 
       <!-- Checkbox (leaf = real tick; parent = tick-all shortcut) -->

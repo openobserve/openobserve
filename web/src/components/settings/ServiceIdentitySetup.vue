@@ -583,6 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Environment Tabs (Chrome-style) -->
         <div class="border-card-glass-border flex items-end gap-0 border-b px-4">
+          <!-- eslint-disable local/no-hardcoded-px -- hairline: the active tab pulls itself 1 device pixel over the panel border to hide it; that nudge must not scale with text -->
           <div
             v-for="env in detectedEnvironments"
             :key="env.key"
@@ -599,6 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             @click="activeEnvironment = env.key"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             {{ env.label }}
             <span
               v-if="(setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0"
@@ -1504,6 +1506,7 @@ const DIM_CARD_THEMES = [
     icon: "cloud",
     iconClass: "text-blue-5",
     countClass: "text-blue-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(59,130,246,0.4); background: rgba(59,130,246,0.06)",
     pill: "bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text",
   },
@@ -1512,6 +1515,7 @@ const DIM_CARD_THEMES = [
     icon: "folder-open",
     iconClass: "text-teal-5",
     countClass: "text-teal-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(20,184,166,0.4); background: rgba(20,184,166,0.06)",
     pill: "bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text",
   },
@@ -1520,6 +1524,7 @@ const DIM_CARD_THEMES = [
     icon: "widgets",
     iconClass: "text-purple-5",
     countClass: "text-purple-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.06)",
     pill: "bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text",
   },
@@ -1528,6 +1533,7 @@ const DIM_CARD_THEMES = [
     icon: "lan",
     iconClass: "text-amber-5",
     countClass: "text-amber-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.06)",
     pill: "bg-badge-amber-soft-bg border-badge-amber-ol-border text-badge-amber-soft-text",
   },
@@ -1536,6 +1542,7 @@ const DIM_CARD_THEMES = [
     icon: "hub",
     iconClass: "text-red-4",
     countClass: "text-red-5",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(244,63,94,0.4); background: rgba(244,63,94,0.06)",
     pill: "bg-badge-error-soft-bg border-badge-error-ol-border text-badge-error-soft-text",
   },
@@ -2069,6 +2076,7 @@ const insightChartData = computed(() => {
           const list = names
             .map(
               (n) =>
+                // eslint-disable-next-line local/no-hardcoded-px -- hairline: 1-device-pixel row padding in the tooltip HTML; scaling it with text would smear the rows
                 `<div style="padding:1px 0;padding-left:0.875rem;font-size: var(--text-2xs);">${n}</div>`,
             )
             .join("");
