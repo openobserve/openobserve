@@ -167,6 +167,8 @@ pub async fn add(record: &SyntheticsLocationRecord) -> Result<(), errors::Error>
         label: Set(record.label.clone()),
         pool: Set(record.pool.clone()),
         enabled: Set(record.enabled),
+        // A new location has never been notified as down.
+        down_notified_at: Set(0),
         created_at: Set(record.created_at),
         updated_at: Set(record.updated_at),
     };
@@ -258,5 +260,51 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
     // mutex is then held forever, hanging every later synthetics query.
     drop(_lock);
     invalidate_and_publish().await;
+    Ok(())
+}
+
+/// Claims the right to send this location's "location down" notification,
+/// returning whether THIS caller won it.
+///
+/// The staleness watcher runs on **every** alert_manager node. Its suppression
+/// flag used to be an in-process `HashSet`, so N nodes each decided
+/// independently that they had not notified yet and N notifications went out for
+/// one outage — repeating on every down → recover → down cycle.
+///
+/// `WHERE down_notified_at = 0` makes the transition a compare-and-swap: exactly
+/// one node flips 0 → now and gets `rows_affected == 1`; the rest see 0 and stay
+/// quiet. Same primitive as `synthetics_jobs::lease_batch` and
+/// `synthetics_checks::try_claim_slot`.
+///
+/// Deliberately NOT cached — `LOCATIONS_CACHE` serves definition reads, and a
+/// stale `down_notified_at` would reintroduce exactly the duplicate this fixes.
+pub async fn try_claim_down_notification(id: &str, now_us: i64) -> Result<bool, errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::update_many()
+        .col_expr(Column::DownNotifiedAt, Expr::value(now_us))
+        .filter(Column::Id.eq(id))
+        .filter(Column::DownNotifiedAt.eq(0i64))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Clears the down flag so a future outage notifies again.
+///
+/// Idempotent and unguarded on purpose: every node may call this on recovery and
+/// the result is the same. Guarding it would leave the flag set if the one node
+/// that "won" the clear died before the next tick, silencing the next outage.
+pub async fn clear_down_notification(id: &str) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::update_many()
+        .col_expr(Column::DownNotifiedAt, Expr::value(0i64))
+        .filter(Column::Id.eq(id))
+        .filter(Column::DownNotifiedAt.ne(0i64))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(())
 }

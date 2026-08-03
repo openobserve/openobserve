@@ -420,9 +420,6 @@ fn html_escape(s: &str) -> String {
 /// Never-registered locations count as pending, not down.
 #[cfg(feature = "enterprise")]
 pub async fn location_staleness_watcher() {
-    use std::collections::HashSet;
-
-    let mut notified_down: HashSet<String> = HashSet::new();
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 
@@ -448,15 +445,12 @@ pub async fn location_staleness_watcher() {
                 .await
                 .unwrap_or_default();
             if !loc.enabled || agents.is_empty() {
-                notified_down.remove(&loc.id);
+                clear_down(&loc.id).await;
                 continue;
             }
             let any_live = agents.iter().any(|a| now - a.last_seen_at <= window_us);
             if any_live {
-                notified_down.remove(&loc.id);
-                continue;
-            }
-            if notified_down.contains(&loc.id) {
+                clear_down(&loc.id).await;
                 continue;
             }
 
@@ -471,9 +465,26 @@ pub async fn location_staleness_watcher() {
                 // Nothing runs here — stay quiet, re-evaluate next tick.
                 continue;
             }
-            // Mark before dispatch so a location without destinations is still
-            // one-shot (no per-tick log spam / retry storm).
-            notified_down.insert(loc.id.clone());
+            // Claim before dispatch so a location without destinations is still
+            // one-shot (no per-tick log spam / retry storm), AND so that only one
+            // alert_manager speaks. This watcher runs on every alert_manager, so
+            // the suppression flag cannot live in this process's memory — N nodes
+            // would each believe they had not notified yet and send N pages for
+            // one outage. The CAS in `try_claim_down_notification` makes exactly
+            // one node the winner.
+            match infra::table::synthetics_locations::try_claim_down_notification(&loc.id, now)
+                .await
+            {
+                Ok(true) => {}
+                Ok(false) => continue, // another node is sending it
+                Err(e) => {
+                    log::error!(
+                        "[synthetics] staleness watcher: claim down notification for {}: {e}",
+                        loc.id
+                    );
+                    continue;
+                }
+            }
 
             let mut destinations: Vec<String> =
                 checks.iter().flat_map(|c| c.destinations.clone()).collect();
@@ -748,5 +759,16 @@ async fn notify_location_down(
                 log::error!("[synthetics] load dest={dest_name} org={org_id}: {e}");
             }
         }
+    }
+}
+
+/// Clears a location's down flag so a future outage notifies again.
+///
+/// Every alert_manager calls this on recovery; the underlying update is
+/// idempotent, so they cannot disagree.
+#[cfg(feature = "enterprise")]
+async fn clear_down(location_id: &str) {
+    if let Err(e) = infra::table::synthetics_locations::clear_down_notification(location_id).await {
+        log::error!("[synthetics] staleness watcher: clear down flag for {location_id}: {e}");
     }
 }
