@@ -48,23 +48,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the single line beneath it. Enter/blur saves, Escape reverts. Pointer
                and key events are stopped so they don't reach the tab trigger
                (select) or Reka's arrow-key roving. -->
-          <input
+          <!-- Auto-size the input to its text via an invisible sizer sharing the
+               input's grid cell, so the field is exactly as wide as the name (no
+               trailing gap). `size="1"` neutralises the input's default ~20ch
+               intrinsic width so the sizer alone drives the max-content column. -->
+          <span
             v-if="editingTabId === tab.tabId"
-            ref="renameInputRef"
-            v-model="editingName"
-            type="text"
-            :size="Math.max(editingName.length, 3)"
-            :maxlength="60"
-            class="text-tabs-active-text w-auto min-w-0 bg-transparent px-0.5 text-sm outline-none"
-            :data-test="`dashboard-tab-${tab.tabId}-rename-input`"
-            @click.stop
-            @mousedown.stop
-            @dblclick.stop
-            @keydown.stop
-            @keydown.enter.prevent="commitRename(tab)"
-            @keydown.esc.prevent="cancelRename"
-            @blur="commitRename(tab)"
-          />
+            class="grid grid-cols-[minmax(0,max-content)] items-center"
+          >
+            <span
+              aria-hidden="true"
+              class="col-start-1 row-start-1 invisible whitespace-pre px-0.5 text-sm"
+              >{{ editingName || " " }}</span
+            >
+            <input
+              ref="renameInputRef"
+              v-model="editingName"
+              type="text"
+              size="1"
+              :maxlength="60"
+              class="text-tabs-active-text col-start-1 row-start-1 w-full min-w-0 bg-transparent px-0.5 text-sm outline-none"
+              :data-test="`dashboard-tab-${tab.tabId}-rename-input`"
+              @click.stop
+              @mousedown.stop
+              @dblclick.stop
+              @keydown.stop
+              @keydown.enter.prevent="commitRename(tab)"
+              @keydown.esc.prevent="cancelRename"
+              @blur="commitRename(tab)"
+            />
+          </span>
           <template v-else>
             <span
               class="w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
