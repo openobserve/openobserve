@@ -221,6 +221,24 @@ describe("TableRenderer", () => {
       expect(table.props("wrap")).toBe(false);
     });
 
+    // Regression: a flat 150px per column trimmed timestamps and wasted space.
+    it("should mark non-pivot columns autoWidth so they carry no fixed width", () => {
+      wrapper = createWrapper();
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      expect(columns.length).toBeGreaterThan(0);
+      expect(columns.every((c) => c.meta?.autoWidth === true)).toBe(true);
+      expect(columns.every((c) => c.size === undefined)).toBe(true);
+    });
+
+    it("should leave pivot columns alone, since pivot fixes its own widths", () => {
+      wrapper = createWrapper({
+        data: { ...mockTableData, pivotHeaderLevels: [{ cells: [{ label: "a", colspan: 1 }] }] },
+      });
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      expect(columns.length).toBeGreaterThan(0);
+      expect(columns.some((c) => c.meta?.autoWidth === true)).toBe(false);
+    });
+
     it("should pass showPagination=true to TenstackTable", () => {
       wrapper = createWrapper({ showPagination: true });
       const table = wrapper.findComponent({ name: "OTable" });
