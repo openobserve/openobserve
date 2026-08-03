@@ -806,6 +806,7 @@ pub fn service_routes() -> Router {
 
         // Search
         .route("/{org_id}/_search", post(search::search))
+        .route("/{org_id}/query_functions", get(search::query_functions::list))
         .route("/{org_id}/_search_partition", post(search::search_partition))
         .route("/{org_id}/{stream_name}/_around", get(search::around_v1).post(search::around_v2))
         .route("/{org_id}/{stream_name}/_values", get(search::values))
@@ -1512,6 +1513,117 @@ mod tests {
                 .and_then(Value::as_array)
                 .is_some_and(|keywords| !keywords.is_empty())
         );
+    }
+
+    // NOTE ON WHAT IS TESTABLE HERE.
+    //
+    // service_routes() wraps the entire router in auth_middleware, which
+    // short-circuits BEFORE routing: a completely nonexistent path also answers
+    // 401. So an HTTP-level test against service_routes() cannot tell a
+    // registered route from an absent one — an assertion like "not 404", or
+    // even "== 401", passes whether or not the endpoint exists.
+    //
+    // Registration is therefore pinned two ways that DO discriminate: the route
+    // appears in the OpenAPI surface, and a minimal router carrying only this
+    // route dispatches GET to the handler and rejects other methods.
+
+    #[tokio::test]
+    async fn query_functions_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route(
+            "/{org_id}/query_functions",
+            get(search::query_functions::list),
+        );
+
+        let ok = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/myorg/query_functions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+
+        let wrong_method = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/myorg/query_functions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            wrong_method.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "the catalog is read-only; the frontend issues GET"
+        );
+    }
+
+    #[test]
+    fn query_functions_is_published_in_the_openapi_surface() {
+        // Discriminating: this fails if the handler is dropped from openapi.rs.
+        let spec = super::openapi::ApiDoc::openapi();
+        let json = serde_json::to_string(&spec).unwrap();
+        assert!(
+            json.contains("/{org_id}/query_functions"),
+            "query_functions is missing from the OpenAPI surface"
+        );
+    }
+
+    // ── tmp/code.md B4 — the query-function catalog route ─────────────────────
+    //
+    // catalog_functions() can be perfect while no HTTP route exposes it. This is
+    // the only assertion that fails if the endpoint is simply never registered.
+
+    #[tokio::test]
+    async fn query_functions_handler_returns_the_documented_payload_shape() {
+        // Calls the handler DIRECTLY, bypassing auth, so the body contract the
+        // frontend service depends on ({ list: [...] }) is actually asserted.
+        use axum::extract::Path;
+
+        let response =
+            openobserve_api_search::search::query_functions::list(Path("default".to_string()))
+                .await
+                .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: Value = serde_json::from_slice(&body).expect("body must be JSON");
+
+        let list = payload
+            .get("list")
+            .and_then(Value::as_array)
+            .expect("payload must be { list: [...] } — the frontend reads data.list");
+        assert!(!list.is_empty(), "catalog must not be empty");
+
+        let entry = list
+            .iter()
+            .find(|f| f.get("name").and_then(Value::as_str) == Some("match_all"))
+            .expect("match_all must be present");
+        for field in ["name", "signature", "doc", "kind", "deprecated"] {
+            assert!(
+                entry.get(field).is_some(),
+                "serialized entry is missing `{field}`"
+            );
+        }
+
+        // Assert non-empty doc on an entry the SERVER is the sole source for.
+        // The frontend catalog carries its own prose for the O2 UDFs and wins
+        // on merge, so requiring a server-side doc for match_all would pin data
+        // the UI never renders.
+        let alias = list
+            .iter()
+            .find(|f| f.get("name").and_then(Value::as_str) == Some("match_all_raw"))
+            .expect("rewriter alias must be present");
+        assert!(!alias["doc"].as_str().unwrap_or("").is_empty());
+        assert_eq!(alias["deprecated"], Value::Bool(true));
     }
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────

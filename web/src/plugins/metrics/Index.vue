@@ -598,7 +598,7 @@ export default defineComponent({
         handler: () => {
           // The metrics PromQL editor is Monaco — focus its inner textarea.
           const el = document.querySelector<HTMLElement>(
-            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea, [data-test="dashboard-panel-query-editor"] .cm-editor',
+            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea',
           );
           el?.focus();
         },

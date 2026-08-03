@@ -17,7 +17,7 @@ import { ref, type Ref } from "vue";
 import store from "@/stores";
 import { generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import { captureFromValuesApi } from "@/composables/useFieldValueStore";
+import { captureFromValuesApi } from "@/composables/fieldValueStore";
 
 export interface FieldValueEntry {
   key: string;

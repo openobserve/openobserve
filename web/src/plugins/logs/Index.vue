@@ -3118,10 +3118,9 @@ export default defineComponent({
       {
         id: "logsFocusQuery",
         handler: () => {
-          // The logs query editor is Monaco — focus its inner textarea
-          // (`.monaco-editor textarea`), not a CodeMirror `.cm-editor`.
+          // The logs query editor is Monaco — focus its inner textarea.
           const el = document.querySelector<HTMLElement>(
-            '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] .cm-editor',
+            '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea',
           );
           el?.focus();
         },
