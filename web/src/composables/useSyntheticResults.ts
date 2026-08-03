@@ -151,14 +151,12 @@ export function useSyntheticResults() {
       const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
       const fields = ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name);
       if (!fields.length) {
-         
         console.warn(
           "[synthetics] stream schema returned no fields; optional columns will render as empty",
         );
       }
       return new Set(fields);
     } catch (e: unknown) {
-       
       console.warn(
         "[synthetics] stream schema unavailable — optional columns (init_ms, attempts, " +
           "retry_history, …) will render as empty, NOT as absent data:",
@@ -267,7 +265,7 @@ export function useSyntheticResults() {
               // Fail Rate, durations and all — to report one missing column.
               // Degrade the flaky column instead, and say so rather than
               // rendering a silent zero.
-               
+
               console.warn("[synthetics] retry attribution query failed:", e);
               attributionFailed = true;
               return [] as Record<string, unknown>[];

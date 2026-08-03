@@ -47,9 +47,9 @@ describe("classifyPreflightFailure", () => {
    * through to `preflight`, which shows what actually happened.
    */
   it("should NOT claim incognito for unrelated failures", () => {
-    expect(
-      classifyPreflightFailure('Unexpected token "" while parsing css selector ""'),
-    ).toBe("preflight");
+    expect(classifyPreflightFailure('Unexpected token "" while parsing css selector ""')).toBe(
+      "preflight",
+    );
     expect(classifyPreflightFailure("Internal error: page not found")).toBe("preflight");
     expect(classifyPreflightFailure("Target closed")).toBe("preflight");
   });

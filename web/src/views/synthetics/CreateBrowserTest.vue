@@ -31,11 +31,7 @@ import type {
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
-import {
-  computeRunBudget,
-  formatBudgetDuration,
-  JOB_LEASE_MS,
-} from "@/utils/synthetics/runBudget";
+import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
   buildCreateBrowserTestPayload,

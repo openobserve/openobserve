@@ -1557,9 +1557,7 @@ const kpiCards = computed<KpiCard[]>(() => {
             key: "flaky-rate",
             label: t("synthetics.runs.flakyRate"),
             value:
-              k.totalRuns > 0
-                ? ((k.flakyExecutions / k.totalRuns) * 100).toFixed(1) + "%"
-                : "0.0%",
+              k.totalRuns > 0 ? ((k.flakyExecutions / k.totalRuns) * 100).toFixed(1) + "%" : "0.0%",
             valueClass: k.flakyExecutions > 0 ? "text-status-warning-text!" : undefined,
           }
         : {

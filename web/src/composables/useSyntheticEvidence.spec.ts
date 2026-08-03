@@ -280,13 +280,7 @@ describe("evidence error affordances", () => {
   });
 
   it("has a message for every kind, so none can render blank", () => {
-    for (const kind of [
-      "unauthorized",
-      "expired",
-      "missing",
-      "unreachable",
-      "server",
-    ] as const) {
+    for (const kind of ["unauthorized", "expired", "missing", "unreachable", "server"] as const) {
       expect(EVIDENCE_ERROR_MESSAGE[kind]).toMatch(/^synthetics\.evidence\./);
     }
   });

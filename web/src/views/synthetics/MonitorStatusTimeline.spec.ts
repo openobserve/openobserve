@@ -71,7 +71,12 @@ function makeFailExec(overrides?: Partial<TimelineExecution>): TimelineExecution
 function tallyOf(executions: TimelineExecution[]): StatusTally {
   const passed = executions.filter((e) => e.status === "pass").length;
   const warning = executions.filter((e) => e.status === "warning").length;
-  return { passed, warning, failed: executions.length - passed - warning, total: executions.length };
+  return {
+    passed,
+    warning,
+    failed: executions.length - passed - warning,
+    total: executions.length,
+  };
 }
 
 function makeSegment(overrides?: Partial<TimelineSegment>): TimelineSegment {
