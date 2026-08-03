@@ -23,7 +23,7 @@
       }
     "
     :title="t('dashboard.valueMappingsTitle')"
-    size="lg"
+    size="md"
     :neutral-button-label="t('dashboard.valueMappingAddNew')"
     neutral-button-variant="outline"
     :primary-button-label="t('dashboard.valueMappingApply')"
@@ -101,15 +101,6 @@
                   :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
                 />
               </div>
-              <OButton
-                variant="ghost"
-                size="icon-xs"
-                icon-left="close"
-                :title="t('common.remove')"
-                class="ml-auto shrink-0"
-                :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
-                @click="removeValueMappingByIndex(index)"
-              />
             </div>
             <!-- Display text -->
             <div class="flex flex-wrap items-center gap-2">
@@ -151,6 +142,15 @@
               />
             </div>
           </div>
+          <OButton
+            variant="ghost"
+            size="icon-xs"
+            icon-left="close"
+            :title="t('common.remove')"
+            class="shrink-0"
+            :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
+            @click="removeValueMappingByIndex(index)"
+          />
         </div>
       </draggable>
     </div>
