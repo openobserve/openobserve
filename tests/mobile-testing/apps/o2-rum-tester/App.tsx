@@ -21,6 +21,7 @@ import {
   OpenObserveProviderConfiguration,
   TrackingConsent,
   OoRum,
+  OoSdkReactNative,
   RumActionType,
   ErrorSource,
 } from '@openobserve/mobile-react-native';
@@ -223,6 +224,12 @@ function App(): React.JSX.Element {
           imagePrivacyLevel: ImagePrivacyLevel.MASK_ALL,
           touchPrivacyLevel: TouchPrivacyLevel.SHOW,
         }).catch(() => {});
+        // Attach a user identity so sessions are attributable (usr_* fields).
+        OoSdkReactNative.setUserInfo({
+          id: 'tester-001',
+          name: 'Alex Morgan',
+          email: 'alex.morgan@example.com',
+        });
       }}>
       <SafeAreaView style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor="#1b1533" />

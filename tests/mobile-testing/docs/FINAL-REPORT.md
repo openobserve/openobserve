@@ -41,8 +41,9 @@ UI     (Playwright → RUM dashboard)    →  assert product renders   ← where
 | Attributes tagging (env/service/version) | Maestro+API | ✅ |
 | Background/foreground session continuity | Maestro+adb+API | ✅ |
 | No-phone-home (zero Datadog hosts in APK) | adb+scan | ✅ |
+| User identity (setUser → usr_* fields) | Maestro+API | ✅ |
 
-9 tests. Run: `npm run test:rn-android`. Runtime ~5–15 min depending on retries.
+10 tests. Run: `npm run test:rn-android`. Runtime ~6–16 min depending on retries.
 
 ## 4. Coverage vs. browser-RUM feature surface (the evaluation)
 
@@ -60,7 +61,7 @@ Legend: ✅ automated · 🟡 partial/data-only · ⬜ gap · ❌ blocked by a k
 | Replay PII masking | ✅ | ✅ | verified at MASK_ALL |
 | Breadcrumbs timeline | 🟡 | ⬜ | intermittent-empty bug; no dedicated assertion |
 | Frustration signals (rage/dead) | ⬜ | ⬜ | not covered (needs app trigger) |
-| User identity (setUser) | ⬜ | ⬜ | not covered (was "Unknown"; needs app change) |
+| User identity (setUser) | ✅ | — | app calls setUserInfo; usr_email asserted |
 | Attributes (env/service/version) | ✅ | — | asserted (env=testing, service, version) |
 | Background/foreground continuity | ✅ | — | true bg/fg keeps one session |
 | No-phone-home (no Datadog host) | ✅ | — | APK scan; zero Datadog hosts |
