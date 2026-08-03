@@ -802,28 +802,17 @@ describe("PerformanceSummary", () => {
   // Template rendering
   // -------------------------------------------------------------------------
 
-  it("renders Web Vitals label from i18n in the template", () => {
+  // Section headings used to be a fixed three-column label row rendered here, which only
+  // described the browser layout. They now come from the dashboard's own section panels
+  // (overview.json), so they are covered by the dashboardCapability specs instead.
+
+  it("no longer renders the fixed browser-shaped label row", () => {
     // Arrange + Act
     wrapper = mountComponent();
 
     // Assert
-    expect(wrapper.text()).toContain("Web Vitals");
-  });
-
-  it("renders Errors label from i18n in the template", () => {
-    // Arrange + Act
-    wrapper = mountComponent();
-
-    // Assert
-    expect(wrapper.text()).toContain("Errors");
-  });
-
-  it("renders Sessions label from i18n in the template", () => {
-    // Arrange + Act
-    wrapper = mountComponent();
-
-    // Assert
-    expect(wrapper.text()).toContain("Sessions");
+    expect(wrapper.text()).not.toContain("Web Vitals");
+    expect(wrapper.text()).not.toContain("Sessions");
   });
 
   // -------------------------------------------------------------------------

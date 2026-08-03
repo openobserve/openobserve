@@ -8,63 +8,51 @@
   "created": "2023-10-20T11:50:23.912Z",
   "panels": [
     {
-      "id": "Panel_ID3649610",
-      "type": "metric",
-      "title": "Largest Contentful Paint ( LCP )",
+      "id": "Panel_Section_Health",
+      "type": "html",
+      "title": "Health at a glance",
       "description": "",
+      "htmlContent": "",
       "config": {
-        "show_legends": true,
+        "show_legends": false,
         "legends_position": null,
-        "unit": "milliseconds",
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
-      },
-      "error_config": {
-        "custom_error_handeling": true,
-        "custom_error_message": "No Data",
-        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+        "unit": null,
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
       },
       "queryType": "sql",
-      "queries": [
-        {
-          "query": "SELECT avg(view_largest_contentful_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version)",
-          "customQuery": true,
-          "fields": {
-            "stream": "_rumdata",
-            "stream_type": "logs",
-            "x": [],
-            "y": [
-              {
-                "label": "View Largest Contentful Paint",
-                "alias": "y_axis_1",
-                "column": "y_axis_1",
-                "color": null,
-                "aggregationFunction": "count"
-              }
-            ],
-            "z": [],
-            "filter": []
-          },
-          "config": {
-            "promql_legend": "",
-            "layer_type": "scatter",
-            "weight_fixed": 1
-          }
-        }
-      ],
-      "layout": { "x": 0, "y": 0, "w": 3, "h": 4, "i": 1 }
+      "queries": [],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 2,
+        "i": 9
+      }
     },
     {
-      "id": "Panel_ID4891410",
+      "id": "Panel_ID9858810",
       "type": "metric",
-      "title": "Interaction to Next Paint ( INP )",
-      "description": "",
+      "title": "Total Sessions",
+      "description": "All RUM sessions in range, across every SDK.",
       "config": {
         "show_legends": true,
         "legends_position": null,
-        "unit": "milliseconds",
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        },
+        "decimals": 0
       },
       "error_config": {
         "custom_error_handeling": true,
@@ -74,65 +62,19 @@
       "queryType": "sql",
       "queries": [
         {
-          "query": "SELECT avg(view_interaction_to_next_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version)",
-          "customQuery": true,
-          "fields": {
-            "stream": "_rumdata",
-            "stream_type": "logs",
-            "x": [],
-            "y": [
-              {
-                "label": "View Interaction to Next Paint",
-                "alias": "y_axis_1",
-                "column": "y_axis_1",
-                "color": null,
-                "aggregationFunction": "count"
-              }
-            ],
-            "z": [],
-            "filter": []
-          },
-          "config": {
-            "promql_legend": "",
-            "layer_type": "scatter",
-            "weight_fixed": 1
-          }
-        }
-      ],
-      "layout": { "x": 0, "y": 3, "w": 3, "h": 4, "i": 2 }
-    },
-    {
-      "id": "Panel_ID4568010",
-      "type": "metric",
-      "title": "Cumulative Layout Shift ( CLS )",
-      "description": "",
-      "config": {
-        "show_legends": true,
-        "legends_position": null,
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
-      },
-      "error_config": {
-        "custom_error_handeling": true,
-        "custom_error_message": "No Data",
-        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
-      },
-      "queryType": "sql",
-      "queries": [
-        {
-          "query": "SELECT avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version)",
+          "query": "SELECT count(distinct(session_id)) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version)",
           "customQuery": false,
           "fields": {
-            "stream": "_rumdata",
+            "stream": "_sessionreplay",
             "stream_type": "logs",
             "x": [],
             "y": [
               {
-                "label": "View Cumulative Layout Shift",
+                "label": "Session Id",
                 "alias": "y_axis_1",
-                "column": "view_cumulative_layout_shift",
+                "column": "session_id",
                 "color": "#5960b2",
-                "aggregationFunction": "avg"
+                "aggregationFunction": "count-distinct"
               }
             ],
             "z": [],
@@ -145,7 +87,13 @@
           }
         }
       ],
-      "layout": { "x": 0, "y": 6, "w": 3, "h": 4, "i": 3 }
+      "layout": {
+        "x": 0,
+        "y": 2,
+        "w": 3,
+        "h": 4,
+        "i": 5
+      }
     },
     {
       "id": "Panel_ID4260310",
@@ -155,8 +103,14 @@
       "config": {
         "show_legends": true,
         "legends_position": null,
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 },
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        },
         "decimals": 0
       },
       "error_config": {
@@ -192,54 +146,13 @@
           }
         }
       ],
-      "layout": { "x": 3, "y": 0, "w": 3, "h": 4, "i": 4 }
-    },
-    {
-      "id": "Panel_ID9858810",
-      "type": "metric",
-      "title": "Total Sessions",
-      "description": "",
-      "config": {
-        "show_legends": true,
-        "legends_position": null,
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 },
-        "decimals": 0
-      },
-      "error_config": {
-        "custom_error_handeling": true,
-        "custom_error_message": "No Data",
-        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
-      },
-      "queryType": "sql",
-      "queries": [
-        {
-          "query": "SELECT count(distinct(session_id)) as \"y_axis_1\"  FROM \"_sessionreplay\" where service in ($service) and env in ($env) and version in ($version)",
-          "customQuery": false,
-          "fields": {
-            "stream": "_sessionreplay",
-            "stream_type": "logs",
-            "x": [],
-            "y": [
-              {
-                "label": "Session Id",
-                "alias": "y_axis_1",
-                "column": "session_id",
-                "color": "#5960b2",
-                "aggregationFunction": "count-distinct"
-              }
-            ],
-            "z": [],
-            "filter": []
-          },
-          "config": {
-            "promql_legend": "",
-            "layer_type": "scatter",
-            "weight_fixed": 1
-          }
-        }
-      ],
-      "layout": { "x": 6, "y": 0, "w": 3, "h": 4, "i": 5 }
+      "layout": {
+        "x": 3,
+        "y": 2,
+        "w": 3,
+        "h": 4,
+        "i": 4
+      }
     },
     {
       "id": "Panel_ID2216110",
@@ -250,8 +163,14 @@
         "show_legends": true,
         "legends_position": null,
         "unit": "custom",
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 },
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        },
         "decimals": 0
       },
       "error_config": {
@@ -287,7 +206,13 @@
           }
         }
       ],
-      "layout": { "x": 3, "y": 6, "w": 3, "h": 4, "i": 7 }
+      "layout": {
+        "x": 6,
+        "y": 2,
+        "w": 3,
+        "h": 4,
+        "i": 7
+      }
     },
     {
       "id": "Panel_ID1825610",
@@ -297,8 +222,14 @@
       "config": {
         "show_legends": true,
         "legends_position": null,
-        "base_map": { "type": "osm" },
-        "map_view": { "zoom": 1, "lat": 0, "lng": 0 },
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        },
         "decimals": 0
       },
       "error_config": {
@@ -334,7 +265,781 @@
           }
         }
       ],
-      "layout": { "x": 3, "y": 3, "w": 3, "h": 4, "i": 8 }
+      "layout": {
+        "x": 9,
+        "y": 2,
+        "w": 3,
+        "h": 4,
+        "i": 8
+      }
+    },
+    {
+      "id": "Panel_Section_Stability",
+      "type": "html",
+      "title": "App stability",
+      "description": "",
+      "htmlContent": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": null,
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "queryType": "sql",
+      "queries": [],
+      "layout": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 2,
+        "i": 10
+      },
+      "o2Platform": "mobile",
+      "o2RequiresAnyField": [
+        "error_is_crash",
+        "error_category",
+        "vital_app_launch_metric"
+      ]
+    },
+    {
+      "id": "Panel_ID_CrashFreeSessions",
+      "type": "metric",
+      "title": "Crash-free Sessions",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "percent",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT 100 - (100.0 * CAST(count(distinct CASE WHEN error_is_crash = true THEN session_id END) AS DOUBLE) / NULLIF(CAST(count(distinct session_id) AS DOUBLE), 0)) as \"y_axis_1\"  FROM \"_rumdata\" where source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "Crash-free Sessions",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 8,
+        "w": 3,
+        "h": 4,
+        "i": 11
+      },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_Crashes",
+      "type": "metric",
+      "title": "Crashes",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "numbers",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT count(distinct(error_id)) as \"y_axis_1\"  FROM \"_rumdata\" where error_is_crash = true and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "Crashes",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 3,
+        "y": 8,
+        "w": 3,
+        "h": 4,
+        "i": 12
+      },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_AppHangs",
+      "type": "metric",
+      "title": "ANRs & App Hangs",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "numbers",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT count(*) as \"y_axis_1\"  FROM \"_rumdata\" where type='error' and error_category in ('ANR', 'App Hang') and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "ANRs & App Hangs",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 6,
+        "y": 8,
+        "w": 3,
+        "h": 4,
+        "i": 13
+      },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_ColdStart",
+      "type": "metric",
+      "title": "Cold Start ( p95 )",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "seconds",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT approx_percentile_cont(vital_duration, 0.95) / 1000000000 as \"y_axis_1\"  FROM \"_rumdata\" where type='vital' and vital_app_launch_metric='ttid' and vital_startup_type='cold_start' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "Cold Start p95",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 9,
+        "y": 8,
+        "w": 3,
+        "h": 4,
+        "i": 14
+      },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_Section_Rendering",
+      "type": "html",
+      "title": "Rendering & responsiveness",
+      "description": "",
+      "htmlContent": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": null,
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "queryType": "sql",
+      "queries": [],
+      "layout": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 2,
+        "i": 15
+      },
+      "o2Platform": "mobile",
+      "o2RequiresAnyField": [
+        "view_slow_frames_rate",
+        "view_freeze_rate",
+        "view_frozen_frame_count",
+        "view_refresh_rate_average"
+      ]
+    },
+    {
+      "id": "Panel_ID_SlowFrames",
+      "type": "metric",
+      "title": "Slow Frames Rate",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "custom",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        },
+        "unit_custom": "/s"
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT avg(view_slow_frames_rate) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "Slow Frames Rate",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 14,
+        "w": 3,
+        "h": 4,
+        "i": 16
+      },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_FreezeRate",
+      "type": "metric",
+      "title": "Freeze Rate",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "custom",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        },
+        "unit_custom": "s/h"
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT avg(view_freeze_rate) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "Freeze Rate",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 3,
+        "y": 14,
+        "w": 3,
+        "h": 4,
+        "i": 17
+      },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_FrozenFrames",
+      "type": "metric",
+      "title": "Frozen Frames",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "numbers",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT sum(view_frozen_frame_count) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "Frozen Frames",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 6,
+        "y": 14,
+        "w": 3,
+        "h": 4,
+        "i": 18
+      },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_RefreshRate",
+      "type": "metric",
+      "title": "UI Refresh Rate",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "custom",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        },
+        "unit_custom": "fps"
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT avg(view_refresh_rate_average) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "UI Refresh Rate",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 9,
+        "y": 14,
+        "w": 3,
+        "h": 4,
+        "i": 19
+      },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_Section_WebVitals",
+      "type": "html",
+      "title": "Web Vitals",
+      "description": "",
+      "htmlContent": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": null,
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "queryType": "sql",
+      "queries": [],
+      "layout": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 2,
+        "i": 20
+      },
+      "o2Platform": "browser",
+      "o2RequiresAnyField": [
+        "view_largest_contentful_paint",
+        "view_interaction_to_next_paint",
+        "view_cumulative_layout_shift"
+      ]
+    },
+    {
+      "id": "Panel_ID3649610",
+      "type": "metric",
+      "title": "Largest Contentful Paint ( LCP )",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "milliseconds",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT avg(view_largest_contentful_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "View Largest Contentful Paint",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 20,
+        "w": 3,
+        "h": 4,
+        "i": 1
+      },
+      "o2Platform": "browser"
+    },
+    {
+      "id": "Panel_ID4891410",
+      "type": "metric",
+      "title": "Interaction to Next Paint ( INP )",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "unit": "milliseconds",
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT avg(view_interaction_to_next_paint/1000000) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "View Interaction to Next Paint",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 3,
+        "y": 20,
+        "w": 3,
+        "h": 4,
+        "i": 2
+      },
+      "o2Platform": "browser"
+    },
+    {
+      "id": "Panel_ID4568010",
+      "type": "metric",
+      "title": "Cumulative Layout Shift ( CLS )",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": {
+          "type": "osm"
+        },
+        "map_view": {
+          "zoom": 1,
+          "lat": 0,
+          "lng": 0
+        }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT avg(view_cumulative_layout_shift) as \"y_axis_1\"  FROM \"_rumdata\" where service in ($service) and env in ($env) and version in ($version)",
+          "customQuery": false,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [],
+            "y": [
+              {
+                "label": "View Cumulative Layout Shift",
+                "alias": "y_axis_1",
+                "column": "view_cumulative_layout_shift",
+                "color": "#5960b2",
+                "aggregationFunction": "avg"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": {
+        "x": 6,
+        "y": 20,
+        "w": 3,
+        "h": 4,
+        "i": 3
+      },
+      "o2Platform": "browser"
     }
   ],
   "variables": {

@@ -55,23 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :currentTimeObj="dateTime"
           searchType="RUM"
           @variablesManagerReady="onVariablesManagerReady"
-        >
-          <!-- Fixed column labels only make sense for the full browser layout; hide them
-               once panels have been filtered out for a mobile-only stream. -->
-          <template v-if="!wasFiltered" v-slot:before_panels>
-            <div class="flex items-center pt-3 text-base font-bold font-medium">
-              <div class="w-[25%] text-center">
-                {{ t("rum.webVitalsLabel") }}
-              </div>
-              <div class="w-[25%] text-center">
-                {{ t("rum.errorLabel") }}
-              </div>
-              <div class="w-[25%] text-center">
-                {{ t("rum.sessionLabel") }}
-              </div>
-            </div>
-          </template>
-        </RenderDashboardCharts>
+        />
       </div>
       <div
         v-show="isLoading.length"
@@ -92,7 +76,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, nextTick, onActivated, type Ref } from "vue";
+import {
+  defineComponent,
+  ref,
+  toRef,
+  watch,
+  onMounted,
+  nextTick,
+  onActivated,
+  type Ref,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -128,11 +121,13 @@ export default defineComponent({
     const performanceChartsRef = ref(null);
     const isLoading: Ref<boolean[]> = ref([]);
 
-    // Adaptive dashboard: drops panels whose columns the stream can't serve (browser Web
-    // Vitals for a mobile-only stream, and vice versa), reflowing the survivors. Browser
-    // data renders as before. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
+    // Adaptive dashboard: drops panels whose columns the stream can't serve, and — because
+    // this tab passes its time range — panels tagged for a platform with no data in that
+    // range, reflowing the survivors. So a browser-only stream keeps the Web Vitals section
+    // and never sees the mobile ones, a mobile-only stream the reverse, and a mixed stream
+    // gets both. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
     const { dashboardData, schemaResolved, showEmptyState, wasFiltered, ensureRumSchema } =
-      useRumPerformanceTab(overviewDashboard);
+      useRumPerformanceTab(overviewDashboard, toRef(props, "dateTime"));
 
     onMounted(() => {
       // Fire-and-forget: ensureRumSchema resolves the gate independently and handles its
