@@ -311,6 +311,7 @@
     {
       "id": "Panel_Section_MobileVitals",
       "type": "html",
+      "o2SectionHeader": true,
       "title": "Mobile Vitals",
       "description": "",
       "htmlContent": "",
