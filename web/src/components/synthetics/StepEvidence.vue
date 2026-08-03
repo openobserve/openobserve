@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * string and a screenshot. Neither describes the application — the error says
  * what the runner was waiting for, and the screenshot shows the symptom.
  *
- * The three blocks below are ordered by how directly they answer "is this the
+ * The blocks below are ordered by how directly they answer "is this the
  * application, or is this us?":
  *
  *  1. **Locator resolution** answers "locator rot?" mechanically. If candidate 1
@@ -34,12 +34,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *     already on the record. A stale `**\/auth/login` response says the page
  *     never got the response it depended on — a categorically different
  *     statement from "an element did not appear".
- *  3. **Settle timing** separates slow-but-healthy from broken on one line:
- *     "settled in 2.3 s when recorded, 41 s today".
+ *
+ * A third block, **settle timing**, used to sit between them: this run's settle
+ * time against the baseline recording observed. It is gone because it could
+ * almost never do its job. `observed_duration_ms` is written PER FAILURE, not
+ * per step, so only the one failing step ever had a baseline; every other step
+ * rendered a half-finished sentence with a dash where the comparison belonged.
+ * Reviving it needs the probe to write that baseline per step — not another
+ * pass at the rendering. `settleMs` is still on the record for whoever does.
  *
  * No verdict anywhere. The ordering is the guidance — presenting evidence and
  * letting the engineer conclude is the deliberate posture (spec X-6 permits one
  * heuristic in the whole system, and this is not it).
+ *
+ * ---
+ *
+ * CARD CHROME. Every section below is the house sectioned card: a bordered
+ * container that CLIPS (`overflow-hidden`), a header strip carrying the title
+ * and its qualifiers, a full-bleed `border-b` under that strip, then the body.
+ * Padding sits on the header and body, never on the container — that is what
+ * makes the divider run edge to edge instead of stopping short at a container
+ * inset. Same structure as the Scorer/Job form sections and the Monitor Runs
+ * breakdown cards; the class strings are repeated per section rather than
+ * hoisted, matching how those files do it.
  */
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -49,6 +66,7 @@ import type {
 } from "@/composables/synthetics/syntheticResultsSchema";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{
   detail: FailureDetail;
@@ -80,14 +98,6 @@ const healed = computed(() => {
 });
 
 const staleSignals = computed(() => signals.value.filter((s) => s.status === "stale"));
-
-/** Settling cost far more than it did when recorded — slow, not necessarily broken. */
-const settleRatio = computed(() => {
-  const now = props.detail.settleMs;
-  const then = props.detail.observedDurationMs;
-  if (!now || !then || then <= 0) return null;
-  return now / then;
-});
 
 function fmtMs(ms: number | null): string {
   if (ms === null) return "—";
@@ -143,15 +153,20 @@ const noFallback = computed(() => candidates.value.length === 1);
 <template>
   <div class="flex flex-col gap-3" data-test="synthetics-run-detail-step-evidence">
     <!-- Item 3: which locator candidates were tried, and what happened. -->
-    <section v-if="candidates.length" data-test="synthetics-run-detail-locator-resolution">
-      <!-- The count answers "was a fallback tried?" before any row is read:
-           "1 of 3 tried" and "1 of 1 tried" are different findings that used to
-           render as the same single row. -->
-      <div class="mb-1 flex items-baseline gap-2">
-        <h4 class="text-text-heading m-0 text-xs font-semibold">
+    <section
+      v-if="candidates.length"
+      class="card-container rounded-default border-border-default bg-card-glass-bg flex flex-col overflow-hidden border"
+      data-test="synthetics-run-detail-locator-resolution"
+    >
+      <!-- Heading and finding on one line. The count answers "was a fallback
+           tried?" before any row is read — "1 of 3 tried" and "1 of 1 tried" are
+           different findings — and the verdict that follows it is the same
+           sentence continued, so stacking them read as two separate remarks. -->
+      <div class="border-border-default flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2">
+        <h4 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("synthetics.runDetail.locatorResolution") }}
         </h4>
-        <span class="text-text-secondary text-2xs" data-test="synthetics-run-detail-locator-count">
+        <span class="text-text-secondary text-xs" data-test="synthetics-run-detail-locator-count">
           {{
             t("synthetics.runDetail.locatorTriedOf", {
               tried: triedCount,
@@ -159,103 +174,93 @@ const noFallback = computed(() => candidates.value.length === 1);
             })
           }}
         </span>
-      </div>
-      <!-- A step with one locator did not "fail to heal" — it had nothing to
-           heal with. That is a recording property, and it is actionable in a way
-           the outcome badge never was. -->
-      <p
-        v-if="noFallback"
-        class="text-status-warning-text m-0 mb-1 flex items-start gap-1 text-xs"
-        data-test="synthetics-run-detail-locator-no-fallback"
-      >
-        <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-        <span>{{ t("synthetics.runDetail.locatorNoFallback") }}</span>
-      </p>
-      <p
-        v-if="noneMatched"
-        class="text-text-secondary m-0 mb-1 text-xs"
-        data-test="synthetics-run-detail-locator-none-matched"
-      >
-        {{ t("synthetics.runDetail.locatorNoneMatched") }}
-      </p>
-      <p
-        v-else-if="healed"
-        class="text-text-secondary m-0 mb-1 text-xs"
-        data-test="synthetics-run-detail-locator-healed"
-      >
-        {{ t("synthetics.runDetail.locatorHealed") }}
-      </p>
-      <ul class="m-0 flex list-none flex-col gap-1 p-0">
-        <!-- Untried rungs are dimmed, not hidden: the same treatment a skipped
-             step gets in the timeline. Hiding them would restore exactly the
-             ambiguity this section exists to remove. -->
-        <li
-          v-for="(c, i) in candidates"
-          :key="`${c.kind}-${i}`"
-          class="flex items-center gap-2 text-xs"
-          :class="c.outcome === 'not_tried' ? 'opacity-50' : ''"
-          data-test="synthetics-run-detail-locator-candidate"
+        <span
+          v-if="noneMatched"
+          class="text-text-secondary text-xs"
+          data-test="synthetics-run-detail-locator-none-matched"
         >
-          <OBadge :variant="outcomeVariant(c.outcome)" size="sm">{{
-            outcomeLabel(c.outcome)
-          }}</OBadge>
-          <span class="text-text-secondary shrink-0">{{ c.kind }}</span>
-          <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ c.value }}</span>
-        </li>
-      </ul>
+          {{ `\u00b7 ${t("synthetics.runDetail.locatorNoneMatched")}` }}
+        </span>
+        <span
+          v-else-if="healed"
+          class="text-text-secondary text-xs"
+          data-test="synthetics-run-detail-locator-healed"
+        >
+          {{ `\u00b7 ${t("synthetics.runDetail.locatorHealed")}` }}
+        </span>
+      </div>
+      <div class="flex flex-col gap-2 px-3 py-2.5">
+        <!-- A step with one locator did not "fail to heal" — it had nothing to
+             heal with. That is a recording property, and it is actionable in a
+             way the outcome badge never was. -->
+        <p
+          v-if="noFallback"
+          class="text-status-warning-text m-0 flex items-start gap-1 text-xs"
+          data-test="synthetics-run-detail-locator-no-fallback"
+        >
+          <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{{ t("synthetics.runDetail.locatorNoFallback") }}</span>
+        </p>
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <!-- Untried rungs are dimmed, not hidden: the same treatment a skipped
+               step gets in the timeline. Hiding them would restore exactly the
+               ambiguity this section exists to remove. -->
+          <li
+            v-for="(c, i) in candidates"
+            :key="`${c.kind}-${i}`"
+            class="flex items-center gap-2 text-xs"
+            :class="c.outcome === 'not_tried' ? 'opacity-50' : ''"
+            data-test="synthetics-run-detail-locator-candidate"
+          >
+            <OBadge :variant="outcomeVariant(c.outcome)" size="sm">{{
+              outcomeLabel(c.outcome)
+            }}</OBadge>
+            <span class="text-text-secondary shrink-0">{{ c.kind }}</span>
+            <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ c.value }}</span>
+          </li>
+        </ul>
+      </div>
     </section>
 
     <!-- Item 4: which recorded signals arrived, and which did not. -->
-    <section v-if="signals.length" data-test="synthetics-run-detail-settle-signals">
-      <h4 class="text-text-heading m-0 mb-1 text-xs font-semibold">
-        {{ t("synthetics.runDetail.settleSignals") }}
-      </h4>
-      <p
-        v-if="staleSignals.length"
-        class="text-status-warning-text m-0 mb-1 flex items-start gap-1 text-xs"
-        data-test="synthetics-run-detail-settle-stale-note"
-      >
-        <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" aria-hidden="true" />
-        <span>{{ t("synthetics.runDetail.settleStaleNote") }}</span>
-      </p>
-      <ul class="m-0 flex list-none flex-col gap-1 p-0">
-        <li
-          v-for="(s, i) in signals"
-          :key="`${s.signal}-${i}`"
-          class="flex items-center gap-2 text-xs"
-        >
-          <OBadge :variant="s.status === 'fired' ? 'success' : 'error'" size="sm">
-            {{ s.status }}
-          </OBadge>
-          <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ s.signal }}</span>
-          <span class="text-text-secondary shrink-0">{{ fmtMs(s.waitedMs) }}</span>
-        </li>
-      </ul>
-    </section>
-
-    <!-- Item 5: what settling cost today, against what recording observed. -->
     <section
-      v-if="detail.settleMs !== null || detail.observedDurationMs !== null"
-      data-test="synthetics-run-detail-settle-timing"
+      v-if="signals.length"
+      class="card-container rounded-default border-border-default bg-card-glass-bg flex flex-col overflow-hidden border"
+      data-test="synthetics-run-detail-settle-signals"
     >
-      <h4 class="text-text-heading m-0 mb-1 text-xs font-semibold">
-        {{ t("synthetics.runDetail.settleTiming") }}
-      </h4>
-      <p class="text-text-secondary m-0 text-xs">
-        {{
-          t("synthetics.runDetail.settleTimingValue", {
-            now: fmtMs(detail.settleMs),
-            recorded: fmtMs(detail.observedDurationMs),
-          })
-        }}
-        <span
-          v-if="settleRatio && settleRatio >= 2"
-          class="text-status-warning-text"
-          data-test="synthetics-run-detail-settle-slower"
-        >
-          {{ t("synthetics.runDetail.settleSlower", { times: settleRatio.toFixed(1) }) }}
-        </span>
-      </p>
+      <!-- The stale note qualifies the heading rather than following it: a
+           recorded signal that never arrived is what the list below is FOR. -->
+      <div
+        class="border-border-default flex flex-wrap items-baseline items-center gap-x-2 border-b px-3 py-2"
+      >
+        <h4 class="text-text-heading m-0 text-sm font-semibold">
+          {{ t("synthetics.runDetail.settleSignals") }}
+        </h4>
+        <OTooltip :content="t('synthetics.runDetail.settleStaleNote')">
+          <span
+            v-if="staleSignals.length"
+            class="text-status-warning-text flex items-start gap-1 text-xs"
+            data-test="synthetics-run-detail-settle-stale-note"
+          >
+            <OIcon name="warning" size="sm" class="shrink-0" aria-hidden="true" />
+          </span>
+        </OTooltip>
+      </div>
+      <div class="flex flex-col gap-2 px-3 py-2.5">
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <li
+            v-for="(s, i) in signals"
+            :key="`${s.signal}-${i}`"
+            class="flex items-center gap-2 text-xs"
+          >
+            <OBadge :variant="s.status === 'fired' ? 'success' : 'error'" size="sm">
+              {{ s.status }}
+            </OBadge>
+            <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ s.signal }}</span>
+            <span class="text-text-secondary shrink-0">{{ fmtMs(s.waitedMs) }}</span>
+          </li>
+        </ul>
+      </div>
     </section>
 
     <!--
@@ -264,53 +269,60 @@ const noFallback = computed(() => candidates.value.length === 1);
       is the difference between "an element did not appear" and "the login call
       returned 503".
     -->
-    <section v-if="hasEvidence" data-test="synthetics-run-detail-app-evidence">
-      <h4 class="text-text-heading m-0 mb-1 text-xs font-semibold">
-        {{ t("synthetics.runDetail.applicationEvidence") }}
-      </h4>
-
-      <!-- Non-2xx first: ordering is the guidance, since there is no verdict. -->
-      <ul
-        v-if="evidence!.worstResponses.length"
-        class="m-0 mb-1 flex list-none flex-col gap-1 p-0"
-        data-test="synthetics-run-detail-worst-responses"
-      >
-        <li
-          v-for="(r, i) in evidence!.worstResponses"
-          :key="`${r.method}-${r.url}-${i}`"
-          class="flex items-center gap-2 text-xs"
+    <section
+      v-if="hasEvidence"
+      class="card-container rounded-default border-border-default bg-card-glass-bg flex flex-col overflow-hidden border"
+      data-test="synthetics-run-detail-app-evidence"
+    >
+      <div class="border-border-default flex flex-wrap items-baseline gap-x-2 border-b px-3 py-2">
+        <h4 class="text-text-heading m-0 text-sm font-semibold">
+          {{ t("synthetics.runDetail.applicationEvidence") }}
+        </h4>
+      </div>
+      <div class="flex flex-col gap-2 px-3 py-2.5">
+        <!-- Non-2xx first: ordering is the guidance, since there is no verdict. -->
+        <ul
+          v-if="evidence!.worstResponses.length"
+          class="m-0 flex list-none flex-col gap-1 p-0"
+          data-test="synthetics-run-detail-worst-responses"
         >
-          <OBadge variant="error" size="sm">{{ r.status }}</OBadge>
-          <span class="text-text-secondary shrink-0">{{ r.method }}</span>
-          <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ r.url }}</span>
-          <span v-if="r.count > 1" class="text-text-secondary shrink-0">x{{ r.count }}</span>
-        </li>
-      </ul>
+          <li
+            v-for="(r, i) in evidence!.worstResponses"
+            :key="`${r.method}-${r.url}-${i}`"
+            class="flex items-center gap-2 text-xs"
+          >
+            <OBadge variant="error" size="sm">{{ r.status }}</OBadge>
+            <span class="text-text-secondary shrink-0">{{ r.method }}</span>
+            <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ r.url }}</span>
+            <span v-if="r.count > 1" class="text-text-secondary shrink-0">x{{ r.count }}</span>
+          </li>
+        </ul>
 
-      <ul
-        v-if="evidence!.firstConsoleErrors.length"
-        class="m-0 mb-1 flex list-none flex-col gap-1 p-0"
-        data-test="synthetics-run-detail-console-errors"
-      >
-        <li
-          v-for="(line, i) in evidence!.firstConsoleErrors"
-          :key="i"
-          class="text-text-body font-mono text-xs break-words"
+        <ul
+          v-if="evidence!.firstConsoleErrors.length"
+          class="m-0 flex list-none flex-col gap-1 p-0"
+          data-test="synthetics-run-detail-console-errors"
         >
-          {{ line }}
-        </li>
-      </ul>
+          <li
+            v-for="(line, i) in evidence!.firstConsoleErrors"
+            :key="i"
+            class="text-text-body font-mono text-xs break-words"
+          >
+            {{ line }}
+          </li>
+        </ul>
 
-      <p class="text-text-secondary m-0 text-xs">
-        {{
-          t("synthetics.runDetail.evidenceCounts", {
-            consoleErrors: evidence!.consoleErrors,
-            pageErrors: evidence!.pageErrors,
-            failed: evidence!.requestsFailed,
-            nonOk: evidence!.responsesNon2xx,
-          })
-        }}
-      </p>
+        <p class="text-text-secondary m-0 text-xs">
+          {{
+            t("synthetics.runDetail.evidenceCounts", {
+              consoleErrors: evidence!.consoleErrors,
+              pageErrors: evidence!.pageErrors,
+              failed: evidence!.requestsFailed,
+              nonOk: evidence!.responsesNon2xx,
+            })
+          }}
+        </p>
+      </div>
     </section>
 
     <!-- X-8.2: reduced fidelity is reported, never silent. -->

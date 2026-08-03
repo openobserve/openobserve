@@ -297,6 +297,18 @@ export interface ReplayResponse {
   error?: string;
 }
 
+/**
+ * Why a replay never got as far as running a step.
+ *
+ * `incognito` — the extension has no incognito access; the one case with a
+ *   known, user-actionable fix, so it gets the chrome://extensions walkthrough.
+ * `in-progress` — a previous replay is still running in the extension.
+ * `preflight` — anything else. The extension's own message is shown verbatim
+ *   rather than guessed at; this exists so an unrecognised failure reports
+ *   itself honestly instead of being labelled as one of the two above.
+ */
+export type BlockedReason = "incognito" | "in-progress" | "preflight";
+
 // ── Live data pushed over the port ──────────────────────────────────────────
 // Mirrors the extension's `ExtensionToO2Message` / `ExtensionToO2Payload`
 // (examples/synthetics-recorder/src/messaging.ts). The discriminant for data

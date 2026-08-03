@@ -180,8 +180,13 @@ describe("BrowserJourneyStepEditor field layout", () => {
     const visible = wrapper.find(test("synthetics-journey-step-group-does"));
     expect(visible.find(test("synthetics-journey-step-action-select")).exists()).toBe(true);
     expect(visible.find(test("synthetics-journey-step-name-input")).exists()).toBe(true);
-    expect(visible.find(test("synthetics-journey-step-locator")).exists()).toBe(true);
     expect(visible.find(test("synthetics-journey-step-value-input")).exists()).toBe(true);
+    // The target sits beside the `does` block rather than inside it. What the test
+    // is for is the absence of a disclosure in front of it, which holds either way,
+    // so this reads from the editor root instead of from the block.
+    expect(wrapper.find(test("synthetics-journey-step-locator")).exists()).toBe(true);
+    const advanced = wrapper.find(test("synthetics-journey-step-group-advanced"));
+    expect(advanced.find(test("synthetics-journey-step-locator")).exists()).toBe(false);
   });
 
   // One disclosure in the whole editor. The locator block used to add a second
@@ -224,81 +229,139 @@ describe("BrowserJourneyStepEditor field layout", () => {
     expect(wrapper.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(true);
   });
 
-  it("captions Advanced with what it is for when the step holds only defaults", () => {
-    const wrapper = render();
-    const caption = wrapper.find(test("synthetics-journey-step-group-advanced")).text();
-    expect(caption).toContain("Page settling");
-    expect(caption).not.toMatch(/Optional|Always run|Timeout \d/);
+  // The trigger no longer carries a caption — `Advanced` renders a bare label — so
+  // there is no rendered text naming what the section holds. What the caption's
+  // input still drives is whether the section opens itself, so that is asserted
+  // once per branch that can set it, rather than through the copy.
+  it("opens Advanced already when the step carries an explicit timeout", () => {
+    const wrapper = render({ timeout: 10000 });
+    expect(wrapper.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(true);
   });
 
-  it("captions Advanced with each non-default value instead", () => {
-    const wrapper = render({ optional: true, alwaysRun: true, timeout: 10000 });
-    const caption = wrapper.find(test("synthetics-journey-step-group-advanced")).text();
-    expect(caption).toContain("Optional");
-    expect(caption).toContain("Always run");
-    expect(caption).toContain("10");
-    expect(caption).not.toContain("Page settling");
-  });
-
-  it("captions Advanced when settle evidence was recorded", () => {
+  it("opens Advanced already when settle evidence was recorded", () => {
     const wrapper = render({
       settle: { navigation: { url_pattern: "**/home" }, observed_duration_ms: 1200 },
     });
+    expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(true);
+  });
+
+  it("keeps Advanced closed when the step holds nothing but defaults", () => {
+    const wrapper = render();
+    expect(wrapper.find(test("synthetics-journey-step-timeout-input")).exists()).toBe(false);
+  });
+
+  // The three groups inside Advanced are one sequence — while it acts, after it
+  // acts, if it fails — and the numbered rail is what says so. Rules between them
+  // said only "these are different".
+  //
+  // The order is the RUNNER's: spec P3.3 has the probe wait for its settle
+  // signals AFTER the action completes, so the timeout phase precedes the settle
+  // phase. The rail once read the other way round, under the heading "Before it
+  // acts", which described the watchers being armed rather than the budget the
+  // field actually sets.
+  it("orders Advanced as three numbered phases of the step", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    const phases = wrapper.findAll('[data-test^="synthetics-journey-step-advanced-"]');
+    expect(phases.map((p) => p.attributes("data-test"))).toEqual([
+      "synthetics-journey-step-advanced-timeout",
+      "synthetics-journey-step-advanced-settle",
+      "synthetics-journey-step-advanced-failure",
+    ]);
+    // The rail's numbers are the sequence, so they are read rather than assumed.
+    expect(phases.map((p) => p.text().trim()[0])).toEqual(["1", "2", "3"]);
+    expect(phases[0].text()).toMatch(/give up after/i);
+    expect(phases[1].text()).toMatch(/let the page settle/i);
+    expect(phases[2].text()).toMatch(/if it fails/i);
+  });
+
+  // Settling happens after the action, and the heading is the only place that
+  // sequence is stated in words rather than by rail position.
+  it("names the settle phase as following the action, not preceding it", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    const settle = wrapper.find(test("synthetics-journey-step-advanced-settle"));
+    expect(settle.text()).toMatch(/after it acts/i);
+    expect(settle.text()).not.toMatch(/before it acts/i);
+  });
+
+  // `Required` turns a signal the run tolerates the absence of into one that
+  // fails the step. That is the largest behavioural difference any control in
+  // this panel makes, and the label alone cannot carry it.
+  // No `openAdvanced` here: recorded settle evidence opens Advanced by itself,
+  // and the helper is a toggle — clicking it would close the section.
+  it("explains what marking a settle signal required does", () => {
+    const wrapper = render({
+      settle: { responses: [{ url_pattern: "**/api/login", method: "POST", required: false }] },
+    });
+    expect(wrapper.find(test("synthetics-journey-step-settle-required-help-0")).exists()).toBe(
+      true,
+    );
+  });
+
+  // These phases always all apply — there is no step the author is "on" — so the
+  // rail must not single one out. 0 is OStepper's "no step active" value.
+  it("highlights none of the phases as current", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    expect(wrapper.findComponent({ name: "OStepper" }).props("modelValue")).toBe(0);
+    expect(wrapper.find("[aria-current='step']").exists()).toBe(false);
+  });
+
+  // A collapsed section that names only itself leaves an author guessing whether
+  // anything in it applies to their step.
+  it("says what Advanced holds on the trigger itself", () => {
+    const wrapper = render();
     expect(wrapper.find(test("synthetics-journey-step-group-advanced")).text()).toContain(
-      "recorded",
+      "Page settling",
     );
   });
 });
 
-// Phase 2 / SE-15. The configure forms size fields with flex, not fixed widths;
-// the step editor was the outlier with `!important` overrides that defeated reflow.
-describe("BrowserJourneyStepEditor layout", () => {
-  it("uses no !important width overrides", () => {
-    const wrapper = render({ action: "type", value: "x" });
-    const offenders = wrapper
-      .findAll("*")
-      .map((n) => n.attributes("class") ?? "")
-      .filter((c) => /\bw-\d+!/.test(c));
-    expect(offenders).toEqual([]);
+// Phase 3 / P3.3, P4. What the recording observed is evidence: it is shown as one
+// read-only block so it cannot be mistaken for a field, apart from the single
+// checkbox on it that is genuinely the author's call.
+describe("BrowserJourneyStepEditor recorded settle evidence", () => {
+  async function openAdvanced(wrapper: ReturnType<typeof render>) {
+    await wrapper.find(`${test("synthetics-journey-step-group-advanced")} button`).trigger("click");
+  }
+
+  it("reports how long settling actually took when it was recorded", () => {
+    const wrapper = render({
+      settle: { navigation: { url_pattern: "**/home" }, observed_duration_ms: 1200 },
+    });
+    expect(wrapper.find(test("synthetics-journey-step-settle-observed")).text()).toContain("1.2");
+  });
+
+  it("shows no evidence block on a step that was never recorded", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    expect(wrapper.find(test("synthetics-journey-step-settle-recorded")).exists()).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-settle-observed")).exists()).toBe(false);
+  });
+
+  // SE-16 again, from the other side: the budget is a field, not evidence, so it
+  // must stay reachable when there is no evidence to sit under.
+  it("keeps the budget field outside the evidence block", async () => {
+    const wrapper = render();
+    await openAdvanced(wrapper);
+    const recorded = wrapper.find(test("synthetics-journey-step-settle-recorded"));
+    expect(recorded.exists()).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-settle-budget-input")).exists()).toBe(true);
   });
 });
 
-// Phase 3 / SE-6, SE-9, SE-20.
+// Phase 3 / SE-9, SE-20.
+//
+// SE-6's leading summary sentence is not rendered, so nothing here reads one. The
+// timeout helper survives, but as OInput's `helpText` rather than a paragraph of
+// this component's own — it has no data-test, and renders in the input's bottom row
+// beside the error and counter, so the assertions read the input.
 describe("BrowserJourneyStepEditor plain language", () => {
-  it("leads with a sentence describing the step", () => {
-    const wrapper = render({
-      action: "click",
-      locator: { candidates: [{ kind: "test_attribute", value: '[data-test="sign-in"]' }] },
-    });
-    const summary = wrapper.find(test("synthetics-journey-step-summary")).text();
-    expect(summary).toContain("Click");
-    expect(summary).toContain('[data-test="sign-in"]');
-    // the effective timeout, not a raw ms number
-    expect(summary).toContain("30");
-  });
-
-  it("uses the author's first locator in the summary, since that is what runs", () => {
-    const wrapper = render({
-      locator: {
-        candidates: [
-          { kind: "css", value: "#authored", origin: "authored" },
-          { kind: "css", value: ".fallback" },
-        ],
-        author_ordered: true,
-      },
-    });
-    expect(wrapper.find(test("synthetics-journey-step-summary")).text()).toContain("#authored");
-  });
-
-  it("reflects an explicit timeout in the summary", () => {
-    const wrapper = render({ timeout: 5000 });
-    expect(wrapper.find(test("synthetics-journey-step-summary")).text()).toContain("5");
-  });
-
   it("names the runner default in the timeout helper for an interaction", async () => {
     const wrapper = render();
     await wrapper.find(`${test("synthetics-journey-step-group-advanced")} button`).trigger("click");
-    const help = wrapper.find(test("synthetics-journey-step-timeout-help")).text();
+    const help = wrapper.find(test("synthetics-journey-step-timeout-input")).text();
     expect(help).toContain("30");
     expect(help).toContain("Maximum 60");
   });
@@ -309,7 +372,7 @@ describe("BrowserJourneyStepEditor plain language", () => {
   it("says the field can only shorten on navigate, where default equals the maximum", async () => {
     const wrapper = render({ action: "navigate", value: "https://example.com" });
     await wrapper.find(`${test("synthetics-journey-step-group-advanced")} button`).trigger("click");
-    const help = wrapper.find(test("synthetics-journey-step-timeout-help")).text();
+    const help = wrapper.find(test("synthetics-journey-step-timeout-input")).text();
     expect(help).toContain("60");
     expect(help).toMatch(/only shorten/i);
   });

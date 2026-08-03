@@ -181,6 +181,7 @@ const baseStubs = {
       "stepResults",
       "activeStepId",
       "blockedReason",
+      "blockedDetail",
       "class",
     ],
   },

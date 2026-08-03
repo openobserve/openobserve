@@ -970,6 +970,22 @@ fn worst_case_run_ms(
             + i64::from(retries) * i64::from(wait_before_retry_secs) * 1_000)
 }
 
+/// Render a millisecond duration the way the person reading the error thinks
+/// about it. `1210000` is arithmetic; `20m10s` is a schedule.
+///
+/// These strings go straight into a save-time validation message that the UI
+/// shows verbatim, so the unit has to be legible without mental division.
+fn human_ms(ms: i64) -> String {
+    let total_secs = ms / 1_000;
+    let mins = total_secs / 60;
+    let secs = total_secs % 60;
+    match (mins, secs) {
+        (0, s) => format!("{s}s"),
+        (m, 0) => format!("{m}m"),
+        (m, s) => format!("{m}m{s}s"),
+    }
+}
+
 /// Bounds a protocol check's `timeout_ms` and its full retry sequence.
 ///
 /// The browser path has had this since `journey_budget_ms` was introduced; the
@@ -1001,12 +1017,25 @@ fn validate_net_retry_budget(
 
     let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
     if worst_case_ms > JOB_LEASE_SECS * 1_000 {
+        // Same shape as the browser message above: remedy first, arithmetic
+        // behind it, durations rather than raw milliseconds.
+        let attempts = retries + 1;
+        let retries_fix = if retries > 0 {
+            format!("lower retries below {retries}, ")
+        } else {
+            String::new()
+        };
         return Err(format!(
-            "config: a full retry sequence must fit inside the {JOB_LEASE_SECS}s job lease, but \
-             (retries={retries} + 1) x timeout_ms={timeout_ms} + retries x \
-             wait_before_retry_secs={wait_before_retry_secs} needs {worst_case_ms}ms. Lower \
-             timeout_ms, retries, or wait_before_retry_secs — a check that outlives its lease has \
-             its job terminated mid-run and its real result rejected as a stale ack."
+            "config: this check needs up to {} per run, which is over the {} job lease. To fix it, \
+             {retries_fix}or lower config.timeout_ms (currently {}). Detail: {} attempt(s) x {} \
+             each, plus {}s between retries. A check that outlives its lease has its job \
+             terminated mid-run and its real result rejected as a stale ack.",
+            human_ms(worst_case_ms),
+            human_ms(JOB_LEASE_SECS * 1_000),
+            human_ms(i64::from(timeout_ms)),
+            attempts,
+            human_ms(i64::from(timeout_ms)),
+            wait_before_retry_secs,
         ));
     }
     Ok(())
@@ -1819,12 +1848,33 @@ fn validate_browser_config(
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
     let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
     if worst_case_ms > JOB_LEASE_SECS * 1_000 {
+        // Remedy FIRST, in terms the form actually offers. The previous wording
+        // led with "Lower journey_budget_ms" — a field the UI neither renders
+        // nor sends — so the one lever named first was the one the reader could
+        // not reach, and the arithmetic came before the instruction. The numbers
+        // are unchanged, just moved behind the fix and rendered as durations.
+        let attempts = retries + 1;
+        let combos_fix = if devices > 1 {
+            format!("drop a combo from config.browser_devices (currently {devices}), ")
+        } else {
+            String::new()
+        };
+        let retries_fix = if retries > 0 {
+            format!("lower retries below {retries}, ")
+        } else {
+            String::new()
+        };
         return Err(format!(
-            "config: a full retry sequence across all browser/device combos must fit inside the \
-             {JOB_LEASE_SECS}s job lease, but browser_devices={devices} x (retries={retries} x \
-             journey_budget_ms={budget_ms} + wait_before_retry_secs={wait_before_retry_secs}) needs \
-             {worst_case_ms}ms. Lower journey_budget_ms, retries, or the number of browser/device \
-             combos — a run that outlives its lease is requeued and executed a second time."
+            "config: this check needs up to {} per run, which is over the {} job lease. To fix it, \
+             {combos_fix}{retries_fix}or shorten the run with config.journey_budget_ms (currently \
+             {}). Detail: {devices} browser/device combo(s) x {attempts} attempt(s) x {} each, \
+             plus {}s between retries. A run that outlives its lease is requeued and executed a \
+             second time.",
+            human_ms(worst_case_ms),
+            human_ms(JOB_LEASE_SECS * 1_000),
+            human_ms(i64::from(budget_ms)),
+            human_ms(i64::from(budget_ms)),
+            wait_before_retry_secs,
         ));
     }
 
@@ -3229,6 +3279,65 @@ mod tests {
         assert!(err.contains("journey_budget_ms"), "{err}");
         assert!(err.contains("retries"), "{err}");
         assert!(err.contains("lease"), "{err}");
+    }
+
+    #[test]
+    fn human_ms_renders_durations_not_milliseconds() {
+        assert_eq!(human_ms(45_000), "45s");
+        assert_eq!(human_ms(300_000), "5m");
+        assert_eq!(human_ms(1_210_000), "20m10s");
+        assert_eq!(human_ms(900_000), "15m");
+    }
+
+    /// The over-lease message is what a user sees INSTEAD of a saved check, so
+    /// it has to lead with something they can act on.
+    ///
+    /// It used to open with "Lower journey_budget_ms" — a field the web UI
+    /// neither renders nor sends — and put the arithmetic ahead of the
+    /// instruction, in raw milliseconds.
+    #[test]
+    fn over_lease_message_leads_with_an_actionable_remedy() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = 3;
+        s.wait_before_retry_secs = 5;
+        s.config["journey_budget_ms"] = serde_json::json!(300_000);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+
+        // 4 attempts x 300s + 3 gaps x 5s = 1215s.
+        // Durations, not millisecond counts, for the two headline numbers.
+        assert!(err.contains("20m15s"), "worst case as a duration: {err}");
+        assert!(err.contains("15m job lease"), "limit as a duration: {err}");
+        // The remedy precedes the arithmetic.
+        let fix_at = err.find("To fix it").expect("names a fix");
+        let detail_at = err.find("Detail:").expect("keeps the arithmetic");
+        assert!(fix_at < detail_at, "remedy must come first: {err}");
+        // `retries` is offered before the field the UI cannot reach.
+        let retries_at = err.find("lower retries").expect("offers retries");
+        let budget_at = err
+            .find("journey_budget_ms")
+            .expect("still names the budget");
+        assert!(retries_at < budget_at, "reachable lever first: {err}");
+    }
+
+    /// Two browser/device combos with the web form's own default `retries: 1`
+    /// and the server default budget land at 2 x (2 x 300s + 5s) = 1210s, past
+    /// the 900s lease — so "Chromium desktop + Chromium mobile" cannot be saved
+    /// without the author first discovering they must set retries to 0.
+    ///
+    /// Asserted here so that changing any of the three defaults has to confront
+    /// which configurations are savable, rather than shifting it silently.
+    #[test]
+    fn two_combos_at_default_retries_exceed_the_lease() {
+        let lease_ms = JOB_LEASE_SECS * 1_000;
+        assert_eq!(
+            worst_case_run_ms(DEFAULT_JOURNEY_BUDGET_MS, 2, 1, 5),
+            1_210_000
+        );
+        assert!(worst_case_run_ms(DEFAULT_JOURNEY_BUDGET_MS, 2, 1, 5) > lease_ms);
+        // Dropping retries to 0 is the lever the form actually offers, and it
+        // brings the same two combos back inside the lease.
+        assert!(worst_case_run_ms(DEFAULT_JOURNEY_BUDGET_MS, 2, 0, 5) <= lease_ms);
     }
 
     #[test]

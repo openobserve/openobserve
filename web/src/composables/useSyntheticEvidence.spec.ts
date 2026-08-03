@@ -15,7 +15,19 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { nextTick, ref } from "vue";
-import { useSyntheticEvidence } from "./useSyntheticEvidence";
+import {
+  EVIDENCE_ERROR_MESSAGE,
+  evidenceErrorCanRetry,
+  evidenceErrorNeedsReload,
+  useSyntheticEvidence,
+} from "./useSyntheticEvidence";
+import syntheticsService from "@/services/synthetics";
+
+// Only the URL-shape predicate is used here; the composable deliberately does
+// its own raw fetch rather than going through this service's axios wrapper.
+vi.mock("@/services/synthetics", () => ({
+  default: { isProxyArtifactUrl: vi.fn(() => false) },
+}));
 
 const NDJSON = [
   '{"ts":100,"kind":"response","method":"GET","url":"https://app.dev/a","status":200,"initiated_ts":90,"duration_ms":10,"first_party":true,"step_id":"s1"}',
@@ -152,5 +164,124 @@ describe("useSyntheticEvidence", () => {
     const fromEvent = setup("other.ndjson", false);
     await fromEvent.load();
     expect(fromEvent.truncated.value).toBe(true);
+  });
+
+  /**
+   * The two URL kinds need OPPOSITE credentials and each fails closed with the
+   * other's setting.
+   *
+   * The proxy endpoint is cookie-authed, and a cross-origin `fetch` omits
+   * cookies unless asked — which is what turned a proxy-mode bundle into a bare
+   * "401 Unauthorized" on every split-origin deployment (any dev setup with
+   * VITE_OPENOBSERVE_ENDPOINT pointed elsewhere). Object storage sends no
+   * `Access-Control-Allow-Credentials`, so asking there fails CORS instead.
+   */
+  describe("fetch credentials", () => {
+    it("sends cookies to our own proxy endpoint", async () => {
+      vi.mocked(syntheticsService.isProxyArtifactUrl).mockReturnValue(true);
+      const { load } = setup();
+      await load();
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ credentials: "include" }),
+      );
+    });
+
+    it("withholds cookies from a presigned object URL", async () => {
+      vi.mocked(syntheticsService.isProxyArtifactUrl).mockReturnValue(false);
+      const { load } = setup();
+      await load();
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ credentials: "omit" }),
+      );
+    });
+  });
+
+  /**
+   * "401 Unauthorized" in a banner tells the reader nothing about whether the
+   * RUN broke, their session died, or the evidence simply aged out. Each has a
+   * different response, so the kind is classified here and the panel writes the
+   * sentence.
+   */
+  describe("error classification", () => {
+    function failWith(httpStatus: number, statusText = "") {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: false,
+        status: httpStatus,
+        statusText,
+        text: async () => "",
+      })) as any;
+    }
+
+    it.each([
+      [401, "unauthorized"],
+      [403, "expired"],
+      [404, "missing"],
+      [410, "missing"],
+      [500, "server"],
+      [502, "server"],
+    ])("classifies HTTP %i as %s", async (httpStatus, kind) => {
+      failWith(httpStatus);
+      const { load, status, errorKind } = setup();
+      await load();
+      expect(status.value).toBe("error");
+      expect(errorKind.value).toBe(kind);
+    });
+
+    it("classifies a rejected fetch as unreachable, not as a server error", async () => {
+      // No response ever existed — DNS, TLS, offline, or a refused CORS
+      // preflight. Reporting that as a server error points at the wrong system.
+      globalThis.fetch = vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }) as any;
+      const { load, status, errorKind, error } = setup();
+      await load();
+      expect(status.value).toBe("error");
+      expect(errorKind.value).toBe("unreachable");
+      expect(error.value).toContain("Failed to fetch");
+    });
+
+    it("keeps the raw status as detail alongside the kind", async () => {
+      failWith(401, "Unauthorized");
+      const { load, error, errorKind } = setup();
+      await load();
+      expect(errorKind.value).toBe("unauthorized");
+      // Still readable — it is the first thing anyone debugging this asks for.
+      expect(error.value).toBe("401 Unauthorized");
+    });
+
+    it("clears the kind when the attempt changes", async () => {
+      failWith(500);
+      const { load, evidenceKey, errorKind } = setup();
+      await load();
+      expect(errorKind.value).toBe("server");
+      evidenceKey.value = "attempt-1-bundle.ndjson";
+      await nextTick();
+      expect(errorKind.value).toBeNull();
+    });
+  });
+});
+
+describe("evidence error affordances", () => {
+  it("offers a reload where retrying the same URL cannot help", () => {
+    // A dead session and an aged-out signature both survive a Retry against the
+    // stale URL; only a reload re-mints one and re-authenticates the other.
+    expect(evidenceErrorNeedsReload("unauthorized")).toBe(true);
+    expect(evidenceErrorNeedsReload("expired")).toBe(true);
+    expect(evidenceErrorNeedsReload("unreachable")).toBe(false);
+    expect(evidenceErrorNeedsReload("server")).toBe(false);
+  });
+
+  it("does not offer a retry for a bundle storage says is gone", () => {
+    expect(evidenceErrorCanRetry("missing")).toBe(false);
+    expect(evidenceErrorCanRetry("unreachable")).toBe(true);
+    expect(evidenceErrorCanRetry("server")).toBe(true);
+  });
+
+  it("has a message for every kind, so none can render blank", () => {
+    for (const kind of ["unauthorized", "expired", "missing", "unreachable", "server"] as const) {
+      expect(EVIDENCE_ERROR_MESSAGE[kind]).toMatch(/^synthetics\.evidence\./);
+    }
   });
 });
