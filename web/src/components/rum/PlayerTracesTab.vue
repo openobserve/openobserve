@@ -434,9 +434,32 @@ async function fetchTraces() {
       return;
     }
 
+    // The view-context columns are browser-shaped and are NOT guaranteed on a mobile
+    // `_rumdata` schema. Referencing a column the stream lacks fails the whole query with a
+    // 400, so each optional column is selected only when present (NULL-aliased otherwise)
+    // and the `action_id` filter is applied only when that column exists. `session_id` and
+    // the guarded `trace_id` are the only hard requirements.
+    const presentCols = new Set(
+      (rumStream?.schema ?? []).map((field: any) => field?.name),
+    );
+    const has = (col: string): boolean => presentCols.has(col);
+    const aggOrNull = (fn: string, col: string, alias: string): string =>
+      has(col) ? `${fn}(${col}) as ${alias}` : `NULL as ${alias}`;
+
+    const selectParts = [
+      aggOrNull("max", "view_id", "_view_id"),
+      aggOrNull("max", "view_url", "_view_url"),
+      aggOrNull("max", "view_loading_type", "_view_loading_type"),
+      `${traceIdExpr} as _trace_id`,
+      aggOrNull("max", "type", "_type"),
+      aggOrNull("min", "date", "_date"),
+    ];
+    const whereParts = [`session_id='${props.sessionId}'`, traceIdSet];
+    if (has("action_id")) whereParts.push("action_id is not null");
+
     const rumQuery = {
       query: {
-        sql: `SELECT max(view_id) as _view_id, max(view_url) as _view_url, max(view_loading_type) as _view_loading_type, ${traceIdExpr} as _trace_id, max(type) as _type, min(date) as _date FROM "_rumdata" WHERE session_id='${props.sessionId}' AND ${traceIdSet} AND action_id is not null GROUP BY ${traceIdExpr} ORDER BY _date ASC`,
+        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr} ORDER BY _date ASC`,
         start_time: searchStartTime,
         end_time: searchEndTime,
         from: 0,
