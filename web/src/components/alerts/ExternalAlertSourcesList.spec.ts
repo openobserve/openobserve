@@ -4,6 +4,7 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ExternalAlertSourcesList from "./ExternalAlertSourcesList.vue";
 import alertSources from "@/services/alert_sources";
+import destinationService from "@/services/alert_destination";
 
 vi.mock("@/services/alert_sources", () => ({
   default: {
@@ -13,7 +14,13 @@ vi.mock("@/services/alert_sources", () => ({
     rotate: vi.fn(),
     create: vi.fn(),
     delete: vi.fn(),
+    setDestinations: vi.fn(),
+    setName: vi.fn(),
   },
+}));
+
+vi.mock("@/services/alert_destination", () => ({
+  default: { list: vi.fn() },
 }));
 
 vi.mock("@/utils/clipboard", () => ({
@@ -28,6 +35,7 @@ const DEFAULT_SOURCE = {
   token: "o2iat_abcd1234efgh5678",
   enabled: true,
   config: {},
+  destinations: [] as string[],
   created_by: "admin@example.com",
   created_at: 1,
   updated_at: 1,
@@ -59,6 +67,7 @@ describe("ExternalAlertSourcesList", () => {
     (alertSources.listSenders as any).mockResolvedValue({
       data: { senders: [] },
     });
+    (destinationService.list as any).mockResolvedValue({ data: [] });
   });
 
   it("fetches integrations and senders on mount", async () => {
@@ -68,11 +77,15 @@ describe("ExternalAlertSourcesList", () => {
     expect(alertSources.listSenders).toHaveBeenCalledWith("myorg", "int-1");
   });
 
-  it("masks the token by default", async () => {
+  it("masks the token in the source table by default", async () => {
+    // Setup snippets that need the real URL only render inside the Add
+    // Source drawer once a source is freshly created (not on the list page
+    // itself), so the table text should never contain an unmasked token.
     const wrapper = buildWrapper();
     await flushPromises();
-    expect(wrapper.text()).not.toContain("abcd1234efgh5678");
-    expect(wrapper.text()).toContain("****");
+    const table = wrapper.find('[data-test="alert-sources-advanced-table"]');
+    expect(table.text()).not.toContain("abcd1234efgh5678");
+    expect(table.text()).toContain("****");
   });
 
   it("reveals the full token when reveal is toggled", async () => {
@@ -89,6 +102,14 @@ describe("ExternalAlertSourcesList", () => {
     await flushPromises();
     await (wrapper.vm as any).copyUrlFor(DEFAULT_SOURCE);
     expect(copyToClipboard).toHaveBeenCalledWith(`http://localhost:5080${DEFAULT_SOURCE.url}`);
+  });
+
+  it("copies just the bare token via copyToClipboard, not the full URL", async () => {
+    const { copyToClipboard } = await import("@/utils/clipboard");
+    const wrapper = buildWrapper();
+    await flushPromises();
+    await (wrapper.vm as any).copyTokenFor(DEFAULT_SOURCE);
+    expect(copyToClipboard).toHaveBeenCalledWith(DEFAULT_SOURCE.token);
   });
 
   it("shows 'not_connected' status when no senders exist", async () => {
@@ -359,11 +380,162 @@ describe("ExternalAlertSourcesList", () => {
     expect(alertSources.delete).not.toHaveBeenCalled();
   });
 
-  it("toggling showAddEditor shows the AddExternalAlertSource component", async () => {
+  it("openEditFor opens the drawer targeting the clicked integration", async () => {
     const wrapper = buildWrapper();
     await flushPromises();
-    (wrapper.vm as any).showAddEditor = true;
+    (wrapper.vm as any).openEditFor(DEFAULT_SOURCE);
+    expect((wrapper.vm as any).showAddDrawer).toBe(true);
+    expect((wrapper.vm as any).editTargetIntegration).toEqual(DEFAULT_SOURCE);
+  });
+
+  it("openAddDrawer opens the drawer with no edit target (create mode)", async () => {
+    const wrapper = buildWrapper();
     await flushPromises();
-    expect(wrapper.findComponent({ name: "AddExternalAlertSource" }).exists()).toBe(true);
+    (wrapper.vm as any).editTargetIntegration = DEFAULT_SOURCE;
+    (wrapper.vm as any).openAddDrawer();
+    expect((wrapper.vm as any).showAddDrawer).toBe(true);
+    expect((wrapper.vm as any).editTargetIntegration).toBeUndefined();
+  });
+
+  it("refreshes the list when the drawer emits 'updated'", async () => {
+    const wrapper = buildWrapper();
+    await flushPromises();
+    const addDrawer = wrapper.findComponent({ name: "AddExternalAlertSource" });
+    addDrawer.vm.$emit("updated");
+    await flushPromises();
+    expect(alertSources.list).toHaveBeenCalledTimes(2); // initial mount + post-update refresh
+  });
+
+  it("clicking Add source opens the AddExternalAlertSource drawer", async () => {
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect((wrapper.vm as any).showAddDrawer).toBe(false);
+    await wrapper.find('[data-test="alert-sources-add-btn"]').trigger("click");
+    expect((wrapper.vm as any).showAddDrawer).toBe(true);
+    expect(wrapper.findComponent({ name: "AddExternalAlertSource" }).props("open")).toBe(true);
+  });
+
+  it("shows the configured incident destinations for a source", async () => {
+    (alertSources.list as any).mockResolvedValue({
+      data: { integrations: [{ ...DEFAULT_SOURCE, destinations: ["sre-pages", "email-oncall"] }] },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect(wrapper.text()).toContain("sre-pages, email-oncall");
+  });
+
+  it("flags a source with no incident destination configured", async () => {
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-sources-no-destination-tag"]').exists()).toBe(true);
+  });
+
+  it("does not flag a source once destinations are set", async () => {
+    (alertSources.list as any).mockResolvedValue({
+      data: { integrations: [{ ...DEFAULT_SOURCE, destinations: ["sre-pages"] }] },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-sources-no-destination-tag"]').exists()).toBe(false);
+  });
+
+  it("shows a 'never resolves' warning icon with a tooltip alongside the status tag when actively receiving", async () => {
+    // last_received_at is recent, so status resolves to "receiving" — the
+    // never-resolved hint must still surface (as an icon beside the status
+    // tag), not get silently swallowed by the receiving/stale/hint
+    // mutual-exclusivity of the status tag itself.
+    (alertSources.listSenders as any).mockResolvedValue({
+      data: {
+        senders: [
+          {
+            integration_id: "int-1",
+            detected_source: "alertmanager",
+            display_name: "alertmanager",
+            first_received_at: 1,
+            last_received_at: Date.now() * 1000,
+            accepted_count: 14,
+            rejected_count: 0,
+            resolved_seen: false,
+            resolve_wiring_hint: true,
+          },
+        ],
+      },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-sources-never-resolves-icon"]').exists()).toBe(true);
+    // No page-level banner — the explanation lives in the icon's tooltip, so
+    // there's no unbounded banner list even with many misconfigured sources.
+    expect(wrapper.find('[data-test^="alert-sources-resolve-wiring-banner-"]').exists()).toBe(false);
+  });
+
+  it("does not show a 'never resolves' indicator when resolves have been seen", async () => {
+    (alertSources.listSenders as any).mockResolvedValue({
+      data: {
+        senders: [
+          {
+            integration_id: "int-1",
+            detected_source: "grafana",
+            display_name: "grafana",
+            first_received_at: 1,
+            last_received_at: Date.now() * 1000,
+            accepted_count: 5,
+            rejected_count: 0,
+            resolved_seen: true,
+            resolve_wiring_hint: false,
+          },
+        ],
+      },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-sources-never-resolves-icon"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-sources-never-resolves-tag"]').exists()).toBe(false);
+  });
+
+  it("shows the 'never resolves' icon for an additional integration's sender too", async () => {
+    (alertSources.list as any).mockResolvedValue({
+      data: {
+        integrations: [
+          DEFAULT_SOURCE,
+          { ...DEFAULT_SOURCE, id: "int-2", name: "grafana-staging", source_type: "grafana" },
+        ],
+      },
+    });
+    (alertSources.listSenders as any).mockImplementation((_org: string, integrationId: string) => {
+      if (integrationId === "int-2") {
+        return Promise.resolve({
+          data: {
+            senders: [
+              {
+                integration_id: "int-2",
+                detected_source: "grafana",
+                display_name: "grafana",
+                first_received_at: 1,
+                last_received_at: Date.now() * 1000,
+                accepted_count: 3,
+                rejected_count: 0,
+                resolved_seen: false,
+                resolve_wiring_hint: true,
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: { senders: [] } });
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect((wrapper.vm as any).additionalResolveWiringHintById["int-2"]).toBe(true);
+    expect(wrapper.find('[data-test="alert-sources-never-resolves-icon"]').exists()).toBe(true);
+  });
+
+  it("renders just the table on the list page — no webhook URL/setup-snippet blocks (those live in the Add Source drawer)", async () => {
+    const wrapper = buildWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-sources-setup-type-tabs"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-sources-setup-snippet"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-sources-url-cell"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-sources-advanced-table"]').exists()).toBe(true);
   });
 });
