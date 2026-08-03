@@ -30,6 +30,10 @@ import {
   type DashboardPanel,
   type RumDashboard,
 } from "./dashboardCapability";
+// The shipped Overview dashboard, asserted against directly so the persona behaviour is
+// pinned to the real panel set rather than a fixture that can drift from it.
+import overviewDashboard from "./overview.json";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 /** Build a single panel fixture with a given layout and SQL. */
 function makePanel(
@@ -234,7 +238,7 @@ describe("dashboardCapability", () => {
       const presentFields = new Set(["session_id", "error_id", "service"]); // LCP absent
 
       // Act
-      const result = filterDashboardBySchema(dashboard, presentFields, 12);
+      const result = filterDashboardBySchema(dashboard, presentFields, { gridWidth: 12 });
 
       // Assert
       const panels = result.dashboard.panels ?? [];
@@ -471,6 +475,319 @@ describe("dashboardCapability", () => {
       const result = presentFieldsFromSchemaMap({ service: { type: "Utf8" } });
 
       expect(result).toEqual(new Set(["service"]));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Platform gating — panels tagged for a platform with no data in the range.
+  // -------------------------------------------------------------------------
+
+  describe("filterDashboardBySchema — platform gating", () => {
+    /** A common panel, a mobile-tagged panel and a browser-tagged panel. */
+    const makeMixedDashboard = () =>
+      makeDashboard([
+        { ...makePanel(1, 0, 0, 3, 4, "SELECT session_id FROM _rumdata") },
+        {
+          ...makePanel(2, 3, 0, 3, 4, "SELECT count(*) FROM _rumdata"),
+          o2Platform: "mobile",
+        },
+        {
+          ...makePanel(3, 6, 0, 3, 4, "SELECT count(*) FROM _rumdata"),
+          o2Platform: "browser",
+        },
+      ]);
+
+    const ALL_FIELDS = new Set(["session_id"]);
+
+    it("drops mobile-tagged panels when only browser data is in range", () => {
+      // Arrange
+      const dashboard = makeMixedDashboard();
+
+      // Act
+      const result = filterDashboardBySchema(dashboard, ALL_FIELDS, {
+        platforms: { hasBrowser: true, hasMobile: false },
+      });
+
+      // Assert
+      expect(result.dashboard.panels?.map((p) => p.o2Platform)).toEqual([undefined, "browser"]);
+      expect(result.droppedCount).toBe(1);
+    });
+
+    it("drops browser-tagged panels when only mobile data is in range", () => {
+      // Arrange
+      const dashboard = makeMixedDashboard();
+
+      // Act
+      const result = filterDashboardBySchema(dashboard, ALL_FIELDS, {
+        platforms: { hasBrowser: false, hasMobile: true },
+      });
+
+      // Assert
+      expect(result.dashboard.panels?.map((p) => p.o2Platform)).toEqual([undefined, "mobile"]);
+      expect(result.droppedCount).toBe(1);
+    });
+
+    it("keeps every panel when both platforms have data in range", () => {
+      // Arrange
+      const dashboard = makeMixedDashboard();
+
+      // Act
+      const result = filterDashboardBySchema(dashboard, ALL_FIELDS, {
+        platforms: { hasBrowser: true, hasMobile: true },
+      });
+
+      // Assert — nothing dropped, so the SAME reference comes back
+      expect(result.dashboard).toBe(dashboard);
+      expect(result.keptCount).toBe(3);
+    });
+
+    it("ignores platform tags when platforms is not supplied", () => {
+      // Arrange — the Vitals / Errors / API tabs, which never probe for sources
+      const dashboard = makeMixedDashboard();
+
+      // Act
+      const result = filterDashboardBySchema(dashboard, ALL_FIELDS);
+
+      // Assert
+      expect(result.dashboard).toBe(dashboard);
+      expect(result.keptCount).toBe(3);
+    });
+
+    it("gates on platform even when the schema is unknown", () => {
+      // Arrange — detection resolved before the schema fetch did
+      const dashboard = makeMixedDashboard();
+
+      // Act
+      const result = filterDashboardBySchema(dashboard, null, {
+        platforms: { hasBrowser: true, hasMobile: false },
+      });
+
+      // Assert
+      expect(result.dashboard.panels).toHaveLength(2);
+      expect(result.droppedCount).toBe(1);
+    });
+
+    it("keeps untagged panels for every platform combination", () => {
+      // Arrange
+      const dashboard = makeDashboard([makePanel(1, 0, 0, 3, 4, "SELECT session_id FROM _rumdata")]);
+
+      // Act
+      const noData = filterDashboardBySchema(dashboard, ALL_FIELDS, {
+        platforms: { hasBrowser: false, hasMobile: false },
+      });
+
+      // Assert
+      expect(noData.keptCount).toBe(1);
+      expect(noData.droppedCount).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Section headers — panels with no SQL that must vanish with their section.
+  // -------------------------------------------------------------------------
+
+  describe("filterDashboardBySchema — o2RequiresAnyField", () => {
+    const makeHeader = () => ({
+      ...makePanel("header", 0, 0, 12, 2),
+      type: "html",
+      title: "App stability",
+      o2Platform: "mobile",
+      o2RequiresAnyField: ["error_is_crash", "error_category"],
+    });
+
+    it("keeps the header when at least one required column is present", () => {
+      // Arrange
+      const dashboard = makeDashboard([makeHeader()]);
+
+      // Act
+      const result = filterDashboardBySchema(dashboard, new Set(["error_category"]), {
+        platforms: { hasBrowser: false, hasMobile: true },
+      });
+
+      // Assert
+      expect(result.keptCount).toBe(1);
+      expect(result.droppedCount).toBe(0);
+    });
+
+    it("drops the header when none of the required columns are present", () => {
+      // Arrange — a mobile app that has never crashed: no crash columns in the schema
+      const dashboard = makeDashboard([makeHeader()]);
+
+      // Act
+      const result = filterDashboardBySchema(dashboard, new Set(["session_id"]), {
+        platforms: { hasBrowser: false, hasMobile: true },
+      });
+
+      // Assert
+      expect(result.keptCount).toBe(0);
+      expect(result.droppedCount).toBe(1);
+    });
+
+    it("ignores the requirement when the schema is unknown", () => {
+      // Arrange
+      const dashboard = makeDashboard([makeHeader()]);
+
+      // Act
+      const result = filterDashboardBySchema(dashboard, null, {
+        platforms: { hasBrowser: false, hasMobile: true },
+      });
+
+      // Assert
+      expect(result.keptCount).toBe(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // The shipped Overview dashboard, exercised through the three ingestion personas.
+  // -------------------------------------------------------------------------
+
+  describe("overview.json — persona adaptation", () => {
+    const BROWSER_FIELDS = [
+      "view_largest_contentful_paint",
+      "view_interaction_to_next_paint",
+      "view_cumulative_layout_shift",
+    ];
+    const MOBILE_FIELDS = [
+      "error_is_crash",
+      "error_category",
+      "vital_app_launch_metric",
+      "vital_startup_type",
+      "vital_duration",
+      "view_slow_frames_rate",
+      "view_freeze_rate",
+      "view_frozen_frame_count",
+      "view_refresh_rate_average",
+    ];
+    const COMMON_FIELDS = ["session_id", "error_id", "error_handling", "type", "source"];
+
+    const titlesOf = (dashboard: RumDashboard) =>
+      (dashboard.panels ?? []).map((p) => p.title as string);
+
+    const filterOverview = (fields: string[], hasBrowser: boolean, hasMobile: boolean) =>
+      filterDashboardBySchema(overviewDashboard as RumDashboard, new Set(fields), {
+        gridWidth: 12,
+        platforms: { hasBrowser, hasMobile },
+      });
+
+    it("shows the browser section and no mobile sections for a browser-only stream", () => {
+      // Act
+      const titles = titlesOf(
+        filterOverview([...COMMON_FIELDS, ...BROWSER_FIELDS], true, false).dashboard,
+      );
+
+      // Assert
+      expect(titles).toContain("Health at a glance");
+      expect(titles).toContain("Web Vitals");
+      expect(titles).toContain("Largest Contentful Paint ( LCP )");
+      expect(titles).not.toContain("App stability");
+      expect(titles).not.toContain("Rendering & responsiveness");
+      expect(titles).not.toContain("Crash-free Sessions");
+    });
+
+    it("shows the mobile sections and no Web Vitals for a mobile-only stream", () => {
+      // Act
+      const titles = titlesOf(
+        filterOverview([...COMMON_FIELDS, ...MOBILE_FIELDS], false, true).dashboard,
+      );
+
+      // Assert
+      expect(titles).toContain("App stability");
+      expect(titles).toContain("Crash-free Sessions");
+      expect(titles).toContain("Cold Start ( p95 )");
+      expect(titles).toContain("Rendering & responsiveness");
+      expect(titles).not.toContain("Web Vitals");
+      expect(titles).not.toContain("Largest Contentful Paint ( LCP )");
+    });
+
+    it("keeps the cross-platform tiles for every persona", () => {
+      // Arrange
+      const leadershipTiles = [
+        "Total Sessions",
+        "Total Errors",
+        "Session with Errors",
+        "Total Unhandled Errors",
+      ];
+
+      // Act
+      const browserOnly = titlesOf(
+        filterOverview([...COMMON_FIELDS, ...BROWSER_FIELDS], true, false).dashboard,
+      );
+      const mobileOnly = titlesOf(
+        filterOverview([...COMMON_FIELDS, ...MOBILE_FIELDS], false, true).dashboard,
+      );
+
+      // Assert
+      leadershipTiles.forEach((title) => {
+        expect(browserOnly).toContain(title);
+        expect(mobileOnly).toContain(title);
+      });
+    });
+
+    it("keeps every panel for a mixed stream", () => {
+      // Act
+      const result = filterOverview(
+        [...COMMON_FIELDS, ...BROWSER_FIELDS, ...MOBILE_FIELDS],
+        true,
+        true,
+      );
+
+      // Assert
+      expect(result.droppedCount).toBe(0);
+      expect(result.keptCount).toBe((overviewDashboard as RumDashboard).panels?.length);
+    });
+
+    it("drops the mobile sections when mobile columns exist but no mobile data is in range", () => {
+      // Arrange — an org that trialled mobile months ago: columns linger in the schema
+      // forever, so field gating alone would leave the mobile sections empty on screen.
+
+      // Act
+      const titles = titlesOf(
+        filterOverview([...COMMON_FIELDS, ...BROWSER_FIELDS, ...MOBILE_FIELDS], true, false)
+          .dashboard,
+      );
+
+      // Assert
+      expect(titles).not.toContain("App stability");
+      expect(titles).not.toContain("Crash-free Sessions");
+      expect(titles).toContain("Web Vitals");
+    });
+
+    it("adapts the same way after the real v2 → v8 schema migration", () => {
+      // Arrange — the production path is convert-then-filter, on the 192-column grid the
+      // dashboard actually renders on. The converter mutates its input, so clone first.
+      const converted = convertDashboardSchemaVersion(
+        JSON.parse(JSON.stringify(overviewDashboard)),
+      ) as RumDashboard;
+
+      // Act
+      const result = filterDashboardBySchema(converted, new Set([...COMMON_FIELDS, ...MOBILE_FIELDS]), {
+        platforms: { hasBrowser: false, hasMobile: true },
+      });
+      const panels = result.dashboard.tabs?.[0]?.panels ?? [];
+      const titles = panels.map((p) => p.title as string);
+
+      // Assert — panels live under tabs[] now, and the browser section is gone
+      expect(panels.length).toBeGreaterThan(0);
+      expect(titles).toContain("App stability");
+      expect(titles).not.toContain("Web Vitals");
+      // Repacked on the 192-col grid, not clamped to some smaller width
+      const sectionHeader = panels.find((p) => p.title === "App stability");
+      expect(sectionHeader?.layout.w).toBe(192);
+      expect(panels.every((p) => p.layout.x + p.layout.w <= 192)).toBe(true);
+    });
+
+    it("packs survivors into full rows with no gaps for a mobile-only stream", () => {
+      // Act
+      const panels =
+        filterOverview([...COMMON_FIELDS, ...MOBILE_FIELDS], false, true).dashboard.panels ?? [];
+
+      // Assert — every row starts at x=0 and no row exceeds the grid
+      const rows = new Map<number, number>();
+      panels.forEach((p) => {
+        rows.set(p.layout.y, (rows.get(p.layout.y) ?? 0) + p.layout.w);
+      });
+      rows.forEach((width) => expect(width).toBeLessThanOrEqual(12));
+      expect(Math.min(...panels.map((p) => p.layout.x))).toBe(0);
     });
   });
 });
