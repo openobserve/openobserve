@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod aggregate_topk;
-pub mod broadcast_join;
-pub mod distribute_analyze;
-pub mod enrichment;
-pub mod index;
-pub mod index_optimizer;
-pub mod join_reorder;
-pub mod remote_scan;
-pub mod rewrite_match;
-pub mod utils;
+//! Bloom-filter build side for compaction.
+//!
+//! - [`builder`] extracts per-(file, field) SBBFs from a tantivy term dictionary.
+//! - [`compact`] is the compactor entry point that owns "which files to bloom" and writes the
+//!   transposed `.bf` for each hour bucket.
+//!
+//! The search-side bloom pruner lives in the search crate, while the underlying
+//! SBBF format and reader/writer live in `infra::bloom`.
+
+mod builder;
+pub(crate) mod compact;
