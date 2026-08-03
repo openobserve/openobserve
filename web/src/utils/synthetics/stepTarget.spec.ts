@@ -22,49 +22,65 @@ function step(partial: Partial<BrowserStep>): BrowserStep {
 }
 
 describe("stepIsMissingTarget", () => {
-  it("should accept a v1 step that carries a selector", () => {
-    expect(stepIsMissingTarget(step({ selector: "#login" }))).toBe(false);
+  // The version-1 channel. `buildV2Steps` puts only the bundle on the wire, so a
+  // step whose element lives in `selector` alone would be posted target-less.
+  it("should reject a step whose only target is a version-1 selector", () => {
+    expect(stepIsMissingTarget(step({ selector: "#login" } as Partial<BrowserStep>))).toBe(true);
   });
 
-  it("should reject a selector-requiring step with neither selector nor locator", () => {
+  it("should reject an element step with no locator", () => {
     expect(stepIsMissingTarget(step({}))).toBe(true);
-    expect(stepIsMissingTarget(step({ selector: "   " }))).toBe(true);
   });
 
-  it("should accept a v2 step whose target lives in the locator bundle", () => {
+  it("should accept a step whose target lives in the locator bundle", () => {
     expect(
       stepIsMissingTarget(
         step({
           locator: {
             candidates: [{ kind: "test_attribute", value: 'internal:testid=[data-test="login"]' }],
-            user_override: null,
           },
         }),
       ),
     ).toBe(false);
   });
 
-  it("should accept a v2 step whose only target is a pinned override", () => {
+  it("should accept a step whose only target is a locator the author wrote", () => {
     expect(
       stepIsMissingTarget(
         step({
-          locator: { candidates: [], user_override: { kind: "css", value: "#login" } },
+          locator: {
+            candidates: [{ kind: "css", value: "#login", origin: "authored" }],
+            author_ordered: true,
+          },
         }),
       ),
     ).toBe(false);
   });
 
-  it("should reject a v2 step whose bundle is empty", () => {
-    expect(stepIsMissingTarget(step({ locator: { candidates: [], user_override: null } }))).toBe(
-      true,
-    );
+  it("should reject a step whose bundle is empty", () => {
+    expect(stepIsMissingTarget(step({ locator: { candidates: [] } }))).toBe(true);
   });
 
   it("should not require a target for actions that carry no element", () => {
     expect(stepIsMissingTarget(step({ action: "navigate", value: "https://app.test" }))).toBe(
       false,
     );
-    expect(stepIsMissingTarget(step({ action: "press", value: "Enter" }))).toBe(false);
+  });
+
+  // The server's V2_ELEMENT_ACTIONS requires a locator for `press`, and this
+  // rule has to agree with it or the gate waves through a step the server
+  // answers with a 400.
+  it("should require a target for press, as the server does", () => {
+    expect(stepIsMissingTarget(step({ action: "press", value: "Enter" }))).toBe(true);
+    expect(
+      stepIsMissingTarget(
+        step({
+          action: "press",
+          value: "Enter",
+          locator: { candidates: [{ kind: "css", value: "#search" }] },
+        }),
+      ),
+    ).toBe(false);
   });
 
   it("should not require a target for a page-level assertion", () => {

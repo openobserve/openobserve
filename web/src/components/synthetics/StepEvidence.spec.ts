@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
@@ -104,17 +117,19 @@ describe("StepEvidence — settle signals (P5.4 item 4)", () => {
   });
 });
 
-describe("StepEvidence — settle timing (P5.4 item 5)", () => {
-  it("shows today against recording, and calls out a large regression", () => {
-    // Slow-but-healthy separates from broken on this line alone.
+describe("StepEvidence — settle timing is not rendered", () => {
+  /**
+   * The card is gone. `observed_duration_ms` is written PER FAILURE, not per
+   * step, so only the failing step ever had a baseline to compare against and
+   * every other step drew a half-finished sentence.
+   *
+   * Asserted rather than merely deleted: the timing fields are still on the
+   * record, so nothing stops the card being reintroduced by reflex. It should
+   * only come back once the probe writes the baseline per step.
+   */
+  it("does not render a timing card even when both numbers are present", () => {
     const w = render(detail({ settleMs: 41000, observedDurationMs: 2300 }));
-    expect(w.text()).toContain("41.0s");
-    expect(w.text()).toContain("2.3s");
-    expect(w.find('[data-test="synthetics-run-detail-settle-slower"]').exists()).toBe(true);
-  });
-
-  it("does not cry regression when timing is comparable", () => {
-    const w = render(detail({ settleMs: 2400, observedDurationMs: 2300 }));
+    expect(w.find('[data-test="synthetics-run-detail-settle-timing"]').exists()).toBe(false);
     expect(w.find('[data-test="synthetics-run-detail-settle-slower"]').exists()).toBe(false);
   });
 
@@ -124,7 +139,6 @@ describe("StepEvidence — settle timing (P5.4 item 5)", () => {
     const w = render(detail());
     expect(w.find('[data-test="synthetics-run-detail-locator-resolution"]').exists()).toBe(false);
     expect(w.find('[data-test="synthetics-run-detail-settle-signals"]').exists()).toBe(false);
-    expect(w.find('[data-test="synthetics-run-detail-settle-timing"]').exists()).toBe(false);
   });
 });
 
@@ -195,5 +209,77 @@ describe("StepEvidence — what the application did (Phase 6)", () => {
         .find('[data-test="synthetics-run-detail-evidence-truncated"]')
         .exists(),
     ).toBe(false);
+  });
+});
+
+// ── Locator ladder ─────────────────────────────────────────────────────────
+//
+// From the live "OpenObserve Cloud Happy Path" failure: step 16 asserted a
+// single role locator and reported `used_as_primary`. The panel showed one grey
+// `used_as_primary` badge and no way to tell whether a fallback had been tried,
+// skipped, or never existed.
+describe("StepEvidence locator ladder", () => {
+  const mountWith = (candidatesTried: any[]) =>
+    mount(StepEvidence, {
+      props: { detail: detail({ candidatesTried }) },
+      global: { plugins: [i18n] },
+    });
+
+  it("states how much of the ladder was walked", () => {
+    const w = mountWith([
+      { kind: "role", value: "a", outcome: "matched" },
+      { kind: "css", value: "b", outcome: "not_tried" },
+      { kind: "text", value: "c", outcome: "not_tried" },
+    ]);
+    expect(w.find('[data-test="synthetics-run-detail-locator-count"]').text()).toContain("1 of 3");
+  });
+
+  it("names a one-rung ladder as having no fallback", () => {
+    // The whole question the old UI could not answer.
+    const w = mountWith([{ kind: "role", value: "a", outcome: "used_as_primary" }]);
+    expect(w.find('[data-test="synthetics-run-detail-locator-no-fallback"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-run-detail-locator-no-fallback"]').text()).toContain(
+      "no fallback",
+    );
+  });
+
+  it("says nothing about fallbacks when the step had several", () => {
+    const w = mountWith([
+      { kind: "role", value: "a", outcome: "matched" },
+      { kind: "css", value: "b", outcome: "not_tried" },
+    ]);
+    expect(w.find('[data-test="synthetics-run-detail-locator-no-fallback"]').exists()).toBe(false);
+  });
+
+  it("replaces the raw enum with words a reader can act on", () => {
+    const w = mountWith([
+      { kind: "role", value: "a", outcome: "used_as_primary" },
+      { kind: "css", value: "b", outcome: "not_tried" },
+    ]);
+    const text = w.find('[data-test="synthetics-run-detail-locator-resolution"]').text();
+    expect(text).toContain("used directly");
+    expect(text).toContain("not reached");
+    expect(text).not.toContain("used_as_primary");
+    expect(text).not.toContain("not_tried");
+  });
+
+  it("dims the rungs the probe never reached", () => {
+    // Same treatment a skipped step gets in the timeline.
+    const w = mountWith([
+      { kind: "role", value: "a", outcome: "matched" },
+      { kind: "css", value: "b", outcome: "not_tried" },
+    ]);
+    const rows = w.findAll('[data-test="synthetics-run-detail-locator-candidate"]');
+    expect(rows[0].classes().join(" ")).not.toContain("opacity-50");
+    expect(rows[1].classes().join(" ")).toContain("opacity-50");
+  });
+
+  it("still reports a ladder where nothing matched", () => {
+    const w = mountWith([
+      { kind: "role", value: "a", outcome: "not_found" },
+      { kind: "css", value: "b", outcome: "not_found" },
+    ]);
+    expect(w.find('[data-test="synthetics-run-detail-locator-none-matched"]').exists()).toBe(true);
+    expect(w.find('[data-test="synthetics-run-detail-locator-count"]').text()).toContain("2 of 2");
   });
 });

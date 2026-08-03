@@ -14,7 +14,92 @@
 
 import { describe, expect, it } from "vitest";
 
-import { FIELD_TOKEN_REGEX, buildSloPreviewQuery, replaceTrailingFieldToken } from "./previewQuery";
+import {
+  FIELD_TOKEN_REGEX,
+  buildSloPreviewQuery,
+  buildSloTimeSlicePreviewQuery,
+  classifyPreviewSlices,
+  intervalLiteral,
+  replaceTrailingFieldToken,
+} from "./previewQuery";
+
+describe("intervalLiteral", () => {
+  it("matches the two widths the backend accepts", () => {
+    expect(intervalLiteral(60)).toBe("1 minute");
+    expect(intervalLiteral(300)).toBe("5 minute");
+  });
+
+  it("falls back to seconds for anything else", () => {
+    expect(intervalLiteral(45)).toBe("45 second");
+  });
+});
+
+describe("buildSloTimeSlicePreviewQuery", () => {
+  const base = { stream: "logs_default", aggregate: "AVG(duration_ms)", sliceIntervalSecs: 300 };
+
+  it("buckets at the slice width and projects the ingest aliases", () => {
+    const sql = buildSloTimeSlicePreviewQuery(base)!;
+    expect(sql).toContain("histogram(_timestamp, '5 minute') AS slice_start");
+    expect(sql).toContain("AVG(duration_ms) AS zo_slo_value");
+    expect(sql).toContain('FROM "logs_default"');
+    expect(sql).toContain("GROUP BY slice_start");
+  });
+
+  it("never puts the threshold in SQL — the ingest pass does not either", () => {
+    const sql = buildSloTimeSlicePreviewQuery(base)!;
+    expect(sql).not.toContain("CASE");
+    expect(sql).not.toContain("<");
+    expect(sql).not.toContain(">");
+  });
+
+  it("parenthesises the scope so an OR cannot re-associate", () => {
+    const sql = buildSloTimeSlicePreviewQuery({ ...base, scope: "a = 1 OR b = 2" })!;
+    expect(sql).toContain("WHERE (a = 1 OR b = 2)");
+  });
+
+  it("returns null until there is something drawable", () => {
+    expect(buildSloTimeSlicePreviewQuery({ ...base, stream: "" })).toBeNull();
+    expect(buildSloTimeSlicePreviewQuery({ ...base, aggregate: "  " })).toBeNull();
+  });
+});
+
+describe("classifyPreviewSlices", () => {
+  it("scores each comparator at its boundary, like classify_time_slice", () => {
+    expect(classifyPreviewSlices([232], "<", 232).good).toBe(0);
+    expect(classifyPreviewSlices([232], "<=", 232).good).toBe(1);
+    expect(classifyPreviewSlices([232], ">", 232).good).toBe(0);
+    expect(classifyPreviewSlices([232], ">=", 232).good).toBe(1);
+  });
+
+  it("withholds an unmeasurable slice instead of calling it bad", () => {
+    // The ordering that matters: null/NaN compares false against every
+    // operator, so a fall-through would record downtime nobody observed.
+    const t = classifyPreviewSlices([100, null, Number.NaN, undefined], "<", 232);
+    expect(t.good).toBe(1);
+    expect(t.bad).toBe(0);
+    expect(t.unmeasured).toBe(3);
+    expect(t.measured).toBe(1);
+  });
+
+  it("treats an unreadable comparator as unmeasurable, not as downtime", () => {
+    const t = classifyPreviewSlices([1, 2], "≈", 232);
+    expect(t.bad).toBe(0);
+    expect(t.unmeasured).toBe(2);
+    expect(t.sli).toBeNull();
+  });
+
+  it("computes the SLI over measured slices only", () => {
+    const t = classifyPreviewSlices([1, 2, 500, null], "<", 232);
+    expect(t.good).toBe(2);
+    expect(t.bad).toBe(1);
+    expect(t.sli).toBeCloseTo(66.667, 3);
+  });
+
+  it("has no SLI when nothing was measured", () => {
+    expect(classifyPreviewSlices([], "<", 232).sli).toBeNull();
+    expect(classifyPreviewSlices([1], "<", Number.NaN).sli).toBeNull();
+  });
+});
 
 describe("buildSloPreviewQuery", () => {
   it("counts matching rows for the good series", () => {

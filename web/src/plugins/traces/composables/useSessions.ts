@@ -145,6 +145,7 @@ export interface SessionRow {
 // ---------------------------------------------------------------------------
 const sessions = ref<SessionRow[]>([]);
 const total = ref(0);
+const totalIsExact = ref(true);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const hasLoadedOnce = ref(false);
@@ -251,6 +252,7 @@ export function useSessions() {
         };
       });
       total.value = Number(body.total) || 0;
+      totalIsExact.value = body.total_is_exact ?? true;
       hasLoadedOnce.value = true;
       // Stamp when/which-org this page was fetched — used to keep the "last
       // refreshed" label accurate and to invalidate the cache on org switch.
@@ -616,6 +618,7 @@ export function useSessions() {
   return {
     sessions,
     total,
+    totalIsExact,
     loading,
     error,
     hasLoadedOnce,

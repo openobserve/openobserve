@@ -101,6 +101,17 @@ export interface OTableColumnMeta {
   isName?: boolean;
   /** Format function applied to cell value before rendering */
   format?: (value: any, row: any) => any;
+  /**
+   * Elastic column: no explicit width, so it absorbs the leftover. In a
+   * `horizontalScroll` table it is content-sized — it grows to its longest
+   * value and the table scrolls.
+   */
+  autoWidth?: boolean;
+  /**
+   * Bounded elastic column: absorbs the leftover like `autoWidth`, but stays
+   * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
+   */
+  fillRemaining?: boolean;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
 }
@@ -201,6 +212,8 @@ export interface OTableProps<TData = any> {
   currentPage?: number;
   /** Total record count (required for server-side pagination) */
   totalCount?: number;
+  /** False when totalCount is a lower bound. The footer adds `+` and omits Last page. */
+  totalCountExact?: boolean;
   /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
   keepPageOnDataChange?: boolean;
   /** When true, the caller's `#bottom` slot IS the pagination bar and replaces

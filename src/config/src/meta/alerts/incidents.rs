@@ -388,9 +388,17 @@ pub struct IncidentAlert {
     pub incident_id: String,
     pub alert_id: String,
     pub alert_name: String,
+    #[serde(default)]
+    pub alert_kind: AlertKind,
     pub alert_fired_at: i64,
     pub correlation_reason: CorrelationReason,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<std::collections::HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detected_source: Option<String>,
 }
 
 /// Incident with its alerts (for detail view)
@@ -540,6 +548,72 @@ fn default_upgrade_window() -> u64 {
 
 fn default_true() -> bool {
     true
+}
+
+/// Whether an incident's member alert is an OpenObserve alert or an
+/// externally-ingested one (External Alert Sources feature).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AlertKind {
+    #[default]
+    Internal,
+    External,
+}
+
+impl AlertKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AlertKind::Internal => "internal",
+            AlertKind::External => "external",
+        }
+    }
+
+    pub fn from_stored(s: &str) -> Self {
+        match s {
+            "external" => AlertKind::External,
+            _ => AlertKind::Internal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ExternalAlertStatus {
+    #[default]
+    Firing,
+    Resolved,
+}
+
+/// One normalized alert event from an external source (Grafana, Alertmanager,
+/// generic JSON). Produced by the normalizers, consumed by persistence +
+/// correlation. Self-contained: `raw` keeps the per-alert slice of the
+/// original payload.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ExternalAlertEvent {
+    pub status: ExternalAlertStatus,
+    pub dedup_key: String,
+    pub title: String,
+    pub severity: IncidentSeverity,
+    pub labels: HashMap<String, String>,
+    /// Source event time (startsAt/endsAt) in epoch micros — NOT receipt time.
+    pub event_ts: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_url: Option<String>,
+    #[serde(default)]
+    pub raw: serde_json::Value,
+}
+
+/// Built-in default severity mapping (spec §4.9: "no JSON for humans").
+/// critical→P1, error/major→P2, warning/minor→P3, info→P4, P1..P4 passthrough,
+/// anything else → P3.
+pub fn map_external_severity(s: &str) -> IncidentSeverity {
+    match s.to_ascii_lowercase().as_str() {
+        "critical" | "crit" | "fatal" | "p1" => IncidentSeverity::P1,
+        "error" | "major" | "high" | "p2" => IncidentSeverity::P2,
+        "warning" | "warn" | "minor" | "p3" => IncidentSeverity::P3,
+        "info" | "low" | "ok" | "p4" => IncidentSeverity::P4,
+        _ => IncidentSeverity::P3,
+    }
 }
 
 /// Statistics for incidents dashboard
@@ -2131,5 +2205,112 @@ mod tests {
             event.event_type,
             IncidentEventType::AIAnalysisComplete
         ));
+    }
+
+    #[test]
+    fn test_alert_kind_serde_and_stored() {
+        assert_eq!(
+            serde_json::to_string(&AlertKind::External).unwrap(),
+            "\"external\""
+        );
+        assert_eq!(AlertKind::from_stored("external"), AlertKind::External);
+        assert_eq!(AlertKind::from_stored("internal"), AlertKind::Internal);
+        assert_eq!(AlertKind::from_stored("garbage"), AlertKind::Internal); // safe default
+        assert_eq!(AlertKind::External.as_str(), "external");
+    }
+
+    #[test]
+    fn test_incident_alert_external_fields_serde() {
+        let alert = IncidentAlert {
+            incident_id: "inc1".to_string(),
+            alert_id: "ext1".to_string(),
+            alert_name: "External Alert".to_string(),
+            alert_kind: AlertKind::External,
+            alert_fired_at: 1000,
+            correlation_reason: CorrelationReason::AlertId,
+            created_at: 1000,
+            source_url: Some("https://example.com/alert/1".to_string()),
+            labels: Some(std::collections::HashMap::from([(
+                "service".to_string(),
+                "checkout".to_string(),
+            )])),
+            detected_source: Some("pagerduty".to_string()),
+        };
+
+        let json = serde_json::to_value(&alert).unwrap();
+        assert_eq!(json["alert_kind"], "external");
+        assert_eq!(json["source_url"], "https://example.com/alert/1");
+        assert_eq!(json["detected_source"], "pagerduty");
+
+        let round_tripped: IncidentAlert = serde_json::from_value(json).unwrap();
+        assert_eq!(round_tripped.alert_kind, AlertKind::External);
+        assert_eq!(
+            round_tripped.source_url,
+            Some("https://example.com/alert/1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_incident_alert_legacy_json_defaults_to_internal() {
+        // Legacy stored/older payloads have no alert_kind or external fields at all.
+        let legacy_json = serde_json::json!({
+            "incident_id": "inc1",
+            "alert_id": "alert1",
+            "alert_name": "My Alert",
+            "alert_fired_at": 1000,
+            "correlation_reason": "alert_id",
+            "created_at": 1000,
+        });
+
+        let alert: IncidentAlert = serde_json::from_value(legacy_json).unwrap();
+        assert_eq!(alert.alert_kind, AlertKind::Internal);
+        assert_eq!(alert.source_url, None);
+        assert_eq!(alert.labels, None);
+        assert_eq!(alert.detected_source, None);
+    }
+
+    #[test]
+    fn test_external_alert_status_serde() {
+        assert_eq!(
+            serde_json::to_string(&ExternalAlertStatus::Firing).unwrap(),
+            "\"firing\""
+        );
+        let s: ExternalAlertStatus = serde_json::from_str("\"resolved\"").unwrap();
+        assert_eq!(s, ExternalAlertStatus::Resolved);
+    }
+
+    #[test]
+    fn test_map_external_severity() {
+        assert_eq!(map_external_severity("critical"), IncidentSeverity::P1);
+        assert_eq!(map_external_severity("CRITICAL"), IncidentSeverity::P1);
+        assert_eq!(map_external_severity("error"), IncidentSeverity::P2);
+        assert_eq!(map_external_severity("warning"), IncidentSeverity::P3);
+        assert_eq!(map_external_severity("info"), IncidentSeverity::P4);
+        assert_eq!(map_external_severity("p2"), IncidentSeverity::P2);
+        assert_eq!(
+            map_external_severity("unknown-things"),
+            IncidentSeverity::P3
+        ); // default
+    }
+
+    #[test]
+    fn test_external_alert_event_serde_roundtrip() {
+        let ev = ExternalAlertEvent {
+            status: ExternalAlertStatus::Firing,
+            dedup_key: "abc123".into(),
+            title: "High CPU".into(),
+            severity: IncidentSeverity::P1,
+            labels: std::collections::HashMap::from([(
+                "namespace".to_string(),
+                "prod".to_string(),
+            )]),
+            event_ts: 1_722_300_000_000_000,
+            source_url: Some("https://grafana.example/alerting/x".into()),
+            raw: serde_json::json!({"k": "v"}),
+        };
+        let json = serde_json::to_string(&ev).unwrap();
+        let back: ExternalAlertEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.dedup_key, "abc123");
+        assert_eq!(back.severity, IncidentSeverity::P1);
     }
 }

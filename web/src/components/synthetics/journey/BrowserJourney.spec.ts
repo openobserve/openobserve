@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -225,7 +238,6 @@ describe("BrowserJourney recording", () => {
       id: "s1",
       action: "click",
       name: "Sign in",
-      code: "",
       locator: { candidates: [{ kind: "test_attribute", value: '[data-test="sign-in"]' }] },
       settle: {
         navigation: { url_pattern: "**/web/**" },
@@ -270,7 +282,6 @@ describe("BrowserJourney recording", () => {
       action: "navigate",
       name: "Open page",
       value: "https://old.test",
-      code: "",
       wire: { id: "w1", action: "navigate", url: "https://old.test" },
     };
 
@@ -291,7 +302,7 @@ describe("BrowserJourney recording", () => {
 
   it("should emit clear-results when modelValue becomes empty", async () => {
     wrapper = mountJourney({
-      modelValue: [{ id: "s1", action: "click", name: "Step 1", code: "" }],
+      modelValue: [{ id: "s1", action: "click", name: "Step 1" }],
     });
 
     // Clearing all steps should trigger the length watcher to emit clear-results
@@ -315,13 +326,15 @@ describe("BrowserJourney step validation", () => {
     return (wrapper.vm as any).validateStepSelectors();
   }
 
-  it("should pass a v1 journey whose steps carry selectors", () => {
+  // The version-1 channel. Only the locator bundle reaches the wire now, so a
+  // step whose element lives in `selector` alone would be posted target-less.
+  it("should fail a step whose only target is a version-1 selector", () => {
     expect(
       validate([
         { id: "1", action: "navigate", value: "https://app.test" },
         { id: "2", action: "click", selector: "#login" },
       ]),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   // Regression: a v2 step identifies its element with a locator bundle and has
@@ -336,21 +349,23 @@ describe("BrowserJourney step validation", () => {
           action: "click",
           locator: {
             candidates: [{ kind: "test_attribute", value: 'internal:testid=[data-test="login"]' }],
-            user_override: null,
           },
         },
       ]),
     ).toBe(true);
   });
 
-  it("should pass a v2 step whose only target is a pinned override", () => {
+  it("should pass a step whose only target is a locator the author wrote", () => {
     expect(
       validate([
         { id: "1", action: "navigate", value: "https://app.test" },
         {
           id: "2",
           action: "click",
-          locator: { candidates: [], user_override: { kind: "css", value: "#login" } },
+          locator: {
+            candidates: [{ kind: "css", value: "#login", origin: "authored" }],
+            author_ordered: true,
+          },
         },
       ]),
     ).toBe(true);
@@ -414,7 +429,6 @@ describe("BrowserJourney step creation", () => {
       action: "navigate",
       name: "Open app",
       value: "https://app.test",
-      code: "",
     };
     wrapper = mountJourney({ modelValue: [existing] });
 
@@ -447,9 +461,135 @@ describe("BrowserJourney step creation is version 2", () => {
 
     const emitted = wrapper.emitted("update:modelValue")!;
     const steps = emitted[emitted.length - 1][0] as any[];
-    expect(steps[0].locator).toEqual({ candidates: [], user_override: null });
+    expect(steps[0].locator).toEqual({ candidates: [] });
     expect(steps[0].selector).toBeUndefined();
     expect(steps[0].selectorType).toBeUndefined();
+  });
+});
+
+// "Add Step" appended a blank row to the end of the list and gave no other
+// signal. On a 20-step journey that row was below the fold and collapsed, and
+// with a filter active it was not rendered at all — so the button read as doing
+// nothing. The new step always needs the author (it has no locator yet), so it
+// is revealed the same way this component already reveals a step with a
+// validation error or a failed replay: expand it, scroll to it.
+describe("BrowserJourney reveals a newly created step", () => {
+  let wrapper: VueWrapper;
+  let scrollSpy: ReturnType<typeof vi.fn>;
+  let originalScrollIntoView: any;
+
+  beforeEach(() => {
+    // jsdom does not implement scrollIntoView — install a spy.
+    scrollSpy = vi.fn();
+    originalScrollIntoView = (Element.prototype as any).scrollIntoView;
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+  });
+
+  afterEach(() => {
+    (Element.prototype as any).scrollIntoView = originalScrollIntoView;
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Mount with real v-model semantics: the parent writes the emitted value
+   * straight back to the prop, synchronously.
+   *
+   * revealStep depends on that. It looks for the new step's DOM on the next
+   * tick, so a harness that only applies the emit afterwards would never have
+   * the row rendered in time — and the test would be measuring the harness.
+   */
+  function mountWithModel(initial: any[], withExpansion = false) {
+    const w = mount(BrowserJourney, {
+      props: {
+        modelValue: initial,
+        "onUpdate:modelValue": (steps: any[]) => w.setProps({ modelValue: steps }),
+      },
+      global: {
+        stubs: withExpansion
+          ? { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion }
+          : { ...STUBS },
+      },
+    }) as VueWrapper;
+    return w;
+  }
+
+  /** The journey as the parent now holds it, after the component's emit. */
+  function currentSteps(w: VueWrapper): any[] {
+    return (w.props() as Record<string, unknown>).modelValue as any[];
+  }
+
+  function expandedIds(w: VueWrapper): string[] {
+    return w.findComponent(JourneyStepsStub).props("expandedIds") as string[];
+  }
+
+  it("should expand the step Add Step just created", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(2);
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
+  });
+
+  it("should scroll the new step into view", async () => {
+    // Needs the stub that renders the expansion slot: the scroll anchor lives
+    // inside it, which is also why revealStep expands before it scrolls.
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }], true);
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(
+      wrapper.find(`[data-test="synthetics-journey-step-anchor-${steps[1].id}"]`).exists(),
+    ).toBe(true);
+    expect(scrollSpy).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+  });
+
+  it("should expand a step created by insert-below, not only appended ones", async () => {
+    const existing = { id: "s1", action: "navigate", name: "Open app" };
+    wrapper = mountWithModel([existing]);
+    wrapper.findComponent(JourneyStepsStub).vm.$emit("insert-below", existing);
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(2);
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
+  });
+
+  /**
+   * A blank step matches no filter query, so appending one while a filter is
+   * active put it somewhere the author could not see — the case where the
+   * button most looked broken.
+   */
+  it("should clear an active filter so the new step is visible", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "click", name: "Login button" }]);
+    const filter = wrapper.find('[data-test="synthetics-journey-filter-input"]');
+    await filter.setValue("login");
+    expect((filter.element as HTMLInputElement).value).toBe("login");
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(
+      (wrapper.find('[data-test="synthetics-journey-filter-input"]').element as HTMLInputElement)
+        .value,
+    ).toBe("");
+  });
+
+  it("should keep steps already expanded expanded", async () => {
+    const existing = { id: "s1", action: "navigate", name: "Open app" };
+    wrapper = mountWithModel([existing]);
+    wrapper.findComponent(JourneyStepsStub).vm.$emit("update:expanded-ids", ["s1"]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(expandedIds(wrapper)).toContain("s1");
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
   });
 });
 
@@ -465,12 +605,11 @@ describe("BrowserJourney per-step failure evidence", () => {
   });
 
   const journey = [
-    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test", code: "" },
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test" },
     {
       id: "s2",
       action: "click",
       name: "Sign in",
-      code: "",
       locator: { candidates: [{ kind: "css", value: "#go" }] },
     },
   ];

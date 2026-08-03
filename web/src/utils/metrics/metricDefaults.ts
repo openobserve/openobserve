@@ -740,6 +740,48 @@ export function computeRateWindow(
 }
 
 /**
+ * Widened `[W]`s to RETRY a rate query with, after the standard window came
+ * back empty on a metric that demonstrably has samples in the range.
+ *
+ * The standard window is sized from the org's CONFIGURED scrape interval, and
+ * that setting is a claim, not a measurement. An app exporting OTLP metrics
+ * every 60s under an org that says `scrape_interval: 15` gets a `[1m]` window
+ * that almost never holds the two samples `rate()` needs — so every rate-based
+ * card reports "too few samples" while the data sits fully ingested in the
+ * selected range.
+ *
+ * The true cadence is unknown at this point (all that is known is that it is
+ * wider than roughly half the window that just failed), so the retries
+ * escalate geometrically: 4x, then 16x. Two rounds cover two orders of
+ * magnitude of mismatch for at most two extra queries, and only on cards
+ * already known to be in this state.
+ *
+ * Capped at half the range: rate over a window wider than that is one global
+ * average masquerading as a trend, and a cadence so slow that two samples do
+ * not fit in half the range could never chart as a rate anyway — at that point
+ * the "too few samples" card is the honest answer.
+ *
+ * @returns {string[]} PromQL durations, each strictly wider than the last and
+ *   than the standard window; empty when the cap leaves no room to widen.
+ */
+export function computeWidenedRateWindows(
+  rangeSeconds: number,
+  maxDataPoints: number = MAX_DATA_POINTS,
+  scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+): string[] {
+  const base = rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds);
+  const cap = Math.floor(Math.max(0, Number(rangeSeconds) || 0) / 2);
+  const widths: number[] = [];
+  for (const factor of [4, 16]) {
+    const w = Math.min(base * factor, cap);
+    if (w > base && w > (widths[widths.length - 1] ?? 0)) widths.push(w);
+    // The cap absorbed this rung; the next factor would only repeat it.
+    if (base * factor >= cap) break;
+  }
+  return widths.map(formatPromDuration);
+}
+
+/**
  * The rate window to hand to a PANEL, as opposed to one we execute ourselves.
  *
  * A card preview needs a concrete window: the explorer calls the search API
