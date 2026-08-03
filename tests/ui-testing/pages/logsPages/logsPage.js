@@ -10089,70 +10089,50 @@ export class LogsPage {
      * @returns {Promise<string|null>} The current chart type or null
      */
     async getCurrentChartType() {
-        const chartTypes = ['bar', 'line', 'area', 'area-stacked', 'metric', 'table', 'scatter', 'pie', 'donut', 'h-bar', 'h-stacked', 'stacked', 'heatmap', 'gauge'];
-
-        for (const chartType of chartTypes) {
-            const chartItem = this.page.locator(this.chartTypeItem(chartType)).first();
-            const isVisible = await chartItem.isVisible().catch(() => false);
-            if (isVisible) {
-                const parent = chartItem.locator('..');
-                // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
-                // Fall back to legacy bg-grey-3/5 (framework) and bg-gray-200/400 (Tailwind).
-                const dataSelected = await parent.getAttribute('data-selected');
-                if (dataSelected === 'true') {
-                    testLogger.info(`Current chart type detected: ${chartType}`);
-                    return chartType;
-                }
-                if (dataSelected === null) {
-                    const parentClassList = (await parent.getAttribute('class')) || '';
-                    if (
-                        parentClassList.includes('bg-grey-3') ||
-                        parentClassList.includes('bg-grey-5') ||
-                        parentClassList.includes('bg-gray-200') ||
-                        parentClassList.includes('bg-gray-400')
-                    ) {
-                        testLogger.info(`Current chart type detected: ${chartType}`);
-                        return chartType;
-                    }
+        // ChartSelection.vue marks the selected chart on the <li> via
+        // :data-test-selected="item.id" (the inner div carries data-selected="true|false",
+        // so reading data-selected off the <li> always yields null). PanelEditor is
+        // mounted in both the Build and Visualize tabs via v-show, so filter to the
+        // visible instance with offsetParent — same approach as verifyChartTypeSelected.
+        const chartType = await this.page.evaluate(() => {
+            const items = document.querySelectorAll('[data-test-selected]');
+            for (const item of items) {
+                if (item.offsetParent !== null) {
+                    return item.getAttribute('data-test-selected');
                 }
             }
+            return null;
+        }).catch(() => null);
+
+        if (chartType) {
+            testLogger.info(`Current chart type detected: ${chartType}`);
+            return chartType;
         }
         testLogger.warn('No chart type detected as selected');
         return null;
     }
 
     /**
-     * Wait for any chart type to become selected (theme-aware).
-     * Uses page.waitForFunction for reliable detection of bg-grey-3/bg-grey-5
-     * directly in the DOM, surviving reactive re-renders across tab switches.
+     * Wait for any chart type to become selected and return its id.
+     * ChartSelection.vue sets :data-test-selected="item.id" on the selected <li>
+     * (and only on that one), so the attribute value IS the chart type. The inner
+     * div's data-selected="true|false" lives on a different element, and the legacy
+     * bg-grey and bg-gray classes no longer exist (the selected <li> now uses the
+     * bg-label-chip-url-bg token), so neither is a usable signal here.
      * @param {number} timeout - Max wait time in ms (default 20000)
      * @returns {Promise<string|null>} The selected chart type or null if timeout
      */
     async waitForChartTypeStabilized(timeout = 20000) {
         try {
-            // Use waitForFunction to detect bg-grey-3 or bg-grey-5 on chart selection items
-            // This is more reliable than Playwright locator polling during reactive re-renders
+            // waitForFunction rather than locator polling: the panel re-renders
+            // reactively across tab switches and URL restoration.
             const result = await this.page.waitForFunction(() => {
-                const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
+                const items = document.querySelectorAll('[data-test-selected]');
                 for (const item of items) {
-                    const classes = item.className || '';
-                    // Prefer data-selected attribute (ChartSelection.vue), fall back to legacy classes
-                    const dataSelected = item.getAttribute('data-selected');
-                    const matchesSelected = dataSelected === 'true' ||
-                        (dataSelected === null && (
-                            classes.includes('bg-grey-3') ||
-                            classes.includes('bg-grey-5') ||
-                            classes.includes('bg-gray-200') ||
-                            classes.includes('bg-gray-400')
-                        ));
-                    if (matchesSelected) {
-                        // Found selected item - extract chart type from child data-test attribute
-                        const section = item.querySelector('[data-test^="selected-chart-"][data-test$="-item"]');
-                        if (section) {
-                            const attr = section.getAttribute('data-test');
-                            const match = attr.match(/^selected-chart-(.+)-item$/);
-                            if (match) return match[1];
-                        }
+                    // PanelEditor is mounted in both Build and Visualize tabs via
+                    // v-show, so skip the hidden copy.
+                    if (item.offsetParent !== null) {
+                        return item.getAttribute('data-test-selected');
                     }
                 }
                 return null;
