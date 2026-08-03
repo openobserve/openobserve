@@ -126,6 +126,31 @@ const syntheticsService = {
     return `${apiOrigin()}/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}${folderParam}`;
   },
 
+  /**
+   * True when a resolved artifact URL points at OUR proxy endpoint rather than
+   * at object storage.
+   *
+   * The two need OPPOSITE fetch credentials, and getting it wrong fails closed:
+   * the proxy is cookie-authed, while a presigned object URL carries its auth in
+   * the query signature and object storage sends no
+   * `Access-Control-Allow-Credentials`, so asking for cookies there fails CORS.
+   * Callers doing a raw `fetch` (the evidence bundle) must ask which they have —
+   * a cross-origin `fetch` omits cookies by default, which is what turned a
+   * proxy-mode bundle into a bare 401.
+   *
+   * Lives beside `artifactUrl` because that is what builds the shape it matches.
+   *
+   * KNOWN GAP: this only matches the ABSOLUTE shape `artifactUrl` builds. On
+   * local-disk storage the presign response returns a ROOT-RELATIVE
+   * `/api/{org}/synthetics/{id}/artifact?key=` instead (o2-enterprise
+   * `job_api::presign_artifacts`), which this misses whenever `API_ENDPOINT`
+   * names another origin — so that one deployment shape still fetches without
+   * cookies. The durable fix is to stop inferring from the URL at all: the
+   * presign response already states `mode: "presigned" | "proxy"`, and
+   * `RunDetail.presignRunArtifacts` currently discards it.
+   */
+  isProxyArtifactUrl: (url: string) => url.startsWith(`${apiOrigin()}/api/`),
+
   // Batch-sign artifact download URLs. Returns { mode: "presigned" | "proxy",
   // expires_in, urls: [{key, url}] }. mode is decided by the backend from its
   // storage config (local disk → proxy, S3/MinIO/Azure → presigned).

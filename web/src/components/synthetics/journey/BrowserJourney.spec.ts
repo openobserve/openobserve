@@ -467,6 +467,132 @@ describe("BrowserJourney step creation is version 2", () => {
   });
 });
 
+// "Add Step" appended a blank row to the end of the list and gave no other
+// signal. On a 20-step journey that row was below the fold and collapsed, and
+// with a filter active it was not rendered at all — so the button read as doing
+// nothing. The new step always needs the author (it has no locator yet), so it
+// is revealed the same way this component already reveals a step with a
+// validation error or a failed replay: expand it, scroll to it.
+describe("BrowserJourney reveals a newly created step", () => {
+  let wrapper: VueWrapper;
+  let scrollSpy: ReturnType<typeof vi.fn>;
+  let originalScrollIntoView: any;
+
+  beforeEach(() => {
+    // jsdom does not implement scrollIntoView — install a spy.
+    scrollSpy = vi.fn();
+    originalScrollIntoView = (Element.prototype as any).scrollIntoView;
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+  });
+
+  afterEach(() => {
+    (Element.prototype as any).scrollIntoView = originalScrollIntoView;
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Mount with real v-model semantics: the parent writes the emitted value
+   * straight back to the prop, synchronously.
+   *
+   * revealStep depends on that. It looks for the new step's DOM on the next
+   * tick, so a harness that only applies the emit afterwards would never have
+   * the row rendered in time — and the test would be measuring the harness.
+   */
+  function mountWithModel(initial: any[], withExpansion = false) {
+    const w = mount(BrowserJourney, {
+      props: {
+        modelValue: initial,
+        "onUpdate:modelValue": (steps: any[]) => w.setProps({ modelValue: steps }),
+      },
+      global: {
+        stubs: withExpansion
+          ? { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion }
+          : { ...STUBS },
+      },
+    }) as VueWrapper;
+    return w;
+  }
+
+  /** The journey as the parent now holds it, after the component's emit. */
+  function currentSteps(w: VueWrapper): any[] {
+    return (w.props() as Record<string, unknown>).modelValue as any[];
+  }
+
+  function expandedIds(w: VueWrapper): string[] {
+    return w.findComponent(JourneyStepsStub).props("expandedIds") as string[];
+  }
+
+  it("should expand the step Add Step just created", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(2);
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
+  });
+
+  it("should scroll the new step into view", async () => {
+    // Needs the stub that renders the expansion slot: the scroll anchor lives
+    // inside it, which is also why revealStep expands before it scrolls.
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }], true);
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(
+      wrapper.find(`[data-test="synthetics-journey-step-anchor-${steps[1].id}"]`).exists(),
+    ).toBe(true);
+    expect(scrollSpy).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+  });
+
+  it("should expand a step created by insert-below, not only appended ones", async () => {
+    const existing = { id: "s1", action: "navigate", name: "Open app" };
+    wrapper = mountWithModel([existing]);
+    wrapper.findComponent(JourneyStepsStub).vm.$emit("insert-below", existing);
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(2);
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
+  });
+
+  /**
+   * A blank step matches no filter query, so appending one while a filter is
+   * active put it somewhere the author could not see — the case where the
+   * button most looked broken.
+   */
+  it("should clear an active filter so the new step is visible", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "click", name: "Login button" }]);
+    const filter = wrapper.find('[data-test="synthetics-journey-filter-input"]');
+    await filter.setValue("login");
+    expect((filter.element as HTMLInputElement).value).toBe("login");
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(
+      (wrapper.find('[data-test="synthetics-journey-filter-input"]').element as HTMLInputElement)
+        .value,
+    ).toBe("");
+  });
+
+  it("should keep steps already expanded expanded", async () => {
+    const existing = { id: "s1", action: "navigate", name: "Open app" };
+    wrapper = mountWithModel([existing]);
+    wrapper.findComponent(JourneyStepsStub).vm.$emit("update:expanded-ids", ["s1"]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(expandedIds(wrapper)).toContain("s1");
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
+  });
+});
+
 // Phase 5 / SE-4. The evidence existed and was discarded: JourneySteps declares a
 // getReplayResult prop "for error cards" and never rendered one, and BrowserJourney
 // never passed it. A failed replay showed a red dot and a one-line banner only.

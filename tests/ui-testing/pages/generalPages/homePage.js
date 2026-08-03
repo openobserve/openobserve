@@ -784,16 +784,15 @@ export class HomePage {
     }
 
     /**
-     * Navigate to Alert Destinations tab in Settings
+     * Navigate to Notification Destinations via the Reliability nav group.
+     * No longer a Settings tab — it moved to /alert-destinations.
      */
     async navigateToAlertDestinations() {
-        await this.navigateToSettings();
-        await this.page.locator('[data-test="alert-destinations-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator('[data-test="alert-destinations-tab"]').click();
+        await openNavFlyoutChild(this.page, 'destinations');
     }
 
     /**
-     * Validate Settings - Alert Destinations page UI elements
+     * Validate Notification Destinations page UI elements
      */
     async validateSettingsAlertDestinationsPageElements() {
         await expect(this.page.locator('[data-test="alert-destination-list-add-alert-btn"]')).toBeVisible({ timeout: 10000 });
@@ -821,16 +820,15 @@ export class HomePage {
     }
 
     /**
-     * Navigate to Templates tab in Settings
+     * Navigate to Templates via the Reliability nav group.
+     * No longer a Settings tab — it moved to /alert-templates.
      */
     async navigateToTemplates() {
-        await this.navigateToSettings();
-        await this.page.locator('[data-test="alert-templates-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator('[data-test="alert-templates-tab"]').click();
+        await openNavFlyoutChild(this.page, 'templates');
     }
 
     /**
-     * Validate Settings - Templates page UI elements
+     * Validate Templates page UI elements
      */
     async validateSettingsTemplatesPageElements() {
         await expect(this.page.locator('[data-test="template-list-add-btn"]')).toBeVisible({ timeout: 10000 });

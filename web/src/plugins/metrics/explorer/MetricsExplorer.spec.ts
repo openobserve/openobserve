@@ -524,8 +524,35 @@ describe("MetricsExplorer wiring", () => {
       (wrapper.vm as any).onSelect(CARD);
 
       expect(grid.effectiveVariant).toHaveBeenCalled();
+      // The default handoff: `$__rate_interval`, for the editor to re-derive
+      // against its own range and width.
+      expect(grid.effectiveVariant).toHaveBeenCalledWith(
+        CARD,
+        undefined,
+        expect.objectContaining({ rateWindow: "$__rate_interval" }),
+      );
       expect((wrapper.vm as any).mode).toBe("visualize");
       expect((wrapper.vm as any).visualizeSeed).toBeTruthy();
+    });
+
+    it("a card that charted through a WIDENED window hands the editor that window", () => {
+      // The editor resolves `$__rate_interval` from the org's scrape interval —
+      // the very value whose overstatement forced the card to widen — so the
+      // variable would resolve straight back to the window that returned
+      // nothing, and the drill-in would open on an empty chart of a metric the
+      // card is visibly charting.
+      grid.previews.value[CARD.name] = { widenedRateWindow: "4m" };
+      const wrapper = mountExplorer();
+
+      (wrapper.vm as any).onSelect(CARD);
+
+      expect(grid.effectiveVariant).toHaveBeenCalledWith(
+        CARD,
+        undefined,
+        expect.objectContaining({ rateWindow: "4m" }),
+      );
+      expect((wrapper.vm as any).mode).toBe("visualize");
+      delete grid.previews.value[CARD.name];
     });
   });
 

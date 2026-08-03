@@ -46,6 +46,7 @@ pub mod backfill;
 pub mod deduplication;
 pub mod derived_streams;
 pub mod destinations;
+pub mod external_alerts;
 #[cfg(feature = "enterprise")]
 pub mod grouping;
 #[cfg(feature = "enterprise")]

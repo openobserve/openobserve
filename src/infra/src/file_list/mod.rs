@@ -88,7 +88,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
     /// Bulk-set `bloom_ver` for the given file_list ids. Used by the
-    /// post-merge bloom builder (enterprise `bloom::compact`).
+    /// post-merge bloom builder (`compaction::bloom::compact`).
     /// Empty `ids` is a no-op.
     async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()>;
     /// Is `bloom_ver` still referenced by at least one live file_list row in

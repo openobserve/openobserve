@@ -50,11 +50,11 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
  * their own sub-pages on hover.
  *
  * Three shapes (see `RailEntry`):
- *   • plain link    — most items (Home, Logs, Metrics, Traces, RUM, Alerts,
- *     Incidents, Actions, Billings, AI, IAM, Management).
+ *   • plain link    — most items (Home, Logs, Metrics, Traces, Actions,
+ *     Billings, AI, IAM, Management).
  *   • link + subnav — a tile that navigates to a main page on click AND surfaces
- *     a section nav on hover. Produced by NAV_GROUPS (Data → /streams,
- *     Dashboards → /dashboards) and by any NAV_SUBNAV entry.
+ *     a section nav on hover. Produced by NAV_GROUPS (Reliability → /alerts,
+ *     Data → /streams, Dashboards → /dashboards) and by any NAV_SUBNAV entry.
  *   • pure group    — a flyout with no page of its own (click toggles it).
  *     Supported by the renderer but not emitted by any current entry.
  *
@@ -82,7 +82,8 @@ export interface NavGroupDef {
   /** Top-level `name`s this group replaces (removed from the rail). */
   absorbs: string[];
   /**
-   * Emit the group's tile immediately AFTER this top-level item (when present).
+   * Emit the group's tile immediately AFTER this anchor — either a top-level
+   * item `name` or another group's `key` (when that anchor is present/active).
    * Defaults to the position of the group's first absorbed item.
    */
   placeAfter?: string;
@@ -91,11 +92,11 @@ export interface NavGroupDef {
 
 export const NAV_GROUPS: NavGroupDef[] = [
   {
-    key: "alerts",
-    titleKey: "menu.alerts",
-    icon: "shield-alert-outline",
+    key: "reliability",
+    titleKey: "menu.reliability",
+    icon: "shield",
     parentLink: "/alerts",
-    absorbs: ["alertList", "sloList"],
+    absorbs: ["alertList", "sloList", "incidentList"],
     children: [
       {
         titleKey: "menu.alerts",
@@ -103,11 +104,36 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertList",
         requires: "alertList",
       },
-      // An SLO is what an SLO alert burns against, so the two are navigated
-      // together. Both children carry `requires` so that hiding either one via
-      // `custom_hide_menus` collapses the group back to a plain link for the
-      // survivor rather than leaving a one-item flyout.
+      // An SLO is what an SLO alert burns against, and an incident is what an
+      // alert escalates into — one reliability workflow, one tile. Every child
+      // carries `requires` so that hiding any of them (`custom_hide_menus`, or
+      // Incidents being enterprise-gated) shrinks the group, and dropping to a
+      // single survivor collapses it back to a plain link rather than leaving a
+      // one-item flyout.
       { titleKey: "menu.slos", icon: "target", name: "sloList", requires: "sloList" },
+      {
+        titleKey: "menu.incidents",
+        icon: "notifications-active",
+        name: "incidentList",
+        requires: "incidentList",
+      },
+      // Where an alert is delivered, and the message it delivers. These moved
+      // out of Settings: they are alerting configuration, not deployment
+      // configuration. They have no rail entry of their own, so they ride on
+      // Alerts being present — hiding `alertList` via custom_hide_menus takes
+      // its plumbing with it.
+      {
+        titleKey: "alert_destinations.header",
+        icon: "location-on",
+        name: "alertDestinations",
+        requires: "alertList",
+      },
+      {
+        titleKey: "alert_templates.header",
+        icon: "description",
+        name: "alertTemplates",
+        requires: "alertList",
+      },
     ],
   },
   {
@@ -116,7 +142,10 @@ export const NAV_GROUPS: NavGroupDef[] = [
     icon: "database",
     parentLink: "/streams",
     absorbs: ["streams", "pipeline", "ingestion"],
-    placeAfter: "incidentList",
+    // Data follows the Reliability tile. This is load-bearing: without it Data
+    // lands at its own first absorbed item (pipeline/streams), near the TOP of
+    // the rail, ahead of Experience and Dashboards.
+    placeAfter: "reliability",
     children: [
       { titleKey: "menu.index", icon: "window", name: "logstreams", requires: "streams" },
       // Pipeline expands into its own tabbed sub-pages (same visibility rules).
@@ -213,13 +242,16 @@ export function groupNavLinks(
     return { type: "link", item };
   };
 
-  // A group is emitted either AFTER a named item (`placeAfter`, when that item is
-  // present) or in place of its first absorbed item (default). Map the anchor
-  // item name → group keys to emit right after it.
+  // A group is emitted either AFTER its `placeAfter` anchor or in place of its
+  // first absorbed item (default). Map anchor → group keys to emit right after
+  // it. The anchor is a top-level item `name` or another group's `key`; it only
+  // counts when that item is present / that group is active, so a group whose
+  // anchor never materialises falls back to default placement.
+  const anchorExists = (anchor: string) => presentNames.has(anchor) || groupChildren.has(anchor);
   const emitAfter = new Map<string, string[]>();
   for (const def of absorbedToGroup.values()) {
     if (!groupChildren.has(def.key)) continue;
-    if (def.placeAfter && presentNames.has(def.placeAfter)) {
+    if (def.placeAfter && anchorExists(def.placeAfter)) {
       const list = emitAfter.get(def.placeAfter) ?? [];
       if (!list.includes(def.key)) list.push(def.key);
       emitAfter.set(def.placeAfter, list);
@@ -241,6 +273,13 @@ export function groupNavLinks(
       },
       children: groupChildren.get(def.key)!,
     });
+    // Groups anchored after THIS group (e.g. Data follows Reliability).
+    emitAnchored(def.key);
+  };
+  const emitAnchored = (anchor: string) => {
+    for (const key of emitAfter.get(anchor) ?? []) {
+      emitGroup(NAV_GROUPS.find((d) => d.key === key)!);
+    }
   };
 
   for (const item of links) {
@@ -248,16 +287,12 @@ export function groupNavLinks(
     if (group) {
       // Absorbed item — drop it. Emit the group here only when it has no
       // (present) `placeAfter` anchor (default first-absorbed placement).
-      const usesPlaceAfter = group.placeAfter && presentNames.has(group.placeAfter);
+      const usesPlaceAfter = group.placeAfter && anchorExists(group.placeAfter);
       if (!usesPlaceAfter) emitGroup(group);
       continue;
     }
     result.push(entryFor(item));
-    // Emit any groups anchored after this item.
-    for (const key of emitAfter.get(item.name) ?? []) {
-      const def = NAV_GROUPS.find((d) => d.key === key)!;
-      emitGroup(def);
-    }
+    emitAnchored(item.name);
   }
 
   // Safety net: append any active group not yet placed.

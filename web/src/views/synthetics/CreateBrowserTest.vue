@@ -26,9 +26,13 @@ import type {
   SyntheticsDevice,
   SyntheticsFolder,
   AgentSetup,
+  BlockedReason,
+  ReplayResponse,
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
+import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
   buildCreateBrowserTestPayload,
   mapResponseToBrowserCheck,
@@ -103,6 +107,19 @@ const isLoadingEdit = ref(false);
 const loadError = ref(false);
 const urlError = ref("");
 const validationErrors = ref<Record<string, string>>({});
+
+/**
+ * What one scheduled fire of this check would cost in the worst case, against
+ * the lease the server holds for it. Recomputed live so the Configure step can
+ * show the number before the author hits Save.
+ */
+const runBudget = computed(() =>
+  computeRunBudget({
+    combos: check.value.browserDevices?.length ?? 1,
+    retries: check.value.retries ?? 0,
+    waitBeforeRetrySecs: check.value.waitBeforeRetrySecs ?? 0,
+  }),
+);
 
 const gateSchema = computed(() => makeBrowserCheckGateSchema(t));
 const saveSchema = computed(() => makeBrowserCheckSaveSchema(t));
@@ -471,6 +488,30 @@ async function persist(): Promise<boolean> {
     return false;
   }
 
+  // ── Run budget vs. job lease ──────────────────────────────────────────
+  // The server rejects this too, but as unattached prose in a toast whose
+  // leading remedy names a field this form does not have. Catching it here puts
+  // the error on the two controls the author can actually change, and says what
+  // the run would cost in minutes.
+  if (runBudget.value.exceedsLease) {
+    const message = t("synthetics.validation.runBudgetExceeded", {
+      worstCase: formatBudgetDuration(runBudget.value.worstCaseMs),
+      limit: formatBudgetDuration(JOB_LEASE_MS),
+      combos: runBudget.value.combos,
+      attempts: runBudget.value.attempts,
+      perAttempt: formatBudgetDuration(runBudget.value.perAttemptMs),
+    });
+    validationErrors.value = {
+      retries: t("synthetics.validation.runBudgetRetriesHint", {
+        limit: formatBudgetDuration(JOB_LEASE_MS),
+      }),
+      browserDevices: message,
+    };
+    currentStep.value = 2;
+    toast({ variant: "error", message });
+    return false;
+  }
+
   isSaving.value = true;
   validationErrors.value = {};
   const dismiss = toast({
@@ -547,17 +588,37 @@ async function onSaveAndExit() {
 const replayPhase = computed(() => recorder.replayPhase.value);
 const stepResults = computed(() => recorder.stepResults);
 const activeStepId = computed(() => recorder.activeStepId.value);
-const blockedReason = computed<"incognito" | null>(() =>
-  recorder.replayPhase.value === "idle" &&
-  recorder.replayResult.value != null &&
-  !recorder.replayResult.value.success &&
-  !recorder.replayResult.value.stopped &&
-  recorder.stepResults.size === 0
-    ? "incognito"
-    : null,
+/**
+ * The replay failed BEFORE any step ran — nothing streamed back, so this is a
+ * pre-flight problem (window, permissions, an unmappable step) rather than a
+ * journey that failed on the page.
+ */
+const preflightFailure = computed<ReplayResponse | null>(() => {
+  const res = recorder.replayResult.value;
+  return recorder.replayPhase.value === "idle" &&
+    res != null &&
+    !res.success &&
+    !res.stopped &&
+    recorder.stepResults.size === 0
+    ? res
+    : null;
+});
+
+/** WHICH pre-flight problem — see `classifyPreflightFailure`. */
+const blockedReason = computed<BlockedReason | null>(() =>
+  preflightFailure.value ? classifyPreflightFailure(preflightFailure.value.error) : null,
 );
 
+/** The raw extension message, shown verbatim on the generic pre-flight card. */
+const blockedDetail = computed(() => preflightFailure.value?.error ?? "");
+
 function onReplay() {
+  // Replay ships the journey to the extension as-is, so a step with no locator
+  // reaches Playwright as an empty selector and kills the run before step 1 —
+  // which then surfaced as a pre-flight failure with a misleading cause. This
+  // is the same gate "Continue to configure" already applies; it points at the
+  // offending step instead.
+  if (!validateJourneyBeforeReplay()) return;
   runReplay(check.value.journey);
 }
 
@@ -571,7 +632,19 @@ function onReplay() {
  * whole implementation, with no extension change.
  */
 function onReplayUpTo(upTo: number) {
+  if (!validateJourneyBeforeReplay()) return;
   runReplay(check.value.journey.slice(0, Math.max(1, upTo)));
+}
+
+/**
+ * Block replay on the same target/first-step rules the Continue button uses.
+ *
+ * Deliberately the whole journey even for a prefix replay: `validateStepSelectors`
+ * reports against the journey the editor is showing, and a partial pass would
+ * leave the untouched later steps looking valid.
+ */
+function validateJourneyBeforeReplay(): boolean {
+  return journeyRef.value?.validateStepSelectors?.() ?? true;
 }
 
 function runReplay(journey: BrowserStep[]) {
@@ -862,6 +935,7 @@ function onClearResults() {
               :step-results="stepResults"
               :active-step-id="activeStepId"
               :blocked-reason="blockedReason"
+              :blocked-detail="blockedDetail"
               class="h-full!"
               @need-extension-setup="onNeedExtensionSetup"
               @replay="onReplay"

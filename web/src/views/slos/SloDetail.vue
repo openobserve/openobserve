@@ -78,32 +78,59 @@
       </OButton>
     </template>
 
-    <!-- Not a subtle indicator: a frozen SLO's alerts neither fire nor
-         resolve, and mistaking that for healthy is the failure mode. -->
-    <OBanner
-      v-if="status?.no_data"
-      variant="warning"
-      icon="ac_unit"
-      class="mb-3"
-      data-test="slos-slodetail-frozen-banner"
-    >
-      <span class="font-bold">{{ t("slos.frozen.title") }}</span>
-      {{
-        t("slos.frozen.body", {
-          coverage: formatCoverage(status?.coverage),
-          floor: coverageFloorLabel,
-        })
-      }}
-    </OBanner>
+    <!-- The page is `bleed` so the groups table can run flush to the window
+         edge, which means everything that is NOT that table has to supply its
+         own inset. OContent is that inset — it puts the banner and the tiles
+         on the same page-edge grid line as the title above and the config
+         list below, instead of hard against the window. `y` because the strip
+         sits directly under the header and needs the breathing room. -->
+    <OContent y>
+      <!-- Not a subtle indicator: a frozen SLO's alerts neither fire nor
+           resolve, and mistaking that for healthy is the failure mode. -->
+      <OBanner
+        v-if="status?.no_data"
+        variant="warning"
+        icon="ac_unit"
+        class="mb-3"
+        data-test="slos-slodetail-frozen-banner"
+      >
+        <span class="font-bold">{{ t("slos.frozen.title") }}</span>
+        {{
+          t("slos.frozen.body", {
+            coverage: formatCoverage(status?.coverage),
+            floor: coverageFloorLabel,
+          })
+        }}
+      </OBanner>
 
-    <OStatStrip v-if="slo" :items="stats" data-test="slos-slodetail-stats" />
+      <OStatStrip v-if="slo" :items="stats" data-test="slos-slodetail-stats" />
+    </OContent>
 
-    <OTabs v-model="tab" class="mt-4" data-test="slos-slodetail-tabs">
+    <!-- No `mt-*`: OContent's bottom inset above already separates the strip
+         from the tabs, and no horizontal padding either — a tab strip's first
+         label self-aligns to the page-edge grid. -->
+    <OTabs v-model="tab" data-test="slos-slodetail-tabs">
+      <OTab name="trend" :label="t('slos.tab.trend')" icon="show-chart" />
       <OTab name="groups" :label="t('slos.tab.groups')" icon="layers" v-if="isGrouped" />
       <OTab name="config" :label="t('slos.tab.configuration')" icon="settings" />
     </OTabs>
 
     <OTabPanels v-model="tab">
+      <OTabPanel name="trend">
+        <OContent>
+          <SloBurndownChart
+            v-if="slo"
+            :slo-id="slo.id"
+            :generation="slo.definition_generation"
+            :target="slo.target"
+            :window-secs="slo.window_secs"
+            :slice-interval-secs="slo.slice_interval_secs"
+            :sli-type="slo.sli_type"
+            data-test="slos-slodetail-burndown"
+          />
+        </OContent>
+      </OTabPanel>
+
       <OTabPanel v-if="isGrouped" name="groups">
         <OTable
           :data="groups"
@@ -208,6 +235,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import SloBurndownChart from "@/components/slos/SloBurndownChart.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { Slo, SloStatus } from "@/ts/interfaces/slo";
@@ -236,7 +264,10 @@ const slo = ref<Slo | null>(null);
 const status = ref<SloStatus | null>(null);
 const groups = ref<SloStatus[]>([]);
 const groupsLoading = ref(false);
-const tab = ref("config");
+// Trend first: "how did the budget get here" is the question the page is
+// usually opened to answer. The configuration is a reference lookup and keeps
+// its tab, it is just no longer what greets you.
+const tab = ref("trend");
 
 const sloId = computed(() => String(route.params.slo_id || ""));
 const org = computed(() => store.state.selectedOrganization?.identifier);
@@ -375,8 +406,12 @@ async function load() {
   const { status: _ignored, ...rest } = body;
   slo.value = rest as Slo;
 
+  // Fetch the groups, but do NOT switch to their tab: every SLO opens on
+  // Trend. This used to select "groups" here, which meant a grouped SLO could
+  // never land on the trend charts — and the per-group breakdown answers
+  // "which one broke", a question you only ask after the burndown has shown
+  // you that something did.
   if (rest.group_by?.length) {
-    tab.value = "groups";
     await loadGroups();
   }
 }

@@ -78,6 +78,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   filterMode: "client",
   defaultColumns: true,
   footerTitle: "",
+  totalCountExact: true,
   showHeader: true,
   fillHeight: true,
 });
@@ -712,6 +713,14 @@ const hasFillColumn = computed(() =>
   }),
 );
 
+// A bounded filler clips instead of growing, so the table must drop `min-w-max`
+// — that would size every column to max-content and defeat the clamp.
+const hasBoundedFill = computed(() =>
+  table.getVisibleLeafColumns().some((c) => (c.columnDef.meta as any)?.fillRemaining),
+);
+
+provide("o2TableBoundedFill", hasBoundedFill);
+
 // Suppress the horizontal scrollbar for fill tables that aren't intentionally
 // scrolling (sub-pixel rounding otherwise shows a 1-2px scrollbar). Keep it for
 // horizontal-scroll tables and frozen flex tables ONLY when the columns
@@ -1147,7 +1156,7 @@ defineExpose({
             // at its longest line so the text never wraps. Sticky total columns
             // still need their explicit content width.
             props.horizontalScroll
-              ? props.wrap && !props.stickyColTotals
+              ? (props.wrap || hasBoundedFill) && !props.stickyColTotals
                 ? 'w-full'
                 : isDelegatedScroll
                   ? 'min-w-max'
@@ -1470,6 +1479,7 @@ defineExpose({
         :current-page="pagination.currentPage.value"
         :total-pages="pagination.totalPages.value"
         :total-count="pagination.totalCount.value"
+        :total-count-exact="props.totalCountExact"
         :page-size="pagination.pageSize.value"
         :page-size-options="pagination.pageSizeOptions.value"
         :showing-from="pagination.showingFrom.value"
