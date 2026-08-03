@@ -205,6 +205,30 @@ describe("requestFieldValues — not asking twice", () => {
     expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
   });
 
+  it("recovers from a transient failure once the cooldown has passed", async () => {
+    // The expiry test above only exercises the EMPTY path. Suppressing failures
+    // permanently satisfies it, and leaves a field's values dead for the whole
+    // session because one request happened to hit a 500 — the worse half of the
+    // same mistake. Asserted through the values, not just the call count: a
+    // second request that still returns nothing would be no better.
+    vi.mocked(streamService.fieldValues).mockRejectedValueOnce(new Error("500"));
+    const store = await freshStore();
+    await expect(store.requestFieldValues(ctx, "environment")).resolves.toEqual([]);
+
+    const realNow = Date.now;
+    try {
+      const advanced = realNow() + 5 * 60 * 1000;
+      Date.now = () => advanced;
+      await expect(store.requestFieldValues(ctx, "environment")).resolves.toEqual([
+        "development",
+        "staging",
+      ]);
+    } finally {
+      Date.now = realNow;
+    }
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
+  });
+
   it("treats a different field as a different question", async () => {
     const store = await freshStore();
     await store.requestFieldValues(ctx, "environment");
