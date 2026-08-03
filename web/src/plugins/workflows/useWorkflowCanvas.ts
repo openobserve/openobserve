@@ -855,9 +855,8 @@ export default function useWorkflowCanvas() {
         },
       },
     ];
-    // Open the (read-only) trigger panel on the now-real node, so closing it
-    // dismisses a panel rather than discarding the node.
-    editNode(id);
+    // Don't auto-open the trigger's (read-only) detail panel — placing the trigger
+    // shouldn't interrupt the build flow. The user can click the node to open it.
   }
 
   const NODE_W = 240;
