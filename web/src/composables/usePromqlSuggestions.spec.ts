@@ -635,6 +635,31 @@ describe("PromQL catalog reaches the editor", () => {
   // Caller-supplied lists replacing the catalog outright is already covered by
   // "should update keywords with provided data" above; not duplicated here.
 
+  it("shows a lone loading row while the label series is in flight", async () => {
+    // The loading row used to be the ONLY entry, because getSuggestions cleared
+    // the list first. Seeding the catalog and dropping that clear turned the
+    // push into an append: the row lands at the end of 113 entries, and every
+    // further keystroke appends ANOTHER one until the response replaces the
+    // array. Bounded only by how slow the request is.
+    // The request must stay in flight for the loading state to be observable
+    // at all — with a promise that settles, .finally() replaces the list before
+    // any assertion can see it, and the test reports 0 rows whether or not the
+    // bug is there.
+    vi.mocked(searchService.get_promql_series).mockReturnValue(new Promise(() => {}) as any);
+
+    const fresh = usePromqlSuggestions();
+    fresh.autoCompleteData.value.query = 'up{instance="';
+    fresh.autoCompleteData.value.position.cursorIndex = 12;
+    await fresh.getSuggestions();
+    await fresh.getSuggestions();
+    await fresh.getSuggestions();
+
+    const rows = fresh.autoCompletePromqlKeywords.value as any[];
+    const loading = rows.filter((k: any) => k.label === "...Loading");
+    expect(loading.length, `${loading.length} loading rows`).toBe(1);
+    expect(rows.length, "the catalog is still in the list behind the loading row").toBe(1);
+  });
+
   it("never leaves the editor with an empty list", async () => {
     // getSuggestions clears the list before deciding what to show, and two of
     // its branches return without refilling it — an untracked cursor is one.

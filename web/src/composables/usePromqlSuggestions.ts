@@ -195,11 +195,18 @@ const usePromqlSuggestions = () => {
 
       let labelSuggestions: any;
 
-      autoCompletePromqlKeywords.value.push({
-        label: "...Loading",
-        insertText: "",
-        kind: "Text",
-      });
+      // ASSIGNED, not pushed. The push relied on the list having just been
+      // cleared at the top of this function; once the catalog was seeded and
+      // that clear removed, it appended a loading row to 113 entries — and
+      // appended another on every keystroke until the response replaced the
+      // array. While this request is in flight the loading row IS the list.
+      autoCompletePromqlKeywords.value = [
+        {
+          label: "...Loading",
+          insertText: "",
+          kind: "Text",
+        },
+      ];
 
       autoCompleteData.value.popup.open(autoCompleteData.value.text);
 
