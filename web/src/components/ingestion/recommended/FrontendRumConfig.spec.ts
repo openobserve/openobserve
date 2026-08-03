@@ -115,6 +115,9 @@ const i18n = createI18n({
         rumPlatformAndroid: "Android",
         rumPlatformIOS: "iOS",
       },
+      common: {
+        beta: "Beta",
+      },
     },
   },
 });
@@ -520,11 +523,21 @@ describe("FrontendRumConfig", () => {
       expect(browserTab.exists()).toBe(true);
       expect(browserTab.text()).toBe("Browser");
       expect(reactNativeTab.exists()).toBe(true);
-      expect(reactNativeTab.text()).toBe("React Native");
+      expect(reactNativeTab.text()).toContain("React Native");
       expect(androidTab.exists()).toBe(true);
-      expect(androidTab.text()).toBe("Android");
+      expect(androidTab.text()).toContain("Android");
       expect(iosTab.exists()).toBe(true);
-      expect(iosTab.text()).toBe("iOS");
+      expect(iosTab.text()).toContain("iOS");
+    });
+
+    it("tags only the mobile platforms as beta", () => {
+      const betaOf = (id: string) =>
+        wrapper.find(`[data-test="rum-setup-platform-${id}"]`).find('[data-test="beta-badge"]');
+
+      expect(betaOf("browser").exists()).toBe(false);
+      expect(betaOf("react-native").text()).toBe("Beta");
+      expect(betaOf("android").text()).toBe("Beta");
+      expect(betaOf("ios").text()).toBe("Beta");
     });
 
     it("does NOT render the platform switcher when rumToken is empty", () => {
