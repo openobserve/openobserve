@@ -20,11 +20,15 @@ pub mod actions;
 pub mod ai;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
+pub mod annotation_queues;
+#[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod authz;
 #[cfg(feature = "cloud")]
 pub mod cloud;
 pub mod dashboards;
+#[cfg(feature = "enterprise")]
+pub mod datasets;
 #[cfg(feature = "enterprise")]
 pub mod domain_management;
 #[cfg(feature = "enterprise")]
