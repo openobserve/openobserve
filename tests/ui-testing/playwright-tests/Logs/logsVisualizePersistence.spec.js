@@ -311,14 +311,8 @@ test.describe("Logs Visualization State Persistence testcases", () => {
   //   No Data, because the toggle was restored ahead of the stream selection and
   //   nothing re-ran the visualization afterwards.
   //
-  // Non-flaky negative assertions (project rule): every "no error" check below is
-  // sequenced AFTER a deterministic positive end-state — the chart canvas/table is
-  // actually painted and the chart type has settled. Error-panel absence is safe to
-  // poll because errorData.errors is only ever cleared by an explicit resetErrors(),
-  // so an error raised at any point in the run is still present. Toasts, by
-  // contrast, auto-dismiss, so their absence is proved with a MutationObserver-based
-  // recorder installed (as an init script) BEFORE the navigation under test rather
-  // than by a post-hoc not.toBeVisible() that could simply have arrived too late.
+  // Every "no error" check below is sequenced AFTER a deterministic positive
+  // end-state; see the assertion helpers in logsPage.js for why each is safe.
   // ===========================================================================
 
   test("should render the Visualize chart without the false required-fields error", {

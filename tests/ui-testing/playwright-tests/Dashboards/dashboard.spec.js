@@ -656,7 +656,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
-  
+
   test("should display a confirmation popup message for unsaved changes when clicking the Discard button", async ({
     page,
   }) => {

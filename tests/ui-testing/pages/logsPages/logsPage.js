@@ -9602,7 +9602,7 @@ export class LogsPage {
      * page.reload() actually exercises URL restoration instead of reloading a URL
      * that has not been synced yet (updateUrlQueryParams runs asynchronously after
      * the chart renders).
-     * @param {{ requireVisualizationData?: boolean, timeout?: number }} options
+     * @param {{ requireVisualizationData?: boolean, requireFunctionContent?: boolean, timeout?: number }} options
      */
     async waitForVisualizeUrlState({
         requireVisualizationData = true,
@@ -9657,8 +9657,6 @@ export class LogsPage {
 
     /**
      * Assert the VRL (transform) editor currently contains the given text.
-     * Monaco virtualises long documents, but the short one-line functions these
-     * tests use are always fully materialised in the DOM.
      * @param {string} text - Substring expected in the editor.
      */
     async expectVrlEditorContains(text) {
