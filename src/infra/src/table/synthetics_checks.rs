@@ -557,6 +557,10 @@ pub async fn fetch_due<C: ConnectionTrait>(
 }
 
 /// Updates `last_triggered_at` and `next_run_at` after the scheduler fans out a check.
+/// Unconditionally sets a check's schedule. For user-initiated changes (edit,
+/// disable, run-now), where the user's action must always win.
+///
+/// **Schedulers must not use this** — see [`try_claim_slot`].
 pub async fn advance_schedule<C: ConnectionTrait>(
     conn: &C,
     id: &str,
@@ -570,6 +574,49 @@ pub async fn advance_schedule<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(())
+}
+
+/// Claims a check's due slot by advancing its schedule, returning whether THIS
+/// caller won it.
+///
+/// `expected_next_run_at` is the `next_run_at` the caller read in `fetch_due`.
+/// The UPDATE only matches while the row still holds that value, so of N
+/// schedulers racing the same slot exactly one gets `rows_affected == 1` and the
+/// rest get 0. This is a compare-and-swap, the same shape as
+/// `synthetics_jobs::lease_batch`'s `status = 0` guard.
+///
+/// Without it, `fetch_due` is a plain SELECT and every alert_manager node fired
+/// every due check: each inserted its own `synthetics_runs` row under a fresh
+/// KSUID, so the rows were genuinely distinct and no unique constraint
+/// downstream could collapse them. Two nodes meant every check ran twice —
+/// double probe cost, double records, double alert evaluation. Latent only
+/// because every environment happens to run `alertmanager 1/1`; scaling for HA
+/// would have silently doubled the fleet.
+///
+/// Callers MUST treat `false` as "another node owns this slot" and do nothing
+/// further — no run row, no jobs.
+///
+/// Deliberately a CAS rather than `SELECT … FOR UPDATE SKIP LOCKED` (which the
+/// design proposed): SKIP LOCKED is Postgres-only and this table is also served
+/// by SQLite and MySQL. A CAS is portable, holds no lock across the fan-out, and
+/// gives the same exactly-once-per-slot guarantee. Synthetic checks are
+/// order-independent, so the advisory lock the OSS alert scheduler adds for
+/// strict FIFO (`scheduler/postgres.rs:672`) is not needed here.
+pub async fn try_claim_slot<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    last_triggered_at: i64,
+    next_run_at: i64,
+    expected_next_run_at: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::LastTriggeredAt, Expr::value(last_triggered_at))
+        .col_expr(Column::NextRunAt, Expr::value(next_run_at))
+        .filter(Column::Id.eq(id))
+        .filter(Column::NextRunAt.eq(expected_next_run_at))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
 }
 
 /// Updates `last_check_status` after a probe acks a job.
@@ -905,5 +952,59 @@ mod tests {
         assert_eq!(check.next_run_at, 1750000001000000);
         assert_eq!(check.last_triggered_at, 1750000000500000);
         assert_eq!(check.last_check_status, SyntheticStatus::Passed);
+    }
+
+    /// The CAS guard is the whole HA fix: without `next_run_at = <expected>` in
+    /// the WHERE clause, every alert_manager node wins every slot and each check
+    /// runs once per node.
+    #[tokio::test]
+    async fn test_try_claim_slot_emits_the_next_run_at_guard() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 1,
+            }])
+            .into_connection();
+
+        let won = try_claim_slot(&db, "mon-1", 200, 300, 100).await.unwrap();
+        assert!(
+            won,
+            "rows_affected = 1 must mean this caller claimed the slot"
+        );
+
+        let log = db.into_transaction_log();
+        let sql = format!("{:?}", log[0]);
+        assert!(
+            sql.contains("next_run_at"),
+            "the UPDATE must filter on next_run_at — without it the claim is not a claim: {sql}"
+        );
+        // The expected value must reach the WHERE clause, not just the SET list.
+        assert!(
+            sql.contains("100"),
+            "expected_next_run_at (100) must be bound into the guard: {sql}"
+        );
+    }
+
+    /// The loser of a race must be told it lost, so it produces no run and no
+    /// jobs. Reporting success here is what produced duplicate executions.
+    #[tokio::test]
+    async fn test_try_claim_slot_reports_false_when_another_node_won() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![MockExecResult {
+                last_insert_id: 0,
+                rows_affected: 0,
+            }])
+            .into_connection();
+
+        let won = try_claim_slot(&db, "mon-1", 200, 300, 100).await.unwrap();
+        assert!(
+            !won,
+            "rows_affected = 0 means the row no longer held the expected next_run_at, \
+             i.e. another scheduler advanced it first"
+        );
     }
 }
