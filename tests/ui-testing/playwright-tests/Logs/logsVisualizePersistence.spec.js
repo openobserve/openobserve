@@ -5,9 +5,11 @@ const logData = require("../../fixtures/log.json");
 const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-// VRL body used by the transform-editor test. Matches the convention in
-// dashboards/visualize-vrl.spec.js (`.vrl=100`).
-const VRL_FUNCTION = '.vrl=100';
+// VRL body the transform-editor test asserts on. clickVrlEditor() types this
+// into Monaco itself (via keyboard.type + a model-stability wait), so the value
+// here must match that helper rather than being typed separately — Monaco
+// ignores direct .inputarea fills.
+const VRL_FUNCTION = '.a=2';
 
 // ----- Helpers -----
 
@@ -495,13 +497,12 @@ test.describe("Logs Visualization State Persistence testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing VRL variant of the URL-refresh restore');
 
-    // 1. Enable the transform (VRL) editor and enter a real function body. Typing
-    //    is what sets tempFunctionContent — without it transformType/content stay
-    //    empty, no functionContent lands in the URL, and this degrades into a
-    //    duplicate of the plain-reload test.
+    // 1. Enable the transform (VRL) editor. clickVrlEditor() focuses Monaco, clears
+    //    it, types VRL_FUNCTION and waits for the model to settle past the editor's
+    //    debounce, so tempFunctionContent is populated when it returns. Assert the
+    //    body really landed rather than trusting the helper.
     await pm.logsPage.toggleVrlEditor();
     await pm.logsPage.clickVrlEditor();
-    await pm.logsPage.typeInVrlEditor(VRL_FUNCTION);
     await pm.logsPage.expectVrlEditorContains(VRL_FUNCTION);
 
     // 2. Re-run the search so the VRL function is part of the current query state.
