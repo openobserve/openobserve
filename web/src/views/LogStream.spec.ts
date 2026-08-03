@@ -94,6 +94,17 @@ vi.mock("@/services/organizations", () => ({
     get_organization: vi.fn(),
     list: vi.fn(),
     add_members: vi.fn(),
+    // Feeds the summary strip above the table.
+    get_organization_summary: vi.fn().mockResolvedValue({
+      data: {
+        streams: {
+          num_streams: 3,
+          total_records: 1500,
+          total_storage_size: 120,
+          total_index_size: 20,
+        },
+      },
+    }),
   },
 }));
 

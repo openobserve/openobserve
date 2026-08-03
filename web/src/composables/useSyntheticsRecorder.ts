@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, ref } from "vue";
 import { synthetics } from "@/constants/config";
@@ -403,8 +416,11 @@ const useSyntheticsRecorder = () => {
     if (res) {
       if (res.stopped) replayPhase.value = "stopped";
       else if (res.passed) replayPhase.value = "passed";
-      else if (stepResults.size === 0)
-        replayPhase.value = "idle"; // pre-flight failure (e.g. incognito)
+      // Nothing streamed back, so no step ran: a pre-flight failure, not a
+      // journey that failed on the page. Stay `idle` rather than `failed` —
+      // the caller classifies the cause from `res.error` (see
+      // CreateBrowserTest's `blockedReason`) and must not assume incognito.
+      else if (stepResults.size === 0) replayPhase.value = "idle";
       else replayPhase.value = "failed";
     } else {
       replayPhase.value = "idle";

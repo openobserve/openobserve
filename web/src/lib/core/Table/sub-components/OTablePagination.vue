@@ -15,6 +15,8 @@ const props = withDefaults(
     currentPage: number;
     totalPages: number;
     totalCount: number;
+    /** False when totalCount is only a lower bound. */
+    totalCountExact?: boolean;
     pageSize: number;
     pageSizeOptions: number[];
     showingFrom: number;
@@ -29,6 +31,7 @@ const props = withDefaults(
   {
     position: "bottom",
     title: "",
+    totalCountExact: true,
   },
 );
 
@@ -79,7 +82,9 @@ const pageSizeSelectOptions = computed(() => {
         data-test="o2-table-pagination-count-skel"
       />
       <slot v-else-if="slots.actions" name="actions" />
-      <span v-else> {{ totalCount.toLocaleString() }} {{ title }} </span>
+      <span v-else>
+        {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }} {{ title }}
+      </span>
     </div>
 
     <!-- Right: controls -->
@@ -96,7 +101,7 @@ const pageSizeSelectOptions = computed(() => {
         data-test="o2-table-pagination-info"
       >
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }}
-        {{ totalCount.toLocaleString() }}
+        {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }}
       </span>
       <div class="bg-border-default h-4 w-px shrink-0" v-if="pageSizeOptions.length > 0" />
       <div v-if="pageSizeOptions.length > 0" class="text-primary flex items-center gap-1.5 text-xs">
@@ -139,6 +144,7 @@ const pageSizeSelectOptions = computed(() => {
           <OIcon name="chevron-right" size="sm" />
         </OButton>
         <OButton
+          v-if="totalCountExact"
           variant="outline"
           size="icon"
           :disabled="isLastPage"

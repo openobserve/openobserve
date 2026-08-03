@@ -77,7 +77,7 @@
            default `min-width: auto` would let a wide child (the query
            editors) push the column past its share. -->
       <div class="flex min-w-0 flex-col gap-4">
-        <SloSection :title="t('slos.section.identity')">
+        <OFormSection :title="t('slos.section.identity')">
           <!-- One row: folder, name, tags — in that order. The folder column
                is fixed-width so the name (the field people actually type in)
                takes the slack; tags get their own share. Wraps to a column on
@@ -121,9 +121,9 @@
             class="mt-3"
             data-test="slos-addslo-description"
           />
-        </SloSection>
+        </OFormSection>
 
-        <SloSection :title="t('slos.section.sli')">
+        <OFormSection :title="t('slos.section.sli')">
           <OToggleGroup v-model="form.sli_type" data-test="slos-addslo-sli-type">
             <OToggleGroupItem
               v-for="opt in sliTypeOptions"
@@ -209,13 +209,21 @@
                 data-test="slos-addslo-timeslice-stream"
               />
             </div>
-            <OInput
+            <!-- The same editor as `scope` below it and `good when` above,
+                 because this is the same kind of thing: SQL over the stream's
+                 schema. It is in fact the field with the strongest claim on
+                 the typeahead — the aggregate names a column, and a mistyped
+                 column is invisible until the ingest query fails. -->
+            <SloExpressionField
               v-model="form.config.query"
+              editor-id="slo-aggregate-editor"
               :label="t('slos.field.aggregate')"
               :hint="t('slos.field.aggregateHint')"
+              :keywords="autoCompleteKeywords"
+              :suggestions="autoCompleteSuggestions"
               class="mt-3"
               required
-              placeholder="approx_percentile_cont(duration_ms, 0.95)"
+              data-test="slos-addslo-aggregate"
             />
             <div class="mt-3 grid grid-cols-2 gap-3">
               <OSelect
@@ -243,9 +251,9 @@
           <OBanner v-else variant="info" class="mt-3">
             {{ t("slos.alertSli.unavailable") }}
           </OBanner>
-        </SloSection>
+        </OFormSection>
 
-        <SloSection :title="t('slos.section.objective')">
+        <OFormSection :title="t('slos.section.objective')">
           <div class="grid grid-cols-2 gap-3">
             <OInput
               v-model.number="form.target"
@@ -300,9 +308,20 @@
           <p v-if="isGrouped" class="text-compact text-text-secondary mt-1">
             {{ t("slos.groupedSliceNote") }}
           </p>
-        </SloSection>
+          <!-- The choice is only ever interesting for one reason, and it is a
+               different reason per SLI type — so say which one applies rather
+               than describing both and leaving the reader to work out which
+               half is theirs. -->
+          <p
+            v-else
+            class="text-compact text-text-secondary mt-1"
+            data-test="slos-addslo-slice-note"
+          >
+            {{ sliceNote }}
+          </p>
+        </OFormSection>
 
-        <SloSection :title="t('slos.section.grouping')">
+        <OFormSection :title="t('slos.section.grouping')">
           <!-- Constraining wrapper: OTagInput's root is `h-full`. -->
           <OSelect
             v-model="groupByList"
@@ -321,14 +340,18 @@
             class="mt-3"
             data-test="slos-addslo-groups-estimate"
           />
-        </SloSection>
+        </OFormSection>
       </div>
 
       <div class="flex flex-col gap-4">
-        <!-- Preview sits above the summary: it answers "is my predicate
-             right?", which is the question asked while the left column is
-             still being filled in. Count SLI only — the other SLI types do
-             not have a good/bad event count to draw. -->
+        <!-- Preview sits above the summary: it answers the question being
+             asked while the left column is still being filled in. Which
+             question that is depends on the SLI type — a count SLI is a
+             PREDICATE and the doubt is whether it is right; a time-slice SLI
+             is a NUMBER and the doubt is whether it is set anywhere sensible.
+             So each gets its own preview rather than one being bent to serve
+             both. An alert SLI has neither: it reads the triggers stream, and
+             there is nothing to draw until it ships. -->
         <SloPreviewChart
           v-if="form.sli_type === 'count' && form.config.stream && form.config.good_expr"
           data-test="slos-addslo-preview-section"
@@ -337,10 +360,22 @@
           :scope="form.config.scope"
           :good-expr="form.config.good_expr"
         />
+        <SloTimeSlicePreview
+          v-else-if="form.sli_type === 'time_slice' && form.config.stream && form.config.query"
+          data-test="slos-addslo-timeslice-preview-section"
+          :stream-type="form.config.stream_type"
+          :stream="form.config.stream"
+          :scope="form.config.scope"
+          :aggregate="form.config.query"
+          :comparator="form.config.comparator"
+          :threshold="form.config.threshold"
+          :slice-interval-secs="form.slice_interval_secs"
+          :target="form.target"
+        />
 
         <!-- Summary. Mirrors the backend's own arithmetic so a budget rejection
            at save time is never the first time a user sees the numbers. -->
-        <SloSection :title="t('slos.section.summary')" class="h-fit">
+        <OFormSection :title="t('slos.section.summary')" class="h-fit">
           <dl class="text-compact grid grid-cols-[8rem_1fr] gap-y-2">
             <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
             <dd>{{ sliTypeLabel(form.sli_type) }}</dd>
@@ -367,7 +402,7 @@
           <OBanner variant="info" class="mt-3">
             {{ t("slos.backfillNote") }}
           </OBanner>
-        </SloSection>
+        </OFormSection>
       </div>
     </div>
   </OPageLayout>
@@ -381,8 +416,9 @@ import { useStore } from "vuex";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import SloSection from "@/components/slos/SloSection.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import SloPreviewChart from "@/components/slos/SloPreviewChart.vue";
+import SloTimeSlicePreview from "@/components/slos/SloTimeSlicePreview.vue";
 import SloExpressionField from "@/components/slos/SloExpressionField.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -419,7 +455,14 @@ const form = reactive<any>({
   config: { stream_type: "logs", stream: "", scope: "", good_expr: "" },
   target: 99.9,
   window_secs: 30 * 86400,
-  slice_interval_secs: 60,
+  // 5 minutes, not 1. For a count SLI the slice width does not touch the
+  // arithmetic at all — the window SLI is Σgood/Σtotal, and repartitioning the
+  // same events into different buckets changes neither sum — so a 60s slice
+  // buys bit-identical numbers for 5× the stored rows (139,680 per series at
+  // the 97-day horizon against 27,936). A time-slice SLI is the exception,
+  // because there the slice IS the unit scored good or bad; see the hint under
+  // the control.
+  slice_interval_secs: 300,
   group_by: null,
   groups_estimate: null,
   enabled: true,
@@ -557,6 +600,22 @@ const sliceOptions = computed(() => [
   { value: 60, label: t("slos.slice.1m"), disable: isGrouped.value },
   { value: 300, label: t("slos.slice.5m") },
 ]);
+
+/** What the slice width actually costs or buys, which is not the same question
+ *  per SLI type.
+ *
+ *  For a count SLI it buys nothing: the window SLI is Σgood/Σtotal, so
+ *  repartitioning the same events leaves both sums untouched and a finer slice
+ *  returns bit-identical numbers for five times the rows.
+ *
+ *  Where the slice is itself scored good or bad — time-slice, and alert-uptime
+ *  when it ships — the width IS the definition, and it sets the smallest amount
+ *  of budget one failure can spend. That is the case worth paying for. */
+const sliceNote = computed(() =>
+  form.sli_type === "time_slice" || form.sli_type === "alert"
+    ? t("slos.sliceNote.perSlice")
+    : t("slos.sliceNote.count"),
+);
 
 // D30: grouped SLOs are pinned to 5-minute slices. Enforced here as well as at
 // the API so the form cannot present a combination the backend will reject.

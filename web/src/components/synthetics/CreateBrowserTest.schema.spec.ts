@@ -38,7 +38,11 @@ function issuePaths(result: { success: boolean; error?: { issues: { path: Proper
 describe("makeBrowserCheckSaveSchema journey validation", () => {
   const schema = makeBrowserCheckSaveSchema(t);
 
-  it("should accept a v1 journey whose steps carry selectors", () => {
+  // A bare `selector` is the version-1 channel, and version 1 is gone. The
+  // element has to be named by the locator bundle, because that is the only
+  // thing buildV2Steps puts on the wire — a gate that accepted `selector`
+  // would wave through a journey the server then answers with a 400.
+  it("should reject a step whose only target is a version-1 selector", () => {
     const result = schema.safeParse(
       form([
         { id: "1", action: "navigate", value: "https://app.test" },
@@ -46,7 +50,8 @@ describe("makeBrowserCheckSaveSchema journey validation", () => {
       ]),
     );
 
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.selector");
   });
 
   // Regression: a check saved as steps_version 2 comes back with no `selector`
@@ -67,7 +72,6 @@ describe("makeBrowserCheckSaveSchema journey validation", () => {
                 value: 'internal:testid=[data-test="login-as-internal-user"]',
               },
             ],
-            user_override: null,
           },
         },
       ]),
@@ -77,14 +81,17 @@ describe("makeBrowserCheckSaveSchema journey validation", () => {
     expect(result.success).toBe(true);
   });
 
-  it("should accept a v2 step whose only target is a pinned override", () => {
+  it("should accept a step whose target is a locator the author wrote", () => {
     const result = schema.safeParse(
       form([
         { id: "1", action: "navigate", value: "https://app.test" },
         {
           id: "2",
           action: "click",
-          locator: { candidates: [], user_override: { kind: "css", value: "#login" } },
+          locator: {
+            candidates: [{ kind: "css", value: "#login", origin: "authored" }],
+            author_ordered: true,
+          },
         },
       ]),
     );
@@ -123,19 +130,82 @@ describe("makeBrowserCheckSaveSchema journey validation", () => {
   });
 });
 
+// Version 1 is retired, so the save gate is the only thing standing between an
+// unsaveable journey and a 400 from the server. It used to be silent: an
+// unsaveable journey simply fell back to the version-1 payload shape.
+describe("makeBrowserCheckSaveSchema version-2 save gate", () => {
+  const bundle = { candidates: [{ kind: "css", value: "#go" }] };
+  const opened = { id: "1", action: "navigate", value: "https://app.test" };
+
+  it("should reject a journey containing a retired action, naming the step", () => {
+    const schema = makeBrowserCheckSaveSchema(t);
+    const result = schema.safeParse(
+      form([opened, { id: "2", action: "wait", name: "Pause", value: "2000" }]),
+    );
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.action");
+  });
+
+  it("should name the step and the action in the retired-action message", () => {
+    const seen: Record<string, unknown>[] = [];
+    const spy = (key: string, params?: Record<string, unknown>) => {
+      if (params) seen.push(params);
+      return key;
+    };
+    makeBrowserCheckSaveSchema(spy).safeParse(
+      form([opened, { id: "2", action: "hover", name: "Reveal menu" }]),
+    );
+
+    expect(seen).toContainEqual({ step: "Reveal menu", action: "hover" });
+  });
+
+  it("should reject an element step whose locator bundle is empty", () => {
+    const schema = makeBrowserCheckSaveSchema(t);
+    const result = schema.safeParse(
+      form([opened, { id: "2", action: "click", name: "Sign in", locator: { candidates: [] } }]),
+    );
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain("journey.1.selector");
+  });
+
+  it("should name the step in the missing-target message", () => {
+    const seen: Record<string, unknown>[] = [];
+    const spy = (key: string, params?: Record<string, unknown>) => {
+      if (params) seen.push(params);
+      return key;
+    };
+    makeBrowserCheckSaveSchema(spy).safeParse(
+      form([opened, { id: "2", action: "click", name: "Sign in", locator: { candidates: [] } }]),
+    );
+
+    expect(seen).toContainEqual({ step: "Sign in" });
+  });
+
+  it("should accept a journey every step of which can be built as version 2", () => {
+    const schema = makeBrowserCheckSaveSchema(t);
+    const result = schema.safeParse(
+      form([opened, { id: "2", action: "click", name: "Sign in", locator: bundle }]),
+    );
+
+    expect(issuePaths(result)).toEqual([]);
+  });
+});
+
 // The step name is the string a failed run displays, and it was optional. Enforced
 // by min(1).trim() in this schema rather than a second validation path, matching
 // the monitor-level name rule. Recorded steps arrive already named from the
 // recorder, so the friction lands on hand-added steps (D10).
 describe("makeBrowserCheckSaveSchema step name", () => {
   const schema = makeBrowserCheckSaveSchema(t);
-  const pin = { candidates: [], user_override: { kind: "css", value: "#go" } };
+  const bundle = { candidates: [{ kind: "css", value: "#go" }] };
 
   it("should reject a step with a blank name", () => {
     const result = schema.safeParse(
       form([
         { id: "1", action: "navigate", value: "https://app.test" },
-        { id: "2", action: "click", name: "", locator: pin },
+        { id: "2", action: "click", name: "", locator: bundle },
       ]),
     );
 
@@ -147,7 +217,7 @@ describe("makeBrowserCheckSaveSchema step name", () => {
     const result = schema.safeParse(
       form([
         { id: "1", action: "navigate", value: "https://app.test" },
-        { id: "2", action: "click", name: "   ", locator: pin },
+        { id: "2", action: "click", name: "   ", locator: bundle },
       ]),
     );
 
@@ -189,7 +259,7 @@ describe("makeBrowserCheckSaveSchema step name", () => {
 // toast-only and covered two rules (SE-3).
 describe("makeBrowserCheckSaveSchema field-level step rules", () => {
   const schema = makeBrowserCheckSaveSchema(t);
-  const pin = { candidates: [], user_override: { kind: "css", value: "#go" } };
+  const bundle = { candidates: [{ kind: "css", value: "#go" }] };
   const opened = { id: "1", action: "navigate", value: "https://app.test" };
 
   it("should reject a navigate step whose URL is not http(s)", () => {
@@ -215,7 +285,7 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
   // A `type` step with no text types nothing and the run still passes.
   it("should reject a type step with no text", () => {
     const result = schema.safeParse(
-      form([opened, { id: "2", action: "type", value: "", locator: pin }]),
+      form([opened, { id: "2", action: "type", value: "", locator: bundle }]),
     );
 
     expect(result.success).toBe(false);
@@ -224,7 +294,7 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
 
   it("should accept a type step that has text", () => {
     const result = schema.safeParse(
-      form([opened, { id: "2", action: "type", value: "hunter2", locator: pin }]),
+      form([opened, { id: "2", action: "type", value: "hunter2", locator: bundle }]),
     );
 
     expect(result.success).toBe(true);
@@ -237,7 +307,7 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
         {
           id: "2",
           action: "assert",
-          locator: pin,
+          locator: bundle,
           assertion: { kind: "element_text", expected: "" },
         },
       ]),
@@ -251,7 +321,7 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
     const result = schema.safeParse(
       form([
         opened,
-        { id: "2", action: "assert", locator: pin, assertion: { kind: "element_visible" } },
+        { id: "2", action: "assert", locator: bundle, assertion: { kind: "element_visible" } },
       ]),
     );
 

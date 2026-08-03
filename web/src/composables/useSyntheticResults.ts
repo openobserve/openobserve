@@ -45,6 +45,17 @@ import {
 } from "@/composables/synthetics/syntheticResultsSchema";
 import useStreams from "@/composables/useStreams";
 
+/**
+ * Row cap on the runs-list query — the one that feeds the timeline, the
+ * breakdown cards, the table and the errors tab.
+ *
+ * Exported because consumers have to be able to say "this is the most recent
+ * N", not just render a truncated set as if it were everything: the KPI cards
+ * are computed by a separate aggregate query over the WHOLE window, so past
+ * this many executions the two legitimately disagree.
+ */
+export const RUNS_QUERY_LIMIT = 1000;
+
 const EMPTY_KPI: SyntheticKpi = {
   uptimePct: 0,
   p95Ms: 0,
@@ -140,14 +151,12 @@ export function useSyntheticResults() {
       const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
       const fields = ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name);
       if (!fields.length) {
-        // eslint-disable-next-line no-console
         console.warn(
           "[synthetics] stream schema returned no fields; optional columns will render as empty",
         );
       }
       return new Set(fields);
     } catch (e: unknown) {
-      // eslint-disable-next-line no-console
       console.warn(
         "[synthetics] stream schema unavailable — optional columns (init_ms, attempts, " +
           "retry_history, …) will render as empty, NOT as absent data:",
@@ -156,6 +165,19 @@ export function useSyntheticResults() {
       return new Set();
     }
   }
+
+  /**
+   * The runs list came back full, so it is the most recent `RUNS_QUERY_LIMIT`
+   * executions rather than every one in the window.
+   *
+   * Reported by the composable, not re-derived by each consumer: the cap is
+   * this module's decision, and anything built from `runs` (the timeline, the
+   * breakdown cards) is a partial view whenever this is true — while the KPI
+   * cards beside them are aggregated server-side over the whole window.
+   */
+  const runsTruncated = computed(
+    () => runsHasLoadedOnce.value && runs.value.length >= RUNS_QUERY_LIMIT,
+  );
 
   // ── Effective p95 — falls back to client-side computation from runs ──────
   //
@@ -243,7 +265,7 @@ export function useSyntheticResults() {
               // Fail Rate, durations and all — to report one missing column.
               // Degrade the flaky column instead, and say so rather than
               // rendering a silent zero.
-              // eslint-disable-next-line no-console
+
               console.warn("[synthetics] retry attribution query failed:", e);
               attributionFailed = true;
               return [] as Record<string, unknown>[];
@@ -354,7 +376,7 @@ export function useSyntheticResults() {
       // Group 3: Runs list — feeds timeline, breakdown cards, table,
       // steps tab, and errors tab. Typically the slowest query.
       const runsPromise = executeQuery(
-        buildRunsSql(monitorId, 1000, schemaFields),
+        buildRunsSql(monitorId, RUNS_QUERY_LIMIT, schemaFields),
         startTime,
         endTime,
         "logs",
@@ -471,6 +493,7 @@ export function useSyntheticResults() {
     kpi,
     buckets,
     runs,
+    runsTruncated,
     runDetail,
     protocolRunDetail,
     loading,

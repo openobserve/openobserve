@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import useSyntheticsRecorder from "./useSyntheticsRecorder";
@@ -137,12 +150,10 @@ describe("useSyntheticsRecorder", () => {
       expect(cmd.testIdAttr).toBe("data-test");
 
       // Stream steps
-      const browserSteps: WireStep[] = [
-        { id: "s1", action: "click", selector: "#go", selector_type: "css" },
-      ];
+      const browserSteps: WireStep[] = [{ id: "s1", action: "click", selector: "#go" }];
       emitStreamEvent({ method: "setActions", browserSteps });
       expect(r.liveSteps.value).toHaveLength(1);
-      expect(r.liveSteps.value[0].selectorType).toBe("CSS");
+      expect(r.liveSteps.value[0].selector).toBe("#go");
 
       emitStreamEvent({ method: "recordingStarted", tabId: 9, url: "https://app.test/next" });
       expect(r.currentUrl.value).toBe("https://app.test/next");

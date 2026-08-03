@@ -38,6 +38,12 @@ import {
   mapHistogram,
   mapKpi,
   mapRun,
+  evidenceOriginTs,
+  evidenceSeverity,
+  indexEvidenceByStep,
+  stepOwnDetail,
+  mergeLocatorLadder,
+  type EvidenceEvent,
 } from "./syntheticResultsSchema";
 
 describe("syntheticResultsSchema query builders", () => {
@@ -902,5 +908,374 @@ describe("run timing breakdown", () => {
       started_ts: 1_700_000_000_000_000,
     });
     expect(run.queueDelayMs).toBe(0);
+  });
+});
+
+// ── Evidence ranking and step attribution ──────────────────────────────────
+
+/** A minimal event; every field the shape requires, overridable per case. */
+const evidenceEv = (over: Partial<EvidenceEvent>): EvidenceEvent => ({
+  ts: 0,
+  stepId: "s1",
+  kind: "response",
+  level: null,
+  text: null,
+  message: null,
+  stack: null,
+  method: null,
+  url: null,
+  status: null,
+  resourceType: null,
+  initiatedTs: null,
+  durationMs: null,
+  firstParty: true,
+  ...over,
+});
+
+describe("evidence origin", () => {
+  it("takes the earliest instant, whatever order the events arrive in", () => {
+    // Buckets are ranked worst-first, so the earliest event is rarely index 0.
+    expect(
+      evidenceOriginTs([evidenceEv({ ts: 900 }), evidenceEv({ ts: 100 }), evidenceEv({ ts: 500 })]),
+    ).toBe(100);
+  });
+
+  it("places an event where the work began, not where it landed", () => {
+    expect(evidenceOriginTs([evidenceEv({ ts: 5_000, initiatedTs: 1_000 })])).toBe(1_000);
+  });
+
+  it("has no origin for an empty bundle, rather than pretending to zero", () => {
+    expect(evidenceOriginTs([])).toBeNull();
+  });
+});
+
+describe("evidence severity ranking", () => {
+  it("ranks a page error above a failed request above a console error", () => {
+    expect(evidenceSeverity(evidenceEv({ kind: "pageerror" }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ kind: "requestfailed" })),
+    );
+    expect(evidenceSeverity(evidenceEv({ kind: "requestfailed" }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ kind: "console", level: "error" })),
+    );
+  });
+
+  it("ranks a 5xx above a 4xx above a healthy response", () => {
+    expect(evidenceSeverity(evidenceEv({ status: 503 }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ status: 401 })),
+    );
+    expect(evidenceSeverity(evidenceEv({ status: 401 }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ status: 200 })),
+    );
+  });
+
+  it("treats a crash as a page error, not as an unranked kind", () => {
+    expect(evidenceSeverity(evidenceEv({ kind: "crash" }))).toBe(
+      evidenceSeverity(evidenceEv({ kind: "pageerror" })),
+    );
+  });
+
+  it("does not promote a non-error console line", () => {
+    // A console.log is not a finding; it must not outrank a 404.
+    expect(evidenceSeverity(evidenceEv({ kind: "console", level: "log" }))).toBeGreaterThan(
+      evidenceSeverity(evidenceEv({ status: 404 })),
+    );
+  });
+});
+
+describe("indexEvidenceByStep", () => {
+  it("buckets events under their own step", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ stepId: "s1" }),
+      evidenceEv({ stepId: "s2" }),
+      evidenceEv({ stepId: "s1" }),
+    ]);
+    expect(byStep.get("s1")).toHaveLength(2);
+    expect(byStep.get("s2")).toHaveLength(1);
+  });
+
+  it("returns unattributed events separately rather than under a null key", () => {
+    // "we could not attribute this" is a finding, not a step.
+    const { byStep, unattributed } = indexEvidenceByStep([
+      evidenceEv({ stepId: null }),
+      evidenceEv({ stepId: "s1" }),
+    ]);
+    expect(unattributed).toHaveLength(1);
+    expect(byStep.has("s1")).toBe(true);
+    expect(byStep.size).toBe(1);
+  });
+
+  it("ranks each bucket by severity, worst first", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 200 }),
+      evidenceEv({ kind: "pageerror" }),
+      evidenceEv({ status: 503 }),
+    ]);
+    expect(
+      byStep.get("s1")!.map((e) => (e.kind === "pageerror" ? "page" : String(e.status))),
+    ).toEqual(["page", "503", "200"]);
+  });
+
+  it("ranks first-party above third-party at equal severity", () => {
+    // Third-party is ranked below, never dropped (design D6).
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 503, firstParty: false, url: "https://cdn.example.io/a" }),
+      evidenceEv({ status: 503, firstParty: true, url: "https://app.example.dev/b" }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.firstParty)).toEqual([true, false]);
+  });
+
+  it("orders equal-severity, equal-party events by when they were initiated", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 200, initiatedTs: 300 }),
+      evidenceEv({ status: 200, initiatedTs: 100 }),
+      evidenceEv({ status: 200, initiatedTs: 200 }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.initiatedTs)).toEqual([100, 200, 300]);
+  });
+
+  it("falls back to the observed timestamp when nothing was initiated", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ kind: "console", level: "log", ts: 500 }),
+      evidenceEv({ kind: "console", level: "log", ts: 100 }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.ts)).toEqual([100, 500]);
+  });
+});
+
+// ── Per-step settle attribution ────────────────────────────────────────────
+//
+// Shapes copied from a live "OpenObserve Sys Query" failure (run 3HFCZ3fm…),
+// where failure_detail carried the whole journey's 13 signals while the failed
+// step owned none of them.
+describe("stepOwnDetail", () => {
+  const RUN_LEVEL = {
+    stepId: "s15",
+    stepName: "Click on synthetics_results",
+    stepIndex: 15,
+    error: "did not become visible within 30000 ms",
+    candidatesTried: [],
+    settleSignals: [
+      {
+        kind: "response" as const,
+        signal: "POST **/auth/login",
+        status: "fired" as const,
+        required: false,
+        waitedMs: 5298,
+      },
+      {
+        kind: "navigation" as const,
+        signal: "navigation to **/web/logs/**",
+        status: "fired" as const,
+        required: false,
+        waitedMs: 2532,
+      },
+      {
+        kind: "response" as const,
+        signal: "POST **/_search_stream",
+        status: "stale" as const,
+        required: false,
+        waitedMs: 30274,
+      },
+    ],
+    settleMs: 30274,
+    observedDurationMs: 1200,
+    screenshotKey: null,
+    traceKey: null,
+  };
+
+  const step = (over: any) => ({
+    step_id: "s14",
+    status: "ok" as const,
+    duration_ms: 30285,
+    error: null,
+    start_time: 0,
+    end_time: 1,
+    screenshot_key: null,
+    ...over,
+  });
+
+  it("gives the failing step only the signals it actually owns", () => {
+    // The run-level list is an accumulation across every step; rendering it on
+    // the failed step credits it with traffic from steps it never ran.
+    const d = stepOwnDetail(
+      step({ step_id: "s15", status: "fail", settle_signals: [] }),
+      RUN_LEVEL,
+    );
+    expect(d?.settleSignals).toEqual([]);
+    expect(d?.error).toBe("did not become visible within 30000 ms");
+  });
+
+  it("puts a stale signal on the step that produced it", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [
+          {
+            kind: "response",
+            signal: "POST **/_search_stream",
+            status: "stale",
+            required: false,
+            waited_ms: 30274,
+          },
+        ],
+      }),
+      RUN_LEVEL,
+    );
+    expect(d?.settleSignals).toHaveLength(1);
+    expect(d?.settleSignals[0]).toMatchObject({ status: "stale", waitedMs: 30274 });
+  });
+
+  it("normalises waited_ms the same way the run-level mapper does", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 46 }],
+      }),
+      RUN_LEVEL,
+    );
+    expect(d?.settleSignals[0].waitedMs).toBe(46);
+    expect(d?.settleSignals[0].required).toBe(false);
+  });
+
+  it("carries the step's own locator candidates", () => {
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "button", outcome: "matched" }] }),
+      RUN_LEVEL,
+    );
+    expect(d?.candidatesTried).toHaveLength(1);
+  });
+
+  it("returns null for a passing step with nothing of its own to show", () => {
+    // Otherwise every row grows an empty evidence block.
+    expect(stepOwnDetail(step({}), RUN_LEVEL)).toBeNull();
+  });
+
+  it("never borrows the run-level error for a step that did not fail", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }],
+      }),
+      RUN_LEVEL,
+    );
+    expect(d?.error).toBe("");
+  });
+
+  it("works when there is no run-level failure detail at all", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }],
+      }),
+      null,
+    );
+    expect(d?.settleSignals).toHaveLength(1);
+    expect(d?.stepId).toBe("s14");
+  });
+});
+
+// ── Locator ladder ─────────────────────────────────────────────────────────
+//
+// Shapes from the live "OpenObserve Cloud Happy Path" failure: step 16 asserts
+// a single role locator and reports `used_as_primary`, while its click steps
+// carry two or three candidates. Nothing on the record said which was which.
+describe("mergeLocatorLadder", () => {
+  const authored = [
+    { kind: "test_attribute", value: 'internal:testid=[data-test="x"]' },
+    { kind: "role", value: "internal:role=button" },
+    { kind: "css", value: "#submit" },
+  ];
+
+  it("marks authored candidates the probe never reached as not_tried", () => {
+    // `not_tried` has been in the union since the type was written and nothing
+    // ever produced it — this is the case it was for.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "test_attribute", value: 'internal:testid=[data-test="x"]', outcome: "matched" }],
+      authored,
+    );
+    expect(ladder.map((c) => c.outcome)).toEqual(["matched", "not_tried", "not_tried"]);
+  });
+
+  it("keeps the authored order, which is the order the probe walks them", () => {
+    const ladder = mergeLocatorLadder([], authored);
+    expect(ladder.map((c) => c.kind)).toEqual(["test_attribute", "role", "css"]);
+  });
+
+  it("pairs an outcome to its candidate by value, not by position", () => {
+    // A probe that skips a rung would otherwise shift every outcome up one.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "css", value: "#submit", outcome: "matched" }],
+      authored,
+    );
+    expect(ladder[2]).toMatchObject({ value: "#submit", outcome: "matched" });
+    expect(ladder[0].outcome).toBe("not_tried");
+  });
+
+  it("falls back to what was tried when the record carries no authored bundle", () => {
+    // Older records predate the locator bundle; showing nothing would be worse
+    // than showing the attempts.
+    const tried = [{ kind: "role", value: "r", outcome: "used_as_primary" as const }];
+    expect(mergeLocatorLadder(tried, undefined)).toEqual(tried);
+    expect(mergeLocatorLadder(tried, [])).toEqual(tried);
+  });
+
+  it("keeps an attempted candidate the authored bundle does not list", () => {
+    // Self-healing may reach for something not in the bundle; dropping it would
+    // hide the locator that actually ran.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "role", value: "surprise", outcome: "matched" }],
+      authored,
+    );
+    expect(ladder.some((c) => c.value === "surprise")).toBe(true);
+    expect(ladder).toHaveLength(4);
+  });
+
+  it("returns nothing when there is neither a bundle nor an attempt", () => {
+    expect(mergeLocatorLadder([], undefined)).toEqual([]);
+  });
+});
+
+describe("stepOwnDetail locator ladder", () => {
+  const step = (over: any) => ({
+    step_id: "s16",
+    status: "fail" as const,
+    duration_ms: 60000,
+    error: null,
+    start_time: 0,
+    end_time: 1,
+    screenshot_key: null,
+    ...over,
+  });
+  const RUN = {
+    stepId: "s16",
+    stepName: "Assert visible row",
+    stepIndex: 16,
+    error: "Timeout 60000ms exceeded",
+    candidatesTried: [],
+    settleSignals: [],
+    settleMs: null,
+    observedDurationMs: null,
+    screenshotKey: null,
+    traceKey: null,
+  };
+
+  it("shows the whole authored ladder, not only what ran", () => {
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "a", outcome: "used_as_primary" }] }),
+      RUN,
+      [
+        { kind: "role", value: "a" },
+        { kind: "css", value: "b" },
+      ],
+    );
+    expect(d?.candidatesTried).toHaveLength(2);
+    expect(d?.candidatesTried[1].outcome).toBe("not_tried");
+  });
+
+  it("reports a one-rung ladder as exactly that", () => {
+    // The Happy Path failure: one authored candidate, so no fallback existed.
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "a", outcome: "used_as_primary" }] }),
+      RUN,
+      [{ kind: "role", value: "a" }],
+    );
+    expect(d?.candidatesTried).toHaveLength(1);
+    expect(d?.candidatesTried[0].outcome).toBe("used_as_primary");
   });
 });

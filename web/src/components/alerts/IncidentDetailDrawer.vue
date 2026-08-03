@@ -69,6 +69,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </span>
+
+          <span v-if="externalSources.length" class="inline-flex cursor-default">
+            <OTag variant="default-outline" data-test="incident-external-source-badge">
+              <OIcon name="webhook" size="xs" />
+              {{ externalSources.join(", ") }}
+            </OTag>
+            <OTooltip
+              :content="
+                t('alerts.incidents.externalSourceTooltip') + ': ' + externalSources.join(', ')
+              "
+            />
+          </span>
         </template>
       </template>
 
@@ -1684,6 +1696,18 @@ export default defineComponent({
       }
     });
 
+    // Distinct external sources (Grafana, Alertmanager, etc.) that fed this
+    // incident — empty when every contributing alert is an internal O2 alert.
+    const externalSources = computed(() => {
+      const sources = new Set<string>();
+      for (const trigger of triggers.value) {
+        if (trigger.alert_kind === "external" && trigger.detected_source) {
+          sources.add(trigger.detected_source);
+        }
+      }
+      return Array.from(sources);
+    });
+
     // Helper: Get actual trigger count for a specific alert_id
     const getTriggerCountForAlert = (alertId: string) => {
       if (!triggers.value) return 0;
@@ -2284,7 +2308,7 @@ export default defineComponent({
         const response = await incidentsService.get(org, incidentId);
 
         incidentDetails.value = response.data;
-        triggers.value = (response.data as any).triggers || [];
+        triggers.value = response.data.triggers || [];
         alerts.value = response.data.alerts || [];
 
         // Initialize editable status and severity from incident data
@@ -3337,6 +3361,7 @@ export default defineComponent({
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
+      externalSources,
       getTriggerCountForAlert,
       uniqueAlertsMap,
       uniqueAlertsCount,

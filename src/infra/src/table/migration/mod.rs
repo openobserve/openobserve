@@ -151,6 +151,9 @@ mod m20260727_000002_add_slo_columns_to_alerts;
 mod m20260728_000001_create_workflows_associations_table;
 mod m20260729_000001_add_promql_multi_alert_to_alerts;
 mod m20260730_000001_add_alert_state_to_synthetics_monitors;
+mod m20260730_000002_create_incident_integrations;
+mod m20260730_000003_create_external_alerts;
+mod m20260730_000004_add_alert_kind_to_incident_alerts;
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -168,38 +171,6 @@ pub(crate) async fn create_slo_tables_for_test(
     m20260727_000001_create_slo_tables::Migration
         .up(&manager)
         .await
-}
-
-/// Apply the `alert_states` chain, for targeted integration tests (§7.6).
-///
-/// Three migrations because the level columns and the group-lifecycle columns
-/// arrived after the tables. Applied in order, as production would.
-#[cfg(test)]
-pub(crate) async fn create_alert_state_tables_for_test(
-    db: &sea_orm::DatabaseConnection,
-) -> Result<(), DbErr> {
-    use sea_orm::ConnectionTrait;
-    use sea_orm_migration::MigrationTrait;
-    let manager = SchemaManager::new(db);
-
-    // m20260725_000002 ALTERs `alerts` as well as `alert_states`, so the
-    // table has to exist. A minimal stand-in is enough and is honest about
-    // what the fixture provides: these tests are about alert *state*, not
-    // about the alerts table, and building the real one would mean replaying
-    // years of unrelated migrations.
-    db.execute_unprepared("CREATE TABLE IF NOT EXISTS alerts (id VARCHAR(27) PRIMARY KEY)")
-        .await?;
-
-    m20260725_000001_create_alert_states_tables::Migration
-        .up(&manager)
-        .await?;
-    m20260725_000002_add_threshold_and_level_columns::Migration
-        .up(&manager)
-        .await?;
-    m20260726_000003_add_group_lifecycle_columns::Migration
-        .up(&manager)
-        .await?;
-    Ok(())
 }
 
 pub struct Migrator;
@@ -341,6 +312,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260728_000001_create_workflows_associations_table::Migration),
             Box::new(m20260729_000001_add_promql_multi_alert_to_alerts::Migration),
             Box::new(m20260730_000001_add_alert_state_to_synthetics_monitors::Migration),
+            Box::new(m20260730_000002_create_incident_integrations::Migration),
+            Box::new(m20260730_000003_create_external_alerts::Migration),
+            Box::new(m20260730_000004_add_alert_kind_to_incident_alerts::Migration),
         ]
     }
 }

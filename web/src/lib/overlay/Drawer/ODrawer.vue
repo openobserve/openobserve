@@ -178,6 +178,8 @@ const sizeClasses = computed(() => {
       return "w-[min(640px,100vw)]";
     case "xl":
       return "w-[min(800px,100vw)]";
+    case "xxl":
+      return "w-[min(1000px,100vw)]";
     case "full":
       return "w-screen";
     default:

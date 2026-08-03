@@ -126,6 +126,7 @@ function startResize(header: any, event: MouseEvent | TouchEvent) {
 }
 
 const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
+const boundedFillTable = inject<{ value: boolean } | null>("o2TableBoundedFill", null);
 
 function handleSort(columnId: string, toggleHandler?: (event: Event) => void, event?: MouseEvent) {
   const meta = props.table.getColumn(columnId)?.columnDef?.meta as any;
@@ -188,8 +189,30 @@ function handleDraggableUpdate(next: string[]): void {
   emit("update:columnOrder", pinFirst(cursor === reordered.length ? fullOrder : reordered));
 }
 
+// Mirrors `isSizeClamped` in OTableBodyCell — keep the two in step.
+function sizeClamped(header: any): boolean {
+  const meta = header.column.columnDef.meta as any;
+  return (
+    !!boundedFillTable?.value &&
+    !props.wrap &&
+    !meta?.autoWidth &&
+    !meta?.fixedWidth &&
+    !meta?.isAction
+  );
+}
+
 function isAutoWidthColumn(header: any): boolean {
   return (header.column.columnDef.meta as any)?.autoWidth === true;
+}
+
+// Mirrors the autoWidth branch of OTableBodyCell's `cellStyle`.
+function autoWidthHeaderStyle(header: any): Record<string, string> {
+  const style: Record<string, string> = {};
+  const min = header.column.columnDef.minSize;
+  if (min && !props.wrap) style.minWidth = `${min}px`;
+  const meta = header.column.columnDef.meta as any;
+  if (meta?.fillRemaining && horizontalScroll?.value && !props.wrap) style.maxWidth = "0";
+  return style;
 }
 
 function headerAlignClass(header: any): string {
@@ -458,9 +481,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         ]"
         :style="{
           ...(isAutoWidthColumn(header)
-            ? header.column.columnDef.minSize && !wrap
-              ? { minWidth: `${header.column.columnDef.minSize}px` }
-              : {}
+            ? autoWidthHeaderStyle(header)
             : (header.column.columnDef.meta as any)?.fixedWidth
               ? {
                   width: headerSizeVar(header),
@@ -468,9 +489,15 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   maxWidth: headerSizeVar(header),
                 }
               : horizontalScroll?.value
-                ? wrap
-                  ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
-                  : { width: headerSizeVar(header) }
+                ? sizeClamped(header)
+                  ? {
+                      width: headerSizeVar(header),
+                      minWidth: headerSizeVar(header),
+                      maxWidth: headerSizeVar(header),
+                    }
+                  : wrap
+                    ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
+                    : { width: headerSizeVar(header) }
                 : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
@@ -732,9 +759,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         ]"
         :style="{
           ...(isAutoWidthColumn(header)
-            ? header.column.columnDef.minSize && !wrap
-              ? { minWidth: `${header.column.columnDef.minSize}px` }
-              : {}
+            ? autoWidthHeaderStyle(header)
             : (header.column.columnDef.meta as any)?.fixedWidth
               ? {
                   width: headerSizeVar(header),
@@ -742,9 +767,15 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   maxWidth: headerSizeVar(header),
                 }
               : horizontalScroll?.value
-                ? wrap
-                  ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
-                  : { width: headerSizeVar(header) }
+                ? sizeClamped(header)
+                  ? {
+                      width: headerSizeVar(header),
+                      minWidth: headerSizeVar(header),
+                      maxWidth: headerSizeVar(header),
+                    }
+                  : wrap
+                    ? { width: headerSizeVar(header), minWidth: headerSizeVar(header) }
+                    : { width: headerSizeVar(header) }
                 : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
           ...(header.column.getIsPinned?.() === 'left'
             ? {

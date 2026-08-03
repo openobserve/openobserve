@@ -1,6 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { LocatorCandidate, LocatorKind } from "@/types/synthetics";
+import type { LocatorCandidate } from "@/types/synthetics";
 
 /**
  * The web mirror of the recorder's locator-stability rules.
@@ -30,57 +43,48 @@ export function isPositionalSelector(selector: string): boolean {
 }
 
 /**
- * Most survivable first.
+ * Ids and classes a component library mints per render.
  *
- * A test attribute exists to be selected on, so it changes only deliberately. A
- * role plus accessible name follows the element's meaning rather than its
- * markup. Text survives restyling but not copy edits or translation. CSS and
- * XPath describe structure, which is exactly what a redesign rewrites.
+ * Ported from `crx`. Upstream emits `#id` ahead of tag-name CSS and filters only
+ * GUID-like values through `isGuidLike`, so a per-render id is neither caught
+ * nor stable: `#reka-popover-trigger-v-21` appeared in a real recording and
+ * changes on the next mount.
+ *
+ * Each pattern is anchored on the library's own prefix and requires the volatile
+ * part, so an author-written `#main-content` or `.css-grid-wrapper` is
+ * untouched. It used to demote a candidate inside the recorder's sort, which
+ * nobody could see; it drives a per-row warning here instead, because the author
+ * is the only one who can act on it.
  */
-export const LOCATOR_KIND_RANK: Record<LocatorKind, number> = {
-  test_attribute: 0,
-  role: 1,
-  text: 2,
-  css: 3,
-  xpath: 4,
-};
+const FRAMEWORK_ID_PATTERNS: RegExp[] = [
+  // Reka UI / Radix: #reka-popover-trigger-v-21, #radix-:r3:
+  /[#[]?"?(?:reka|radix)-[\w-]*v?-?\d+/i,
+  // React useId: :r0:, :r1a:. A CSS selector escapes both colons, so the closing
+  // one arrives as `\:` — matching only the bare form missed every real case.
+  /:r[0-9a-z]+\\?:/,
+  // Angular view encapsulation: _ngcontent-abc-c12, _nghost-…
+  /_ng(?:content|host)-/,
+  // Emotion / styled-components hashed class: .css-1q2w3e4 (hash, not a word)
+  /\.css-(?=[a-z0-9]*\d)[a-z0-9]{5,}\b/i,
+  // Vue scoped styles: [data-v-7ba5bd90]
+  /\[data-v-[0-9a-f]{6,}\]/i,
+  // Vue useId(): #v-0, #v-1-2. Upstream's isGuidLike happens to catch these
+  // while the counter stays under three digits and stops at #v-100, so a
+  // long-lived page's ids slipped through exactly when they mattered most.
+  /#v-\d+(?:-\d+)*$/,
+];
 
-/**
- * Sort a stored bundle the way the recorder would sort it today.
- *
- * Positionality is the PRIMARY key, because Playwright's own scoring says so:
- * `kNthScore` is 10000 against kind scores of 500-530, i.e. upstream treats
- * "needed an index" as an order of magnitude worse than any distinction between
- * kinds. A candidate without an index matched exactly one element when it was
- * recorded; one with an index did not. Better evidence of a worse kind still
- * beats worse evidence of a better one.
- *
- * Stable within a group: ties keep the order the generator produced, so a
- * deterministic recording renders deterministically.
- */
-export function rankCandidates(candidates: LocatorCandidate[]): LocatorCandidate[] {
-  return candidates
-    .map((candidate, index) => ({
-      candidate,
-      positional: isPositionalSelector(candidate.value),
-      index,
-    }))
-    .sort(
-      (a, b) =>
-        Number(a.positional) - Number(b.positional) ||
-        LOCATOR_KIND_RANK[a.candidate.kind] - LOCATOR_KIND_RANK[b.candidate.kind] ||
-        a.index - b.index,
-    )
-    .map((c) => c.candidate);
+/** Does this locator depend on an id the framework regenerates each render? */
+export function isFrameworkGeneratedId(selector: string): boolean {
+  return FRAMEWORK_ID_PATTERNS.some((re) => re.test(selector));
 }
 
 /**
  * Could the recorder identify this element at all?
  *
- * When every candidate is positional, re-ranking them changes nothing — the
+ * When every candidate is positional, reordering them changes nothing — the
  * step is identified by counting siblings whichever one is chosen. That is the
- * case the author has to resolve by pinning, and the only case that warrants
- * telling them so.
+ * case the author resolves by combining two of them, or by writing their own.
  */
 export function isFullyPositional(candidates: LocatorCandidate[]): boolean {
   return candidates.length > 0 && candidates.every((c) => isPositionalSelector(c.value));

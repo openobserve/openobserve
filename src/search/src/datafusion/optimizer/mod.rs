@@ -46,7 +46,6 @@ use {
     crate::datafusion::optimizer::logical_optimizer::cipher::{
         RewriteCipherCall, RewriteCipherKey,
     },
-    o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
     o2_enterprise::enterprise::search::datafusion::optimizer::eliminate_aggregate::EliminateAggregateRule,
 };
 
@@ -59,7 +58,7 @@ use crate::{
             rewrite_histogram::RewriteHistogram,
         },
         physical_optimizer::{
-            distribute_analyze::optimize_distribute_analyze,
+            aggregate_topk::AggregateTopkRule, distribute_analyze::optimize_distribute_analyze,
             index_optimizer::LeaderIndexOptimizerRule, join_reorder::JoinReorderRule,
             remote_scan::generate_remote_scan_rules,
         },
@@ -178,10 +177,7 @@ pub fn generate_physical_optimizer_rules(
                 rules.push(generate_remote_scan_rules(req, sql, context));
             }
             PhysicalOptimizerContext::AggregateTopk => {
-                #[cfg(feature = "enterprise")]
                 rules.push(Arc::new(AggregateTopkRule::new(sql.limit)));
-                #[cfg(not(feature = "enterprise"))]
-                continue;
             }
             PhysicalOptimizerContext::StreamingAggregation(context) => {
                 if let Some(_context) = context {

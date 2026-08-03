@@ -40,8 +40,19 @@
          content. Monaco does not wrap by default and its horizontal scrollbar
          is `auto`, so a long predicate scrolls sideways — which is the
          single-line behaviour we want, not clipped text. -->
+    <!-- Monaco paints its OWN background from the editor theme, and
+         `myCustomTheme` sets `editor.background: #fafafa` — which is exactly
+         `--color-grey-50`, the value `bg-card-bg` resolves to for the section
+         behind this field. Identical colours, so the input vanished into the
+         card. Neutralising the editor's own fill lets the wrapper's
+         `bg-input-bg` (white, the same token OInput uses) show through, which
+         is what makes this read as a field like the ones around it.
+
+         Overridden here rather than in the theme: `editor.background` is
+         global, and the logs search bar and query editors are built expecting
+         that grey. -->
     <div
-      class="rounded-default border-border-default bg-surface-base h-[2.125rem] overflow-hidden border"
+      class="rounded-default border-input-border bg-input-bg h-[2.125rem] overflow-hidden border [&_.monaco-editor]:bg-transparent [&_.monaco-editor_.margin]:bg-transparent [&_.monaco-editor-background]:bg-transparent"
       :class="focused ? 'border-input-border-focus' : ''"
     >
       <CodeQueryEditor
