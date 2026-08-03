@@ -902,6 +902,21 @@ export default defineComponent({
           model: MonacoEditor.editor.ITextModel,
           position: MonacoEditor.Position,
         ) {
+          // Answer only for THIS editor's model.
+          //
+          // Monaco registers completion providers globally per LANGUAGE, not
+          // per editor, and aggregates the results of every registered
+          // provider. Each instance of this component registers one, so with
+          // two SQL editors mounted at once every suggestion was returned
+          // twice — three editors, three times. The duplicates are not a
+          // keyword-list bug: each provider is correctly returning the full
+          // list, for an editor that did not ask.
+          //
+          // Guarded on `editorObj` because the provider is registered before
+          // the editor finishes creating; until then answering is correct.
+          const own = editorObj?.getModel?.();
+          if (own && model !== own) return { suggestions: [] };
+
           // find out if we are completing a property in the 'dependencies' object.
           var textUntilPosition = model.getValueInRange({
             startLineNumber: 1,

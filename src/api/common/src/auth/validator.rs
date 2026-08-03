@@ -784,7 +784,8 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         && (path_columns[2].eq("alerts")
             || path_columns[2].eq("folders")
             || path_columns[2].eq("reports")
-            || path_columns[2].eq("synthetics"))
+            || path_columns[2].eq("synthetics")
+            || path_columns[2].eq("incidents"))
     {
         path_columns[1]
     } else {

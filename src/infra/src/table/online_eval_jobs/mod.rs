@@ -19,7 +19,7 @@ use config::meta::{
     pipeline::components::ScorerRef,
     self_reporting::{
         evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM,
-        usage::is_reserved_self_reporting_stream,
+        usage::is_reserved_internal_stream,
     },
 };
 use sea_orm::{
@@ -50,7 +50,7 @@ pub fn is_reserved_eval_source_stream(stream: &str) -> bool {
     let stream = stream.trim().to_ascii_lowercase();
     stream == EVALUATOR_STREAM
         || stream == LLM_SCORES_STREAM
-        || is_reserved_self_reporting_stream(&stream)
+        || is_reserved_internal_stream(&stream)
         || matches!(
             stream.as_str(),
             "eval.task.span"

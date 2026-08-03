@@ -1,31 +1,32 @@
 <template>
-  <!-- Standard app header: back tile + "Add Function" title, with the name/
-       transform-type fields inline (#tabs) and the action buttons (#actions).
-       The name + transType controls are form-owned (OForm*); the parent
-       AddFunction.vue provides the <OForm> context they inject. -->
+  <!-- Standard app header: back tile + the function NAME as the title (inline-
+       edited in place, so it is not a boxed field wedged into the toolbar), the
+       mode as the subtitle, the transform-type radios inline (#tabs) and the
+       action buttons (#actions). The name + transType controls are form-owned
+       (OForm*); the parent AddFunction.vue provides the <OForm> context they
+       inject — which is what lets the title live in the #title slot. -->
   <OPageHeader
-    :title="t('function.addFunction')"
+    :subtitle="t('function.addFunction')"
+    title-overflow="visible"
     :back="{
       label: t('function.header'),
       onClick: redirectToFunctions,
       dataTest: 'add-function-back-btn',
     }"
   >
+    <template #title>
+      <OFormInlineEdit
+        name="name"
+        data-test="add-function-name-input"
+        :placeholder="t('function.name')"
+        :aria-label="t('function.name')"
+        :edit-hint="t('function.renameHint')"
+        :readonly="disableName"
+        :disabled="disableName"
+      />
+    </template>
     <template #tabs>
       <div class="o2-input flex items-center gap-6">
-        <div class="flex items-center">
-          <OFormInput
-            name="name"
-            data-test="add-function-name-input"
-            :placeholder="t('function.name')"
-            class="w-full p-0"
-            :readonly="disableName"
-            :disabled="disableName"
-            required
-            tabindex="0"
-            style="min-width: 300px"
-          />
-        </div>
         <!-- Transform Type Radio Buttons -->
         <div class="flex h-9 items-center gap-4">
           <!-- Language toggle hidden when a host forces a single language
@@ -150,7 +151,7 @@ import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";

@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ t("dashboard.inlinePreview") }}</span>
           </div>
           <div
-            class="rounded-default overflow-hidden border border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] [&_[data-test=dashboard-table-cell-copy-btn]]:hidden!"
+            class="rounded-default overflow-hidden border border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] [&_[data-test^=o2-table-cell-copy-]]:hidden!"
           >
             <TableRenderer
               v-if="selectedPreview"

@@ -44,6 +44,8 @@ const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
+const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
+const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
@@ -423,11 +425,104 @@ const useRoutes = () => {
       ],
     },
     {
+      path: "slos",
+      name: "sloList",
+      component: () => import("@/views/slos/SloList.vue"),
+      meta: {
+        title: "SLOs",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Literal segments before the {slo_id} catch-all, matching the router's
+      // ordering rule.
+      path: "slos/add",
+      name: "addSlo",
+      component: () => import("@/views/slos/AddSlo.vue"),
+      meta: {
+        title: "New SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "slos/edit/:slo_id",
+      name: "editSlo",
+      component: () => import("@/views/slos/AddSlo.vue"),
+      meta: {
+        title: "Edit SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "slos/:slo_id",
+      name: "sloDetail",
+      component: () => import("@/views/slos/SloDetail.vue"),
+      meta: {
+        title: "SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "alerts",
       name: "alertList",
       component: AlertList,
       meta: {
         title: "Alerts",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Notification destinations and templates: alerting configuration, so
+      // they moved out of /settings (which wrapped them in the Settings shell)
+      // and into the Reliability rail group.
+      //
+      // Top-level and FLAT, not under /alerts: they are siblings of Alerts, not
+      // sub-pages of it. Nesting them made the URL claim otherwise, and the rail
+      // believed it — /alerts/destinations lit up Alerts as well, because that
+      // is exactly how a real drill-down like /alerts/detail/:id behaves. Every
+      // other Reliability section is top-level too (/alerts, /slos, /incidents).
+      //
+      // The route NAMES are unchanged — every call site navigates by name — and
+      // the old /settings/* paths still redirect here for existing bookmarks.
+      path: "alert-destinations",
+      name: "alertDestinations",
+      component: AlertsDestinationList,
+      meta: {
+        title: "Notification Destinations",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alert-templates",
+      name: "alertTemplates",
+      component: TemplateList,
+      meta: {
+        title: "Templates",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Alert status page. Replaces the row-click side panel, and is where a
+      // multi-alert's per-group state lives (alerts_2.md §5.4).
+      path: "alerts/detail/:alert_id",
+      name: "alertDetail",
+      component: () => import("@/views/alerts/AlertDetail.vue"),
+      meta: {
+        title: "Alert Detail",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

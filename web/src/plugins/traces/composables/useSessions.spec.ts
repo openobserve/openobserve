@@ -50,6 +50,7 @@ beforeEach(() => {
   const s = useSessions();
   s.sessions.value = [];
   s.total.value = 0;
+  s.totalIsExact.value = true;
   s.loading.value = false;
   s.error.value = null;
   s.hasLoadedOnce.value = false;
@@ -176,6 +177,18 @@ describe("useSessions — fetchPage: field mapping", () => {
     await fetchPage("stream", 1000, 2000, 0, 25);
 
     expect(total.value).toBe(42);
+  });
+
+  it("marks a lower-bound total as inexact while another page exists", async () => {
+    mockSessionsList.mockResolvedValue({
+      data: { hits: [], total: 21, has_more: true, total_is_exact: false },
+    });
+
+    const { total, totalIsExact, fetchPage } = useSessions();
+    await fetchPage("stream", 1000, 2000, 0, 20);
+
+    expect(total.value).toBe(21);
+    expect(totalIsExact.value).toBe(false);
   });
 
   it("sets hasLoadedOnce=true after successful fetch", async () => {

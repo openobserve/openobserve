@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { DateTime } from "luxon";
 import type {
   BrowserCheck,
@@ -12,7 +25,8 @@ import type {
   TlsCheckConfig,
 } from "@/types/synthetics";
 import { convertDateToTimestamp } from "@/utils/timezone";
-import { journeyToWireSteps, mapWireSteps } from "./mapRecordedStep";
+import { mapWireSteps } from "./mapRecordedStep";
+import { buildV2Steps } from "./buildV2Steps";
 import { useLocalTimezone } from "../storage";
 
 // ── Outbound: BrowserCheck → API payload ─────────────────────────────────────
@@ -124,7 +138,11 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     frequency: buildFrequency(schedule),
 
     config: {
-      steps: journeyToWireSteps(journey),
+      // One step format, so no version key: the server refuses unknown fields,
+      // and `steps_version` is now one of them. Steps are built field by field
+      // rather than spread, for the same reason. A journey that cannot be built
+      // throws here — the save gate is what stops it getting this far.
+      steps: buildV2Steps(journey),
       browser_devices: browserDevices ?? [{ browser: "chromium", device: "desktop" }],
       timeout_ms: 30000,
       capture: {
@@ -375,6 +393,10 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
 
     browserDevices: config?.browser_devices,
 
+    // No `preserveWire`: a stored version-2 step is poorer than what
+    // buildWireFromStep rebuilds from the UI fields, so keeping it would shadow
+    // the correct reconstruction — which is how a reloaded `select` came to
+    // replay as "select nothing". See MapWireStepOptions.
     journey: mapWireSteps(config?.steps ?? []),
 
     ...(variables?.length && {

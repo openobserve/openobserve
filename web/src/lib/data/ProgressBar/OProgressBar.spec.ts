@@ -87,6 +87,43 @@ describe("OProgressBar", () => {
     });
   });
 
+  // A bar with a `start` is a SEGMENT of the track rather than a fill from its
+  // edge, which is what lets a column of them read as a timeline.
+  describe("start offset", () => {
+    const fill = (w: ReturnType<typeof mount>) =>
+      w.find("[role='progressbar'] > div").attributes("style") ?? "";
+
+    it("fills from the track start when start is omitted", () => {
+      const wrapper = mount(OProgressBar, { props: { value: 0.4 } });
+      expect(fill(wrapper)).toContain("width: 40%");
+      expect(fill(wrapper)).toContain("margin-inline-start: 0%");
+    });
+
+    it("offsets the fill and spans only start..value", () => {
+      const wrapper = mount(OProgressBar, { props: { start: 0.25, value: 0.75 } });
+      expect(fill(wrapper)).toContain("margin-inline-start: 25%");
+      expect(fill(wrapper)).toContain("width: 50%");
+    });
+
+    // Negative widths paint the whole track in some engines, so an inverted
+    // range must render as nothing rather than as everything.
+    it("renders an empty fill when start is past value", () => {
+      const wrapper = mount(OProgressBar, { props: { start: 0.8, value: 0.2 } });
+      expect(fill(wrapper)).toContain("width: 0%");
+    });
+
+    it("clamps start into [0, 1]", () => {
+      const wrapper = mount(OProgressBar, { props: { start: -3, value: 0.5 } });
+      expect(fill(wrapper)).toContain("margin-inline-start: 0%");
+      expect(fill(wrapper)).toContain("width: 50%");
+    });
+
+    it("reports the segment's magnitude as aria-valuenow, not its end", () => {
+      const wrapper = mount(OProgressBar, { props: { start: 0.6, value: 0.9 } });
+      expect(wrapper.find("[role='progressbar']").attributes("aria-valuenow")).toBe("30");
+    });
+  });
+
   describe("accessibility", () => {
     it("has role=progressbar", () => {
       const wrapper = mount(OProgressBar, { props: { value: 0.3 } });

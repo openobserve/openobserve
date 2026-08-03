@@ -208,6 +208,31 @@ async fn update(msg: Message) -> Result<()> {
         TriggerModule::QueryRecommendations => {
             todo!("We will get here eventually")
         }
+        // Both SLO modules key on the SLO, so they share one existence check.
+        // Pushing a trigger whose SLO has not synced yet would create a job
+        // that fires against nothing; the handler reschedules in that case,
+        // but not creating it is cheaper.
+        TriggerModule::Slo | TriggerModule::SloBackfill => {
+            if infra::table::slos::get(conn, &trigger.org, &trigger.module_key)
+                .await
+                .unwrap_or(None)
+                .is_some()
+            {
+                scheduler::push(trigger.clone()).await.map_err(|e| {
+                    let error_msg = format!(
+                        "[SUPER_CLUSTER:sync] Failed to push scheduler: {}/{:?}/{}, error: {}",
+                        trigger.org, trigger.module, trigger.module_key, e
+                    );
+                    log::error!("{error_msg}");
+                    Error::Message(error_msg)
+                })?;
+            } else {
+                log::warn!(
+                    "[SUPER_CLUSTER:sync] SLO not found for module_key: {}. No need to sync this trigger",
+                    trigger.module_key
+                );
+            }
+        }
         TriggerModule::AnomalyDetection => {
             // Only sync if the anomaly detection config still exists in this region.
             if infra::table::anomaly_detection::config::get_by_id(

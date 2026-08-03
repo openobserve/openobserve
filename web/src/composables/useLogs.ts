@@ -495,10 +495,25 @@ const useLogs = () => {
       (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
-    // selectedStream array is coerced to its comma-joined string form as key
-    let colOrder = searchObj.data.resultGrid.colOrder[
-      searchObj.data.stream.selectedStream.join(",")
-    ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"));
+    // selectedStream array is coerced to its comma-joined string form as key.
+    // Two shapes have to be tolerated:
+    //  • missing — the table only reports an order once the user reorders, so
+    //    "no entry" means "no order".
+    //  • object — a saved view round-trips this array through the API and comes
+    //    back as `{0:"a",1:"b"}`. Calling `.filter` on that throws, and because
+    //    closeColumn()/add-field both start here, EVERY column add/remove then
+    //    dies silently.
+    const storedColOrder =
+      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream.join(",")];
+    const colOrderList: string[] = Array.isArray(storedColOrder)
+      ? storedColOrder
+      : storedColOrder && typeof storedColOrder === "object"
+        ? (Object.values(storedColOrder) as string[])
+        : [];
+
+    let colOrder = colOrderList.filter(
+      (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    );
 
     // Skip reordering when colOrder is empty to prevent unstable sort in Firefox
     if (colOrder.length === 0) {

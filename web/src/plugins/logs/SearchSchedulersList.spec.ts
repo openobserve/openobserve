@@ -125,7 +125,7 @@ describe("SearchSchedulersList Component", () => {
           ConfirmDialog: true,
           NoData: true,
           TenstackTable: true,
-          QTablePagination: true,
+          Pagination: true,
           JsonPreview: true,
         },
         mocks: {

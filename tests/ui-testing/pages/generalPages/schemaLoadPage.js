@@ -37,13 +37,13 @@ class SchemaLoadPage {
             '[data-test="logs-search-bar-refresh-btn"]'
         );
         this.logsSearchResultTableBody = page.locator(
-            '[data-test="logs-search-result-table-body"]'
+            '[data-test="o2-table-body"]'
         );
         this.tableRowExpandMenu = page.locator(
-            '[data-test="table-row-expand-menu"]'
+            '[data-test^="o2-table-expand-"]'
         );
         this.logTableColumnTimestamp = page.locator(
-            '[data-test="log-table-column-0-_timestamp"]'
+            '[data-test="o2-table-row-0"] [data-test="o2-table-cell-_timestamp"]'
         );
 
         // Streams page — search input (OInput wrapper → fill `-field` variant)

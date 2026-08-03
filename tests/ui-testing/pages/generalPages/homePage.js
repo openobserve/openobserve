@@ -53,7 +53,7 @@ export class HomePage {
         this.logo = page.locator('[data-test="header-openobserve-logo"]').first();
 
         // ===== PAGE LOAD INDICATORS (for verifying navigation completed) =====
-        this.logsPageIndicator = page.locator('[data-test="logs-search-bar-refresh-btn"]').or(page.locator('[data-test="log-table-column-0-source"]')).first();
+        this.logsPageIndicator = page.locator('[data-test="logs-search-bar-refresh-btn"]').or(page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]')).first();
         this.streamsPageIndicator = page.locator('[data-test="streams-search-stream-input"]').or(page.locator('[data-test="stream-add-stream-btn"]')).first();
         this.dashboardsPageIndicator = page.locator('[data-test="dashboard-new"]').or(page.locator('[data-test="dashboard-table"]')).first();
         this.alertsPageIndicator = page.locator('[data-test="alert-list-page"]').or(page.locator('[data-test="alerts-page"]')).first();
@@ -546,7 +546,7 @@ export class HomePage {
      */
     async isDarkMode() {
         // The dark-mode signal is the `.dark` class on <html>
-        // (document.documentElement) — set by utils/theme.ts. The legacy Quasar
+        // (document.documentElement) — set by utils/theme.ts. The legacy
         // `body--dark` class on <body> was retired in the design-token
         // migration (#13173).
         return await this.page.evaluate(() => document.documentElement.classList.contains('dark'));
@@ -784,16 +784,15 @@ export class HomePage {
     }
 
     /**
-     * Navigate to Alert Destinations tab in Settings
+     * Navigate to Notification Destinations via the Reliability nav group.
+     * No longer a Settings tab — it moved to /alert-destinations.
      */
     async navigateToAlertDestinations() {
-        await this.navigateToSettings();
-        await this.page.locator('[data-test="alert-destinations-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator('[data-test="alert-destinations-tab"]').click();
+        await openNavFlyoutChild(this.page, 'destinations');
     }
 
     /**
-     * Validate Settings - Alert Destinations page UI elements
+     * Validate Notification Destinations page UI elements
      */
     async validateSettingsAlertDestinationsPageElements() {
         await expect(this.page.locator('[data-test="alert-destination-list-add-alert-btn"]')).toBeVisible({ timeout: 10000 });
@@ -821,16 +820,15 @@ export class HomePage {
     }
 
     /**
-     * Navigate to Templates tab in Settings
+     * Navigate to Templates via the Reliability nav group.
+     * No longer a Settings tab — it moved to /alert-templates.
      */
     async navigateToTemplates() {
-        await this.navigateToSettings();
-        await this.page.locator('[data-test="alert-templates-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator('[data-test="alert-templates-tab"]').click();
+        await openNavFlyoutChild(this.page, 'templates');
     }
 
     /**
-     * Validate Settings - Templates page UI elements
+     * Validate Templates page UI elements
      */
     async validateSettingsTemplatesPageElements() {
         await expect(this.page.locator('[data-test="template-list-add-btn"]')).toBeVisible({ timeout: 10000 });
