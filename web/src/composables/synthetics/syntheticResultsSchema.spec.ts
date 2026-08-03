@@ -1291,3 +1291,52 @@ describe("stepOwnDetail locator ladder", () => {
     expect(d?.candidatesTried[0].outcome).toBe("used_as_primary");
   });
 });
+
+describe("foldStepStream coverage", () => {
+  const agg = (stepId: string, stepIndex: number, executions: number, first: number, last: number) => ({
+    step_id: stepId,
+    step_index: stepIndex,
+    executions,
+    failures: 0,
+    flaky: 0,
+    avg_duration_ms: 1,
+    p95_duration_ms: 1,
+    max_duration_ms: 1,
+    first_ts: first,
+    last_ts: last,
+  });
+
+  it("counts EXECUTIONS, not step rows", () => {
+    // One execution writes one row per step. Summing the per-step counts would
+    // report a 3-step check as 3x its real execution count, which is what the
+    // banner would then show the user.
+    const r = foldStepStream(
+      [agg("s1", 0, 100, 1_000, 2_000), agg("s2", 1, 100, 1_000, 2_000), agg("s3", 2, 90, 1_000, 2_000)],
+      [],
+      [],
+    );
+    expect(r.coverage.executions).toBe(100);
+  });
+
+  it("takes the window from the unbounded aggregate, not the capped sparkline", () => {
+    // The sparkline is LIMIT 2000; the aggregates are not. Deriving the window
+    // from the sparkline reported a 7-day range as the newest ~100 minutes.
+    const r = foldStepStream(
+      [agg("s1", 0, 10, 1_000_000, 9_000_000)],
+      [],
+      // Sparkline covers a deliberately narrower slice — it must not win.
+      [{ step_id: "s1", status: "passed", failed_in_prior_attempt: false, _timestamp: 8_000_000 }],
+    );
+    expect(r.coverage.fromMs).toBe(1_000);
+    expect(r.coverage.toMs).toBe(9_000);
+  });
+
+  it("orders steps by step_index", () => {
+    const r = foldStepStream(
+      [agg("late", 5, 1, 1, 2), agg("early", 0, 1, 1, 2)],
+      [],
+      [],
+    );
+    expect(r.stepGroups.map((g) => g.key)).toEqual(["step-early", "step-late"]);
+  });
+});

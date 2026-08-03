@@ -1384,6 +1384,8 @@ export function buildStepAggregateSql(monitorId: string): string {
   return `SELECT step_id,
        min(step_index) AS step_index,
        count(*) AS executions,
+       min(${F.timestamp}) AS first_ts,
+       max(${F.timestamp}) AS last_ts,
        sum(CASE WHEN status <> 'passed' THEN 1 ELSE 0 END) AS failures,
        sum(CASE WHEN failed_in_prior_attempt THEN 1 ELSE 0 END) AS flaky,
        avg(duration_ms) AS avg_duration_ms,
@@ -1450,7 +1452,18 @@ export function foldStepStream(
   stepDefs?: Map<string, { name: string; selector: string | null }>,
 ): StepStatsResult {
   const byStep = new Map<string, StepGroup>();
+  // step_index is already on the aggregate row; keeping it here avoids re-finding
+  // it per comparison in the sort below, and avoids widening StepGroup for a
+  // value only the ordering needs.
+  const stepIndex = new Map<string, number>();
+  // Executions, not step-rows: one execution contributes one row PER STEP, so
+  // summing the per-step counts would report a 20-step check as 20x its real
+  // execution count. The step that ran most often is the closest honest answer —
+  // steps can be skipped when an earlier one fails, so no single step sees them
+  // all, and the maximum is the count at least one step actually observed.
   let executionsTotal = 0;
+  let firstTs = 0;
+  let lastTs = 0;
 
   for (const hit of aggregateHits) {
     const stepId = str(hit.step_id);
@@ -1458,7 +1471,12 @@ export function foldStepStream(
     const executions = num(hit.executions);
     const failures = num(hit.failures);
     const flaky = num(hit.flaky);
-    executionsTotal += executions;
+    executionsTotal = Math.max(executionsTotal, executions);
+    stepIndex.set(stepId, num(hit.step_index));
+    const first = num(hit.first_ts);
+    const last = num(hit.last_ts);
+    if (first > 0) firstTs = firstTs === 0 ? first : Math.min(firstTs, first);
+    if (last > 0) lastTs = Math.max(lastTs, last);
     const def = stepDefs?.get(stepId);
     byStep.set(stepId, {
       key: `step-${stepId}`,
@@ -1530,13 +1548,10 @@ export function foldStepStream(
     if (group) group.recentRates = list.reverse();
   }
 
-  const stepGroups = [...byStep.values()].sort((a, b) => {
-    const ai = aggregateHits.find((h) => `step-${str(h.step_id)}` === a.key);
-    const bi = aggregateHits.find((h) => `step-${str(h.step_id)}` === b.key);
-    return num(ai?.step_index) - num(bi?.step_index);
-  });
+  const stepGroups = [...byStep.values()].sort(
+    (a, b) => (stepIndex.get(a.key.slice(5)) ?? 0) - (stepIndex.get(b.key.slice(5)) ?? 0),
+  );
 
-  const stamps = sparklineHits.map((h) => num(h._timestamp)).filter((n) => n > 0);
   return {
     stepGroups,
     stepFailures: [],
@@ -1546,8 +1561,12 @@ export function foldStepStream(
     failureInstances: [],
     coverage: {
       executions: executionsTotal,
-      fromMs: stamps.length ? Math.min(...stamps) / 1000 : 0,
-      toMs: stamps.length ? Math.max(...stamps) / 1000 : 0,
+      // From the AGGREGATE, which has no LIMIT — not from the sparkline, which
+      // is capped at 2000 rows. A 20-step check at one run a minute fills that
+      // cap in ~100 minutes, so borrowing its bounds reported a 7-day window as
+      // an hour and a half.
+      fromMs: firstTs > 0 ? firstTs / 1000 : 0,
+      toMs: lastTs > 0 ? lastTs / 1000 : 0,
       // No cap to bind — this is what B10 buys.
       truncated: false,
     },
