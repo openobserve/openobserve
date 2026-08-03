@@ -1,4 +1,4 @@
-//! `SeaORM` Entity for synthetics_monitors table.
+//! `SeaORM` Entity for synthetics_checks table.
 
 use sea_orm::entity::prelude::*;
 
@@ -16,19 +16,19 @@ pub struct Model {
     pub description: String,
     pub tags: Json,
     pub config: Json,
-    /// Serialized `MonitorFrequency` — replaces interval_secs / frequency_type / cron_expr.
+    /// Serialized `SyntheticFrequency` — replaces interval_secs / frequency_type / cron_expr.
     pub frequency: Json,
     pub locations: Json,
     pub enabled: bool,
     pub destinations: Json,
-    /// Extra monitor settings (retries, cooldown, rum toggles). No secrets here.
+    /// Extra check settings (retries, cooldown, rum toggles). No secrets here.
     pub settings: Json,
     /// JSON blob: { "auth": {...}, "cookies": [...], "variables": [...] }
     /// All secret values encrypted per-field with AESenc:<base64> using the org DEK.
     pub secrets: String,
     /// Pre-computed next fire time (microseconds). 0 = fire on next scheduler tick.
     pub next_run_at: i64,
-    /// When the scheduler last fanned out this monitor (microseconds).
+    /// When the scheduler last fanned out this check (microseconds).
     pub last_triggered_at: i64,
     /// Denormalised status from the most recent completed check.
     /// 0=Unknown, 1=Up, 2=Warning, 3=Down
@@ -72,7 +72,7 @@ mod tests {
             name: "Login Flow".to_string(),
             synthetics_type: "browser".to_string(),
             target: "https://app.example.com".to_string(),
-            description: "Monitors the login flow".to_string(),
+            description: "Checks the login flow".to_string(),
             tags: serde_json::json!(["prod", "checkout"]),
             config: serde_json::json!({"browser_devices": [{"browser": "chromium", "device": "desktop"}], "steps": []}),
             frequency: serde_json::json!({"type": "minutes", "interval": 5, "cron": ""}),

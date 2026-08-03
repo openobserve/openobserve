@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 62;
+pub const DB_SCHEMA_VERSION: u64 = 63;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1577,6 +1577,18 @@ pub struct Common {
     pub dashboard_placeholder: String,
     #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
     pub aggregation_topk_enabled: bool,
+    #[env_config(
+        name = "ZO_DF_USE_AGG_TOPK_HEAP",
+        default = true,
+        help = "Use the heap implementation for eligible aggregate TopK plans"
+    )]
+    pub use_agg_topk_heap: bool,
+    #[env_config(
+        name = "ZO_DF_TOPK_HEAP_MAX_LIMIT",
+        default = 500,
+        help = "Maximum aggregate TopK limit that uses the heap implementation"
+    )]
+    pub agg_topk_heap_max_limit: u64,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]

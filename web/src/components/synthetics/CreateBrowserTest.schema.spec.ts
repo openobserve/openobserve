@@ -170,17 +170,22 @@ describe("makeBrowserCheckSaveSchema version-2 save gate", () => {
     expect(issuePaths(result)).toContain("journey.1.selector");
   });
 
-  it("should name the step in the missing-target message", () => {
-    const seen: Record<string, unknown>[] = [];
+  // The opposite of the retired-action message above, and deliberately so. This
+  // issue reaches the author only through `setStepFieldErrors`, which renders it
+  // on the locator input of the step it names — so naming the step again says it
+  // twice inside that step's own row. The step-scoped wording lives on
+  // `validation.selectorRequired`, which is the toast.
+  it("should not name the step in the missing-target message", () => {
+    const seen: string[] = [];
     const spy = (key: string, params?: Record<string, unknown>) => {
-      if (params) seen.push(params);
+      if (!params) seen.push(key);
       return key;
     };
     makeBrowserCheckSaveSchema(spy).safeParse(
       form([opened, { id: "2", action: "click", name: "Sign in", locator: { candidates: [] } }]),
     );
 
-    expect(seen).toContainEqual({ step: "Sign in" });
+    expect(seen).toContain("synthetics.validation.locatorRequired");
   });
 
   it("should accept a journey every step of which can be built as version 2", () => {

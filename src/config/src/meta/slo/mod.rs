@@ -1796,13 +1796,6 @@ mod tests {
         ));
     }
 
-    // ---- time-slice threshold finiteness ------------------------------------
-
-    /// The threshold decides whether every bucket is good or bad. `NaN`
-    /// compares false against everything, so every slice classifies bad;
-    /// `±inf` classifies every slice the same way in the other direction.
-    /// Either way the SLO reports a confident, uniform, wrong answer.
-    #[test]
     /// A create request must not have to invent server-assigned fields.
     #[test]
     fn an_slo_deserializes_without_server_assigned_fields() {
@@ -1849,6 +1842,12 @@ mod tests {
         assert_eq!(SliType::from_storage_id(4), None);
     }
 
+    // ---- time-slice threshold finiteness ------------------------------------
+
+    /// The threshold decides whether every bucket is good or bad. `NaN`
+    /// compares false against everything, so every slice classifies bad;
+    /// `±inf` classifies every slice the same way in the other direction.
+    /// Either way the SLO reports a confident, uniform, wrong answer.
     #[test]
     fn a_non_finite_time_slice_threshold_is_rejected() {
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {

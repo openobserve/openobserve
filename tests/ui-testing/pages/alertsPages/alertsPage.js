@@ -67,6 +67,8 @@ export class AlertsPage {
             // trigger swaps to an input on click. -trigger opens, -input edits.
             alertNameTrigger: '[data-test="add-alert-name-input-trigger"]',
             alertNameInputField: '[data-test="add-alert-name-input-input"]',
+            // Display-mode value of the inline-edit title (present when NOT editing).
+            alertNameValue: '[data-test="add-alert-name-input-value"]',
             alertSubmitButton: '[data-test="add-alert-submit-btn"]',
             alertBackButton: '[data-test="add-alert-back-btn"]',
 
@@ -824,6 +826,22 @@ export class AlertsPage {
         await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill(name);
         testLogger.info(`Filled alert name: ${name}`);
+    }
+
+    /**
+     * Read the current alert name from the inline-edit title (OFormInlineEdit).
+     * In display mode the value is the `-value` span; only in edit mode is there
+     * an `-input`. Reads the committed display value, falling back to the live
+     * input value if the editor happens to be open.
+     * @returns {Promise<string>}
+     */
+    async getAlertName() {
+        const valueSpan = this.page.locator(this.locators.alertNameValue).first();
+        if (await valueSpan.count() > 0) {
+            return (await valueSpan.innerText()).trim();
+        }
+        // Editor is open (edit mode) — read the live input value instead.
+        return (await this.page.locator(this.locators.alertNameInputField).inputValue()).trim();
     }
 
     /**

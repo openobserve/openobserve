@@ -213,6 +213,9 @@ export default defineComponent({
         filterable: props.enableFiltering && !col._isRowField && !col._isTotalColumn,
         meta: {
           ...(col.meta ?? {}),
+          // Without a width OTable falls back to TanStack's flat 150px; autoWidth
+          // sizes each column to its content. Pivot fixes its own widths.
+          ...(isPivot.value ? {} : { autoWidth: true }),
           _col: col,
           format: col.format,
           align: col.align,

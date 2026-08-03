@@ -155,7 +155,11 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["journey", i, "selector"],
-            message: t("synthetics.validation.selectorRequired", { step: step.name }),
+            // Field-scoped: this issue reaches the author only through
+            // `setStepFieldErrors`, which renders it on the locator input of the
+            // step it names. The accompanying toast is `fixHighlightedFields`, so
+            // repeating the step name here says it twice inside its own row.
+            message: t("synthetics.validation.locatorRequired"),
           });
         }
       }

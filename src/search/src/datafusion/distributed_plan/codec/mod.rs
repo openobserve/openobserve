@@ -20,16 +20,12 @@ use datafusion::{
 };
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 
-#[cfg(feature = "enterprise")]
 mod aggregate_topk_exec;
 mod deduplication_exec;
 mod empty_exec;
-#[cfg(feature = "enterprise")]
 mod enrichment_exec;
 mod physical_plan_node;
-#[cfg(feature = "enterprise")]
 mod streaming_aggs_exec;
-#[cfg(feature = "enterprise")]
 mod tmp_exec;
 
 pub fn get_physical_extension_codec() -> ComposedPhysicalExtensionCodec {
