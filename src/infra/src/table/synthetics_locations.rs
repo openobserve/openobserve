@@ -59,8 +59,10 @@ pub const KIND_PRIVATE: &str = "private";
 /// exist yet, so a short TTL is what bounds staleness across pods. Writes in
 /// this module invalidate eagerly, so the TTL only covers changes made by a
 /// *different* node.
-static LOCATIONS_CACHE: LazyLock<RwLock<Option<(Vec<SyntheticsLocationRecord>, Instant)>>> =
-    LazyLock::new(|| RwLock::new(None));
+/// The cached rows and the instant they were loaded, absent until first load.
+type CachedLocations = Option<(Vec<SyntheticsLocationRecord>, Instant)>;
+
+static LOCATIONS_CACHE: LazyLock<RwLock<CachedLocations>> = LazyLock::new(|| RwLock::new(None));
 
 const LOCATIONS_CACHE_TTL: Duration = Duration::from_secs(30);
 
