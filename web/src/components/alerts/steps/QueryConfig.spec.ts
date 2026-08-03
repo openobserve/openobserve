@@ -2128,6 +2128,6 @@ describe("QueryConfig.vue", () => {
 
 // Stored field values for the N1 value-context probe above. Only useSuggestions
 // consumes this module, so mocking it does not affect the rest of the suite.
-vi.mock("@/composables/useFieldValueStore", () => ({
+vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue(["error", "warn"]),
 }));

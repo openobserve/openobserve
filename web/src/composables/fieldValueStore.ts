@@ -14,9 +14,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Composable that orchestrates field value capture from both data sources:
- *   1. Values API — field expansion in FieldList
- *   2. Search result hits — Run Query results
+ * Persisted field VALUES, for autocomplete. Not a composable — plain functions
+ * over IndexedDB, which is why it carries no `use` prefix and sits beside
+ * fieldValueDB.ts. (It was `useFieldValueStore`, one character from the real
+ * composable `useFieldValuesStream`, and the two were mistaken for each other.)
+ *
+ * THE ONLY TWO WRITERS, and neither is tied to a stream type:
+ *   1. captureFromValuesApi   — expanding a field in the sidebar. Reached from
+ *      logs, traces and pipeline, via useFieldValuesStream.
+ *   2. captureFromSearchHits  — Run Query results. Its one caller lives under
+ *      composables/useLogs/, which is the Logs PAGE, not the logs stream TYPE:
+ *      it captures under whichever type was searched, and that page's stream
+ *      selector covers metrics and traces too.
+ *
+ * So the rule is "values come from what has been SEARCHED or EXPANDED", never
+ * "values are logs-only". A stream nobody has looked at yet simply has none;
+ * that is a cold cache, not a missing capability.
  *
  * All IndexedDB writes are scheduled via requestIdleCallback so they have
  * zero impact on main-thread rendering. Reads use an in-memory cache
@@ -52,7 +65,12 @@ const READ_CACHE_MAX_ENTRIES = 500;
 
 export interface StreamContext {
   org: string;
-  streamType: string; // 'logs' | 'metrics' | 'traces'
+  /**
+   * Whichever type the caller searched or expanded — all three are stored and
+   * read back the same way. Part of the key, never a filter on what may be
+   * captured.
+   */
+  streamType: "logs" | "metrics" | "traces" | (string & {});
   streamName: string;
 }
 

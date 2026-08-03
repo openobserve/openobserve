@@ -55,7 +55,7 @@ vi.mock("@/services/stream", () => ({
 const { getFieldValuesForSuggestion } = vi.hoisted(() => ({
   getFieldValuesForSuggestion: vi.fn(async () => ["ERROR", "INFO"]),
 }));
-vi.mock("@/composables/useFieldValueStore", () => ({ getFieldValuesForSuggestion }));
+vi.mock("@/composables/fieldValueStore", () => ({ getFieldValuesForSuggestion }));
 
 vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
   default: { template: '<div data-test="panel-schema-renderer" />' },

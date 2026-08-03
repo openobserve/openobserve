@@ -1,6 +1,6 @@
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
-import { getFieldValuesForSuggestion } from "@/composables/useFieldValueStore";
+import { getFieldValuesForSuggestion } from "@/composables/fieldValueStore";
 import {
   SQL_KEYWORDS,
   SQL_CLAUSE_KEYWORDS,

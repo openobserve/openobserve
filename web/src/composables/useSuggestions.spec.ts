@@ -12,7 +12,7 @@ vi.mock("vuex", async (importOriginal) => {
 });
 
 // ─── Mock IDB so no real storage is touched ───────────────────────────────────
-vi.mock("@/composables/useFieldValueStore", () => ({
+vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
 }));
 
@@ -23,7 +23,7 @@ vi.mock("@/services/query_functions", () => ({
   default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
 }));
 
-import { getFieldValuesForSuggestion } from "@/composables/useFieldValueStore";
+import { getFieldValuesForSuggestion } from "@/composables/fieldValueStore";
 import useSqlSuggestions from "./useSuggestions";
 
 // ─── helper: build composable with common defaults ────────────────────────────

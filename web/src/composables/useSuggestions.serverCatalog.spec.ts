@@ -28,7 +28,7 @@ vi.mock("vuex", async (importOriginal) => {
   return { ...actual, useStore: vi.fn(() => mockStore) };
 });
 
-vi.mock("@/composables/useFieldValueStore", () => ({
+vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
 }));
 
