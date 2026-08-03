@@ -35,6 +35,7 @@ import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRendere
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
 import rumCard from "@/components/ingestion/setupCard/content/rum";
@@ -69,6 +70,8 @@ const PLATFORMS: {
   id: string;
   labelKey: I18nKey;
   icon: IconName;
+  /** Mobile SDKs are still in beta — the switch tags them so it shows up wherever the guide is picked. */
+  beta?: boolean;
   build: () => RichCardContent;
 }[] = [
   {
@@ -89,6 +92,7 @@ const PLATFORMS: {
     id: "react-native",
     labelKey: "ingestion.rumPlatformReactNative",
     icon: "smartphone",
+    beta: true,
     build: () =>
       rumReactNativeCard({
         endpoint: endpoint.value,
@@ -102,6 +106,7 @@ const PLATFORMS: {
     id: "android",
     labelKey: "ingestion.rumPlatformAndroid",
     icon: "android",
+    beta: true,
     build: () =>
       rumAndroidCard({
         endpoint: endpoint.value,
@@ -115,6 +120,7 @@ const PLATFORMS: {
     id: "ios",
     labelKey: "ingestion.rumPlatformIOS",
     icon: "phone-iphone",
+    beta: true,
     build: () =>
       rumIOSCard({
         endpoint: endpoint.value,
@@ -170,6 +176,7 @@ const subs = computed<CardSubstitutions>(() => ({
           >
             <OIcon :name="p.icon" size="xs" class="me-1" />
             {{ t(p.labelKey) }}
+            <BetaBadge v-if="p.beta" size="xs" class="ml-1.5" />
           </OToggleGroupItem>
         </OToggleGroup>
       </template>
