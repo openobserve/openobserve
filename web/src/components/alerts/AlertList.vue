@@ -1175,6 +1175,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: COL.status,
+          minSize: 130,
           meta: { align: "left" },
         },
         // "priority" — how much humans care (Feature 2, PT-3). A different
