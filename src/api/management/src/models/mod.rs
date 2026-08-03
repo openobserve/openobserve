@@ -17,9 +17,13 @@ pub mod action;
 #[cfg(feature = "enterprise")]
 pub mod ai;
 pub mod alerts;
+#[cfg(feature = "enterprise")]
+pub mod annotation_queues;
 #[cfg(feature = "cloud")]
 pub mod billings;
 pub mod dashboards;
+#[cfg(feature = "enterprise")]
+pub mod datasets;
 pub mod destinations;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
