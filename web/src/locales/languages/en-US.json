@@ -5294,6 +5294,7 @@
       "priorityP5": "P5 (Informational)"
     },
     "lastRun": "Last run: {time}",
+    "retryTraining": "Retrain the model and re-run detection",
     "queryEditor": {
       "noStream": "none",
       "showVrlEditor": "show VRL editor",
