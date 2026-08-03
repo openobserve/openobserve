@@ -1509,7 +1509,10 @@ export function foldStepStream(
   }
 
   // Dimension rows fold twice — once per axis — because counts compose.
-  const dims = new Map<string, { browser: Map<string, StepDimensionStat>; location: Map<string, StepDimensionStat> }>();
+  const dims = new Map<
+    string,
+    { browser: Map<string, StepDimensionStat>; location: Map<string, StepDimensionStat> }
+  >();
   for (const hit of dimensionHits) {
     const stepId = str(hit.step_id);
     if (!stepId || !byStep.has(stepId)) continue;

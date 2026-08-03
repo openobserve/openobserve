@@ -58,9 +58,7 @@ describe("useSyntheticResults", () => {
     // cache (it only engages for time-bucketed queries) and so rescanned on every
     // load. p95 stays a separate call: percentiles do not sum across buckets.
     executeQuery
-      .mockResolvedValueOnce([
-        { total_runs: 100, passed_runs: 99, failed_runs: 1 },
-      ])
+      .mockResolvedValueOnce([{ total_runs: 100, passed_runs: 99, failed_runs: 1 }])
       .mockResolvedValueOnce([{ p95_duration: 2940 }])
       .mockResolvedValueOnce([{ status: "passed", ts: 1_700_000_000_000_000 }])
       .mockResolvedValueOnce([

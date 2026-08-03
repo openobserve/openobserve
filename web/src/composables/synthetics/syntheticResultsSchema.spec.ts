@@ -1293,7 +1293,13 @@ describe("stepOwnDetail locator ladder", () => {
 });
 
 describe("foldStepStream coverage", () => {
-  const agg = (stepId: string, stepIndex: number, executions: number, first: number, last: number) => ({
+  const agg = (
+    stepId: string,
+    stepIndex: number,
+    executions: number,
+    first: number,
+    last: number,
+  ) => ({
     step_id: stepId,
     step_index: stepIndex,
     executions,
@@ -1311,7 +1317,11 @@ describe("foldStepStream coverage", () => {
     // report a 3-step check as 3x its real execution count, which is what the
     // banner would then show the user.
     const r = foldStepStream(
-      [agg("s1", 0, 100, 1_000, 2_000), agg("s2", 1, 100, 1_000, 2_000), agg("s3", 2, 90, 1_000, 2_000)],
+      [
+        agg("s1", 0, 100, 1_000, 2_000),
+        agg("s2", 1, 100, 1_000, 2_000),
+        agg("s3", 2, 90, 1_000, 2_000),
+      ],
       [],
       [],
     );
@@ -1351,11 +1361,7 @@ describe("foldStepStream coverage", () => {
   });
 
   it("orders steps by step_index", () => {
-    const r = foldStepStream(
-      [agg("late", 5, 1, 1, 2), agg("early", 0, 1, 1, 2)],
-      [],
-      [],
-    );
+    const r = foldStepStream([agg("late", 5, 1, 1, 2), agg("early", 0, 1, 1, 2)], [], []);
     expect(r.stepGroups.map((g) => g.key)).toEqual(["step-early", "step-late"]);
   });
 });
