@@ -159,9 +159,20 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
     const map: Record<string, string> = { Desktop: "Desktop", Tablet: "Tablet", Mobile: "Mobile" };
     return map[v] || v;
   });
+  // Mirrors the real module: known ids map to browserDevices keys (resolved via
+  // t() in the component), unknown ids return undefined → shown verbatim.
+  const deviceLabelKey = vi.fn((v: string) => {
+    const map: Record<string, string> = {
+      desktop: "synthetics.browserDevices.desktop",
+      tablet: "synthetics.browserDevices.tablet",
+      mobile: "synthetics.browserDevices.mobile",
+    };
+    return map[v];
+  });
   return {
     deviceIconName,
     deviceLabel,
+    deviceLabelKey,
   };
 });
 

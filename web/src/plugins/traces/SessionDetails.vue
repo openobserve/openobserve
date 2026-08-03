@@ -909,7 +909,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   useSessions,
   type SessionDetail,
@@ -1092,7 +1092,7 @@ function kpiAccentClass(variant?: "danger"): string {
 /** A turn reference inside a KPI sub-line — rendered as a hover-preview chip. */
 interface TurnChip {
   n: number; // 1-based turn number
-  label: string;
+  label: I18nText;
 }
 
 // Session-level KPI tiles. Each sub-line is split into `subLead` text, optional
@@ -1102,7 +1102,7 @@ interface TurnChip {
 const kpiCards = computed<
   {
     key: string;
-    label: string;
+    label: I18nText;
     /** Material-symbol icon name (OIcon) shown next to the tile label. */
     icon: string;
     value: string;
@@ -1112,7 +1112,7 @@ const kpiCards = computed<
     subTail: string;
     variant?: "danger";
     estimate?: boolean;
-    tooltipRows?: { label: string; value: string }[];
+    tooltipRows?: { label: I18nText; value: string }[];
     /** Errors tile: show a "Filter Errors" button instead of per-turn chips
      *  when there are too many error turns to list as chips. */
     filterErrors?: boolean;
@@ -1163,7 +1163,7 @@ const kpiCards = computed<
               errors: s.errors,
               total: d.turns,
             }),
-      subTurns: s.errors > 3 ? [] : s.errorTurnNums.map((n) => ({ n, label: String(n) })),
+      subTurns: s.errors > 3 ? [] : s.errorTurnNums.map((n) => ({ n, label: raw(String(n)) })),
       filterErrors: s.errors > 3,
       subTail: "",
     },
@@ -1178,7 +1178,7 @@ const kpiCards = computed<
       subLead: t("traces.sessionDetail.kpiSub.latencyLead", {
         slowest: formatDuration(s.slowestLat),
       }),
-      subTurns: [{ n: s.slowestTurn, label: `${turnWord} ${s.slowestTurn}` }],
+      subTurns: [{ n: s.slowestTurn, label: raw(`${turnWord} ${s.slowestTurn}`) }],
       subTail: "",
     },
     {
@@ -1190,7 +1190,7 @@ const kpiCards = computed<
       subLead: t("traces.sessionDetail.kpiSub.costLead", {
         peak: usd4(s.maxCost),
       }),
-      subTurns: [{ n: s.peakTurn, label: `${turnWord} ${s.peakTurn}` }],
+      subTurns: [{ n: s.peakTurn, label: raw(`${turnWord} ${s.peakTurn}`) }],
       subTail: "",
     },
     {
@@ -1292,7 +1292,7 @@ const modelOptions = computed(() => {
   traces.value.forEach((tr) => tr.models.forEach((m) => models.add(m)));
   return [
     { label: t("traces.sessionDetail.filters.all"), value: "all" },
-    ...Array.from(models).map((m) => ({ label: m, value: m })),
+    ...Array.from(models).map((m) => ({ label: raw(m), value: m })),
   ];
 });
 
@@ -1346,7 +1346,7 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
         const inputMsgs = messagesFromInput(sp.gen_ai_input_messages);
         for (let i = inputMsgs.length - 1; i >= 0; i--) {
           if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
-            userMessage = { role: "user", content: inputMsgs[i].content };
+            userMessage = { role: "user", content: raw(inputMsgs[i].content) };
             break;
           }
         }

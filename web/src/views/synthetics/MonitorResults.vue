@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     data-test="synthetic-monitor-results-page"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.results.monitors'),
       to: { name: 'synthetics' },
@@ -91,8 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="drawerOpen"
     side="right"
     :width="90"
-    :title="monitorName"
-    :subTitle="drawerTimestamp"
+    :title="raw(monitorName)"
+    :subTitle="raw(drawerTimestamp)"
     data-test="synthetics-run-detail-drawer"
     @update:open="onDrawerClose"
   >
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
@@ -211,7 +211,7 @@ const selectedExecutionId = ref("");
 const drawerRunStatus = ref<{
   variant: BadgeVariant;
   icon: string;
-  label: string;
+  label: I18nText;
 } | null>(null);
 const drawerUrl = ref("");
 const drawerTimestamp = ref("");
@@ -219,7 +219,7 @@ const drawerTimestamp = ref("");
 function onRunStatusUpdate(status: {
   variant: BadgeVariant;
   icon: string;
-  label: string;
+  label: I18nText;
   url: string;
   timestamp: string;
 }) {

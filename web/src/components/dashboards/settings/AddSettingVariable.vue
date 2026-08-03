@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DashboardHeader :title="title" backButton @back="close"> </DashboardHeader>
 
       <div
-        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default min-h-0 flex-1 overflow-y-auto px-0.75 pb-4 [scrollbar-color:var(--color-border-default)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
+        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default min-h-0 flex-1 [scrollbar-width:thin] [scrollbar-color:var(--color-border-default)_transparent] overflow-y-auto px-0.75 pb-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
       >
         <OForm greedy id="add-setting-variable-form" :form="form" class="px-0.5">
           <div class="mt-3">
@@ -204,7 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="name"
                       searchable
                       :placeholder="
-                        filter.name ? '' : t('dashboard.addSettingVariable.selectFieldPlaceholder')
+                        filter.name
+                          ? raw('')
+                          : t('dashboard.addSettingVariable.selectFieldPlaceholder')
                       "
                       :title="filter.name || undefined"
                       @update:model-value="filterUpdated(index, $event)"
@@ -529,7 +531,7 @@ import {
   computed,
   nextTick,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import { addVariable, getDashboard, updateVariable } from "../../../utils/commons";
@@ -607,7 +609,7 @@ export default defineComponent({
         filter: [],
       },
       value: "",
-      options: [{ label: "", value: "", selected: true }],
+      options: [{ label: raw(""), value: "", selected: true }],
       multiSelect: false,
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
@@ -689,7 +691,7 @@ export default defineComponent({
     // Format tabs for selection from dashboard data
     const tabsOptions = computed(() =>
       dashboardData.value.tabs.map((tab: any) => ({
-        label: tab.name,
+        label: raw(tab.name),
         value: tab.tabId,
       })),
     );
@@ -730,7 +732,7 @@ export default defineComponent({
           // Add existing panels from this tab
           panelOptions.push(
             ...(tab.panels || []).map((panel: any) => ({
-              label: panel.title,
+              label: raw(panel.title),
               value: panel.id,
             })),
           );
@@ -788,7 +790,7 @@ export default defineComponent({
     ]);
 
     const streamTypeOptions = computed(() =>
-      data.streamType.map((t: string) => ({ label: t, value: t })),
+      data.streamType.map((t: string) => ({ label: raw(t), value: t })),
     );
 
     const handleCustomSelectAll = () => {
@@ -1051,7 +1053,7 @@ export default defineComponent({
     const addField = () => {
       // add new field for options
       formPush("options", {
-        label: "",
+        label: raw(""),
         value: "",
         selected: false,
       });
@@ -1442,7 +1444,7 @@ export default defineComponent({
       });
 
       return filteredVars.map((it: any) => ({
-        label: it.name,
+        label: raw(it.name),
         value: "$" + it.name,
       }));
     });
@@ -1539,6 +1541,7 @@ export default defineComponent({
       isSavingVariable,
       store,
       t,
+      raw,
       data,
       streamsFilterFn,
       fieldsFilterFn,

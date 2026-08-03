@@ -67,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, inject } from "vue";
+import { defineComponent, computed, inject, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
@@ -80,13 +80,13 @@ export default defineComponent({
   components: { OIcon },
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
 
     caption: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
 
     link: {

@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-import type { I18nKey } from "@/types/i18n";
+import { raw, type I18nKey, I18nText } from "@/types/i18n";
 
 // Fields available to a workflow Condition. A workflow has no upstream stream
 // node (unlike a pipeline), so conditions branch on the fired-alert payload.
@@ -26,7 +26,7 @@ import type { I18nKey } from "@/types/i18n";
 // column).
 
 export interface WorkflowFieldOption {
-  label: string;
+  label: I18nText;
   value: string;
   type: string;
 }
@@ -77,17 +77,17 @@ export const TRIGGER_META_VARS: TriggerOutputVar[] = [
 // map at this stage, so even numeric-looking fields (threshold/count/period,
 // timestamps) are exposed as strings. Revisit once the backend types the columns.
 export const ALERT_PAYLOAD_FIELDS: WorkflowFieldOption[] = [
-  { label: "meta_alert_name", value: "meta_alert_name", type: "Utf8" },
-  { label: "meta_alert_type", value: "meta_alert_type", type: "Utf8" },
-  { label: "meta_alert_operator", value: "meta_alert_operator", type: "Utf8" },
-  { label: "meta_alert_threshold", value: "meta_alert_threshold", type: "Utf8" },
-  { label: "meta_alert_count", value: "meta_alert_count", type: "Utf8" },
-  { label: "meta_alert_period", value: "meta_alert_period", type: "Utf8" },
-  { label: "meta_stream_name", value: "meta_stream_name", type: "Utf8" },
-  { label: "meta_stream_type", value: "meta_stream_type", type: "Utf8" },
-  { label: "meta_org_id", value: "meta_org_id", type: "Utf8" },
-  { label: "meta_alert_start_time", value: "meta_alert_start_time", type: "Utf8" },
-  { label: "meta_alert_end_time", value: "meta_alert_end_time", type: "Utf8" },
-  { label: "meta_alert_trigger_time", value: "meta_alert_trigger_time", type: "Utf8" },
-  { label: "meta_alert_url", value: "meta_alert_url", type: "Utf8" },
+  { label: raw("meta_alert_name"), value: "meta_alert_name", type: "Utf8" },
+  { label: raw("meta_alert_type"), value: "meta_alert_type", type: "Utf8" },
+  { label: raw("meta_alert_operator"), value: "meta_alert_operator", type: "Utf8" },
+  { label: raw("meta_alert_threshold"), value: "meta_alert_threshold", type: "Utf8" },
+  { label: raw("meta_alert_count"), value: "meta_alert_count", type: "Utf8" },
+  { label: raw("meta_alert_period"), value: "meta_alert_period", type: "Utf8" },
+  { label: raw("meta_stream_name"), value: "meta_stream_name", type: "Utf8" },
+  { label: raw("meta_stream_type"), value: "meta_stream_type", type: "Utf8" },
+  { label: raw("meta_org_id"), value: "meta_org_id", type: "Utf8" },
+  { label: raw("meta_alert_start_time"), value: "meta_alert_start_time", type: "Utf8" },
+  { label: raw("meta_alert_end_time"), value: "meta_alert_end_time", type: "Utf8" },
+  { label: raw("meta_alert_trigger_time"), value: "meta_alert_trigger_time", type: "Utf8" },
+  { label: raw("meta_alert_url"), value: "meta_alert_url", type: "Utf8" },
 ];

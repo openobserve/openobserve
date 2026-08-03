@@ -120,7 +120,7 @@ export default defineComponent({
         filtered = filtered.filter(
           (integration) =>
             integration.displayName.toLowerCase().includes(query) ||
-            integration.description.toLowerCase().includes(query) ||
+            t(integration.descriptionKey).toLowerCase().includes(query) ||
             integration.name.toLowerCase().includes(query),
         );
       }

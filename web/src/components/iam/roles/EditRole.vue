@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="pb-2.5"
     data-test="edit-role-page"
-    :title="editingRole"
+    :title="raw(editingRole)"
     :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
     bleed
   >
@@ -262,7 +262,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
 import { useStore } from "vuex";

@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -93,9 +93,9 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 interface DataSourceTab {
   name: string;
   to: Record<string, any>;
-  label: string;
+  label: I18nText;
   icon?: string;
-  title?: string;
+  title?: I18nText;
   dataTest?: string;
 }
 
@@ -112,7 +112,7 @@ const props = withDefaults(
     /** data-test for the search input. */
     searchDataTest?: string;
     /** Placeholder for the search input (defaults to common.search). */
-    searchPlaceholder?: string;
+    searchPlaceholder?: I18nText;
     /** Extra class(es) for the OTabs element. */
     tabsClass?: string;
     /** data-test for the tab-list wrapper. */
@@ -126,7 +126,7 @@ const props = withDefaults(
     splitterWidth: 250,
     searchable: false,
     searchDataTest: "",
-    searchPlaceholder: "",
+    searchPlaceholder: raw(""),
     tabsClass: "",
     panelDataTest: "",
     tabDataTestPrefix: "",

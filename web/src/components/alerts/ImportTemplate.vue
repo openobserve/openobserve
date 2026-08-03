@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import templateService from "@/services/alert_templates";
@@ -218,10 +218,10 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type templateCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
     type templateErrors = (ErrorMessage | string)[][];
@@ -369,17 +369,17 @@ export default defineComponent({
     };
 
     const validateTemplateInputs = async (input: any, index: number) => {
-      let templateErrors: (string | { message: string; field: string })[] = [];
+      let templateErrors: (string | ErrorMessage)[] = [];
 
       // Validate name using the updated props.templates
       if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
         templateErrors.push({
-          message: `Template - ${index}: The "name" field is required and should be a valid string.`,
+          message: t("alert_templates.import.nameRequired", { index }),
           field: "template_name",
         });
       } else if (props.templates.some((template: any) => template.name === input.name)) {
         templateErrors.push({
-          message: `Template - ${index}: "${input.name}" already exists`,
+          message: t("alert_templates.import.nameExists", { index, name: input.name }),
           field: "template_name",
         });
       }
@@ -387,7 +387,7 @@ export default defineComponent({
       // Validate type
       if (!input.type || (input.type !== "email" && input.type !== "http")) {
         templateErrors.push({
-          message: `Template - ${index}: The "type" field must be either "email" or "http"`,
+          message: t("alert_templates.import.typeInvalid", { index }),
           field: "type",
         });
       }
@@ -395,14 +395,14 @@ export default defineComponent({
       // Validate body
       if (!input.body || typeof input.body !== "string" || input.body.trim() === "") {
         templateErrors.push({
-          message: `Template - ${index}: The "body" field is required and should be a valid JSON string.`,
+          message: t("alert_templates.import.bodyRequired", { index }),
           field: "body",
         });
       } else {
         const result = validateTemplateBody(input.body);
         if (!result.valid) {
           templateErrors.push({
-            message: `Template - ${index}: The "body" field should contain valid JSON. Placeholders like {value} for numbers and "{name}" for strings are supported.`,
+            message: t("alert_templates.import.bodyInvalidJson", { index }),
             field: "body",
           });
         }
@@ -412,7 +412,7 @@ export default defineComponent({
       if (input.type === "email") {
         if (!input.title || typeof input.title !== "string" || input.title.trim() === "") {
           templateErrors.push({
-            message: `Template - ${index}: The "title" field is required for email type templates.`,
+            message: t("alert_templates.import.titleRequiredEmail", { index }),
             field: "title",
           });
         }
@@ -445,7 +445,7 @@ export default defineComponent({
         });
 
         tempalteCreators.value.push({
-          message: `Template - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file `,
+          message: t("alert_templates.import.createSuccess", { index, name: input.name }),
           success: true,
         });
 
@@ -455,7 +455,11 @@ export default defineComponent({
         return true;
       } catch (error: any) {
         tempalteCreators.value.push({
-          message: `Template - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("alert_templates.import.createFailed", {
+            index,
+            name: input.name,
+            reason: error?.response?.data?.message || t("alert_templates.import.unknownError"),
+          }),
           success: false,
         });
         return false;

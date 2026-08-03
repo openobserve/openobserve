@@ -505,7 +505,7 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 
 import dashboardService from "../../services/dashboards";
@@ -563,7 +563,7 @@ interface DashboardRow {
   folder_id?: string;
   name: string;
   identifier: string;
-  description: string;
+  description: I18nText;
   owner: string;
   created_raw: string;
   created: string;
@@ -580,7 +580,7 @@ interface DashboardSearchResult {
 // Narrows a caught `unknown` to the axios-style error shape this view reads.
 interface CaughtError {
   name?: string;
-  message?: string;
+  message?: I18nText;
   status?: number;
   response?: { status?: number; data?: { message?: string } };
 }

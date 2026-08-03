@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :min="1000"
               :max="1000000"
               class="ml-2 w-45!"
-              :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
+              :placeholder="raw('40000 (' + t('settings.systemDefault') + ')')"
               data-test="general-settings-max-series-per-query"
             >
               <template v-slot:icon-right>
@@ -564,7 +564,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -1285,6 +1285,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       config,
       router,

@@ -144,7 +144,7 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import SearchService from "@/services/search";
 import { onBeforeMount, ref, defineComponent, computed, toRaw, watch } from "vue";
 
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -176,6 +176,8 @@ export default defineComponent({
     OSearchInput,
   },
   setup() {
+    // Declared first: the option lists below resolve their labels through `t`.
+    const { t } = useI18nTyped();
     const store = useStore();
     const schemaData = ref({});
     const lastRefreshed = ref("");
@@ -190,9 +192,9 @@ export default defineComponent({
     });
 
     const searchFieldOptions = ref([
-      { label: "All Fields", value: "all" },
-      { label: "Exec. Duration", value: "exec_duration" },
-      { label: "Query Range", value: "query_range" },
+      { label: t("search.allFieldsLabel"), value: "all" },
+      { label: t("queries.duration"), value: "exec_duration" },
+      { label: t("queries.queryRange"), value: "query_range" },
     ]);
 
     const selectedQueryTypeTab = ref<"summary" | "all">("summary");
@@ -206,8 +208,8 @@ export default defineComponent({
     };
 
     const runningQueryTypes = [
-      { label: "User Summary", value: "summary" },
-      { label: "All Queries", value: "all" },
+      { label: t("queries.userSummary"), value: "summary" },
+      { label: t("queries.allQueries"), value: "all" },
     ];
     const selectedSearchField = ref(searchFieldOptions.value[0].value);
 
@@ -309,7 +311,6 @@ export default defineComponent({
       data: null as any,
     });
 
-    const { t } = useI18nTyped();
     const showListSchemaDialog = ref(false);
 
     const listSchema = (row: any) => {
@@ -320,18 +321,18 @@ export default defineComponent({
     };
 
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
+      { label: raw("5"), value: 5 },
+      { label: raw("10"), value: 10 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
     ];
     const selectedPerPage = ref(20);
     const pagination: any = ref({
       rowsPerPage: 20,
     });
 
-    const changePagination = (val: { label: string; value: any }) => {
+    const changePagination = (val: { label: I18nText; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
     };
@@ -549,23 +550,23 @@ export default defineComponent({
     const otherFieldOptions = computed(() => {
       if (selectedSearchField.value === "exec_duration") {
         return [
-          { label: "> 1 second", value: "gt_1s" },
-          { label: "> 5 seconds", value: "gt_5s" },
-          { label: "> 15 seconds", value: "gt_15s" },
-          { label: "> 30 seconds", value: "gt_30s" },
-          { label: "> 1 minute", value: "gt_1m" },
-          { label: "> 5 minutes", value: "gt_5m" },
-          { label: "> 10 minutes", value: "gt_10m" },
+          { label: t("queries.durationOptions.gt1s"), value: "gt_1s" },
+          { label: t("queries.durationOptions.gt5s"), value: "gt_5s" },
+          { label: t("queries.durationOptions.gt15s"), value: "gt_15s" },
+          { label: t("queries.durationOptions.gt30s"), value: "gt_30s" },
+          { label: t("queries.durationOptions.gt1m"), value: "gt_1m" },
+          { label: t("queries.durationOptions.gt5m"), value: "gt_5m" },
+          { label: t("queries.durationOptions.gt10m"), value: "gt_10m" },
         ];
       } else if (selectedSearchField.value === "query_range") {
         return [
-          { label: "> 5 minutes", value: "gt_5m" },
-          { label: "> 10 minutes", value: "gt_10m" },
-          { label: "> 15 minutes", value: "gt_15m" },
-          { label: "> 1 hour", value: "gt_1h" },
-          { label: "> 1 day", value: "gt_1d" },
-          { label: "> 1 week", value: "gt_1w" },
-          { label: "> 1 Month", value: "gt_1M" },
+          { label: t("queries.durationOptions.gt5m"), value: "gt_5m" },
+          { label: t("queries.durationOptions.gt10m"), value: "gt_10m" },
+          { label: t("queries.durationOptions.gt15m"), value: "gt_15m" },
+          { label: t("queries.durationOptions.gt1h"), value: "gt_1h" },
+          { label: t("queries.durationOptions.gt1d"), value: "gt_1d" },
+          { label: t("queries.durationOptions.gt1w"), value: "gt_1w" },
+          { label: t("queries.durationOptions.gt1Month"), value: "gt_1M" },
         ];
       }
 

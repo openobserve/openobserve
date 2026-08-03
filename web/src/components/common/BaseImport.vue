@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader
       v-if="!hideHeader"
       :title="title"
-      :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
+      :back="{ label: raw(''), onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
       class="border-border-default shrink-0 border-b"
       :class="headerContainerClass"
     >
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <AppTabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
-                    :tabs="tabs"
+                    :tabs="resolvedTabs"
                     v-model:active-tab="activeTab"
                     @update:active-tab="handleTabChange"
                   />
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          helpText=".json files only"
+                          :helpText="t('common.jsonFilesOnlyHint')"
                         >
                           <template v-slot:prepend>
                             <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
@@ -207,7 +207,7 @@ import {
   onBeforeUnmount,
   type PropType,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -235,26 +235,19 @@ export default defineComponent({
   props: {
     // Title for the import page
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
-    // Tabs configuration (shape matches AppTabs' Tab interface)
+    // Tabs configuration (shape matches AppTabs' Tab interface).
+    // No `default` here on purpose: the fallback tabs carry translated labels and
+    // a prop default factory runs outside the component's i18n context, which
+    // would freeze them at the locale active when the first instance mounted.
+    // `resolvedTabs` in setup() builds them with `t()` instead — see below.
     tabs: {
       type: Array as PropType<
-        { label: string; value: string; icon?: string; disabled?: boolean }[]
+        { label: I18nText; value: string; icon?: string; disabled?: boolean }[]
       >,
-      default: () => [
-        {
-          label: "File Upload / JSON",
-          value: "import_json_file",
-          icon: "upload",
-        },
-        {
-          label: "URL Import",
-          value: "import_json_url",
-          icon: "link",
-        },
-      ],
+      required: false,
     },
     // Default active tab
     defaultActiveTab: {
@@ -353,6 +346,17 @@ export default defineComponent({
         editorKey.value++; // Force editor to update only if not importing
       }
     };
+
+    // Tabs the page actually renders: the host's `tabs` prop when given,
+    // otherwise the built-in File-upload / URL pair, translated here (inside
+    // setup) so the labels follow the active locale.
+    const resolvedTabs = computed(
+      () =>
+        props.tabs ?? [
+          { label: t("common.fileUploadJsonTab"), value: "import_json_file", icon: "upload" },
+          { label: t("common.urlImportTab"), value: "import_json_url", icon: "link" },
+        ],
+    );
 
     // Computed styles
     const contentStyle = computed(() => {
@@ -516,12 +520,14 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       jsonStr,
       jsonFiles,
       url,
       jsonArrayOfObj,
       activeTab,
+      resolvedTabs,
       splitterModel,
       editorKey,
       isImporting,

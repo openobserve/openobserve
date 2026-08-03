@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="error"
         data-test="llm-insights-empty-error"
         :title="t('traces.lLMInsightsDashboard.failedToLoad')"
-        :description="error || ''"
+        :description="raw(error || '')"
         :action-label="t('traces.lLMInsightsDashboard.retry')"
         action-icon="refresh"
         @action="loadInsights()"
@@ -292,7 +292,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
@@ -763,7 +763,7 @@ function onEmptyAction(id?: string) {
 }
 
 interface KpiCard {
-  label: string;
+  label: I18nText;
   /** Material-symbol icon name (OIcon) shown in the card's corner tile. */
   icon: string;
   value: string;

@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-config-panel-time-picker"
                   class="w-fit max-w-full min-w-0 overflow-hidden"
                 />
-                <OTooltip :content="formattedPickerValue" max-width="320px" />
+                <OTooltip :content="raw(formattedPickerValue)" max-width="320px" />
               </div>
               <OIcon
                 class="mr-1 ml-2 flex-shrink-0 shrink-0 cursor-pointer"
@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="`${t('dashboard.queryLabel')} ${Number(index) + 1}`"
+              :label="raw(`${t('dashboard.queryLabel')} ${Number(index) + 1}`)"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>
@@ -603,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <OInput
-            placeholder="{field_name}"
+            :placeholder="raw('{field_name}')"
             v-model="
               dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
                 .config.query_label
@@ -719,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
           v-model="dashboardPanelDataModel.data.config.no_value_replacement"
-          placeholder="-"
+          :placeholder="raw('-')"
           :label="t('dashboard.noValueReplacement')"
           data-test="dashboard-config-no-value-replacement"
         >
@@ -1729,7 +1729,7 @@ import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { computed, defineComponent, inject, nextTick, onBeforeMount, onMounted, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -2150,8 +2150,10 @@ export default defineComponent({
         value: "center",
       },
     ];
-    // Single source of truth — shared with the column-formatting dialog.
-    const unitOptions = getUnitOptions(t);
+    // Single source of truth — shared with the column-formatting dialog. Its
+    // labels are already translated (it is handed `t`), but the helper's
+    // signature widens them back to `string`, so re-brand them for OSelect.
+    const unitOptions = getUnitOptions(t).map((o) => ({ ...o, label: raw(o.label) }));
 
     const labelPositionOptions = [
       {
@@ -2306,7 +2308,7 @@ export default defineComponent({
 
       return streamFields.schema.map((it: any) => {
         return {
-          label: it.name,
+          label: raw(it.name),
           value: it.name,
         };
       });
@@ -2557,6 +2559,7 @@ export default defineComponent({
     const decimalsTouched = ref(false);
 
     return {
+      raw,
       legendsPositionModel,
       legendsTypeModel,
       chartAlignModel,

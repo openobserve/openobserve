@@ -135,9 +135,9 @@ export default defineComponent({
 
     // Provider options for the select dropdown.
     const providerOptions = computed(() => [
-      { label: "AWS", value: "aws" },
-      { label: "GCP", value: "gcp" },
-      { label: "Azure", value: "azure" },
+      { label: raw("AWS"), value: "aws" },
+      { label: raw("GCP"), value: "gcp" },
+      { label: raw("Azure"), value: "azure" },
       { label: t("synthetics.locations.providerOther"), value: "custom" },
     ]);
 

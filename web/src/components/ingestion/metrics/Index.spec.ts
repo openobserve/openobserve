@@ -352,7 +352,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({ innerText: "fail text" });
 
       expect(copyToClipboard).toHaveBeenCalledWith("fail text", expect.any(Function), {
-        successMessage: expect.any(String),
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });

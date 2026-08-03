@@ -4,7 +4,7 @@
 import type { TimeProps, TimeEmits, TimeSlots } from "./OTime.types";
 import { computed, ref, useAttrs, useId, watch } from "vue";
 import { PopoverRoot, PopoverTrigger, PopoverContent } from "reka-ui";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18nTyped();
@@ -91,7 +91,7 @@ function calcPos(index: number, total: number, radius: number) {
 
 interface ClockNum {
   value: number;
-  label: string;
+  label: I18nText;
   x: number;
   y: number;
 }
@@ -102,12 +102,12 @@ const clockNumbers = computed((): ClockNum[] => {
       const h = i + 1;
       const index = h % 12;
       const pos = calcPos(index, 12, NUM_RADIUS);
-      return { value: h, label: String(h), ...pos };
+      return { value: h, label: raw(String(h)), ...pos };
     });
   }
   return Array.from({ length: 12 }, (_, i) => {
     const pos = calcPos(i, 12, NUM_RADIUS);
-    return { value: i * 5, label: String(i * 5).padStart(2, "0"), ...pos };
+    return { value: i * 5, label: raw(String(i * 5).padStart(2, "0")), ...pos };
   });
 });
 

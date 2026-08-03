@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               side="bottom"
                               align="start"
                               :max-width="'24rem'"
-                              :content="getFailureTooltip(event)"
+                              :content="raw(getFailureTooltip(event))"
                             />
                           </span>
                           <span
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";

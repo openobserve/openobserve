@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import { type LLMPanelDef, renderPanelSql, panelI18nKey } from "./config/llmInsightsPanels";
+import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
 import { buildLLMPanelSchema } from "./llmPanelSchema";
 
 interface Props {
@@ -88,9 +88,11 @@ const props = defineProps<Props>();
 
 const { t } = useI18nTyped();
 
-// Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
-const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));
-const displaySubtitle = computed(() => t(`${panelI18nKey(props.panel.id)}.subtitle`));
+// Title/subtitle are i18n KEYS stored on the panel definition (a plain config
+// module with no i18n context) — resolved here, on every render, so they follow
+// the active locale.
+const displayTitle = computed(() => t(props.panel.titleKey));
+const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.subtitleKey) : ""));
 
 // Fully-rendered SQL: stream substituted, agent predicate spliced. We swap the
 // templated `histogram(_timestamp, '{{interval}}')` for the auto-bucketing

@@ -17,7 +17,7 @@ limitations under the License.
   <ODialog
     v-model:open="isOpen"
     size="md"
-    :title="`${t('alerts.destinationPreview')} - ${getDestinationTypeName(type)}`"
+    :title="raw(`${t('alerts.destinationPreview')} - ${getDestinationTypeName(type)}`)"
     data-test="destination-preview-dialog"
   >
     <div data-test="destination-preview-card" class="w-full">
@@ -398,7 +398,7 @@ limitations under the License.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -447,8 +447,8 @@ const getDestinationTypeName = (type: string): string => {
 // Copy template to clipboard
 const copyTemplate = () => {
   copyToClipboard(props.templateContent, t, {
-    successMessage: "Template copied to clipboard",
-    errorMessage: "Failed to copy template",
+    successMessage: t("alerts.previewCopyTemplateSuccess"),
+    errorMessage: t("alerts.previewCopyTemplateError"),
     timeout: 2000,
   });
 };

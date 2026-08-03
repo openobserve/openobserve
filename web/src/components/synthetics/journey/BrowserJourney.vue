@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserStep, ReplayPhase, StepReplayResult, WireStep } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
@@ -17,10 +17,9 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
 import {
-  ACTION_LABELS,
   SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST,
   VALUE_ACTIONS as VALUE_ACTIONS_CONST,
-  VALUE_LABELS,
+  VALUE_LABEL_KEYS,
   SELECTOR_TYPE_OPTIONS,
   actionOptions,
   VALUE_WIDTH_MAP,
@@ -451,9 +450,11 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
 const selectorActions = SELECTOR_ACTIONS_CONST;
 const valueActions = VALUE_ACTIONS_CONST;
 const selectorTypeOptions = SELECTOR_TYPE_OPTIONS;
+const actionSelectOptions = computed(() => actionOptions(t));
 
-function valueActionLabel(action: string): string {
-  return VALUE_LABELS[action] || t("synthetics.journey.valueFallback");
+function valueActionLabel(action: string): I18nText {
+  const key = VALUE_LABEL_KEYS[action];
+  return key ? t(key) : t("synthetics.journey.valueFallback");
 }
 
 function valueWidthClass(action: string): string {
@@ -910,13 +911,13 @@ function openChromeExtensions() {
             <OSelect
               :model-value="row.action"
               :label="t('synthetics.journey.actionLabel')"
-              :options="actionOptions"
+              :options="actionSelectOptions"
               class="w-50! shrink-0"
               :error="firstStepError && props.modelValue[0]?.id === row.id"
               :error-message="
                 firstStepError && props.modelValue[0]?.id === row.id
                   ? t('synthetics.validation.firstStepMustNavigate')
-                  : ''
+                  : raw('')
               "
               data-test="synthetics-journey-step-action-select"
               @update:model-value="
@@ -963,7 +964,7 @@ function openChromeExtensions() {
                             step: props.modelValue.indexOf(row) + 1,
                           }),
                       })
-                    : ''
+                    : raw('')
                 "
                 data-test="synthetics-journey-step-selector-input"
                 @update:model-value="
@@ -986,7 +987,7 @@ function openChromeExtensions() {
             @update:model-value="(v: any) => handleStepUpdate(row, { value: v })"
           >
             <template v-if="valueTooltip(row.action)" #tooltip>
-              <OTooltip :content="valueTooltip(row.action)!" />
+              <OTooltip :content="raw(valueTooltip(row.action)!)" />
             </template>
           </OInput>
           <!-- Timeout -->

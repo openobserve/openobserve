@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { debounce } from "lodash-es";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -281,7 +281,10 @@ const uniqueVersions = computed<GenAiAgentListItem[]>(() => {
 });
 
 const versionOptions = computed<SelectOption[]>(() =>
-  uniqueVersions.value.map((v) => ({ label: v.version as string, value: v.version as string })),
+  uniqueVersions.value.map((v) => ({
+    label: raw(v.version as string),
+    value: v.version as string,
+  })),
 );
 
 // Default: B = the immediately-previous version, A = current (latest). Sort the

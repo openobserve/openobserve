@@ -724,8 +724,8 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should have the expected id and label for each top-level group", () => {
       const groups = wrapper.vm.metricGroupResources;
-      expect(groups[0]).toMatchObject({ id: "pods", label: "Pods" });
-      expect(groups[1]).toMatchObject({ id: "nodes", label: "Nodes" });
+      expect(groups[0]).toMatchObject({ id: "pods", labelKey: "metrics.groups.pods" });
+      expect(groups[1]).toMatchObject({ id: "nodes", labelKey: "metrics.groups.nodes" });
     });
 
     it("should nest compute/memory/network/storage/others under each top-level group", () => {

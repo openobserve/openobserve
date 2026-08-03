@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="showPreview"
       size="md"
-      :title="previewedPattern?.name"
+      :title="raw(previewedPattern?.name)"
       data-test="pattern-preview-dialog"
       :secondary-button-label="t('regex_patterns.close')"
       :primary-button-label="t('regex_patterns.import_this_pattern')"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
@@ -246,7 +246,7 @@ interface PatternExample {
 interface BuiltInPattern {
   name: string;
   pattern: string;
-  description: string;
+  description: I18nText;
   tags: string[];
   rarity: number;
   url: string | null;
@@ -291,7 +291,7 @@ export default defineComponent({
     });
 
     const tagOptions = computed(() =>
-      availableTags.value.map((tag) => ({ label: tag, value: tag })),
+      availableTags.value.map((tag) => ({ label: raw(tag), value: tag })),
     );
 
     const filteredPatterns = computed(() => {
@@ -437,6 +437,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       patterns,
       loading,

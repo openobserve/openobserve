@@ -39,13 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 defineProps<{
   /** Optional override for the default "No data available" message. */
-  title?: string;
+  title?: I18nText;
   /** When true, shows "No results found" with a "Clear filters" action. */
   filtered?: boolean;
 }>();

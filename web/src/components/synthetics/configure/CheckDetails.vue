@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsFolder } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -15,8 +15,8 @@ const props = defineProps<{
   folders?: SyntheticsFolder[];
   validationErrors?: Record<string, string>;
   /** Override the target field label/placeholder (protocol checks take a host, not a URL). */
-  targetLabel?: string;
-  targetPlaceholder?: string;
+  targetLabel?: I18nText;
+  targetPlaceholder?: I18nText;
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
@@ -49,13 +49,13 @@ const url = computed({
 
 const description = computed({
   get: () => props.check.description ?? "",
-  set: (v: string) => update({ description: v }),
+  set: (v: string) => update({ description: raw(v) }),
 });
 
 const tagInput = ref("");
 
 const folderOptions = computed(() => {
-  const opts = (props.folders ?? []).map((f) => ({ label: f.name, value: f.folderId }));
+  const opts = (props.folders ?? []).map((f) => ({ label: raw(f.name), value: f.folderId }));
   return opts.length
     ? opts
     : [{ label: t("synthetics.checkDetails.defaultFolder"), value: "default" }];
@@ -100,7 +100,7 @@ function handleTagKeydown(event: KeyboardEvent) {
         :label="t('synthetics.checkDetails.name')"
         required
         :error="!!props.validationErrors?.name"
-        :error-message="props.validationErrors?.name"
+        :error-message="raw(props.validationErrors?.name)"
         :placeholder="t('synthetics.checkDetails.namePlaceholder')"
         data-test="synthetics-check-details-name-input"
       />
@@ -124,7 +124,7 @@ function handleTagKeydown(event: KeyboardEvent) {
         :label="targetLabel ?? t('synthetics.checkDetails.startingUrl')"
         required
         :error="!!props.validationErrors?.url"
-        :error-message="props.validationErrors?.url"
+        :error-message="raw(props.validationErrors?.url)"
         :placeholder="targetPlaceholder ?? t('synthetics.checkDetails.startingUrlPlaceholder')"
         data-test="synthetics-check-details-url-input"
       />

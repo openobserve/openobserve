@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { raw } from "@/types/i18n";
+
 import { PrebuiltConfig } from "./types";
 
 /**
@@ -94,7 +96,7 @@ export const slackConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.slackWebhookUrl",
       type: "text",
       required: true,
-      hint: "Get your webhook URL from Slack App settings",
+      hintKey: "alerts.prebuiltDestinations.slackWebhookUrlHelp",
       validator: (url: string) => {
         const invalid = { key: "alerts.prebuiltDestinations.invalidSlackWebhookUrl" };
         try {
@@ -115,7 +117,7 @@ export const slackConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.slackChannel",
       type: "text",
       required: false,
-      hint: "e.g., #alerts",
+      hint: raw("e.g., #alerts"),
     },
   ],
 };

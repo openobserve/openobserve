@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   computed,
   defineComponent,
@@ -501,7 +501,7 @@ export default defineComponent({
         icon: "table-chart",
       },
       {
-        label: "JSON",
+        label: raw("JSON"),
         value: "json",
         icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
@@ -810,7 +810,7 @@ export default defineComponent({
             "default",
           );
           organizations.value = response.data.data.map((org: any) => ({
-            label: org.name,
+            label: raw(org.name),
             value: org.identifier,
           }));
           organizations.value.sort((a: any, b: any) => a.label.localeCompare(b.label));
@@ -822,7 +822,7 @@ export default defineComponent({
         }
       } else {
         organizations.value = store.state.organizations.map((org: any) => ({
-          label: org.name,
+          label: raw(org.name),
           value: org.identifier,
         }));
       }
@@ -1484,6 +1484,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       isDark,
       t,
       selectedOrganization,

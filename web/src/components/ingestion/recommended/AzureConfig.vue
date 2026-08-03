@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="cat.value"
                   v-model="enabledCategories"
                   :val="cat.value"
-                  :label="cat.label"
+                  :label="raw(cat.label)"
                 />
               </div>
             </div>
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- eslint-disable vue/no-bare-strings-in-template -- example Azure resource-group name format, not translatable content -->
                 <OInput
-                  placeholder="rg-openobserve-activity-logs"
+                  :placeholder="raw('rg-openobserve-activity-logs')"
                   v-model="resourceGroup"
                   autocomplete="off"
                   data-test="azure-resource-group-input"
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- eslint-disable vue/no-bare-strings-in-template -- example Azure deployment-name format, not translatable content -->
                 <OInput
-                  placeholder="o2-activity-20260420"
+                  :placeholder="raw('o2-activity-20260420')"
                   v-model="deploymentName"
                   autocomplete="off"
                   data-test="azure-deployment-name-input"
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-text-secondary mb-2 text-xs">
                 {{ t("ingestion.azureSetup.runCommandAfterDeployment") }}
               </div>
-              <CopyContent :content="curlCommand" data-test="azure-curl-command" />
+              <CopyContent :content="raw(curlCommand)" data-test="azure-curl-command" />
             </div>
           </div>
         </div>
@@ -206,14 +206,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-text-heading mb-2 text-sm font-semibold">
         {{ t("ingestion.azureSetup.manualTitle") }}
       </div>
-      <CopyContent :content="manualContent" />
+      <CopyContent :content="raw(manualContent)" />
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -324,6 +324,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       LOG_CATEGORIES,

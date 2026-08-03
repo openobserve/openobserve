@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
             :key="group.id"
             :value="group.id"
-            :label="`${group.display} (${group.id})`"
+            :label="raw(`${group.display} (${group.id})`)"
           />
         </OFormCheckboxGroup>
       </div>
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import alertsService from "@/services/alerts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

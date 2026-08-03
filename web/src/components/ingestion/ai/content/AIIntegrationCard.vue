@@ -24,13 +24,13 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
 import { renderCardSegments, safeHttpUrl, type CardSubstitutions } from "./renderMarkdown";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
 const props = defineProps<{
   /** Raw `data-source-ui.md` content for this integration. */
-  content: string;
+  content: I18nText;
   /** Optional documentation URL shown as a footer link. */
   docUrl?: string;
 }>();
@@ -93,7 +93,7 @@ const renderedSections = computed(() =>
         v-for="(w, i) in warnings"
         :key="`warn-${i}`"
         variant="warning"
-        :content="w"
+        :content="raw(w)"
         class="mb-5"
       />
 

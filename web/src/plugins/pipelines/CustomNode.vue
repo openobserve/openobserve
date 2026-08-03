@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import useDragAndDrop from "./useDnD";
 import { ref, computed, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -66,7 +66,7 @@ interface PipelineEdge {
 }
 
 interface NodeType {
-  label: string;
+  label: I18nText;
   icon: string;
   subtype?: string;
   io_type?: string;

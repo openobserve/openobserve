@@ -128,7 +128,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -149,7 +149,7 @@ interface WebinarData {
   id: number;
   documentId: string;
   tag: string;
-  title: string;
+  title: I18nText;
   date: string;
   primaryButton: PrimaryButton;
 }

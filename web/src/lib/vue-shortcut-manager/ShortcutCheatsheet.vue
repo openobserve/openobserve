@@ -220,7 +220,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -259,14 +259,14 @@ interface DisplayEntry {
   id: string;
   /** Combo string rendered as keycaps (e.g. "ctrl+enter", "del / ⌫"). */
   display: string;
-  label: string;
+  label: I18nText;
 }
 interface DisplaySection {
-  title: string;
+  title: I18nText;
   entries: DisplayEntry[];
 }
 interface DisplayModule {
-  title: string;
+  title: I18nText;
   sections: DisplaySection[];
 }
 
@@ -414,7 +414,7 @@ useShortcut(
     open.value = !open.value;
   },
   {
-    description: "shortcuts.actions.openCheatsheet",
+    description: raw("shortcuts.actions.openCheatsheet"),
     scope: "global",
   },
 );

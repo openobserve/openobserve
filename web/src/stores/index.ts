@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { createStore } from "vuex";
 import { useLocalOrganization, useLocalCurrentUser, useLocalTimezone } from "../utils/zincutils";
 import streams from "./streams";
@@ -65,7 +67,7 @@ const organizationObj = {
   orgTokens: [] as Array<{
     name: string;
     token: string;
-    description: string;
+    description: I18nText;
     is_default: boolean;
     enabled: boolean;
     created_by: string;

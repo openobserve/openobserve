@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ incidentDetails.title }}
           <OTooltip
             v-if="incidentDetails && (incidentDetails.title?.length ?? 0) > 35"
-            :content="incidentDetails.title"
+            :content="raw(incidentDetails.title)"
           />
         </span>
       </template>
@@ -58,14 +58,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag type="incidentStatus" :value="incidentDetails.status" />
             <OTooltip
               :content="
-                t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)
+                raw(t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status))
               "
             />
           </span>
 
           <span class="inline-flex cursor-default">
             <OTag type="severity" :value="incidentDetails.severity" />
-            <OTooltip :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
+            <OTooltip
+              :content="raw(t('alerts.incidents.severity') + ': ' + incidentDetails.severity)"
+            />
           </span>
 
           <span class="inline-flex cursor-default">
@@ -759,7 +761,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ index + 1 }}.
                               </span>
                               <div class="min-w-0 flex-1">
-                                <OTooltip v-if="alert.name.length > 30" :content="alert.name" />
+                                <OTooltip
+                                  v-if="alert.name.length > 30"
+                                  :content="raw(alert.name)"
+                                />
                                 <span class="block truncate font-medium">
                                   {{
                                     alert.name.length > 30
@@ -1363,7 +1368,7 @@ import {
   onBeforeUnmount,
   onUnmounted,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -1481,16 +1486,16 @@ export default defineComponent({
 
     // Status and Severity options
     const statusOptions = [
-      { label: "Open", value: "open" },
-      { label: "Acknowledged", value: "acknowledged" },
-      { label: "Resolved", value: "resolved" },
+      { label: t("alerts.incidents.statusOpen"), value: "open" },
+      { label: t("alerts.incidents.statusAcknowledged"), value: "acknowledged" },
+      { label: t("alerts.incidents.statusResolved"), value: "resolved" },
     ];
 
     const severityOptions = [
-      { label: "P1 - Critical", value: "P1" },
-      { label: "P2 - High", value: "P2" },
-      { label: "P3 - Medium", value: "P3" },
-      { label: "P4 - Low", value: "P4" },
+      { label: t("alerts.incidents.severityP1"), value: "P1" },
+      { label: t("alerts.incidents.severityP2"), value: "P2" },
+      { label: t("alerts.incidents.severityP3"), value: "P3" },
+      { label: t("alerts.incidents.severityP4"), value: "P4" },
     ];
 
     // Table of Contents
@@ -2774,10 +2779,10 @@ export default defineComponent({
             });
           } else {
             const ok = await confirm({
-              title: "Re-run AI Analysis?",
-              message: "Severity has changed. Would you like AI to re-analyze this incident?",
-              confirmLabel: "Re-run AI analysis",
-              cancelLabel: "No thanks",
+              title: t("alerts.incidents.rerunAnalysisTitle"),
+              message: t("alerts.incidents.rerunAnalysisMessage"),
+              confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
+              cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
               persistent: false,
             });
             if (ok) {
@@ -3355,6 +3360,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       loading,

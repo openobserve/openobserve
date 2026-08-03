@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <span class="text-xs">
                     {{ cfg.label }}
-                    <OTooltip :content="cfg.groupField" />
+                    <OTooltip :content="raw(cfg.groupField)" />
                   </span>
                 </ODropdownItem>
               </template>
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="item.p99"
                     :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
-                    :label="formatOperationLatency(item.p99)"
+                    :label="raw(formatOperationLatency(item.p99))"
                     variant="warning"
                     align="right"
                     inline
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="item.p95"
                     :max="rowMaxes(sortedOperationsTableRows, ['p95']).p95"
-                    :label="formatOperationLatency(item.p95)"
+                    :label="raw(formatOperationLatency(item.p95))"
                     align="right"
                     inline
                   />
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="item.p75"
                     :max="rowMaxes(sortedOperationsTableRows, ['p75']).p75"
-                    :label="formatOperationLatency(item.p75)"
+                    :label="raw(formatOperationLatency(item.p75))"
                     align="right"
                     inline
                   />
@@ -455,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="item.p99"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
-                    :label="formatOperationLatency(item.p99)"
+                    :label="raw(formatOperationLatency(item.p99))"
                     variant="warning"
                     align="right"
                     inline
@@ -465,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="item.p95"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p95']).p95"
-                    :label="formatOperationLatency(item.p95)"
+                    :label="raw(formatOperationLatency(item.p95))"
                     align="right"
                     inline
                   />
@@ -474,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="item.p75"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p75']).p75"
-                    :label="formatOperationLatency(item.p75)"
+                    :label="raw(formatOperationLatency(item.p75))"
                     align="right"
                     inline
                   />
@@ -628,7 +628,7 @@ import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText, type I18nKey } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -669,7 +669,7 @@ const AgentNodeBehaviorTab = defineAsyncComponent(
 
 export interface ResourceTabConfig {
   id: string; // unique tab name (= FoundGroup.group_id)
-  label: string; // display label
+  label: I18nText; // display label
   groupField: string; // SQL GROUP BY field (= FoundGroup.aliases["traces"])
   colLabel: string; // header of the first column (entity name)
   colId: string; // row property key for the entity name column
@@ -703,8 +703,12 @@ export interface ResourceTabConfig {
 export interface InferredServiceTab {
   /** Unique tab identifier, e.g. "hosts", "databases", "queries" */
   id: string;
-  /** User-facing tab label, e.g. "Hosts", "Databases", "Queries" */
-  label: string;
+  /** Already-resolved tab label. Holds only names that read the same in every
+   *  language (e.g. "URLs", "RPC Services"); omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n KEY for the tab label — this registry is module-scope, so it cannot
+   *  call t(); the mapper in setup() resolves it. `labelKey` wins when both set. */
+  labelKey?: I18nKey;
   /** Column header shown in the resource table, e.g. "Host", "Database", "DB Operation" */
   colLabel: string;
   /**
@@ -742,19 +746,19 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
   database: [
     {
       id: "hosts",
-      label: "Hosts",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
       colLabel: "Host",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "databases",
-      label: "Databases",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabDatabases",
       colLabel: "Database",
       fields: ["db_namespace", "db_name"],
     },
     {
       id: "queries",
-      label: "Queries",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabQueries",
       colLabel: "DB Operation",
       fields: ["db_operations"],
     },
@@ -762,13 +766,13 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
   queue: [
     {
       id: "hosts",
-      label: "Hosts",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
       colLabel: "Host",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "destinations",
-      label: "Destinations",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabDestinations",
       colLabel: "Destination",
       fields: ["messaging_destination_name", "messaging_destination"],
     },
@@ -776,13 +780,13 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
   rpc: [
     {
       id: "hosts",
-      label: "Hosts",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
       colLabel: "Host",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "rpc_services",
-      label: "RPC Services",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabRpcServices",
       colLabel: "RPC Service",
       fields: ["rpc_service"],
     },
@@ -790,13 +794,13 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
   external: [
     {
       id: "hosts",
-      label: "Hosts",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
       colLabel: "Host",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "urls",
-      label: "URLs",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabUrls",
       colLabel: "URL",
       fields: ["http_url", "url_full"],
     },
@@ -1157,7 +1161,7 @@ export default defineComponent({
       rangeFiltersVersion.value;
       const chips: {
         key: string;
-        label: string;
+        label: I18nText;
         type: "duration" | "error";
       }[] = [];
       localRangeFilters.value.forEach((f, key) => {
@@ -1255,7 +1259,7 @@ export default defineComponent({
       sourceEvent?: {
         timestamp?: number | string;
         severity?: string;
-        message?: string;
+        message?: I18nText;
       };
       logStreams: any[];
       metricStreams: any[];
@@ -1515,15 +1519,16 @@ export default defineComponent({
       // schema fetch completes (reactive via streamFieldSet).
       if (!schemaResolved.value) return [];
       const resolved: ResourceTabConfig[] = [];
-      for (const t of tabs) {
-        const present = t.fields.filter((f) => fieldSet.has(f));
+      // named `tab`, not `t` — that would shadow the translator used just below
+      for (const tab of tabs) {
+        const present = tab.fields.filter((f) => fieldSet.has(f));
         if (present.length === 0) continue;
         resolved.push({
-          id: t.id,
-          label: t.label,
+          id: tab.id,
+          label: tab.labelKey ? t(tab.labelKey) : (tab.label ?? raw("")),
           groupField: `COALESCE(${buildCoalesceExpr(present)})`,
-          colLabel: t.colLabel,
-          colId: t.id,
+          colLabel: tab.colLabel,
+          colId: tab.id,
           environment: "",
           isDefault: true,
           fields: present,
@@ -2222,7 +2227,7 @@ export default defineComponent({
           const envKey = groupEnvKey(g.group_id) ?? g.group_id.split("-")[0];
           return {
             id: g.group_id,
-            label: g.display,
+            label: raw(g.display),
             groupField: field,
             colLabel: g.display,
             colId: g.group_id.replace(/-/g, "_"),
@@ -2465,6 +2470,7 @@ export default defineComponent({
     }
 
     return {
+      raw,
       t,
       serviceMetrics,
       serviceHealth,

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
-import type { I18nKey } from "@/types/i18n";
+import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
 
 /**
  * Visibility gates — each predicate mirrors the EXACT `visible` condition the
@@ -167,7 +167,9 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
  */
 export function groupNavLinks(
   links: NavItem[],
-  t: (key: string) => string = (k) => k,
+  // Defaults to `raw`, which brands the key unchanged — the same identity
+  // fallback as before, for callers (and specs) that pass no translator.
+  t: TranslateFn = raw,
 ): RailEntry[] {
   const presentNames = new Set(links.map((l) => l.name));
 

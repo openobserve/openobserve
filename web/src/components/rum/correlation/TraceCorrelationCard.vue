@@ -273,7 +273,7 @@ const calculatePercentage = (value: number, total: number) => {
 
 const copyTraceId = () => {
   copyToClipboard(props.traceId, t, {
-    successMessage: "Trace ID copied to clipboard",
+    successMessage: t("traces.traceDetails.traceIdCopied"),
     timeout: 1500,
   });
 };

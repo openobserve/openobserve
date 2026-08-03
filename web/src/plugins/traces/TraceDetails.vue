@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.spansLabel") }}
                   </span>
                 </OTag>
-                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+                <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
               <div class="bg-text-label h-4 w-px py-0" />
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
                   >
                 </OTag>
-                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
+                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
               </span>
             </div>
           </template>
@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.spansLabel") }}
                   </span>
                 </OTag>
-                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+                <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
               <div class="bg-text-label h-4 w-px py-0" />
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
                   >
                 </OTag>
-                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
+                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
               </span>
             </div>
           </div>
@@ -533,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! overflow-x-hidden! overflow-y-auto! [scrollbar-gutter:stable]!"
+                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! [scrollbar-gutter:stable]! overflow-x-hidden! overflow-y-auto!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
@@ -874,7 +874,7 @@ import {
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
@@ -1162,7 +1162,7 @@ export default defineComponent({
       const toPatternNode = (node: EngineTreeNode): PatternTreeNode => ({
         id: node.id,
         name: node.name,
-        label: node.label,
+        label: raw(node.label),
         value: node.value,
         errorRate: node.errorRate ?? 0,
         metadata: node.metadata,
@@ -2209,7 +2209,7 @@ export default defineComponent({
     }
 
     const calculateTracePosition = () => {
-      const tics: { value: number; label: string; left: string }[] = [];
+      const tics: { value: number; label: I18nText; left: string }[] = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
@@ -2219,7 +2219,7 @@ export default defineComponent({
       for (let i = 0; i <= 4; i++) {
         tics.push({
           value: Number(time.toFixed(2)),
-          label: `${formatTimeWithSuffix(time * 1000)}`,
+          label: raw(formatTimeWithSuffix(time * 1000)),
           left: i === 0 ? "-1px" : `${25 * i}%`,
         });
         time += quarterMs;
@@ -2877,6 +2877,7 @@ export default defineComponent({
     return {
       router,
       t,
+      raw,
       // Exposed for the template `v-if` gating the LLM Observability
       // surfaces (Thread tab toggle + ThreadView body) behind
       // `config.showLLMUI`.

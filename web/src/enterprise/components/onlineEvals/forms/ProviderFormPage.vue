@@ -81,7 +81,7 @@
             </div>
             <OFormInput
               name="endpoint"
-              :placeholder="endpointPlaceholder"
+              :placeholder="raw(endpointPlaceholder)"
               size="sm"
               data-test="provider-form-endpoint-input"
             />
@@ -185,7 +185,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -228,14 +228,14 @@ const form = useOForm<ProviderForm>({
 const formValues = form.useStore((s: any) => s.values as ProviderForm);
 
 const providerTypeOptions = computed(() => [
-  { label: "OpenAI", value: "openai" },
-  { label: "DeepSeek", value: "deepseek" },
-  { label: "Anthropic", value: "anthropic" },
-  { label: "Azure OpenAI", value: "azure_openai" },
-  { label: "Ollama", value: "ollama" },
-  { label: "vLLM", value: "vllm" },
-  { label: "OpenAI-compatible", value: "openai_compatible" },
-  { label: "Other", value: "other" },
+  { label: raw("OpenAI"), value: "openai" },
+  { label: raw("DeepSeek"), value: "deepseek" },
+  { label: raw("Anthropic"), value: "anthropic" },
+  { label: raw("Azure OpenAI"), value: "azure_openai" },
+  { label: raw("Ollama"), value: "ollama" },
+  { label: raw("vLLM"), value: "vllm" },
+  { label: raw("OpenAI-compatible"), value: "openai_compatible" },
+  { label: t("ingestion.otherLabel"), value: "other" },
 ]);
 
 // Default API endpoint for each provider type, shown as a placeholder to hint

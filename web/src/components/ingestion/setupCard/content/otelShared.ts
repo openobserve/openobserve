@@ -21,6 +21,8 @@
 // Per-DB content (the prepare/grant SQL, the receiver config, run, verify) stays
 // in each card's own file (e.g. sqlServer.ts, postgres.ts).
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardStep, RichCardStepVariant } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
@@ -65,28 +67,28 @@ export function collectorInstallStep(version: string = COLLECTOR_VERSION): RichC
   const icon = osIcons();
   return {
     id: "install",
-    title: "Install OpenTelemetry Collector Contrib",
-    description: "The receiver is in the Contrib build only — pick your platform.",
-    chip: { kind: "terminal", label: "Terminal" },
+    titleKey: "ingestion.setupCard.collectorInstallTitle",
+    descriptionKey: "ingestion.setupCard.collectorInstallDesc",
+    chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
     completeOn: "copy",
     // The OS chosen here also drives the configure step (shared "os" group).
     variantGroup: "os",
     variants: [
       {
         id: "linux-amd64",
-        label: "Linux (x86_64)",
+        label: raw("Linux (x86_64)"),
         icon: icon.linux,
         code: { lang: "bash", raw: unixInstall("linux_amd64", version) },
       },
       {
         id: "linux-arm64",
-        label: "Linux (ARM64)",
+        label: raw("Linux (ARM64)"),
         icon: icon.linux,
         code: { lang: "bash", raw: unixInstall("linux_arm64", version) },
       },
       {
         id: "darwin-arm64",
-        label: "macOS (Apple Silicon)",
+        label: raw("macOS (Apple Silicon)"),
         icon: icon.mac,
         iconInvertDark: true,
         code: { lang: "bash", raw: unixInstall("darwin_arm64", version) },
@@ -94,7 +96,7 @@ export function collectorInstallStep(version: string = COLLECTOR_VERSION): RichC
       },
       {
         id: "darwin-amd64",
-        label: "macOS (Intel)",
+        label: raw("macOS (Intel)"),
         icon: icon.mac,
         iconInvertDark: true,
         code: { lang: "bash", raw: unixInstall("darwin_amd64", version) },
@@ -102,7 +104,7 @@ export function collectorInstallStep(version: string = COLLECTOR_VERSION): RichC
       },
       {
         id: "windows-amd64",
-        label: "Windows (x86_64)",
+        label: raw("Windows (x86_64)"),
         icon: icon.windows,
         code: { lang: "powershell", raw: winInstall(version) },
       },
@@ -144,22 +146,22 @@ export function writeConfigVariants(
     masked: psWriteConfig(applySubsMasked(configYaml, subs)),
   };
   return [
-    { id: "linux-amd64", label: "Linux (x86_64)", icon: icon.linux, code: bashCfg },
-    { id: "linux-arm64", label: "Linux (ARM64)", icon: icon.linux, code: bashCfg },
+    { id: "linux-amd64", label: raw("Linux (x86_64)"), icon: icon.linux, code: bashCfg },
+    { id: "linux-arm64", label: raw("Linux (ARM64)"), icon: icon.linux, code: bashCfg },
     {
       id: "darwin-arm64",
-      label: "macOS (Apple Silicon)",
+      label: raw("macOS (Apple Silicon)"),
       icon: icon.mac,
       iconInvertDark: true,
       code: bashCfg,
     },
     {
       id: "darwin-amd64",
-      label: "macOS (Intel)",
+      label: raw("macOS (Intel)"),
       icon: icon.mac,
       iconInvertDark: true,
       code: bashCfg,
     },
-    { id: "windows-amd64", label: "Windows (x86_64)", icon: icon.windows, code: psCfg },
+    { id: "windows-amd64", label: raw("Windows (x86_64)"), icon: icon.windows, code: psCfg },
   ];
 }

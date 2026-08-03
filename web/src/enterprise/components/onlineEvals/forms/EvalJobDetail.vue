@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     :width="70"
-    :title="row?.name"
+    :title="raw(row?.name)"
     :title-data-test="'eval-job-detail-name-badge'"
     :sub-title="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
@@ -468,7 +468,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -747,9 +747,9 @@ const agents = ref<AgentFilterSelection[]>([]);
 const agentKey = ref(ALL_AGENTS_VALUE);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("traces.allAgents"), value: ALL_AGENTS_VALUE },
   ...agents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -841,7 +841,7 @@ async function refreshAll() {
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() => {
+const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(() => {
   const k = kpis.value;
   return [
     {

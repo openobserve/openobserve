@@ -31,7 +31,14 @@ const mockStore = createStore({
 const mockI18n = createI18n({
   locale: "en",
   messages: {
-    en: {},
+    // The component passes t("common.*") messages to copyToClipboard, so
+    // mounts using this mock need the keys or t() echoes the key path.
+    en: {
+      common: {
+        contentCopiedSuccessfully: "Content Copied Successfully!",
+        copyContentError: "Error while copying content.",
+      },
+    },
   },
 });
 
@@ -119,7 +126,7 @@ describe("CopyContent.vue Branch Coverage", () => {
         expect.any(Function),
         {
           successMessage: "Content Copied Successfully!",
-          errorMessage: "Error while copy content.",
+          errorMessage: "Error while copying content.",
           timeout: 5000,
         },
       );
@@ -153,7 +160,7 @@ describe("CopyContent.vue Branch Coverage", () => {
         expect.any(Function),
         {
           successMessage: "Content Copied Successfully!",
-          errorMessage: "Error while copy content.",
+          errorMessage: "Error while copying content.",
           timeout: 5000,
         },
       );
@@ -323,7 +330,7 @@ describe("CopyContent.vue Branch Coverage", () => {
         expect.any(Function),
         {
           successMessage: "Content Copied Successfully!",
-          errorMessage: "Error while copy content.",
+          errorMessage: "Error while copying content.",
           timeout: 5000,
         },
       );

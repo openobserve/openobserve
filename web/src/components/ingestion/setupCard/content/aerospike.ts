@@ -17,6 +17,8 @@
 // https://openobserve.ai/blog/how-to-monitor-aerospike-database (aerospike
 // receiver). No monitoring user needed for the basic setup.
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
@@ -52,32 +54,43 @@ export default function aerospikeCard(subs: CardSubstitutions): RichCardContent 
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
         variantToggle: false,
         inputs: [
-          { id: "host", label: "Aerospike Host", default: "localhost", placeholder: "localhost" },
-          { id: "port", label: "Port", default: "3000", placeholder: "3000", width: "sm" },
+          {
+            id: "host",
+            labelKey: "ingestion.setupCard.aerospikeHostLabel",
+            default: "localhost",
+            placeholder: raw("localhost"),
+          },
+          {
+            id: "port",
+            labelKey: "ingestion.setupCard.portLabel",
+            default: "3000",
+            placeholder: raw("3000"),
+            width: "sm",
+          },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or check Streams for the `aerospike_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyAerospikeMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["Namespaces", "Nodes", "Memory", "Storage", "Connections"],

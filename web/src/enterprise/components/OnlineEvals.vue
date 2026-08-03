@@ -67,8 +67,8 @@ the Free Software Foundation, either version 3 of the License, or
 
       <OPageHeader
         v-if="hideTabBar && embeddedHeader"
-        :title="embeddedHeader.title"
-        :subtitle="embeddedHeader.subtitle"
+        :title="raw(embeddedHeader.title)"
+        :subtitle="raw(embeddedHeader.subtitle)"
         :icon="embeddedHeader.icon"
         class="border-border-default shrink-0 border-b"
       >
@@ -364,7 +364,7 @@ the Free Software Foundation, either version 3 of the License, or
 import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type EvalJob,
@@ -535,7 +535,7 @@ const filteredRows = computed<AnyRow[]>(() => {
   );
 });
 
-const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>>(() => [
+const tabs = computed<Array<{ value: ActiveTab; label: I18nText; badge?: string }>>(() => [
   { value: "quality", label: t("onlineEvals.tabs.quality") },
   { value: "jobs", label: t("onlineEvals.tabs.jobs") },
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
@@ -637,9 +637,9 @@ const qualityPageRef = ref<{
 } | null>(null);
 
 const qualityAgentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("onlineEvals.quality.allAgents"), value: ALL_AGENTS_VALUE },
   ...qualityAgents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);

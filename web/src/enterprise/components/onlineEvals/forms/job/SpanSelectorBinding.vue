@@ -143,7 +143,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -181,7 +181,7 @@ const props = defineProps<{
   scorerId: string;
   selectors: SpanSelector[];
   binding?: string;
-  streamFields: Array<{ label: string; value: string; type: string }>;
+  streamFields: Array<{ label: I18nText; value: string; type: string }>;
 }>();
 
 const emit = defineEmits<{
@@ -197,7 +197,7 @@ const formId = computed(
 
 const selectorOptions = computed(() =>
   props.selectors.map((selector) => ({
-    label: selector.name,
+    label: raw(selector.name),
     value: selector.id,
   })),
 );

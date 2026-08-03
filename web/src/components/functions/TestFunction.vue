@@ -14,7 +14,12 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip side="right" align="center" :side-offset="10" :content="sqlQueryErrorMsg" />
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="raw(sqlQueryErrorMsg)"
+            />
           </OIcon>
         </template>
         <template #right>
@@ -142,7 +147,12 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip side="right" align="center" :side-offset="10" :content="eventsErrorMsg" />
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="raw(eventsErrorMsg)"
+            />
           </OIcon>
         </template>
         <template #right>
@@ -206,7 +216,7 @@
               side="right"
               align="center"
               :side-offset="10"
-              :content="outputEventsErrorMsg"
+              :content="raw(outputEventsErrorMsg)"
             />
           </OIcon>
         </template>
@@ -361,9 +371,9 @@ const { getStreams, getStream } = useStreams(t);
 const { buildQueryPayload } = useQuery();
 
 const streamTypes = [
-  { label: "Logs", value: "logs", icon: "description" },
-  { label: "Metrics", value: "metrics", icon: "bar-chart" },
-  { label: "Traces", value: "traces", icon: "activity" },
+  { label: t("common.logs"), value: "logs", icon: "description" },
+  { label: t("common.metrics"), value: "metrics", icon: "bar-chart" },
+  { label: t("common.traces"), value: "traces", icon: "activity" },
 ];
 
 const isFetchingStreams = ref(false);

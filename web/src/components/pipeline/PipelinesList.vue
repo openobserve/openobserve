@@ -365,7 +365,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="errorDialog.data?.name"
     :sub-title="
       errorDialog.data
-        ? `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}`
+        ? raw(
+            `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}`,
+          )
         : undefined
     "
     :primary-button-label="t('pipeline_list.close')"

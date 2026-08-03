@@ -3,17 +3,19 @@
  * OTab renders a single clickable tab trigger inside OTabs.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 export interface OTabProps {
   /** Unique identifier — must match the corresponding OTabPanel name */
   name: string | number;
   /** Display text label */
-  label?: string;
+  label?: I18nText;
   /** Material icon name shown before the label */
   icon?: string;
   /** Prevents interaction with this tab */
   disable?: boolean;
   /** Tooltip shown on hover — especially useful when disable is true to explain why */
-  tooltip?: string;
+  tooltip?: I18nText;
 }
 
 export interface OTabSlots {

@@ -38,7 +38,7 @@ import { ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
 import { useStore } from "vuex";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey, type TranslateFn } from "@/types/i18n";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
@@ -47,11 +47,15 @@ export const LLM_COLUMN_IDS = new Set(["input_tokens", "output_tokens", "cost"])
 /**
  * Known column metadata. Any field name NOT in this map gets a generic
  * prettified header and default width.
+ *
+ * `headerKey` is an i18n KEY, not resolved text: this map lives at MODULE scope,
+ * where `t()` would resolve once at import and freeze the copy at whatever
+ * locale was active on page load. `toColumnDef` translates it per build instead.
  */
 const KNOWN_COLUMN_META: Record<
   string,
   {
-    header: string;
+    headerKey: I18nKey;
     size: number;
     meta: Record<string, unknown>;
     accessorFn?: (row: any) => any;
@@ -59,17 +63,17 @@ const KNOWN_COLUMN_META: Record<
   }
 > = {
   service_name: {
-    header: "Service",
+    headerKey: "traces.tableColumns.service",
     size: 160,
     meta: { cellClass: "text-[var(--color-text-secondary)]", slot: true },
   },
   operation_name: {
-    header: "Operation Name",
+    headerKey: "traces.tableColumns.operationName",
     size: 200,
     meta: { cellClass: "text-[var(--color-text-secondary)]", slot: true },
   },
   duration: {
-    header: "Duration",
+    headerKey: "traces.tableColumns.duration",
     size: 120,
     meta: {
       sortable: true,
@@ -78,7 +82,7 @@ const KNOWN_COLUMN_META: Record<
     },
   },
   spans: {
-    header: "Spans",
+    headerKey: "traces.tableColumns.spans",
     size: 100,
     meta: {
       align: "right",
@@ -88,38 +92,38 @@ const KNOWN_COLUMN_META: Record<
     accessorFn: (row: any) => row.spans,
   },
   span_kind: {
-    header: "Span Kind",
+    headerKey: "traces.tableColumns.spanKind",
     size: 120,
     meta: { align: "left", slot: false, closable: true },
     accessorFn: (row: any) => SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
   },
   span_status: {
-    header: "Span Status",
+    headerKey: "traces.tableColumns.spanStatus",
     size: 120,
     meta: { align: "left", slot: true, disableCellAction: true },
   },
   status: {
-    header: "Status",
+    headerKey: "traces.tableColumns.status",
     size: 120,
     meta: { align: "left", slot: true, disableCellAction: true },
   },
   service_latency: {
-    header: "Service Latency",
+    headerKey: "traces.tableColumns.serviceLatency",
     size: 160,
     meta: { slot: true, disableCellAction: true },
   },
   input_tokens: {
-    header: "Input Tokens",
+    headerKey: "traces.tableColumns.inputTokens",
     size: 130,
     meta: { align: "right", slot: true },
   },
   output_tokens: {
-    header: "Output Tokens",
+    headerKey: "traces.tableColumns.outputTokens",
     size: 130,
     meta: { align: "right", slot: true },
   },
   cost: {
-    header: "Cost",
+    headerKey: "traces.tableColumns.cost",
     size: 130,
     meta: { align: "right", slot: true },
   },
@@ -127,6 +131,7 @@ const KNOWN_COLUMN_META: Record<
 
 function toColumnDef(
   fieldName: string,
+  t: TranslateFn,
   searchMode?: "traces" | "spans",
 ): ColumnDef<Record<string, any>> {
   const known = KNOWN_COLUMN_META[fieldName];
@@ -134,7 +139,7 @@ function toColumnDef(
   if (known && !(fieldName === "status" && searchMode === "spans")) {
     return {
       id: fieldName,
-      header: known.header,
+      header: t(known.headerKey),
       size: known.size,
       meta: { ...known.meta },
       ...(known.accessorFn ? { accessorFn: known.accessorFn } : {}),
@@ -167,7 +172,7 @@ export function useTracesTableColumns() {
     selectedFields: string[],
   ): ColumnDef<Record<string, any>>[] => {
     const cols: ColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
-      toColumnDef(field, searchMode),
+      toColumnDef(field, t, searchMode),
     );
 
     const timestampCol = store?.state?.zoConfig?.timestamp_column || "_timestamp";
@@ -192,13 +197,13 @@ export function useTracesTableColumns() {
       const llm: ColumnDef<Record<string, any>>[] = [];
 
       if (!selectedFields.includes("input_tokens")) {
-        llm.push(toColumnDef("input_tokens", searchMode));
+        llm.push(toColumnDef("input_tokens", t, searchMode));
       }
       if (!selectedFields.includes("output_tokens")) {
-        llm.push(toColumnDef("output_tokens", searchMode));
+        llm.push(toColumnDef("output_tokens", t, searchMode));
       }
       if (!selectedFields.includes("cost")) {
-        llm.push(toColumnDef("cost", searchMode));
+        llm.push(toColumnDef("cost", t, searchMode));
       }
 
       if (tailIdx !== -1) {

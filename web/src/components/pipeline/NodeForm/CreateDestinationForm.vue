@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import type { DestinationData, Headers } from "@/ts/interfaces";
@@ -461,56 +461,56 @@ const destinationSchema = makeDestinationSchema(t);
 const isEditMode = computed(() => !!props.destination);
 
 const apiMethods = [
-  { label: "GET", value: "get" },
-  { label: "POST", value: "post" },
-  { label: "PUT", value: "put" },
+  { label: raw("GET"), value: "get" },
+  { label: raw("POST"), value: "post" },
+  { label: raw("PUT"), value: "put" },
 ];
 const outputFormats = [
-  { label: "JSON", value: "json" },
-  { label: "NDJSON", value: "ndjson" },
-  { label: "NestedEvent", value: "nestedevent" },
-  { label: "ESBulk", value: "esbulk" },
-  { label: "String Separated", value: "stringseparated" },
+  { label: raw("JSON"), value: "json" },
+  { label: raw("NDJSON"), value: "ndjson" },
+  { label: raw("NestedEvent"), value: "nestedevent" },
+  { label: raw("ESBulk"), value: "esbulk" },
+  { label: t("pipeline.destinationFormatStringSeparated"), value: "stringseparated" },
 ];
 const destinationTypes = [
   {
-    label: "OpenObserve",
+    label: raw("OpenObserve"),
     value: "openobserve",
     icon: "insights",
     image: getImageURL("images/pipeline/openobserve.svg"),
   },
   {
-    label: "Splunk",
+    label: raw("Splunk"),
     value: "splunk",
     icon: "analytics",
     image: getImageURL("images/pipeline/splunk.webp"),
   },
   {
-    label: "Elasticsearch / OpenSearch",
+    label: raw("Elasticsearch / OpenSearch"),
     value: "elasticsearch",
     icon: "search",
     image: getImageURL("images/pipeline/elasticsearch.png"),
   },
   {
-    label: "Datadog",
+    label: raw("Datadog"),
     value: "datadog",
     icon: "pets",
     image: getImageURL("images/pipeline/datadog.png"),
   },
   {
-    label: "Dynatrace",
+    label: raw("Dynatrace"),
     value: "dynatrace",
     icon: "speed",
     image: getImageURL("images/pipeline/dynatrace.png"),
   },
   {
-    label: "Newrelic",
+    label: raw("Newrelic"),
     value: "newrelic",
     icon: "monitor-heart",
     image: getImageURL("images/pipeline/newrelic.png"),
   },
   {
-    label: "Custom",
+    label: t("common.custom"),
     value: "custom",
     icon: "settings",
     image: getImageURL("images/pipeline/custom.png"),

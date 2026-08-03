@@ -396,7 +396,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, inject } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -515,7 +515,7 @@ function onStreamChange(val: SelectModelValue) {
 // ── Stream type options ────────────────────────────────────────────────
 
 const streamTypeOptions = computed(() =>
-  ["logs", "metrics", "traces"].map((t: string) => ({ label: t, value: t })),
+  ["logs", "metrics", "traces"].map((t: string) => ({ label: raw(t), value: t })),
 );
 
 // ── Stream list ────────────────────────────────────────────────────────

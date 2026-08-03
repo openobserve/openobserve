@@ -29,7 +29,7 @@ const echoKeyTranslator: Translator = (key) => key as unknown as I18nText;
 interface QueryCondition {
   conditions?: {
     groupId?: string;
-    label?: string;
+    label?: I18nText;
     items?: Array<{
       column: string;
       operator: string;
@@ -88,7 +88,7 @@ interface Alert {
   destinations: string[];
   context_attributes: any[];
   enabled: boolean;
-  description?: string;
+  description?: I18nText;
   lastTriggeredAt?: number;
   createdAt?: string;
   updatedAt?: string;

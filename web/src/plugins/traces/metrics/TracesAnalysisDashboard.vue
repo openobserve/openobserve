@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     v-model:open="isOpen"
     :width="80"
-    :title="drawerTitle"
+    :title="raw(drawerTitle)"
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
@@ -306,7 +306,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import {
   useLatencyInsightsAnalysis,

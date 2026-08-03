@@ -21,7 +21,7 @@ export interface ToastAction {
 /** A single entry in the collapsible "affected sections" detail list */
 export interface ToastDetail {
   /** Human-readable resource label, e.g. "Dashboards" */
-  label: string;
+  label: I18nText;
   /** API path shown alongside the label, e.g. "/api/default/dashboards" */
   url: string;
 }

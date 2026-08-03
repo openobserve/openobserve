@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <IngestionContent>
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.vmagent.singleTargetTitle") }}</div>
-      <CopyContent :content="singleTargetContent" />
+      <CopyContent :content="raw(singleTargetContent)" />
     </div>
 
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.vmagent.fanoutTitle") }}</div>
-      <CopyContent :content="fanoutContent" />
+      <CopyContent :content="raw(fanoutContent)" />
       <div class="italic">
         {{ t("ingestion.vmagent.tipPrefix") }}
         <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- CLI flag name must stay identical in every language -->
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
@@ -88,6 +88,7 @@ export default defineComponent({
   -remoteWrite.basicAuth.password=[PASSCODE]`;
 
     return {
+      raw,
       t,
       singleTargetContent,
       fanoutContent,

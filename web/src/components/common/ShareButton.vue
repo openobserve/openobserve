@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onBeforeUnmount, computed, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -85,8 +85,8 @@ export default defineComponent({
     },
     // Custom tooltip text
     tooltip: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     // Optional keyboard-shortcut hint shown in the tooltip (raw key, e.g. "ctrl+shift+c")
     shortcut: {
@@ -308,6 +308,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       isLoading,
       isWebUrlNotConfigured,

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
-        :subtitle="currentRun.timestamp"
+        :subtitle="raw(currentRun.timestamp)"
         :back="{
           label: t('synthetics.results.monitors'),
           to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="lightboxOpen"
     size="full"
-    :title="lightboxTitle"
+    :title="raw(lightboxTitle)"
     data-test="synthetics-run-detail-step-screenshot-lightbox"
   >
     <div
@@ -465,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="errorOpen"
     size="full"
-    :title="errorTitle"
+    :title="raw(errorTitle)"
     data-test="synthetics-run-detail-step-error-fullscreen"
   >
     <div v-if="errorStep" class="flex h-full flex-col overflow-y-auto p-6">
@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
@@ -529,7 +529,7 @@ const emit = defineEmits<{
     status: {
       variant: BadgeVariant;
       icon: string;
-      label: string;
+      label: I18nText;
       url: string;
       timestamp: string;
     },
@@ -1022,7 +1022,7 @@ const statusChip = computed(() => {
 });
 
 interface InfoChip {
-  label: string;
+  label: I18nText;
   value: string;
   icon: string;
   colorClass?: string;

@@ -587,7 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 data-test="add-report-schedule-start-timezone-select"
                                 name="trigger_condition.timezone"
                                 :options="filteredTimezone"
-                                :placeholder="t('logStream.timezone') + ' *'"
+                                :placeholder="raw(t('logStream.timezone') + ' *')"
                                 :title="triggerData.timezone"
                                 width="xs"
                               />
@@ -907,7 +907,7 @@ import {
   onMounted,
   onBeforeMount,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import {
@@ -2090,7 +2090,7 @@ const filterStreams = (val: string, update: any) => {
     if (!val || val === "") {
       // If value is empty, show all streams
       filteredStreams.value = streams.value.map((stream: any) => ({
-        label: stream.name,
+        label: raw(stream.name),
         value: stream.name,
       }));
       // Only fetch if we haven't loaded this stream type yet
@@ -2101,7 +2101,7 @@ const filterStreams = (val: string, update: any) => {
       // Filter existing streams based on the search value
       filteredStreams.value = streams.value
         .map((stream: any) => ({
-          label: stream.name,
+          label: raw(stream.name),
           value: stream.name,
         }))
         .filter((stream: any) => {
@@ -2121,7 +2121,7 @@ async function getStreamList() {
     streams.value = res.list || [];
     // Set filtered streams to show all streams initially
     filteredStreams.value = streams.value.map((stream: any) => ({
-      label: stream.name,
+      label: raw(stream.name),
       value: stream.name,
     }));
     // Update stream keywords for auto-suggest FROM clause
@@ -2386,7 +2386,7 @@ const expandLog = (index: any) => {
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData, t, {
-    successMessage: "Content Copied Successfully!",
+    successMessage: t("common.contentCopiedSuccessfully"),
     timeout: 1000,
   });
 };

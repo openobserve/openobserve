@@ -5,7 +5,7 @@
     side="right"
     size="lg"
     :title="t('synthetics.privateLocations.setup.title')"
-    :sub-title="locationName || undefined"
+    :sub-title="raw(locationName || undefined)"
     data-test="synthetics-agent-setup-drawer"
     @update:open="emit('update:open', $event)"
   >
@@ -159,7 +159,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

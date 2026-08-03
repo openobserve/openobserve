@@ -31,6 +31,8 @@
 // asymmetry is the single most common reason RUM events arrive while session
 // replay silently does not, so it gets its own step and its own FAQ entry.
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
@@ -174,14 +176,14 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
   const installVariants: RichCardStepVariant[] = [
     {
       id: "npm",
-      label: "npm",
+      label: raw("npm"),
       icon: nodeIcon,
       code: { lang: "bash", raw: installCmd("npm install") },
       note: "The session-replay and navigation packages are optional — drop either line if you do not need screen recording or automatic view tracking.",
     },
     {
       id: "yarn",
-      label: "Yarn",
+      label: raw("Yarn"),
       icon: nodeIcon,
       code: { lang: "bash", raw: installCmd("yarn add") },
       note: "The session-replay and navigation packages are optional — drop either line if you do not need screen recording or automatic view tracking.",
@@ -205,10 +207,9 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
     steps: [
       {
         id: "install",
-        title: "Install the React Native SDK",
-        description:
-          "Add the core SDK plus the optional session-replay and navigation packages. On iOS, run `npx pod-install` afterwards so the native modules are linked.",
-        chip: { kind: "terminal", label: "Install" },
+        titleKey: "ingestion.setupCard.installReactNativeSdkTitle",
+        descriptionKey: "ingestion.setupCard.installReactNativeSdkDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipInstall" },
         completeOn: "copy",
         required: true,
         variantGroup: "pkg",
@@ -216,10 +217,9 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       },
       {
         id: "init",
-        title: "Initialize RUM + Logs",
-        description:
-          "Wrap your app in `OpenObserveProvider`. The endpoints below are this org's — the SDK appends `/rum` and `/logs` to them. Adjust `applicationId`, `service` and `env` to describe your app. The `clientToken` ships inside your app bundle by design; it can only write RUM events and you can rotate it from this page's header.",
-        chip: { kind: "editor", label: "App.tsx" },
+        titleKey: "ingestion.setupCard.rumInitTitle",
+        descriptionKey: "ingestion.setupCard.initRumLogsDesc",
+        chip: { kind: "editor", label: raw("App.tsx") },
         completeOn: "copy",
         required: true,
         code: {
@@ -232,10 +232,9 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       },
       {
         id: "session-replay",
-        title: "Enable Session Replay",
-        description:
-          "Session Replay is configured **separately** from RUM and does **not** inherit `rumConfiguration.customEndpoint`. It also does not append a path, so it needs the full `/replay` URL below. Getting this wrong is the usual reason RUM events arrive but replays never do.",
-        chip: { kind: "editor", label: "App.tsx" },
+        titleKey: "ingestion.setupCard.enableSessionReplayTitle",
+        descriptionKey: "ingestion.setupCard.enableSessionReplayDesc",
+        chip: { kind: "editor", label: raw("App.tsx") },
         completeOn: "copy",
         code: {
           lang: "tsx",
@@ -247,10 +246,9 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       },
       {
         id: "navigation",
-        title: "Track Screens Automatically (Optional)",
-        description:
-          "If you use React Navigation, hand the SDK your navigation ref and every route change is recorded as a RUM view — no per-screen code.",
-        chip: { kind: "editor", label: "Editor" },
+        titleKey: "ingestion.setupCard.trackScreensTitle",
+        descriptionKey: "ingestion.setupCard.trackScreensDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.chipEditor" },
         completeOn: "copy",
         code: {
           lang: "tsx",
@@ -261,10 +259,9 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Run the app on a simulator, emulator or device, move between a few screens, then hit Test — React Native events land in the `_rumdata` stream.",
-        chip: { kind: "traces", label: "RUM" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyReactNativeRumDesc",
+        chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["Sessions", "Views", "User Actions", "Errors", "Crashes", "Session Replay"],

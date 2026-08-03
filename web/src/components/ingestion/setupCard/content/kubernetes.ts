@@ -29,6 +29,8 @@
 // The raw Helm sequence stays a secondary, collapsed path (extras.advanced),
 // mirroring the "Advanced Installation" accordion it replaces.
 
+import { gt, raw } from "@/types/i18n";
+
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent, RichCardStepVariant } from "../types";
@@ -131,7 +133,7 @@ const LANGUAGES: { id: string; label: string; icon: string; extra?: string }[] =
 const instrumentVariants = (): RichCardStepVariant[] =>
   LANGUAGES.map((l) => ({
     id: l.id,
-    label: l.label,
+    label: raw(l.label),
     icon: getImageURL(l.icon),
     code: { lang: "bash", raw: annotate(l.id, l.extra) },
     note:
@@ -165,13 +167,13 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
     : [
         {
           id: "external",
-          label: "External Endpoint",
+          labelKey: "ingestion.setupCard.externalEndpointVariant",
           code: externalCode,
           note: `${INSTALLER_NOTE} ${ADVANCED_HINT}`,
         },
         {
           id: "internal",
-          label: "Internal Endpoint",
+          labelKey: "ingestion.setupCard.internalEndpointVariant",
           code: codeFor(scriptInstall(`--internal-endpoint=${IN_CLUSTER_URL}`), subs),
           note: `Use this when OpenObserve runs in this same cluster — traffic never leaves it. ${INSTALLER_NOTE} ${ADVANCED_HINT}`,
         },
@@ -194,19 +196,18 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
         // "(Recommended)" is carried in the title, as it was on the page this
         // replaces — it is the path the overwhelming majority should take, and
         // the manual Helm sequence below must not read as an equal alternative.
-        title: "Quick Install (Recommended)",
-        description:
-          "Install the OpenObserve collector with a **single command** — just set your cluster name and run. The name tags every record, so you can tell clusters apart once several are reporting.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.quickInstallTitle",
+        descriptionKey: "ingestion.setupCard.quickInstallDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         inputs: [
           {
             id: "cluster",
-            label: "Cluster Name",
+            labelKey: "ingestion.setupCard.clusterNameLabel",
             default: "cluster1",
-            placeholder: "production",
-            help: "Identifies this cluster in your logs, metrics and dashboards.",
+            placeholder: raw("production"),
+            helpKey: "ingestion.setupCard.clusterNameHelp",
           },
         ],
         // Cloud: one command, no toggle. Self-hosted: external / internal.
@@ -218,19 +219,17 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
       },
       {
         id: "instrument",
-        title: "Auto-Instrument Your Applications for Traces",
-        description:
-          "Optional. The OpenTelemetry operator injects instrumentation into annotated workloads, so you get **distributed traces without touching application code or rebuilding images**. Pick a language, then annotate the namespace it runs in.",
-        chip: { kind: "editor", label: "Optional" },
+        titleKey: "ingestion.setupCard.autoInstrumentTracesTitle",
+        descriptionKey: "ingestion.setupCard.autoInstrumentTracesDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
         completeOn: "copy",
         variants: instrumentVariants(),
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Give the collector a few seconds to start, then hit Test — cluster logs land in the `default` stream.",
-        chip: { kind: "traces", label: "Logs" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyK8sDataDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["Container Logs", "Kubernetes Events", "Node Metrics", "Pod Metrics", "Traces"],
@@ -249,10 +248,13 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
       // boxes with a "wait 2 minutes" instruction between them; the explicit
       // `kubectl wait` on the webhook makes that deterministic.
       advanced: {
-        label: "Advanced Installation (Manual Steps)",
+        labelKey: "ingestion.setupCard.advancedInstallLabel",
+        // The self-hosted variant interpolates the in-cluster URL, which
+        // descriptionKey (resolved without params) can't express — so both
+        // branches translate here, at card-build time.
         description: isCloud
-          ? "For custom configurations, or to pin versions and customise the chart values. Run the steps in order."
-          : `For custom configurations, or to pin versions and customise the chart values. Run the steps in order. If OpenObserve runs in this same cluster, replace the exporter endpoints with \`${IN_CLUSTER_URL}\`.`,
+          ? gt("ingestion.setupCard.advancedInstallDescCloud")
+          : gt("ingestion.setupCard.advancedInstallDescSelfHosted", { url: IN_CLUSTER_URL }),
         code: codeFor(helmInstall("{url}"), subs),
       },
       fixTitle: "Wait For The cert-manager Webhook",

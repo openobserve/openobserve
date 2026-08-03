@@ -46,9 +46,17 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { safeHttpUrl } from "./subs";
-import type { CardSubstitutions, RichCardContent, RichCardStep, StepChipKind } from "./types";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+  RichCardInput,
+  RichCardStep,
+  RichCardStepVariant,
+  RichCardStreamInput,
+  StepChipKind,
+} from "./types";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 const props = defineProps<{
   /** The integration's rich content (already token-substituted). */
@@ -164,8 +172,8 @@ const streamName = ref(props.content.streamInput?.default ?? "");
 const STREAM_NAME_RE = /^[a-zA-Z0-9_]+$/;
 const streamNameError = computed(() =>
   streamName.value.trim() && !STREAM_NAME_RE.test(streamName.value.trim())
-    ? "Use letters, numbers and _ only."
-    : "",
+    ? t("ingestion.setupCard.streamNameError")
+    : raw(""),
 );
 const watchedStream = computed(() =>
   props.content.streamInput
@@ -246,6 +254,32 @@ const displayCode = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.code : step.code;
 const currentVariantNote = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.note : undefined;
+
+// ── copy resolution ─────────────────────────────────────────────────────────
+// Content modules carry either resolved text (`title`) or an i18n KEY stored as
+// data (`titleKey`) — they are plain modules with no i18n context, so the key is
+// translated HERE, on every render, and therefore follows the active locale.
+// The `*Key` half wins when a step sets both. See types.ts.
+const stepTitle = (step: RichCardStep): I18nText =>
+  step.titleKey ? t(step.titleKey) : (step.title ?? raw(""));
+const stepDescription = (step: RichCardStep): I18nText =>
+  step.descriptionKey ? t(step.descriptionKey) : (step.description ?? raw(""));
+const variantLabel = (variant: RichCardStepVariant): I18nText =>
+  variant.labelKey ? t(variant.labelKey) : (variant.label ?? raw(""));
+const inputLabel = (input: RichCardInput | RichCardStreamInput): I18nText =>
+  input.labelKey ? t(input.labelKey) : (input.label ?? raw(""));
+const chipLabel = (chip: { label?: I18nText; labelKey?: I18nKey }): I18nText =>
+  chip.labelKey ? t(chip.labelKey) : (chip.label ?? raw(""));
+// Same pair for the two collapsed extras sections (advanced install, uninstall).
+const sectionLabel = (section: { label?: I18nText; labelKey?: I18nKey }): I18nText =>
+  section.labelKey ? t(section.labelKey) : (section.label ?? raw(""));
+// Empty string (not undefined) when a section has no paragraph, so the same
+// call can drive the `v-if` and the `v-html` without a second narrowing.
+const sectionDescription = (section: {
+  description?: I18nText;
+  descriptionKey?: I18nKey;
+}): I18nText =>
+  section.descriptionKey ? t(section.descriptionKey) : (section.description ?? raw(""));
 
 // ── step completion / active-step model ─────────────────────────────────────
 const copied = ref<Record<string, boolean>>({});
@@ -486,9 +520,9 @@ function fireConfetti() {
       <div v-if="content.streamInput" class="c-config" data-test="ai-stream-config">
         <OInput
           v-model="streamName"
-          :label="content.streamInput.label"
-          :placeholder="content.streamInput.placeholder || content.streamInput.default"
-          :help-text="!streamNameError ? content.streamInput.help : undefined"
+          :label="inputLabel(content.streamInput)"
+          :placeholder="raw(content.streamInput.placeholder || content.streamInput.default)"
+          :help-text="!streamNameError && content.streamInput.helpKey ? t(content.streamInput.helpKey) : undefined"
           :error="!!streamNameError"
           :error-message="streamNameError"
           size="sm"
@@ -510,7 +544,7 @@ function fireConfetti() {
           v-for="(step, i) in content.steps"
           :key="step.id"
           :name="i + 1"
-          :title="step.title"
+          :title="stepTitle(step)"
           :done="isStepDone(step)"
           :data-test="`ai-step-${step.id}`"
         >
@@ -523,12 +557,12 @@ function fireConfetti() {
               <template v-if="step.chip.kind === 'terminal'" #icon>
                 <span class="step-tag-glyph">$_</span>
               </template>
-              {{ step.chip.label }}
+              {{ chipLabel(step.chip) }}
             </OTag>
           </template>
 
           <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
-            <p class="step-desc" v-html="inlineMd(step.description)"></p>
+            <p class="step-desc" v-html="inlineMd(stepDescription(step))"></p>
 
             <!-- Per-step inputs (e.g. host/port) — fill {id} in this step's code -->
             <div
@@ -540,9 +574,9 @@ function fireConfetti() {
                 v-for="inp in step.inputs"
                 :key="inp.id"
                 v-model="inputValues[inp.id]"
-                :label="inp.label"
-                :placeholder="inp.placeholder || inp.default"
-                :help-text="inp.help"
+                :label="inputLabel(inp)"
+                :placeholder="raw(inp.placeholder || inp.default)"
+                :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
                 size="sm"
                 :width="inp.width || 'md'"
                 :data-test="`ai-input-${inp.id}`"
@@ -577,7 +611,7 @@ function fireConfetti() {
                       :class="{ 'variant-icon-invert': v.iconInvertDark }"
                     />
                   </template>
-                  {{ v.label }}
+                  {{ variantLabel(v) }}
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
@@ -777,16 +811,16 @@ function fireConfetti() {
           v-if="extras.advanced"
           ref="advancedRef"
           v-model="advancedOpen"
-          :label="extras.advanced.label"
+          :label="sectionLabel(extras.advanced)"
           icon="settings"
           class="acc-item"
           data-test="ai-advanced-accordion"
         >
           <div class="acc-body">
             <p
-              v-if="extras.advanced.description"
+              v-if="sectionDescription(extras.advanced)"
               class="step-desc"
-              v-html="inlineMd(extras.advanced.description)"
+              v-html="inlineMd(sectionDescription(extras.advanced))"
             ></p>
             <OCodeBlock
               :lang="extras.advanced.code.lang"
@@ -849,16 +883,16 @@ function fireConfetti() {
         <!-- Removal path — last, and collapsed, since it undoes the flow above. -->
         <OCollapsible
           v-if="extras.uninstall"
-          :label="extras.uninstall.label"
+          :label="sectionLabel(extras.uninstall)"
           icon="delete-outline"
           class="acc-item"
           data-test="ai-uninstall-accordion"
         >
           <div class="acc-body">
             <p
-              v-if="extras.uninstall.description"
+              v-if="sectionDescription(extras.uninstall)"
               class="step-desc"
-              v-html="inlineMd(extras.uninstall.description)"
+              v-html="inlineMd(sectionDescription(extras.uninstall))"
             ></p>
             <OCodeBlock
               :lang="extras.uninstall.code.lang"

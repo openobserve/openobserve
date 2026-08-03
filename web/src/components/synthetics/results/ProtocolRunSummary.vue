@@ -5,7 +5,7 @@
 // timing waterfall, and assertion outcomes. No steps/screenshots/replay
 // (those are browser-run concepts).
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -32,7 +32,13 @@ const props = withDefaults(
 const emit = defineEmits<{
   (
     e: "update-status",
-    status: { variant: BadgeVariant; icon: string; label: string; url: string; timestamp: string },
+    status: {
+      variant: BadgeVariant;
+      icon: string;
+      label: I18nText;
+      url: string;
+      timestamp: string;
+    },
   ): void;
 }>();
 
@@ -224,7 +230,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
-        :subtitle="run ? fmtTs(run.timestamp) : ''"
+        :subtitle="raw(run ? fmtTs(run.timestamp) : '')"
         :back="{
           label: t('synthetics.results.monitors'),
           to: { name: 'synthetic-monitor-results', params: { id: monitorId } },

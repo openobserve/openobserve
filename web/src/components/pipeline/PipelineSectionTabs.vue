@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -88,7 +88,7 @@ const activeSectionKey = computed(() => {
 
 interface Section {
   key: string;
-  label: string;
+  label: I18nText;
   icon: string;
   to: RouteLocationRaw;
   visible: boolean;

@@ -20,8 +20,25 @@
 // via markdown frontmatter (ai/content/richCard/buildFromMarkdown), and in-repo
 // data sources via typed builders (setupCard/content/*, setupCard/registry).
 
+import type { I18nKey, I18nText } from "@/types/i18n";
+
 import type { FieldWidth } from "@/lib/forms/Input/OInput.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+// ── Translating card copy ────────────────────────────────────────────────────
+// The in-repo builders (setupCard/content/*) are plain modules with no component
+// context, so they must NOT call `t()` — it would resolve once and freeze the
+// copy at whatever locale was active when the module first ran. Instead the
+// user-facing text fields below come in pairs:
+//
+//   • `title` / `label` / `description` — already-resolved text (`I18nText`).
+//     Used by content that is not translatable data (markdown-authored AI cards)
+//     or is a code token / product name (wrapped in `raw()`).
+//   • `titleKey` / `labelKey` / `descriptionKey` — an i18n KEY stored as data,
+//     translated by SetupCardRenderer at RENDER time so it follows the locale.
+//
+// Exactly one of each pair should be set; the `*Key` half wins when both are.
+// Same shape as `BadgeValueConfig.labelKey` (lib/core/Badge/badgeGroups.ts).
 
 /**
  * Per-org values substituted into a card's code blocks. `token` is the
@@ -48,7 +65,10 @@ export type StepCompleteOn = "copy" | "detect" | "action";
 
 export interface RichCardChip {
   kind: StepChipKind;
-  label: string;
+  /** Already-resolved chip text. Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n KEY for the chip text, translated by the renderer. */
+  labelKey?: I18nKey;
 }
 
 export interface RichCardCode {
@@ -72,8 +92,10 @@ export interface RichCardCode {
 export interface RichCardStepVariant {
   /** Stable id (also the toggle's data-test suffix). */
   id: string;
-  /** Toggle label, e.g. "Linux (x86_64)". */
-  label: string;
+  /** Toggle label, e.g. "Linux (x86_64)". Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the toggle label, translated by the renderer. */
+  labelKey?: I18nKey;
   /** Optional resolved icon URL shown before the label (e.g. an OS logo). */
   icon?: string;
   /**
@@ -95,7 +117,7 @@ export interface RichCardStepVariant {
 export interface RichCardStepAction {
   /** Emitted with the `step-action` event so the page can dispatch. */
   id: string;
-  label: string;
+  label: I18nText;
   /** OIcon registry name rendered before the label. */
   icon?: IconName;
   /** Renders as a secondary button (default is primary). */
@@ -107,9 +129,14 @@ export interface RichCardStepAction {
 export interface RichCardStep {
   /** Stable id (also used as the scroll target for the next-step auto-advance). */
   id: string;
-  title: string;
+  /** Step heading. Omit when `titleKey` is set. */
+  title?: I18nText;
+  /** i18n key for the step heading, translated by the renderer. */
+  titleKey?: I18nKey;
   /** Inline markdown: supports **bold** and `code` only (rendered safely). */
-  description: string;
+  description?: I18nText;
+  /** i18n key for the description, translated by the renderer. */
+  descriptionKey?: I18nKey;
   chip?: RichCardChip;
   code?: RichCardCode;
   /**
@@ -195,10 +222,15 @@ export interface RichCardExtras {
    * through the same live substitution as the steps ({stream} and step inputs).
    */
   advanced?: {
-    /** Accordion label, e.g. "Advanced Installation (Manual Steps)". */
-    label: string;
+    /** Accordion label, e.g. "Advanced Installation (Manual Steps)".
+     *  Omit when `labelKey` is set. */
+    label?: I18nText;
+    /** i18n KEY for the accordion label, translated by the renderer. */
+    labelKey?: I18nKey;
     /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
-    description?: string;
+    description?: I18nText;
+    /** i18n KEY for that paragraph, translated by the renderer. */
+    descriptionKey?: I18nKey;
     code: RichCardCode;
   };
   /**
@@ -208,10 +240,14 @@ export interface RichCardExtras {
    * installed the thing.
    */
   uninstall?: {
-    /** Accordion label, e.g. "Uninstall the Agent". */
-    label: string;
+    /** Accordion label, e.g. "Uninstall the Agent". Omit when `labelKey` is set. */
+    label?: I18nText;
+    /** i18n KEY for the accordion label, translated by the renderer. */
+    labelKey?: I18nKey;
     /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
-    description?: string;
+    description?: I18nText;
+    /** i18n KEY for that paragraph, translated by the renderer. */
+    descriptionKey?: I18nKey;
     code: RichCardCode;
   };
   troubleshooting?: { q: string; a: string }[];
@@ -244,14 +280,16 @@ export interface RichCardProvider {
  * to and the stream the card listens on in lockstep.
  */
 export interface RichCardStreamInput {
-  /** Field label, e.g. "Traces Stream Name". */
-  label: string;
+  /** Field label, e.g. "Traces Stream Name". Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the field label, translated by the renderer. */
+  labelKey?: I18nKey;
   /** Stream used when the field is left blank (e.g. "default"). */
   default: string;
   /** Placeholder (falls back to `default`). */
-  placeholder?: string;
-  /** Helper text under the field. */
-  help?: string;
+  placeholder?: I18nText;
+  /** i18n key for the helper text under the field, translated by the renderer. */
+  helpKey?: I18nKey;
 }
 
 /**
@@ -262,14 +300,16 @@ export interface RichCardStreamInput {
 export interface RichCardInput {
   /** Placeholder key — `{id}` in any code block is replaced with this value. */
   id: string;
-  /** Field label, e.g. "SQL Server Host". */
-  label: string;
+  /** Field label, e.g. "SQL Server Host". Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the field label, translated by the renderer. */
+  labelKey?: I18nKey;
   /** Value used (and shown in code) before the user edits the field. */
   default: string;
   /** Placeholder text (falls back to `default`). */
-  placeholder?: string;
-  /** Helper text under the field. */
-  help?: string;
+  placeholder?: I18nText;
+  /** i18n key for the helper text under the field, translated by the renderer. */
+  helpKey?: I18nKey;
   /** Width hint passed to OInput (e.g. "sm" | "md"). Defaults to "md". */
   width?: FieldWidth;
 }

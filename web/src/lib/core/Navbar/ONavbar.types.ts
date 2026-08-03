@@ -14,10 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ComputedRef, InjectionKey } from "vue";
-import type { I18nKey } from "@/types/i18n";
+import type { I18nKey, I18nText } from "@/types/i18n";
 
 export interface NavItem {
-  title: string;
+  title: I18nText;
   icon: string;
   link: string;
   exact?: boolean;
@@ -100,7 +100,7 @@ export type RailEntry =
   | {
       type: "group";
       key: string;
-      title: string;
+      title: I18nText;
       icon: string;
       children: SubnavChild[];
       pinBottom: boolean;

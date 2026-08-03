@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { ref, computed, reactive } from "vue";
 import {
   buildScopedDependencyGraph,
@@ -23,7 +25,7 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export interface VariableConfig {
   name: string;
-  label?: string;
+  label?: I18nText;
   type: "query_values" | "custom" | "constant" | "textbox" | "dynamic_filters";
   scope: "global" | "tabs" | "panels";
   tabs?: string[];
@@ -43,7 +45,7 @@ export interface VariableConfig {
     }>;
   };
   options?: Array<{
-    label: string;
+    label: I18nText;
     value: string;
     selected?: boolean;
   }>;

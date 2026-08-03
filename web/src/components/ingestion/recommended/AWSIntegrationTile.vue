@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div class="text-text-secondary mb-3 min-h-[3em] text-sm leading-normal">
-        {{ integration.description }}
+        {{ t(integration.descriptionKey) }}
       </div>
     </OCardSection>
 
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ template.name }}
             </span>
             <span class="text-muted-foreground mt-1 block text-xs">
-              {{ template.description }}
+              {{ t(template.descriptionKey) }}
             </span>
           </div>
           <OIcon name="chevron-right" size="sm" class="ms-auto shrink-0" />
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ option.name }}
             </span>
             <span class="text-muted-foreground mt-1 block text-xs">
-              {{ option.description }}
+              {{ t(option.descriptionKey) }}
             </span>
           </div>
           <OIcon name="chevron-right" size="sm" class="ms-auto shrink-0" />
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="aws-integration-tile-content-dialog"
       v-model:open="showComponentContent"
       size="xl"
-      :title="selectedComponentTitle"
+      :title="raw(selectedComponentTitle)"
     >
       <component
         :is="selectedComponent"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -452,10 +452,11 @@ export default defineComponent({
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
           const ok = await confirm({
-            title: "Dashboard Already Exists",
-            message: `A dashboard for ${props.integration.displayName} already exists. Do you wish to replace it?`,
-            confirmLabel: "Replace",
-            cancelLabel: "Cancel",
+            title: t("ingestion.awsSetup.dashboardExistsTitle"),
+            message: t("ingestion.awsSetup.dashboardExistsMessage", {
+              name: props.integration.displayName,
+            }),
+            confirmLabel: t("common.replace"),
           });
           if (!ok) return;
 
@@ -557,6 +558,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       handleAddSource,

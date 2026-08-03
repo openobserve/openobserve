@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.compareWithPast.addComparisonWindow") }}
             <OTooltip
               v-if="isComparisonDisabled"
-              :content="comparisonDisabledTooltip"
+              :content="raw(comparisonDisabledTooltip)"
               side="top"
               align="center"
               :sideOffset="8"
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed, inject, type PropType } from "vue";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
@@ -396,6 +396,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       multiWindowContainerRef,

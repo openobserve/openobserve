@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div data-test="services-catalog-stream-selector" class="w-rail flex-shrink-0">
         <OSelect
           :model-value="streamFilter"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          :options="availableStreams.map((s) => ({ label: raw(s), value: s }))"
           labelKey="label"
           valueKey="value"
           class="rounded-default w-full"
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.error_rate"
                 :max="columnMaxes.error_rate"
-                :label="formatPercent(row.error_rate)"
+                :label="raw(formatPercent(row.error_rate))"
                 :variant="
                   row.error_rate > 10 ? 'danger' : row.error_rate > 5 ? 'warning' : 'default'
                 "
@@ -349,14 +349,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-total_requests="{ row }">
               <span :data-test="`services-catalog-requests-${row.service_name}`">
                 {{ formatLargeNumber(row.total_requests) }}
-                <OTooltip :content="row.total_requests.toLocaleString()" />
+                <OTooltip :content="raw(row.total_requests.toLocaleString())" />
               </span>
             </template>
 
             <template #cell-error_count="{ row }">
               <span :data-test="`services-catalog-errors-${row.service_name}`">
                 {{ formatLargeNumber(row.error_count) }}
-                <OTooltip :content="row.error_count.toLocaleString()" />
+                <OTooltip :content="raw(row.error_count.toLocaleString())" />
               </span>
             </template>
 
@@ -365,8 +365,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.p50_latency_ns"
                 :max="columnMaxes.p50_latency_ns"
-                :label="formatLat(row.p50_latency_ns)"
-                :tooltip="row.p50_latency_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.p50_latency_ns))"
+                :tooltip="raw(row.p50_latency_ns.toLocaleString() + ' ns')"
               />
             </template>
 
@@ -374,8 +374,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.p95_latency_ns"
                 :max="columnMaxes.p95_latency_ns"
-                :label="formatLat(row.p95_latency_ns)"
-                :tooltip="row.p95_latency_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.p95_latency_ns))"
+                :tooltip="raw(row.p95_latency_ns.toLocaleString() + ' ns')"
               />
             </template>
 
@@ -383,8 +383,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.p99_latency_ns"
                 :max="columnMaxes.p99_latency_ns"
-                :label="formatLat(row.p99_latency_ns)"
-                :tooltip="row.p99_latency_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.p99_latency_ns))"
+                :tooltip="raw(row.p99_latency_ns.toLocaleString() + ' ns')"
                 :variant="row.p99_latency_ns > P99_WARN_NS ? 'warning' : 'default'"
               />
             </template>
@@ -393,8 +393,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.avg_duration_ns"
                 :max="columnMaxes.avg_duration_ns"
-                :label="formatLat(row.avg_duration_ns)"
-                :tooltip="row.avg_duration_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.avg_duration_ns))"
+                :tooltip="raw(row.avg_duration_ns.toLocaleString() + ' ns')"
               />
             </template>
 
@@ -402,8 +402,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.max_duration_ns"
                 :max="columnMaxes.max_duration_ns"
-                :label="formatLat(row.max_duration_ns)"
-                :tooltip="row.max_duration_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.max_duration_ns))"
+                :tooltip="raw(row.max_duration_ns.toLocaleString() + ' ns')"
               />
             </template>
           </OTable>
@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";

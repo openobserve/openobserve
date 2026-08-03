@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       size="lg"
-      :title="selectedService?.service_name"
+      :title="raw(selectedService?.service_name)"
       data-test="service-side-panel"
     >
       <template #header-right>
@@ -477,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -548,17 +548,18 @@ watch([filterKey, filterValue, searchQuery], () => {
 });
 
 // Label override for internal field keys shown in the filter dropdown
-const KEY_DISPLAY_LABELS: Record<string, string> = {
+const KEY_DISPLAY_LABELS: Record<string, I18nText> = {
   set_id: t("settings.correlation.workload"),
 };
 
-const allKeys = computed((): { label: string; value: string }[] => {
+const allKeys = computed((): { label: I18nText; value: string }[] => {
   const keys = new Set<string>();
   keys.add("set_id");
   for (const s of services.value) {
     for (const k of Object.keys(s.disambiguation)) keys.add(k);
   }
-  return [...keys].sort().map((k) => ({ label: KEY_DISPLAY_LABELS[k] ?? k, value: k }));
+  // Keys without an override are backend field identifiers, shown verbatim.
+  return [...keys].sort().map((k) => ({ label: KEY_DISPLAY_LABELS[k] ?? raw(k), value: k }));
 });
 
 const allValues = computed((): string[] => {

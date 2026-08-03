@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { computed, onMounted, ref, watch, type Ref, onActivated, provide } from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
@@ -193,7 +193,7 @@ interface StreamRoute {
   };
   delay: number;
   context_attributes: any;
-  description: string;
+  description: I18nText;
   enabled: boolean;
 }
 

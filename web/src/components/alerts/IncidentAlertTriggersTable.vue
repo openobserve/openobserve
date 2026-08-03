@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="correlationReason"
             :value="row.correlation_reason"
           />
-          <OTooltip :content="getReasonTooltip(row.correlation_reason)" side="top" />
+          <OTooltip :content="raw(getReasonTooltip(row.correlation_reason))" side="top" />
         </span>
       </template>
     </OTable>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, PropType, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatToReadable } from "@/utils/date";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -168,6 +168,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       columns,
       formatTimestamp,

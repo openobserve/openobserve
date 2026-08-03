@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-warning shrink-0 cursor-pointer"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
-            <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
+            <OTooltip :content="raw(searchObj.data.histogram.errorMsg)" side="top" align="center" />
           </div>
         </div>
 
@@ -629,7 +629,7 @@ import {
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
@@ -1884,6 +1884,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       isDark,
       t,
       store,

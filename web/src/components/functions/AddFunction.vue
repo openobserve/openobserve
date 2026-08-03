@@ -58,7 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="function"
                   v-model:is-expanded="expandState.functions"
                   :label="
-                    (transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'
+                    raw(
+                      (transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) +
+                        '*',
+                    )
                   "
                   min-header-height="2.125rem"
                 />
@@ -73,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :query="formData.function"
                     :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
                     :disable-ai="!store.state.zoConfig.ai_enabled"
-                    :disable-ai-reason="''"
+                    :disable-ai-reason="raw('')"
                     :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                     :ai-tooltip="t('function.enterFunctionPrompt')"
                     editor-height="100%"
@@ -182,7 +185,7 @@ import {
 } from "vue";
 
 import jsTransformService from "../../services/jstransform";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import segment from "../../services/segment_analytics";
@@ -597,6 +600,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       emit,
       disableColor,

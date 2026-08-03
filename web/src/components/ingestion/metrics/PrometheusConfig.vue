@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
     <IngestionDocLink
       href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
     >
@@ -33,7 +33,7 @@ import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincut
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "traces-otlp",
@@ -67,6 +67,7 @@ export default defineComponent({
       username: [EMAIL]
       password: [PASSCODE]`;
     return {
+      raw,
       t,
       store,
       config,

@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export interface InsightPayload {
@@ -73,7 +73,7 @@ export interface InsightPayload {
   count: number;
   target?: string;
   view?: string;
-  message?: string;
+  message?: I18nText;
   rate?: number;
 }
 

@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, inject, type PropType, type Ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -269,8 +269,8 @@ export default defineComponent({
       default: () => [],
     },
     description: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     rowTemplate: {
       type: String,
@@ -404,6 +404,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       variableRows,

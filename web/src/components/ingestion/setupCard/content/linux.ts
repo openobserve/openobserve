@@ -18,6 +18,8 @@
 // callout; it is now a variant toggle, with the EC2 IAM prerequisite riding on
 // the EC2 variant's note where it is actually relevant.
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
@@ -51,23 +53,22 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
     steps: [
       {
         id: "install",
-        title: "Install the Agent",
-        description:
-          "Run this on the host as **root** (or with `sudo`). Pick **AWS EC2** to additionally pick up instance metadata and use the instance's Name tag as the host identifier.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.installAgentTitle",
+        descriptionKey: "ingestion.setupCard.installAgentLinuxDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variants: [
           {
             id: "generic",
-            label: "Generic Linux",
+            labelKey: "ingestion.setupCard.genericLinuxVariant",
             icon: icon.linux,
             code: agentCode(install(""), subs, "bash"),
             note: "Any Linux server or VM.",
           },
           {
             id: "ec2",
-            label: "AWS EC2",
+            label: raw("AWS EC2"),
             icon: icon.ec2,
             code: agentCode(install("/ec2"), subs, "bash"),
             note: EC2_IAM_NOTE,
@@ -76,10 +77,9 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "The agent starts on install. Give it a few seconds, then hit Test — host metrics arrive as `system_*` streams.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyLinuxAgentDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["System Logs", "journald", "CPU", "Memory", "Disk", "Network"],

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
           <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
-          <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
+          <OTooltip :content="raw(selectedFunctionTooltip)" :side-offset="2" />
         </OButton>
       </template>
       <div data-test="logs-search-saved-function-list" class="py-0">
@@ -92,7 +92,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";

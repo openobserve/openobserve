@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
@@ -45,7 +45,7 @@ const retryDelayMs = computed({
           v-model="retries"
           type="number"
           class="w-25!"
-          :placeholder="'0'"
+          :placeholder="raw('0')"
           data-test="synthetics-check-retries-count-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{
@@ -60,7 +60,7 @@ const retryDelayMs = computed({
           v-model="retryDelayMs"
           type="number"
           class="w-25!"
-          :placeholder="'0'"
+          :placeholder="raw('0')"
           data-test="synthetics-check-retries-delay-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{

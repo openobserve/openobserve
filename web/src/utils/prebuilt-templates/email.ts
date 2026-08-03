@@ -112,7 +112,7 @@ export const emailConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.emailRecipients",
       type: "email",
       required: true,
-      hint: "Comma-separated email addresses",
+      hintKey: "alerts.prebuiltDestinations.emailRecipientsHelp",
       validator: (emails: string) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const emailList = emails.split(",").map((e) => e.trim());

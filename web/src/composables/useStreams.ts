@@ -19,7 +19,7 @@ import { computed, ComputedRef } from "vue";
 import { ref } from "vue";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { TranslateFn } from "@/types/i18n";
+import type { TranslateFn, I18nText } from "@/types/i18n";
 
 const getStreamsPromise: any = ref(null);
 
@@ -682,7 +682,7 @@ const useStreams = (t: TranslateFn) => {
     policy: string;
     apply_at?: string | null; // Optional or nullable
     pattern: string;
-    description?: string;
+    description?: I18nText;
   };
 
   //this function is used to compare the pattern associations

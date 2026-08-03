@@ -29,6 +29,7 @@
  * Read the LLM operation kind from a span.
  * Uses the OTEL gen_ai.operation.name value directly.
  */
+
 export function getOp(span: any): string {
   return String(span?.gen_ai_operation_name || "");
 }
@@ -125,6 +126,7 @@ export type Role = "system" | "user" | "assistant" | "tool" | "unknown";
 
 export interface Message {
   role: Role;
+  /** LLM message body — data from the traced payload, never UI copy. */
   content: string;
   /** stable signature used for dedup across turns */
   sig: string;

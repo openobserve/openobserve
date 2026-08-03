@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`correlation-event-header-subject-${chip.key}`"
         >
           {{ getSubjectButtonLabel ? getSubjectButtonLabel(chip.key) : chip.label }}
-          <OTooltip :content="`${chip.label} = ${chip.value}`" side="top" />
+          <OTooltip :content="raw(`${chip.label} = ${chip.value}`)" side="top" />
           <template v-if="chip.disabled">
             <OTooltip
               :content="t('correlation.noMetricStreamsFor', { kind: chip.label.toLowerCase() })"
@@ -165,7 +165,7 @@ import {
   convertTimeFromMicroToMilli,
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
@@ -173,7 +173,7 @@ type ChipKind = "context" | "subject";
 
 export type DimensionChip = {
   key: string;
-  label: string;
+  label: I18nText;
   value: string;
   kind: ChipKind;
   active: boolean;
@@ -185,7 +185,7 @@ const props = withDefaults(
     sourceEvent?: {
       timestamp?: number | string;
       severity?: string;
-      message?: string;
+      message?: I18nText;
     };
     contextChips?: DimensionChip[];
     subjectChips?: DimensionChip[];

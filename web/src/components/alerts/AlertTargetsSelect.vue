@@ -82,13 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Option {
-  label: string;
+  label: I18nText;
   value: string;
 }
 // Option lists may be plain strings (destinations = `getFormattedDestinations`
@@ -152,12 +152,12 @@ watch(propsCombined, (next) => {
 // Normalize a raw option (string or {label,value}) to a { name, label } pair.
 // Returns null for anything unusable (see the isFilled note above) so the caller
 // can drop it rather than render a `dest:undefined` row or throw.
-const norm = (o: RawOption): { name: string; label: string } | null => {
+const norm = (o: RawOption): { name: string; label: I18nText } | null => {
   if (!isFilled(o)) return null;
-  if (typeof o === "string") return { name: o, label: o };
+  if (typeof o === "string") return { name: o, label: raw(o) };
   if (!isFilled((o as Option).value)) return null;
   const value = String((o as Option).value);
-  return { name: value, label: (o as Option).label ?? value };
+  return { name: value, label: (o as Option).label ?? raw(value) };
 };
 
 const toTagged = (list: RawOption[] | undefined, tag: string) =>

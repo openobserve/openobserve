@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nothing here — their content components have their own headers. -->
       <OPageHeader
         :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
-        :subtitle="showPipelineActions ? t('pipeline.subtitle') : ''"
+        :subtitle="showPipelineActions ? t('pipeline.subtitle') : raw('')"
         :icon="showPipelineActions ? 'lan' : undefined"
         :back="detailBack"
         :tabs-below="showPipelineActions"
@@ -152,7 +152,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -194,15 +194,19 @@ export default defineComponent({
     const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
 
     // ── Level 3 detail crumb ────────────────────────────────────────────────
-    const detailLabels: Record<string, () => string> = {
-      pipelineEditor: () => (router.currentRoute.value.query.name as string) || "Edit Pipeline",
+    const detailLabels: Record<string, () => I18nText> = {
+      pipelineEditor: () => {
+        // The crumb is the pipeline's own name (data) when the URL carries one.
+        const name = router.currentRoute.value.query.name as string;
+        return name ? raw(name) : t("pipeline.editPipeline");
+      },
       createPipeline: () => t("pipeline.addPipeline"),
       importPipeline: () => t("pipeline.import"),
       pipelineHistory: () => t("pipeline.history"),
       pipelineBackfill: () => t("pipeline.backfill"),
     };
     const isDetailView = computed(() => routeName.value in detailLabels);
-    const breadcrumbLabel = computed(() => detailLabels[routeName.value]?.() ?? "");
+    const breadcrumbLabel = computed(() => detailLabels[routeName.value]?.() ?? raw(""));
 
     // On a detail sub-page (editor/create/history/backfill) the leading icon
     // becomes a Back button to the pipelines list, mirroring the CRUD sub-page
@@ -275,6 +279,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       config,
       orgIdentifier,

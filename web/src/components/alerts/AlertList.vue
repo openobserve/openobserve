@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unit="iso"
                   mode="absolute"
                   :timezone="store.state.timezone"
-                  empty-label="—"
+                  :empty-label="raw('—')"
                 />
               </template>
 
@@ -709,7 +709,7 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -2835,6 +2835,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       store,
       router,

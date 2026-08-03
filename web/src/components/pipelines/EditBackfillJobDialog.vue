@@ -265,11 +265,9 @@ const onSubmit = async (value: BackfillForm) => {
   // Show confirmation dialog if delete_before_backfill is enabled
   if (value.deleteBeforeBackfill) {
     const ok = await confirm({
-      title: "Confirm Data Deletion",
-      message:
-        "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is updated. Are you sure you want to proceed?",
-      confirmLabel: "Yes, Delete and Backfill",
-      cancelLabel: "Cancel",
+      title: t("pipeline.confirmDataDeletion"),
+      message: t("pipeline.editBackfillDeleteConfirmMessage"),
+      confirmLabel: t("pipeline.yesDeleteAndBackfill"),
     });
     if (ok) {
       await updateBackfillJobRequest(value);

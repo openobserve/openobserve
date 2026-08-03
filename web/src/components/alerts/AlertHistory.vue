@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -449,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

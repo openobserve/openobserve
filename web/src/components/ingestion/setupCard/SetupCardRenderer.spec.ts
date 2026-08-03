@@ -119,6 +119,53 @@ describe("SetupCardRenderer — advanced section", () => {
   });
 });
 
+// The in-repo content builders (setupCard/content/*) are plain modules with no
+// i18n context, so translatable copy is stored as an i18n KEY (titleKey /
+// descriptionKey / labelKey) and resolved HERE. A consumer that forgets to call
+// t() renders the dotted path to the user, so guard each one.
+describe("SetupCardRenderer — key-as-data copy", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  const keyed: RichCardContent = {
+    ...CONTENT,
+    steps: [
+      {
+        id: "configure",
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        completeOn: "copy",
+        inputs: [
+          { id: "host", labelKey: "ingestion.setupCard.jmxHostLabel", default: "localhost" },
+        ],
+        variants: [
+          {
+            id: "generic",
+            labelKey: "ingestion.setupCard.genericWindowsVariant",
+            code: { lang: "bash", raw: "echo hi" },
+          },
+        ],
+      },
+      CONTENT.steps[1],
+    ],
+  };
+
+  it("translates titleKey / descriptionKey / labelKey instead of printing the key", () => {
+    wrapper = mountCard(keyed);
+    const text = wrapper.text();
+    expect(text).toContain("Configure the OpenTelemetry Collector");
+    // inlineMd turns the `config.yaml` backticks into <code>, so match the prose.
+    expect(text).toContain("set the host/port below");
+    expect(text).toContain("JMX Host");
+    expect(text).toContain("Generic Windows");
+    // No unresolved dotted path leaked anywhere on the card.
+    expect(text).not.toContain("ingestion.setupCard.");
+  });
+});
+
 describe("SetupCardRenderer — uninstall section", () => {
   let wrapper: VueWrapper<any>;
 

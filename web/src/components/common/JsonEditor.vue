@@ -57,8 +57,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, computed, defineAsyncComponent } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  watch,
+  computed,
+  defineAsyncComponent,
+  type PropType,
+} from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
@@ -79,7 +87,7 @@ export default defineComponent({
       required: true,
     },
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     type: {

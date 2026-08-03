@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import type { BrowserCheck } from "@/types/synthetics";
@@ -115,7 +115,7 @@ const silenceMinutes = computed({
           v-model="failureThreshold"
           type="number"
           class="w-25!"
-          :placeholder="'1'"
+          :placeholder="raw('1')"
           data-test="synthetics-check-alerts-threshold-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{

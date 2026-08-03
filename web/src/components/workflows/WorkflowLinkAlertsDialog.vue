@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -223,7 +223,7 @@ const folderOptions = computed(() => {
     if (!byId.has(a.folder_id)) byId.set(a.folder_id, a.folder_name);
   }
   return [...byId.entries()]
-    .map(([value, label]) => ({ label, value }))
+    .map(([value, label]) => ({ label: raw(label), value }))
     .sort((x, y) => {
       if (x.value === "default") return -1;
       if (y.value === "default") return 1;
@@ -235,7 +235,7 @@ const folderOptions = computed(() => {
 const alertOptions = computed(() =>
   alerts.value
     .filter((a) => a.folder_id === selectedFolder.value)
-    .map((a) => ({ label: a.name, value: a.alert_id })),
+    .map((a) => ({ label: raw(a.name), value: a.alert_id })),
 );
 
 // The alerts dropdown only edits the CURRENT folder's slice of the global

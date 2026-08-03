@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="person" size="sm" />
             <OTooltip
               v-if="group.userId"
-              :content="group.userId"
+              :content="raw(group.userId)"
               side="bottom"
               align="center"
               :side-offset="6"
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export interface Props {

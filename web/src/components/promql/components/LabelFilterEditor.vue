@@ -145,7 +145,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { PromqlLabelMatcher } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
@@ -181,7 +181,7 @@ const operatorOptions = ["=", "!=", "=~", "!~"];
 
 // Computed: available labels minus ones already selected in other rows
 const availableLabelOptions = computed(() => {
-  const selectedLabels = props.labels.map((l) => l.label);
+  const selectedLabels: string[] = props.labels.map((l) => l.label);
   return availableLabels.value.filter((label) => !selectedLabels.includes(label));
 });
 
@@ -216,7 +216,7 @@ const addLabel = () => {
   const newLabels: PromqlLabelMatcher[] = [
     ...props.labels,
     {
-      label: "",
+      label: raw(""),
       op: "=",
       value: "",
     },
@@ -252,7 +252,7 @@ const getLabelValueOptions = (labelKey: string) => {
   const actualValues = labelValuesMap.value.get(labelKey) || [];
   actualValues.forEach((value: string) => {
     options.push({
-      label: value,
+      label: raw(value),
       value: value,
       isVariable: false,
     });

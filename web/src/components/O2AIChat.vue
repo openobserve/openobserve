@@ -31,7 +31,7 @@
                         :sideOffset="8"
                         side="bottom"
                         align="center"
-                        :content="displayedTitle"
+                        :content="raw(displayedTitle)"
                       />
                     </span>
                     <OIcon name="arrow-drop-down" size="md" class="flex-shrink-0" />
@@ -220,7 +220,7 @@
         v-model:open="showImagePreview"
         @update:open="(v) => !v && closeImagePreview()"
         size="lg"
-        :title="previewImage?.filename"
+        :title="raw(previewImage?.filename)"
       >
         <div class="flex justify-center">
           <img
@@ -1018,7 +1018,7 @@
                         class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                         @click="openImagePreview(img)"
                       />
-                      <OTooltip :content="img.filename" />
+                      <OTooltip :content="raw(img.filename)" />
                     </div>
                   </div>
                   <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
@@ -1292,7 +1292,7 @@
           <RichTextInput
             ref="chatInput"
             v-model="inputMessage"
-            :placeholder="inputPlaceholder"
+            :placeholder="raw(inputPlaceholder)"
             :disabled="isLoading"
             :theme="store.state.theme"
             :references="contextReferences"
@@ -1391,7 +1391,7 @@ import {
   computed,
   onUnmounted,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import hljs from "highlight.js";
@@ -1652,7 +1652,7 @@ export default defineComponent({
     const pendingConfirmation = ref<{
       tool: string;
       args: Record<string, any>;
-      message: string;
+      message: I18nText;
       navAction?: NavigationAction;
     } | null>(null);
 
@@ -1695,7 +1695,7 @@ export default defineComponent({
     // Active tool call state - for showing tool progress outside message box
     const activeToolCall = ref<{
       tool: string;
-      message: string;
+      message: I18nText;
       context: Record<string, any>;
       call_id?: string;
     } | null>(null);
@@ -2035,7 +2035,9 @@ export default defineComponent({
                 }
               }
               // Keep partial content but indicate it was cancelled
-              lastMessage.content += "\n\n_[Response stopped by user]_";
+              lastMessage.content = raw(
+                lastMessage.content + "\n\n_[" + t("aiAssistant.responseStoppedByUser") + "]_",
+              );
             }
           }
         }
@@ -2053,10 +2055,10 @@ export default defineComponent({
             // Tools ran before any text, so place them ahead of it.
             lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
           } else {
-            const stoppedNote = "_[Response stopped by user]_";
+            const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
             chatMessages.value.push({
               role: "assistant",
-              content: stoppedNote,
+              content: raw(stoppedNote),
               contentBlocks: [...pendingToolCalls.value, { type: "text", text: stoppedNote }],
             });
           }
@@ -2217,7 +2219,7 @@ export default defineComponent({
         chatMessages.value = [
           {
             role: "assistant",
-            content: "Error: Unable to connect to backend",
+            content: t("aiAssistant.backendConnectionError"),
           },
         ];
         console.error("Error fetching initial message:", error);
@@ -2445,7 +2447,7 @@ export default defineComponent({
                     } else {
                       msgs.push({
                         role: "assistant",
-                        content: "",
+                        content: raw(""),
                         contentBlocks: [...pendingToolCalls.value, confirmBlock],
                       });
                       pendingToolCalls.value = [];
@@ -2533,7 +2535,7 @@ export default defineComponent({
                     if (!lastMessage || lastMessage.role !== "assistant") {
                       msgs.push({
                         role: "assistant",
-                        content: errorMessage,
+                        content: raw(errorMessage),
                         contentBlocks: [
                           ...pendingToolCalls.value,
                           { type: "text", text: errorMessage },
@@ -2543,9 +2545,9 @@ export default defineComponent({
                     } else {
                       // Append error to existing message
                       if (lastMessage.content) {
-                        lastMessage.content += "\n\n" + errorMessage;
+                        lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
                       } else {
-                        lastMessage.content = errorMessage;
+                        lastMessage.content = raw(errorMessage);
                       }
                       if (!lastMessage.contentBlocks) {
                         lastMessage.contentBlocks = [];
@@ -2607,7 +2609,7 @@ export default defineComponent({
                       } else {
                         msgs.push({
                           role: "assistant",
-                          content: "",
+                          content: raw(""),
                           contentBlocks: [...pendingToolCalls.value],
                         });
                       }
@@ -2772,7 +2774,7 @@ export default defineComponent({
                       } else {
                         msgs.push({
                           role: "assistant",
-                          content: "",
+                          content: raw(""),
                           contentBlocks: [...pendingToolCalls.value, confirmBlock],
                         });
                         pendingToolCalls.value = [];
@@ -2835,7 +2837,7 @@ export default defineComponent({
                     } else {
                       msgs.push({
                         role: "assistant",
-                        content: "",
+                        content: raw(""),
                         contentBlocks: [...pendingToolCalls.value, errorBlock],
                       });
                       pendingToolCalls.value = [];
@@ -2916,7 +2918,7 @@ export default defineComponent({
                       // Create new assistant message with pending tool calls + text
                       msgs.push({
                         role: "assistant",
-                        content: streamingMsg,
+                        content: raw(streamingMsg),
                         contentBlocks: [
                           ...pendingToolCalls.value,
                           { type: "text", text: textSegment },
@@ -2927,7 +2929,7 @@ export default defineComponent({
                       await throttledSaveCtx(true);
                     } else {
                       // Update existing assistant message's total content
-                      lastMessage.content = streamingMsg;
+                      lastMessage.content = raw(streamingMsg);
 
                       // Update or add text block in contentBlocks
                       if (!lastMessage.contentBlocks) {
@@ -3053,7 +3055,7 @@ export default defineComponent({
                   if (!lastMessage || lastMessage.role !== "assistant") {
                     msgs.push({
                       role: "assistant",
-                      content: errorMessage,
+                      content: raw(errorMessage),
                       contentBlocks: [
                         ...pendingToolCalls.value,
                         { type: "text", text: errorMessage },
@@ -3062,9 +3064,9 @@ export default defineComponent({
                     pendingToolCalls.value = [];
                   } else {
                     if (lastMessage.content) {
-                      lastMessage.content += "\n\n" + errorMessage;
+                      lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
                     } else {
-                      lastMessage.content = errorMessage;
+                      lastMessage.content = raw(errorMessage);
                     }
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
@@ -3215,7 +3217,7 @@ export default defineComponent({
                   } else {
                     msgs.push({
                       role: "assistant",
-                      content: "",
+                      content: raw(""),
                       contentBlocks: [...pendingToolCalls.value, errorBlock],
                     });
                     pendingToolCalls.value = [];
@@ -3280,7 +3282,7 @@ export default defineComponent({
                   if (!lastMessage || lastMessage.role !== "assistant") {
                     msgs.push({
                       role: "assistant",
-                      content: streamingMsg,
+                      content: raw(streamingMsg),
                       contentBlocks: [
                         ...pendingToolCalls.value,
                         { type: "text", text: textSegment },
@@ -3289,7 +3291,7 @@ export default defineComponent({
                     pendingToolCalls.value = [];
                     await throttledSaveCtx(true);
                   } else {
-                    lastMessage.content = streamingMsg;
+                    lastMessage.content = raw(streamingMsg);
 
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
@@ -3481,7 +3483,7 @@ export default defineComponent({
       {
         id: "aiChatClose",
         key: "escape",
-        description: "Close AI chat",
+        description: t("shortcuts.actions.aiChatClose"),
         // Escape must close the chat even while typing a message in its input.
         allowInInput: true,
         handler: () => {
@@ -3496,7 +3498,7 @@ export default defineComponent({
         id: "aiChatExpand",
         key: "ctrl+b",
         keyForMac: "meta+b",
-        description: "Expand/collapse AI chat",
+        description: t("shortcuts.actions.aiChatExpand"),
         handler: toggleExpand,
       },
     ]);
@@ -3762,10 +3764,14 @@ export default defineComponent({
           target.functionContent = vrlFunction;
         }
 
+        const streamLabel =
+          { logs: t("common.logs"), metrics: t("common.metrics"), traces: t("common.traces") }[
+            streamType as string
+          ] ?? raw(streamType.charAt(0).toUpperCase() + streamType.slice(1));
         return {
           resource_type: streamType,
           action: "load_query",
-          label: `View in ${streamType.charAt(0).toUpperCase() + streamType.slice(1)}`,
+          label: t("aiAssistant.viewInTarget", { target: streamLabel }),
           target,
         };
       }
@@ -3866,7 +3872,9 @@ export default defineComponent({
       return {
         resource_type: resourceType,
         action: "navigate_direct",
-        label: `View ${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)}`,
+        label: t("aiAssistant.viewTarget", {
+          target: resourceType.charAt(0).toUpperCase() + resourceType.slice(1),
+        }),
         target,
       };
     };
@@ -3989,22 +3997,22 @@ export default defineComponent({
       setTimeout(async () => {
         try {
           // Add success message AFTER navigation completes
-          const successMessage = `Successfully navigated to ${pageName}`;
+          const successMessage = t("aiAssistant.navigatedTo", { page: pageName });
           let lastMessage = chatMessages.value[chatMessages.value.length - 1];
 
           if (!lastMessage || lastMessage.role !== "assistant") {
             // Create new assistant message
             chatMessages.value.push({
               role: "assistant",
-              content: successMessage,
+              content: raw(successMessage),
               contentBlocks: [{ type: "text", text: successMessage }],
             });
           } else {
             // Append to existing assistant message
             if (lastMessage.content) {
-              lastMessage.content += "\n\n" + successMessage;
+              lastMessage.content = raw(lastMessage.content + "\n\n" + successMessage);
             } else {
-              lastMessage.content = successMessage;
+              lastMessage.content = raw(successMessage);
             }
             if (!lastMessage.contentBlocks) {
               lastMessage.contentBlocks = [];
@@ -4161,7 +4169,7 @@ export default defineComponent({
       // But we'll use backendMessage for the API call
       chatMessages.value.push({
         role: "user",
-        content: backendMessage, // Use backend message with full context
+        content: raw(backendMessage), // Use backend message with full context
         ...(hasImages && { images: messagesToSend }),
       });
       inputMessage.value = "";
@@ -4280,7 +4288,7 @@ export default defineComponent({
         }
         chatMessages.value.push({
           role: "assistant",
-          content: errorMessage,
+          content: raw(errorMessage),
         });
         await saveToHistory(); // Save after error
       }
@@ -5639,6 +5647,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       inputMessage,
       chatMessages,
       isLoading,

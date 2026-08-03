@@ -19,13 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-row-status-pill"
     type="spanStatus"
     :value="hasErrors ? 'error' : 'success'"
-    :label="label"
+    :label="raw(label)"
   />
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
 const { t } = useI18nTyped();

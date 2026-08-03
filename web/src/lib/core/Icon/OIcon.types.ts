@@ -1,3 +1,5 @@
+import type { I18nText } from "@/types/i18n";
+
 import type { IconName } from "./OIcon.icons";
 
 export type { IconName };
@@ -15,7 +17,7 @@ export interface IconProps {
    */
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   /** Accessible label. When provided the icon has role="img". When omitted it is aria-hidden. */
-  label?: string;
+  label?: I18nText;
 }
 
 export interface IconSlots {

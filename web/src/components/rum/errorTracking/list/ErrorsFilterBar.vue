@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -109,7 +109,7 @@ const ALL_SERVICES = "__all__";
 
 const serviceOptions = computed(() => [
   { label: t("rum.all"), value: ALL_SERVICES },
-  ...props.services.map((service) => ({ label: service, value: service })),
+  ...props.services.map((service) => ({ label: raw(service), value: service })),
 ]);
 
 const onServiceSelect = (value: unknown) => {

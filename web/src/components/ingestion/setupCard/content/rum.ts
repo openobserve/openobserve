@@ -21,6 +21,8 @@
 // The install + init steps share the "pkg" variant group: picking NPM or CDN
 // on either step switches both, so the two read as one coherent path.
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
@@ -185,14 +187,14 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
   const installVariants: RichCardStepVariant[] = [
     {
       id: "npm",
-      label: "NPM",
+      label: raw("NPM"),
       icon: nodeIcon,
       code: { lang: "bash", raw: NPM_INSTALL },
       note: "Prefer NPM when you own the build — the SDK ships inside your bundle, versions move with your lockfile, and your CSP stays first-party.",
     },
     {
       id: "cdn",
-      label: "CDN",
+      label: raw("CDN"),
       code: {
         lang: "html",
         filename: "index.html",
@@ -205,7 +207,7 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
   const initVariants: RichCardStepVariant[] = [
     {
       id: "npm",
-      label: "NPM",
+      label: raw("NPM"),
       icon: nodeIcon,
       code: {
         lang: "javascript",
@@ -217,7 +219,7 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
     },
     {
       id: "cdn",
-      label: "CDN",
+      label: raw("CDN"),
       code: {
         lang: "html",
         filename: "index.html",
@@ -242,10 +244,9 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
     steps: [
       {
         id: "install",
-        title: "Add the SDK to Your App",
-        description:
-          "Pick how the SDK ships: bundle it with **NPM**, or drop the **CDN** loader into your HTML `<head>` — no build step needed.",
-        chip: { kind: "terminal", label: "Install" },
+        titleKey: "ingestion.setupCard.rumInstallTitle",
+        descriptionKey: "ingestion.setupCard.rumInstallDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipInstall" },
         completeOn: "copy",
         required: true,
         variantGroup: "pkg",
@@ -253,10 +254,9 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
       },
       {
         id: "init",
-        title: "Initialize RUM + Logs",
-        description:
-          "Both SDKs are initialized with this org's values — copy as-is, then adjust `service`, `env` and `applicationId` to describe your app. The `clientToken` ships to visitors' browsers by design (NPM bundles it, CDN inlines it) — it can only write RUM events, and you can rotate it from this page's header anytime.",
-        chip: { kind: "editor", label: "Editor" },
+        titleKey: "ingestion.setupCard.rumInitTitle",
+        descriptionKey: "ingestion.setupCard.rumInitDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.chipEditor" },
         completeOn: "copy",
         required: true,
         variantGroup: "pkg",
@@ -264,10 +264,9 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Open your app in a browser, click around for a few seconds, then hit Test — RUM events land in the `_rumdata` stream.",
-        chip: { kind: "traces", label: "RUM" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyRumDesc",
+        chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["Sessions", "Page Views", "User Actions", "Errors", "Web Vitals", "Session Replay"],

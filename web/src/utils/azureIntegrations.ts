@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw, type I18nKey } from "@/types/i18n";
+
 export interface AzureIntegration {
   id: string;
   name: string;
   displayName: string;
   icon: string;
-  description: string;
+  descriptionKey: I18nKey;
   armTemplate?: string; // HTTPS URL to ARM template JSON on S3
   hasDashboard: boolean;
   dashboardFolderId?: string;
@@ -33,8 +35,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Activity Logs",
     displayName: "Azure Activity Logs",
     icon: "",
-    description:
-      "Stream Azure subscription activity logs to OpenObserve via Event Hub and Event Publisher",
+    descriptionKey: "ingestion.integrations.azure.activity-logs.description",
     armTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/azure/activity-logs-to-openobserve.json",
     hasDashboard: false,
@@ -47,7 +48,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "AKS",
     displayName: "Azure Kubernetes Service",
     icon: "",
-    description: "Collect logs and metrics from Azure Kubernetes Service clusters",
+    descriptionKey: "ingestion.integrations.azure.aks.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "compute",
@@ -57,7 +58,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Front Door",
     displayName: "Azure Front Door",
     icon: "",
-    description: "Monitor Azure Front Door access logs and metrics",
+    descriptionKey: "ingestion.integrations.azure.front-door.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "networking",
@@ -67,7 +68,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "App Service",
     displayName: "Azure App Service",
     icon: "",
-    description: "Collect logs from Azure App Service applications",
+    descriptionKey: "ingestion.integrations.azure.app-service.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "compute",
@@ -77,7 +78,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "SQL Database",
     displayName: "Azure SQL Database",
     icon: "",
-    description: "Monitor Azure SQL Database logs and performance metrics",
+    descriptionKey: "ingestion.integrations.azure.sql-database.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "storage",
@@ -87,7 +88,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Storage Account",
     displayName: "Azure Storage Account",
     icon: "",
-    description: "Track Azure Storage operations and access logs",
+    descriptionKey: "ingestion.integrations.azure.storage-account.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "storage",
@@ -97,7 +98,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Virtual Machines",
     displayName: "Azure Virtual Machines",
     icon: "",
-    description: "Collect logs and metrics from Azure VMs",
+    descriptionKey: "ingestion.integrations.azure.virtual-machines.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "compute",
@@ -107,7 +108,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Application Gateway",
     displayName: "Azure Application Gateway",
     icon: "",
-    description: "Monitor Application Gateway access logs and performance",
+    descriptionKey: "ingestion.integrations.azure.application-gateway.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "networking",
@@ -117,7 +118,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Load Balancer",
     displayName: "Azure Load Balancer",
     icon: "",
-    description: "Collect metrics and logs from Azure Load Balancer",
+    descriptionKey: "ingestion.integrations.azure.load-balancer.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "networking",
@@ -127,7 +128,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Network Security Group",
     displayName: "Network Security Group",
     icon: "",
-    description: "Monitor NSG flow logs and security events",
+    descriptionKey: "ingestion.integrations.azure.network-security-group.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "security",
@@ -137,7 +138,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Key Vault",
     displayName: "Azure Key Vault",
     icon: "",
-    description: "Track Key Vault access and audit logs",
+    descriptionKey: "ingestion.integrations.azure.key-vault.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "security",
@@ -147,7 +148,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Active Directory",
     displayName: "Azure Active Directory",
     icon: "",
-    description: "Monitor AAD sign-in and audit logs",
+    descriptionKey: "ingestion.integrations.azure.active-directory.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "security",
@@ -157,7 +158,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Cosmos DB",
     displayName: "Azure Cosmos DB",
     icon: "",
-    description: "Collect Cosmos DB operation logs and metrics",
+    descriptionKey: "ingestion.integrations.azure.cosmos-db.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "storage",
@@ -167,7 +168,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Functions",
     displayName: "Azure Functions",
     icon: "",
-    description: "Monitor Azure Functions execution logs",
+    descriptionKey: "ingestion.integrations.azure.functions.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "compute",
@@ -177,7 +178,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "API Management",
     displayName: "Azure API Management",
     icon: "",
-    description: "Track API Management gateway logs",
+    descriptionKey: "ingestion.integrations.azure.api-management.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "other",
@@ -187,7 +188,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Container Instances",
     displayName: "Azure Container Instances",
     icon: "",
-    description: "Collect logs from Azure Container Instances",
+    descriptionKey: "ingestion.integrations.azure.container-instances.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "compute",
@@ -197,7 +198,7 @@ export const azureIntegrations: AzureIntegration[] = [
     name: "Virtual Network",
     displayName: "Azure Virtual Network",
     icon: "",
-    description: "Monitor Virtual Network flow logs and diagnostics",
+    descriptionKey: "ingestion.integrations.azure.virtual-network.description",
     hasDashboard: false,
     documentationUrl: "https://github.com/openobserve/azure-function-openobserve",
     category: "networking",

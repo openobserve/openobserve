@@ -420,7 +420,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
@@ -494,7 +494,7 @@ interface SessionInsight {
   count: number;
   target?: string;
   view?: string;
-  message?: string;
+  message?: I18nText;
   rate?: number;
 }
 

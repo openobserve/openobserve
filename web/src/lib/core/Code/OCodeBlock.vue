@@ -36,11 +36,13 @@ const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   copyable: true,
-  copyMessage: "Copied to clipboard!",
-  revealTooltip: "Reveal",
-  hideTooltip: "Hide",
   dataTest: "code-block",
 });
+
+// Resolved here rather than as `withDefaults` defaults: a default is evaluated
+// once at module scope, which would freeze these tooltips in the boot locale.
+const revealTooltipText = computed(() => props.revealTooltip ?? t("common.reveal"));
+const hideTooltipText = computed(() => props.hideTooltip ?? t("common.hide"));
 
 const emit = defineEmits<CodeBlockEmits>();
 defineSlots<CodeBlockSlots>();
@@ -77,8 +79,9 @@ const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
 
 const onCopy = () => {
   copyToClipboard(props.code, t, {
-    successMessage: props.copyMessage,
-    errorMessage: "Error while copying content.",
+    // Render-time fallback so the default stays locale-reactive.
+    successMessage: props.copyMessage ?? t("common.copySuccess"),
+    errorMessage: t("common.copyContentError"),
   });
   emit("copy");
 };
@@ -127,7 +130,7 @@ const onCopy = () => {
           @click="revealed = !revealed"
         >
           <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
-          <OTooltip :content="revealed ? hideTooltip : revealTooltip" side="top" />
+          <OTooltip :content="revealed ? hideTooltipText : revealTooltipText" side="top" />
         </OButton>
         <!-- Extra toolbar actions (e.g. a download button) -->
         <slot name="actions" />

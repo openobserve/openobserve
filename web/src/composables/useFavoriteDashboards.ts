@@ -16,12 +16,12 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { TranslateFn } from "@/types/i18n";
+import type { TranslateFn, I18nText } from "@/types/i18n";
 
 export interface FavoriteDashboard {
   dashboardId: string;
   folderId: string;
-  label: string;
+  label: I18nText;
 }
 
 // Reserved pseudo-folder id for the folder-rail "Favorites" entry. Real folder

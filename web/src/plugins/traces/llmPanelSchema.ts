@@ -29,6 +29,8 @@
  * Only panel types present in `TYPE_MAP` are convertible.
  */
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import type { LLMPanelDef } from "./config/llmInsightsPanels";
 
 /** Our internal panel type → dashboard chart type id (see ChartSelection.vue). */
@@ -47,11 +49,13 @@ interface AxisField {
   alias: string;
   column: string;
   color: string | null;
-  label: string;
+  label: I18nText;
 }
 
+// Axis labels here are column aliases and panel-defined series names
+// (`p50`, `errors`, the raw breakdown column) — identifiers, not prose.
 function axisField(name: string, label: string): AxisField {
-  return { alias: name, column: name, color: null, label };
+  return { alias: name, column: name, color: null, label: raw(label) };
 }
 
 export function buildLLMPanelSchema(opts: {

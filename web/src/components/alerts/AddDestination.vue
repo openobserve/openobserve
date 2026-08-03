@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import type { PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -519,7 +519,7 @@ const apiHeaders = form.useStore(
 const isUpdatingDestination = ref(false);
 const isLoadingActions = ref(false);
 const router = useRouter();
-const actionOptions = ref<{ value: string; label: string; type: string }[]>([]);
+const actionOptions = ref<{ value: string; label: I18nText; type: string }[]>([]);
 
 const { getAllActions } = useActions();
 
@@ -895,17 +895,17 @@ const prebuiltTemplateOptions = computed(() => {
     return template.type !== "email";
   });
 
-  const options: { label: string; value: string }[] = [];
+  const options: { label: I18nText; value: string }[] = [];
 
   if (defaultPrebuiltTemplateName.value) {
     const defaultLabel = t("alert_destinations.templateDefaultOption", {
       name: defaultPrebuiltTemplateName.value,
     });
-    options.push({ label: defaultLabel, value: defaultPrebuiltTemplateName.value });
+    options.push({ label: raw(defaultLabel), value: defaultPrebuiltTemplateName.value });
   }
 
   matching.forEach((template) => {
-    options.push({ label: template.name, value: template.name });
+    options.push({ label: raw(template.name), value: template.name });
   });
 
   return options;

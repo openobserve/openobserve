@@ -140,7 +140,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -177,9 +177,9 @@ interface Props {
   editorHeight?: string;
   hideNlToggle?: boolean; // Hide floating AI icon (for pages that don't want AI)
   disableAi?: boolean; // Disable AI send (e.g. no stream selected)
-  disableAiReason?: string; // Tooltip reason when AI is disabled
-  aiPlaceholder?: string; // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
-  aiTooltip?: string; // Custom tooltip for AI send button (default: 'search.enterPrompt')
+  disableAiReason?: I18nText; // Tooltip reason when AI is disabled
+  aiPlaceholder?: I18nText; // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
+  aiTooltip?: I18nText; // Custom tooltip for AI send button (default: 'search.enterPrompt')
   hasExpandButton?: boolean; // Reserve right padding so AI bar close btn doesn't overlap the expand btn
 
   // Testing
@@ -199,7 +199,7 @@ const props = withDefaults(defineProps<Props>(), {
   editorHeight: "200px",
   hideNlToggle: false,
   disableAi: false,
-  disableAiReason: "",
+  disableAiReason: raw(""),
   hasExpandButton: false,
   dataTestPrefix: "query-editor",
 });
@@ -368,7 +368,7 @@ const handleAIGenerate = async () => {
   currentAbortController.value = new AbortController();
 
   // Track user message for chat history
-  chatMessages.value.push({ role: "user", content: userInput });
+  chatMessages.value.push({ role: "user", content: raw(userInput) });
 
   // Call the CodeQueryEditor's handleGenerateSQL method with abort + session
   if (editorRef.value && typeof editorRef.value.handleGenerateSQL === "function") {

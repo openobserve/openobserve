@@ -166,7 +166,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, reactive, ref, toRef } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -219,19 +219,19 @@ const scoreConfigFixers = reactive<Record<number, string>>({});
 const providerFixers = reactive<Record<number, string>>({});
 
 const typeOptions = [
-  { label: "LLM Judge", value: "llm_judge" },
-  { label: "Remote", value: "remote" },
+  { label: t("onlineEvals.scorer.detail.typeLlmJudge"), value: "llm_judge" },
+  { label: t("onlineEvals.scorer.detail.typeRemote"), value: "remote" },
 ];
 
 const scoreConfigOptions = computed(() =>
   scoreConfigs.value.map((sc) => ({
-    label: sc.name,
+    label: raw(sc.name),
     value: String((sc as any).entityId ?? (sc as any).entity_id ?? sc.id),
   })),
 );
 
 const providerOptions = computed(() =>
-  providers.value.map((p) => ({ label: p.name, value: String(p.id) })),
+  providers.value.map((p) => ({ label: raw(p.name), value: String(p.id) })),
 );
 
 const editorHeights = computed(() => ({
@@ -337,6 +337,7 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     existingScorerNames: existingScorers.value,
     scoreConfigs: scoreConfigs.value,
     providers: providers.value,
+    t,
   });
 
   // Seed inline fixers from the current raw values.

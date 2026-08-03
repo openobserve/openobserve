@@ -369,16 +369,16 @@ export default defineComponent({
       if (hasFailedJob.value) {
         // When there's a failed job, only allow: reload, replace failed, or replace all
         return [
-          { label: "Reload existing URLs", value: "reload" },
-          { label: "Replace failed URL only", value: "replace_failed" },
-          { label: "Replace all URLs", value: "replace" },
+          { label: t("function.updateModeReload"), value: "reload" },
+          { label: t("function.updateModeReplaceFailed"), value: "replace_failed" },
+          { label: t("function.updateModeReplaceAll"), value: "replace" },
         ];
       } else {
         // Normal mode: reload, append, or replace
         return [
-          { label: "Reload existing URLs", value: "reload" },
-          { label: "Add new URL", value: "append" },
-          { label: "Replace all URLs", value: "replace" },
+          { label: t("function.updateModeReload"), value: "reload" },
+          { label: t("function.updateModeAppend"), value: "append" },
+          { label: t("function.updateModeReplaceAll"), value: "replace" },
         ];
       }
     });

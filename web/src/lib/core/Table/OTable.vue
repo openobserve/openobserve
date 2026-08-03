@@ -11,7 +11,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
@@ -76,7 +76,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   globalFilterPlaceholder: "Search...",
   filterMode: "client",
   defaultColumns: true,
-  footerTitle: "",
+  footerTitle: raw(""),
   showHeader: true,
   fillHeight: true,
 });

@@ -144,7 +144,7 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -153,9 +153,9 @@ import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 
 interface ColorOption {
-  label: string;
+  label: I18nText;
   value?: string;
-  subLabel?: string;
+  subLabel?: I18nText;
   colorPalette?: string[];
   header?: boolean;
 }

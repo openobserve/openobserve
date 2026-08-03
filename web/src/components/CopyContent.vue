@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { defineComponent, ref, type PropType } from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
@@ -51,7 +51,7 @@ export default defineComponent({
   components: { OButton, OIcon, OTooltip },
   props: {
     content: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       default: "", // Default value for content prop (empty string in this case)
     },
     displayContent: {
@@ -88,8 +88,8 @@ export default defineComponent({
     const copyToClipboardFn = () => {
       const content = replaceValues(props.content, false);
       copyToClipboard(content, t, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("common.copyContentError"),
         timeout: 5000,
       });
     };

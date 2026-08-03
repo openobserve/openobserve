@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import useIngestion from "@/composables/useIngestion";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 const name = "python";
@@ -31,7 +31,7 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
 
 <template>
   <IngestionContent>
-    <CopyContent :content="content" />
+    <CopyContent :content="raw(content)" />
     <div>
       <div class="font-medium">{{ t("ingestion.checkFurtherDocumentationAt") }}</div>
       <ol class="mt-1 list-decimal pl-5">

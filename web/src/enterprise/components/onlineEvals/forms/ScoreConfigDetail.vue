@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     size="lg"
-    :title="row?.name"
+    :title="raw(row?.name)"
     title-data-test="score-config-detail-name-badge"
     :sub-title="t('onlineEvals.scoreConfig.detail.eyebrow')"
     data-test="score-config-detail"
@@ -244,7 +244,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

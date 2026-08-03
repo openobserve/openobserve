@@ -45,7 +45,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
@@ -55,7 +55,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
   groupKey: string;
-  title: string;
+  title: I18nText;
   icon: string;
   children: SubnavChild[];
   /** When set, the tile navigates here on click and the flyout is hover-only. */

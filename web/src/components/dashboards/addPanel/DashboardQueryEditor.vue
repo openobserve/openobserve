@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :hide-nl-toggle="false"
                     :disable-ai="false"
-                    :disable-ai-reason="''"
+                    :disable-ai-reason="raw('')"
                     :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                     :ai-tooltip="t('function.enterFunctionPrompt')"
                     editor-height="100%"
@@ -276,7 +276,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
 import { defineComponent, ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
@@ -892,6 +892,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       router,
       onDropDownClick,

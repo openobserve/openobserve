@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import useStreams from "@/composables/useStreams";
 import { ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -159,9 +159,9 @@ const form = useOForm<AddPipelineForm>({
 });
 
 const streamTypes = ref([
-  { label: "Logs", value: "logs" },
-  { label: "Metrics", value: "metrics" },
-  { label: "Traces", value: "traces" },
+  { label: t("common.logs"), value: "logs" },
+  { label: t("common.metrics"), value: "metrics" },
+  { label: t("common.traces"), value: "traces" },
 ]);
 
 const indexOptions = ref<string[]>([]);

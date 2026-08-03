@@ -183,7 +183,7 @@ export const useSearchConnection = (t: TranslateFn) => {
           breakdownField: null,
           breakdownSeries: null,
           chartParams: {
-            title: "",
+            title: raw(""),
             unparsed_x_data: [],
             timezone: "",
           },

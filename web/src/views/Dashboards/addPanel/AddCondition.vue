@@ -130,7 +130,9 @@
                       searchable
                       :error="condition.values?.length === 0"
                       :error-message="
-                        condition.values?.length === 0 ? t('common.atLeastOneItemRequired') : ''
+                        condition.values?.length === 0
+                          ? t('common.atLeastOneItemRequired')
+                          : raw('')
                       "
                       data-test="dashboard-add-condition-list-tab"
                       class="o2-custom-select-dashboard"
@@ -169,7 +171,7 @@ import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
@@ -256,8 +258,8 @@ export default defineComponent({
     ];
 
     const filterOptions = [
-      { label: "AND", value: "AND" },
-      { label: "OR", value: "OR" },
+      { label: raw("AND"), value: "AND" },
+      { label: raw("OR"), value: "OR" },
     ];
 
     const computedLabel = (condition: any) => {
@@ -344,6 +346,7 @@ export default defineComponent({
       computedLabel,
       labelParts,
       t,
+      raw,
       filterStreamFn,
       filterOptions,
       filterListFn,

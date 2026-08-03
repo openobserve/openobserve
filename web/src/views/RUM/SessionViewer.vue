@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="qp-2"
-    :title="sessionDetails.id || t('rum.sessionReplay')"
+    :title="sessionDetails.id ? raw(sessionDetails.id) : t('rum.sessionReplay')"
     :back="{
       label: t('rum.sessionReplay'),
       onClick: () => router.back(),
@@ -132,7 +132,7 @@ import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";

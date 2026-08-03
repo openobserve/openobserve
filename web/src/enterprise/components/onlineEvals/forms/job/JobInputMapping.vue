@@ -189,7 +189,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -220,7 +220,7 @@ const props = withDefaults(
     inputMappings: Record<string, Record<string, string>>;
     spanSelectors?: SpanSelector[];
     spanSelectorBindings?: Record<string, string>;
-    streamFields?: Array<{ label: string; value: string; type: string }>;
+    streamFields?: Array<{ label: I18nText; value: string; type: string }>;
   }>(),
   {
     spanSelectors: () => [],
@@ -269,7 +269,7 @@ const mappingOptions = computed<SelectOption[]>(() => {
       const value = mappingExpression(name);
       systemValues.add(value);
       options.push({
-        label: name,
+        label: raw(name),
         value,
       });
     });
@@ -280,7 +280,8 @@ const mappingOptions = computed<SelectOption[]>(() => {
     const value = mappingExpression(field.value);
     if (systemValues.has(value) || seenAttributes.has(value)) return [];
     seenAttributes.add(value);
-    return [{ label: field.label, value }];
+    // Span-attribute names come from the stream schema — not translated copy.
+    return [{ label: raw(field.label), value }];
   });
 
   if (attributeOptions.length) {

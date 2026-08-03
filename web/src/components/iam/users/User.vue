@@ -258,7 +258,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
 import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
@@ -467,7 +467,7 @@ export default defineComponent({
     ]);
     const isBuiltinRole = (r: string) => BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
     const userEmail: any = ref("");
-    const options = ref<{ label: string; value: string }[]>([]);
+    const options = ref<{ label: I18nText; value: string }[]>([]);
     const customRoles = ref<string[]>([]);
     const selectedRole = ref();
     const currentUserRole = ref("");

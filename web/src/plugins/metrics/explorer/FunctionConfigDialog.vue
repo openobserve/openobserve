@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="modelValue"
-    :title="card.name"
+    :title="raw(card.name)"
     size="xl"
     data-test="metrics-fn-config"
     @update:open="$emit('update:modelValue', $event)"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ORadio
           size="xs"
           :value="variant.id"
-          :label="variant.label"
+          :label="variantLabel(variant)"
           :data-test="`metrics-fn-radio-${variant.id}`"
         />
 
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="p"
             size="xs"
             :model-value="isChecked(variant, p)"
-            :label="`p${p}`"
+            :label="raw(`p${p}`)"
             :disabled="isOnlyChecked(variant, p)"
             :data-test="`metrics-fn-percentile-${variant.id}-${p}`"
             @update:model-value="togglePercentile(variant, p)"
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import MetricCardChart from "./MetricCardChart.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -299,6 +299,13 @@ export default defineComponent({
 
     const variants = computed<any[]>(() => props.defaults?.variants ?? []);
     const variantById = (id: string) => variants.value.find((v) => v.id === id) ?? null;
+
+    // `metricDefaults` is a Vue-free module evaluated at import time, so it
+    // stores an i18n KEY (`labelKey`) instead of resolved text. Translate it
+    // HERE, on every render, so the variant names follow the active locale.
+    // `label` remains for names built from live data ("Top 5 by pod").
+    const variantLabel = (variant: any): I18nText =>
+      variant?.labelKey ? t(variant.labelKey) : (variant?.label ?? raw(""));
 
     /* ----------------------------------------------------------- selection */
 
@@ -548,8 +555,10 @@ export default defineComponent({
     const onRestore = () => emit("restore");
 
     return {
+      raw,
       t,
       variants,
+      variantLabel,
       selectedId,
       select,
       isChecked,

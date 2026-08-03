@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="incidentStatus"
             :value="row.status"
-            :label="getStatusLabel(row.status)"
+            :label="raw(getStatusLabel(row.status))"
             size="sm"
             data-test="incident-status-badge"
           />
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unit="us"
             mode="relative"
             :timezone="store.state.timezone"
-            empty-label="—"
+            :empty-label="raw('—')"
           />
         </template>
         <template #cell-actions="{ row }">
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
@@ -813,6 +813,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       loading,
       allIncidents,

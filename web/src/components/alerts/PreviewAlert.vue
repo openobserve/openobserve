@@ -50,7 +50,7 @@ import { reactive } from "vue";
 import { onBeforeMount } from "vue";
 import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1013,7 +1013,7 @@ const refreshData = () => {
   ];
 
   let yAxis: Array<{
-    label: string;
+    label: I18nText;
     alias: string;
     column: string;
     color: string | null;
@@ -1080,7 +1080,7 @@ const refreshData = () => {
     // Configure y-axis for zo_sql_num (counts)
     yAxis = [
       {
-        label: "count",
+        label: raw("count"),
         alias: "zo_sql_num",
         column: "zo_sql_num",
         color: "#5960b2",

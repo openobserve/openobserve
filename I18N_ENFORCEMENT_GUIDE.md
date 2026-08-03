@@ -3,13 +3,28 @@
 How the OpenObserve web app guarantees that user-facing text is translatable, and
 what to do when a check fires.
 
-**Status: enforcement complete and green.** `lint:ci` 0 errors · `type-check:app`
-0 errors · spec-inclusive `type-check` 0 errors · `format:check` clean.
+**Status: enforcement complete.** `lint:ci` 0 errors · `type-check:app` **exit 0**
+(with `--composite false`, which the npm script passes, no TS6307 surfaces) ·
+`format:check` clean.
+
+> **Known measurement gap:** the "spec-inclusive" `type-check` (tsconfig.vitest.json)
+> currently checks **no spec files at all** — its include is `src/**/*.spec.{ts,js}`,
+> and TypeScript globs do **not** brace-expand, so the pattern matches nothing.
+> Any past "spec-inclusive type-check 0 errors" claim was vacuous. Fixing it means
+> splitting the include into `src/**/*.spec.ts` + `src/**/*.spec.js` AND then fixing
+> the spec-only type errors that surface (e.g. `metricGrouping.spec.ts` assigns keys
+> that don't exist in en-US to `I18nKey` fixtures). Tracked in §9.
 
 The mechanisms are done and so is the message cleanup — **0 fake plurals** remain in
-en-US. What is left is narrower: **non-English plural rules**, the last **6 `gt` sites**,
-and **one CI gap**. See [§9 Outstanding work](#9-outstanding-work) — that section is the
-to-do list, kept in sync with measurements.
+en-US, the 10 surviving `gt()` calls are each individually justified (§8), `TEXT_ATTRS`
+has been retired in favour of prop types (§8), and the dead-key sweep is complete (§9).
+What is left is narrower: **non-English plural rules** and **spec type-checking**
+(a broken tsconfig glob plus a missing PR gate, §9.3). See
+[§9 Outstanding work](#9-outstanding-work) — that section is the to-do list, kept in
+sync with measurements.
+
+Converting the 71 dynamic key sites so they can be type-checked was **considered and
+declined** — it is recorded under §4 as an accepted limit, not pending work.
 
 ---
 
@@ -89,11 +104,11 @@ only two remaining `(s)` values are the seconds unit. Keep it that way.
 `{{ t('common.save') }}` · `:label="t('x')"` · `:label="row.name"` (a variable
 contributes no literal) · `:label="'—'"` (no letters).
 
-### Two curated lists
+### One curated list
 
-- **`TEXT_ATTRS`** (47 names) — props that carry user-facing text. Feeds both the
-  static and bound rules, so "what counts as a text prop" is defined once. **Add a
-  name here when a component takes UI text through a new prop.**
+`TEXT_ATTRS` is **gone** — prop types now decide what counts as a text prop, so there
+is no list to maintain (§8). Declaring a prop `I18nText` is what makes it enforced.
+
 - **`NON_TRANSLATABLE`** (39 entries) — tokens that must read identically in every
   language: units (`px`, `ms`, `ns`, `min`), symbols (`×`, `→`, `~`), protocol and
   spec identifiers (`GET`, `UTC`, `SQL`, `PromQL`, the OpenTelemetry statuses
@@ -121,7 +136,7 @@ follows a pattern the library already used for icons (`iconLeft?: IconName`).
 | **`I18nKey`**        | a field holding an **i18n key as data** (`titleKey`, `labelKey`)            |
 | **`useI18nTyped()`** | replaces `useI18n()` in components — `t` returns `I18nText`                 |
 | **`TranslateFn`**    | the type of `t` when a composable/util takes it as a **parameter**          |
-| **`gt()`**           | last resort for genuinely context-free code — **1 file**, see below         |
+| **`gt()`**           | last resort for genuinely context-free code — **4 files**, see below        |
 | **`raw()`**          | the explicit opt-out for text that must not be translated                   |
 
 ```ts
@@ -155,7 +170,7 @@ presets.ts(76,5): error TS2820: Type '"emptyState.noLogs.titel"' is not assignab
   to type 'I18nKey'. Did you mean '"emptyState.noLogs.title"'?
 ```
 
-Cost: **~31 s** for the full app type-check with the 10,665-key union. Not a
+Cost: **~31 s** for the full app type-check with the ~9,800-key union. Not a
 perf concern.
 
 ### Getting a `t`: three cases, in order of preference
@@ -179,7 +194,7 @@ perf concern.
    }
    ```
 
-   This is the standard for non-component code (**27 files**). It is preferred over
+   This is the standard for non-component code (**35 files**). It is preferred over
    `gt()` because these functions are also called directly by specs, outside any
    component, where `useI18n()` would throw. Specs pass the real translator:
 
@@ -192,13 +207,27 @@ perf concern.
    composable translates, `t` belongs on that function, not on the composable.
 
 3. **Genuinely context-free code** → `gt("some.key")`. Only where there is neither a
-   setup context nor a caller to thread `t` through. Exactly **one** file qualifies:
-   `useUnauthorizedErrorGrouper.ts`, reached from an axios 403 interceptor registered
-   once at module load (interceptor → 300 ms `setTimeout` → toast → click handler).
+   setup context nor a caller to thread `t` through. Exactly **four** files qualify
+   (10 call sites), each for a distinct structural reason:
+
+   - `useUnauthorizedErrorGrouper.ts` (6) — reached from an axios 403 interceptor
+     registered once at module load (interceptor → 300 ms `setTimeout` → toast →
+     click handler). The founding case.
+   - `ingestion/setupCard/content/kubernetes.ts` (2) — the setup-card registry pins
+     every builder to `(subs: CardSubstitutions) => RichCardContent`; threading `t`
+     would change that shared contract for ~20 cards. Static prose in cards uses
+     `descriptionKey`/`helpKey` (renderer-resolved); `gt` covers only the one
+     description that interpolates a URL, translated at card-build time.
+   - `utils/query/searchError.ts` (1) — the translated **default** of an optional
+     `fallback: I18nText` parameter, evaluated per call; callers that hold `t`
+     override it (e.g. `parseSearchError(err, gt("search.unknownError"))`).
+   - `usePanelPromQLExecutor.ts` (1) — reached through composable chains that are
+     not guaranteed to run in a setup context, where `useI18n()` would throw.
 
    `gt` is deliberately a narrow escape hatch, not an alternative to case 2. Before
-   reaching for it, check whether a caller can pass `t` instead — 43 of the original
-   49 `gt` sites turned out to be case 2.
+   reaching for it, check whether a caller can pass `t` instead — the overwhelming
+   majority of historical `gt` sites (including the import validators and
+   `useQualityDetailCharts`, converted since) turned out to be case 2.
 
 > **Keys resolved at display time, not module load.** When storing keys as data, keep
 > the `I18nKey` map at module scope but resolve it inside the function that renders.
@@ -250,11 +279,18 @@ annotation is made by hand at the declaration rather than by a pattern match.
 | `t()` keys — literal                             | enforced (ESLint, `.vue` **and** `.ts`)           |
 | i18n keys stored as data                         | enforced (`I18nKey`, 19 files)                    |
 | Toast / notification text                        | enforced (`I18nText`, incl. the store + wrappers) |
-| Text reached via `useI18nTyped()`                | branded across **663** files                      |
+| Text reached via `useI18nTyped()`                | branded across **668** files                      |
 | Composables / utils taking `t: TranslateFn`      | **27** files                                      |
 
-**Numbers:** en-US grew 10,216 → **10,665 keys**; **311** sit under `toastMessages.*`
-(28 module groups). 62 `raw()` opt-outs. **6** `gt()` call sites, all in one file.
+**Numbers** (re-measured 2026-07-31, after the post-review debt cleanup): en-US holds
+**9,837 keys** across **72 namespaces** (10,216 → 11,002 as text was migrated in,
+→ 9,648 after the dead-key sweep §9, → 9,837 as the remaining hardcoded prose —
+import validators, setup-card descriptions, status labels, dialog buttons — was
+keyed); **309** sit under `toastMessages.*`. **977** `raw()` opt-outs — the count
+rose steeply when props became `I18nText`, since every genuinely non-translatable
+value (units, tokens, glyphs, API data) has to say so explicitly, then fell as
+`raw()`-wrapped prose was converted to keys. **10** `gt()` call sites in **4**
+files (see §3 case 3 for the per-file justification).
 
 **Where the two checkers divide.** `no-missing-keys` validates `t('x.y')` **calls**;
 it cannot see a key assigned to a field. Keys stored as **data** are validated instead
@@ -264,27 +300,54 @@ be green to claim key coverage; neither alone is sufficient.
 
 ### Not covered
 
-- **Dynamic keys** — ``t(`about.feature_${id}`)`` (**312** sites). No lint or type
-  check can resolve these. The `t` key parameter is deliberately permissive
-  (`I18nKey | (string & {})`) so they keep compiling.
+- **Dynamic keys — 71 sites. Considered and DECLINED; do not re-open as pending work.**
+
+  ``t(`about.feature_${id}`)`` and similar. A renamed or deleted key reached this way is
+  caught by nothing: ESLint sees no literal, `t`'s permissive
+  `I18nKey | (string & {})` parameter accepts any string, vue-i18n returns the key
+  instead of throwing, and the production build strips its dev warning. It renders the
+  raw dotted path on screen.
+
+  Nothing is currently broken — every key these sites can request was expanded and
+  verified present. The exposure is a future rename, concentrated in `onlineEvals`
+  (40 of the 71 sites).
+
+  Closing it would mean removing the `(string & {})` arm, which surfaces **117 errors**:
+  ~80 are unrelated consumers declaring their translator loosely as
+  `(key: string) => string` (a contravariance failure, not a key problem), 15 need a
+  variable widened to a literal union, 9 need a `Record<string, I18nKey>` map, and a
+  handful are genuine key/code mismatches. Two-thirds of the work is therefore not about
+  dynamic keys at all, which is why this was judged not worth it as a standalone project.
+
+  If the guarantee is ever wanted, the cheap route is a second strict export
+  (`(key: I18nKey)`) used by new code only — no flag day, no 98-file PR.
+
+  > Count these with a word boundary: `grep 't(\`'` also matches `` fetch(`…`) `` and any
+other call ending in `t`, which inflates the figure roughly fourfold. A further 21
+  > sites use backticks but interpolate nothing — those are ordinary static keys.
+
 - **Interfaces not yet annotated.** `I18nText` guards what it is applied to. That is
   _incomplete_, never _wrong_ — coverage grows one declaration at a time, at the
   definition site, with no central registry to keep in sync.
 - **Other locales.** The 14 non-en locales are generated from en-US and lag behind;
   `localeDir` points at en-US only, on purpose. Never hand-edit them.
-- **Unused keys.** `@intlify/vue-i18n/no-unused-keys` is available but **not
-  enabled**. Measured on this repo it reports 2,421 keys of which only ~1,302 are
-  genuinely dead — 681 are reached via a key-string, 437 via a dynamic prefix. If
-  you enable it, use `warn`, never `enableFix`, and populate `ignores` with the
-  dynamic prefixes; its autofix would delete live translations.
+- **Unused keys.** `@intlify/vue-i18n/no-unused-keys` is available but **not enabled**.
+  It reports 2,421 keys, but it only sees `t('literal')` calls — so keys reached
+  through a variable or a dynamic prefix look unused to it, and its autofix would
+  delete them. A direct measurement (literal tokens + dynamic prefixes + the one
+  concatenation site) put the genuinely dead set at **1,363**, since deleted (§9).
+  If you ever enable the rule, use `warn`, never `enableFix`, and populate `ignores`
+  with the dynamic prefixes. Note that even the direct measurement missed 9 live keys
+  (§9) — no automated sweep sees keys held in JSON data files.
 
 ---
 
 ## 5. Deliberately deferred: `strictTemplates`
 
-Typing a component prop `label: I18nText` only gates `<OButton label="Save" />` if
-Vue's `strictTemplates` is on. It is **not** enabled, which is why `TEXT_ATTRS`
-still exists.
+A **declared** prop typed `label: I18nText` gates `<OButton label="Save" />` with or
+without `strictTemplates` — declared props are always checked. `strictTemplates`
+governs **undeclared** attributes only. This was verified by probe, and it is what
+allowed `TEXT_ATTRS` to be retired (§8) while `strictTemplates` stays off.
 
 Measured twice on this branch:
 
@@ -297,10 +360,9 @@ Of those, ~303 are genuine `TS2322` type mismatches (real latent bugs); the rest
 undeclared pass-through attributes.
 
 **It was left out on purpose.** It is a large _type-safety_ migration, not i18n work,
-and its i18n payoff is only retiring the `TEXT_ATTRS` list — whose real gap was
-measured at **five sites** (all fixed here: `reveal-tooltip`, `hide-tooltip`,
-`unstable-dimension-tooltip`, `date-disabled-tooltip`). Worth doing as its own PR;
-not worth burying this one under 2,655 unrelated errors.
+and it turned out to carry **no i18n payoff at all** — retiring `TEXT_ATTRS` did not
+require it. Worth doing as its own PR for the ~303 genuine `TS2322` mismatches; not
+worth burying this one under 2,655 unrelated errors.
 
 ---
 
@@ -320,8 +382,17 @@ not worth burying this one under 2,655 unrelated errors.
 | A recurring unit/symbol/code token                   | add to `NON_TRANSLATABLE` with a one-line reason                                                      |
 | A whole file that is genuinely code                  | add to the SyntaxGuide exemption block                                                                |
 
-New text-carrying **component prop** → add its name to `TEXT_ATTRS`.
+New text-carrying **component prop** → declare it `I18nText`. In `<script setup>`,
+`defineProps<{ label: I18nText }>()`. In the Options API the double cast is required,
+because `StringConstructor` resolves to an unbranded `string`:
+
+```ts
+title: { type: String as unknown as PropType<I18nText>, default: raw("") }
+```
+
 New **interface field** carrying text or a key → declare it `I18nText` / `I18nKey`.
+New **i18n key stored in a `.json` data file** → add it to the `localeKeys.spec.ts`
+guard; no type or lint rule can see it (§9).
 
 ---
 
@@ -397,10 +468,25 @@ Recorded so they are not re-reported as open:
 - **Verb injection.** 5 messages interpolated an English verb into a sentence
   (`"Failed to {action} the alert"`), which is unlocalisable word order; each is now a
   complete message per case.
-- **`gt` proliferation.** 49 sites / 22 files → **6 sites / 1 file**, by passing
-  `t: TranslateFn` (§3, case 2).
+- **`gt` proliferation.** 49 sites / 22 files → **10 sites / 4 files**, by passing
+  `t: TranslateFn` (§3, case 2). The audit (2026-07-31) converted every site whose
+  caller could supply `t` — the onlineEvals import validators now take `t` via their
+  `ctx`, `useQualityDetailCharts` and `computePrefixAssignment` take it as a
+  parameter. The 10 that remain are each structurally unable to receive a `t`
+  (axios interceptor, fixed registry contract, optional-param default, non-setup
+  composable chain — the per-file list is in §3 case 3) and are **intentional and
+  final**. Two alternatives were considered and rejected: deferring keys to render
+  time, and injecting a translator at the composition root. `gt` stays exported as
+  a deliberate, narrow escape hatch; **do not re-raise this as cleanup.**
 - **The `useI18n` import ban** is clean tree-wide. The only remaining `vue-i18n` import
   outside the exempt paths is `createI18n` in a test fixture, which the ban permits.
+- **`TEXT_ATTRS` is gone.** The 47-name attribute allowlist and the bound-prop half of
+  `local/no-bare-bound-text-props` were deleted; prop types now do that job (§3). A
+  declared `I18nText` prop is checked in templates **without** `strictTemplates` —
+  `strictTemplates` governs _undeclared_ attributes only, so §5 is not a blocker for
+  this. Type checking is also _stricter_ than the old rule: it rejects a plain `string`
+  variable, which the rule allowed. `vue/no-bare-strings-in-template` stays enabled,
+  because a bare text node has no prop to annotate; `NON_TRANSLATABLE` still feeds it.
 - **Fake plurals everywhere else.** The remaining 104 `(s)` messages are gone — pipe
   plurals went 53 → **139**. Breakdown of how they were fixed:
   - 69 already interpolated `{count}`/`{n}`, so the call sites were already correct and
@@ -424,9 +510,50 @@ Recorded so they are not re-reported as open:
 
 ## 9. Outstanding work
 
-Ordered by value. Item 3 is the cheapest; item 1 is the only user-visible one.
+### ~~1. Delete dead keys from `en-US.json`~~ — done
 
-### 1. Non-English plural rules (`pluralRules`)
+`en-US.json` went from **11,002 → 9,648 keys** (75 → 71 namespaces, ~90 KB smaller).
+1,363 keys were deleted and **9 were restored** after audit; see below. (The count
+has since grown again to **9,837 / 72 namespaces** as the post-review debt cleanup
+keyed the remaining hardcoded prose — that growth is live keys, not resurrected
+dead ones.)
+
+**What the scan excluded up front.** Keys with a literal reference in prod code or
+specs, keys reachable through a dynamic prefix (a conservative exclusion — spared
+because a dynamic key _might_ reach them, not because they are proven live), and the
+5 keys reachable through the one concatenation site (`utils/common.ts`, `"message." +
+code`).
+
+**The audit that followed, and why it mattered.** Six independent read-only agents
+re-checked all 1,363 deletions, each told to hunt specifically for what a
+quoted-literal scan structurally cannot see. They found **9 genuine false deletions**
+across two distinct blind spots — both now closed by guards that were verified to
+fail when the key is removed:
+
+| Blind spot                                                        | Keys | Guard added                                                   |
+| ----------------------------------------------------------------- | ---- | ------------------------------------------------------------- |
+| Keys living in a **JSON data file** (`constants/features.json`)   | 5    | `localeKeys.spec.ts` — resolves every key features.json cites |
+| Template literal **assigned to a variable** before reaching `t()` | 4    | `useGreeting.ts` — `const key: I18nKey = …`                   |
+
+The first is the more important lesson: TypeScript widens imported JSON string values
+to `string`, so keys stored in a data file cannot be typed as `I18nKey` and are
+invisible to _every_ static check. Annotating `FeatureAvailability` documents intent
+but **does not enforce** — `FEATURE_REGISTRY` casts with `as`, and the widening defeats
+it regardless. Only the spec guard actually catches this.
+
+**If you delete keys again.** Regenerate the list (the set moves as code changes) and
+scan **`.json`/`.md`/`.yaml` as well as `.ts`/`.vue`** — the original sweep read only
+JS/TS and that is exactly how the features.json keys were lost. Never use
+`no-unused-keys --fix`: it shares the blind spot and would delete the dynamic-reachable
+keys. `no-missing-keys` and `I18nKey` together catch an over-delete of any _literal_
+reference, but neither sees the two cases above.
+
+**Other locales.** The 14 non-English files still carry ~1,317 of the deleted keys.
+This is expected and self-healing: `scripts/translations/README.md` documents the
+pipeline as pruning keys removed from `en-US.json`. Harmless meanwhile — nothing
+requests them and en-US is the fallback.
+
+### 2. Non-English plural rules (`pluralRules`)
 
 The en-US messages are now real pipe plurals, but **branch selection still uses
 vue-i18n's built-in default for every locale** because this repo configures no
@@ -444,26 +571,47 @@ generated and must not be hand-edited, so they keep their `(s)` until regenerate
 This degrades safely: if en-US has a pipe and fr-FR does not, vue-i18n returns the
 French message unchanged rather than mis-selecting a branch.
 
-### 2. The last 6 `gt()` sites
+### 3. Spec type-checking does not exist — anywhere
 
-`useUnauthorizedErrorGrouper.ts`. Blocked on architecture, not effort — see §3 case 3
-for why there is no caller to thread `t` through. Two designs were considered and
-rejected (deferring keys to render time; injecting a translator at the composition
-root). Closing this is what would allow `gt` to be deleted from `types/i18n.ts`
-entirely.
+Two separate problems compound here.
 
-### 3. Spec-inclusive `type-check` does not gate PRs
+**First, the config is broken.** `tsconfig.vitest.json`'s include is
+`src/**/*.spec.{ts,js}` — but TypeScript globs do **not** support brace expansion,
+so the pattern matches **zero files**. `npm run type-check` "passes" in seconds
+because it checks nothing but `vitest.config.ts`/`vite.config.ts` (verify with
+`npx tsc -p tsconfig.vitest.json --listFilesOnly`). Any past claim that the tree
+is "green under both configs" was vacuous. Additionally, the npm script's
+`NODE_OPTIONS=…` prefix is POSIX-only, so `npm run type-check` errors outright on
+Windows shells.
 
-`unit-tests.yml` runs `type-check:app`, which **excludes specs**. The spec-inclusive
-`type-check` runs only in `npm-update.yml`, a scheduled dependency job — so a spec that
-fails to compile can reach `main`. Adding one step to `unit-tests.yml` closes it, and
-the tree is currently green under both, so it would go in clean.
+**Second, even a working spec type-check would not gate PRs.** `unit-tests.yml`
+(the PR gate) runs only `type-check:app`, which excludes specs. Vitest transpiles
+through esbuild, which strips types without checking them, so a type-broken spec
+still runs and can pass while testing the wrong thing. This branch hit exactly
+that — when `useDashboardPanelData()` gained its `t` parameter, **55 specs** kept
+the old signature while `type-check:app` reported 0 errors.
+
+Fix is two steps, in order:
+
+1. Split the include in `tsconfig.vitest.json` into `src/**/*.spec.ts` and
+   `src/**/*.spec.js`, run it, and fix what surfaces — spec-only type errors exist
+   today (e.g. `metricGrouping.spec.ts` assigns non-existent keys to `I18nKey`
+   fixtures), so expect this to start **red**, not clean.
+2. Then add the step next to the existing one in `unit-tests.yml`:
+
+```yaml
+- name: Type-check specs (any error fails)
+  working-directory: web
+  run: npm run type-check
+```
 
 ### 4. Standing limits (accepted, not scheduled)
 
-- **312 dynamic keys** — unresolvable by design (§4).
-- **`no-unused-keys` not enabled** — ~1,302 genuinely dead keys of the 2,421 it
-  reports; its autofix would delete live translations (§4).
+- **71 dynamic keys** — conversion considered and **declined**; see §4 for the full
+  reasoning and what closing it would cost.
+- **`no-unused-keys` not enabled** — it reports 2,421 keys but shares the blind spot
+  that makes ~1,000 of those false positives, and its autofix deletes what it flags.
+  The dead-key cleanup in §9.1 uses a directly-measured list instead (§4).
 - **`strictTemplates` deferred** — 2,655 errors, a type-safety migration rather than
   i18n work (§5).
 - **`eslint.config.js` duplicate rule keys** — `prettier/prettier` appears 3×,

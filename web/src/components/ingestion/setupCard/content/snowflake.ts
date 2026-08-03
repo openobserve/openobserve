@@ -18,6 +18,8 @@
 // The snowflake receiver is account-based (no host/port) and the guide pins the
 // collector to v0.92.0 (newer builds have a known float→int conversion bug).
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
@@ -64,9 +66,9 @@ export default function snowflakeCard(subs: CardSubstitutions): RichCardContent 
       collectorInstallStep(SNOWFLAKE_COLLECTOR_VERSION),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — replace the `<…>` values inline.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorSnowflakeDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
@@ -76,17 +78,17 @@ export default function snowflakeCard(subs: CardSubstitutions): RichCardContent 
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or check Streams for the `snowflake_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifySnowflakeMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["Storage Bytes", "Query Count", "Billing Credits", "Logins", "Warehouse Usage"],

@@ -33,7 +33,7 @@ import useSearchConnection from "@/composables/useLogs/useSearchConnection";
 import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
-import type { TranslateFn } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 // `t` injected: reached from other composables, never a setup context.
 export const useSearchStreamRefactored = (t: TranslateFn) => {
@@ -121,7 +121,7 @@ export const useSearchStreamRefactored = (t: TranslateFn) => {
             breakdownField: null,
             breakdownSeries: null,
             chartParams: {
-              title: "",
+              title: raw(""),
               unparsed_x_data: [],
               timezone: "",
             },

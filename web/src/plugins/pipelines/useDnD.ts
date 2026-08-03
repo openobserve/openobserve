@@ -20,7 +20,7 @@ import { watch, reactive } from "vue";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { TranslateFn } from "@/types/i18n";
+import type { TranslateFn, I18nText } from "@/types/i18n";
 
 const dialogObj = {
   show: false,
@@ -60,12 +60,12 @@ const defaultObject = {
   },
   dialog: dialogObj,
   nodeTypes: [] as Array<{
-    label: string;
+    label: I18nText;
     icon: string;
     isSectionHeader: boolean;
     subtype?: string;
     io_type?: string;
-    tooltip?: string;
+    tooltip?: I18nText;
   }>,
   // Node rail open/closed. Lives here rather than in PipelineEditor because the
   // toggle sits in Vue Flow's control stack (PipelineFlow) while the rail it

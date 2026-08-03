@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
+import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -75,7 +75,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   // both enterprise and cloud builds, gated on the ai_enabled runtime flag.
   const aiEnabled = isEnt && !!store.state.zoConfig.ai_enabled;
 
-  const groups: { label: string; items: SectionHubItem[] }[] = [
+  const groups: SectionHubGroup[] = [
     {
       label: t("iam.sectionAccess"),
       items: [

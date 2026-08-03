@@ -55,7 +55,7 @@
 import { defineComponent, ref, toRef, watch, type Ref, toRefs } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -79,8 +79,8 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
     const operatorOptions = [
-      { label: "=", value: "=" },
-      { label: "!=", value: "!=" },
+      { label: raw("="), value: "=" },
+      { label: raw("!="), value: "!=" },
     ];
     const options = toRef(props.variableItem, "options");
     const { modelValue: adhocVariables } = toRefs(props) as {
@@ -121,6 +121,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       fieldsFilterFn,
       fieldsFilteredOptions,
       addFields,

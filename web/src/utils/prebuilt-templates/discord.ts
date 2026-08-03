@@ -101,7 +101,7 @@ export const discordConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.discordWebhookUrl",
       type: "text",
       required: true,
-      hint: "Get your webhook URL from Discord channel settings",
+      hintKey: "alerts.prebuiltDestinations.discordWebhookUrlHint",
       validator: (url: string) => {
         const invalid = { key: "alerts.prebuiltDestinations.invalidDiscordWebhookUrl" };
         try {
@@ -122,7 +122,7 @@ export const discordConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.discordUsername",
       type: "text",
       required: false,
-      hint: "Custom username for the webhook bot",
+      hintKey: "alerts.prebuiltDestinations.discordUsernameHint",
     },
   ],
 };

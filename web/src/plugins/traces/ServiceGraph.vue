@@ -11,7 +11,7 @@
       >
         <OSelect
           :model-value="streamFilter"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          :options="availableStreams.map((s) => ({ label: raw(s), value: s }))"
           labelKey="label"
           valueKey="value"
           class="rounded-default w-auto flex-shrink-0"
@@ -365,7 +365,7 @@ import {
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -1869,6 +1869,7 @@ export default defineComponent({
     expose({ refresh: loadServiceGraph, loading, lastRunAt });
 
     return {
+      raw,
       t,
       loading,
       error,

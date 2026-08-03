@@ -17,7 +17,7 @@
 // `ColumnOverrideUI` shape and (de)serializes to/from the persisted
 // `config.override_config` array on load/save.
 
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
 
 // null means "not set" → renderer falls back to the panel-level default.
@@ -178,8 +178,8 @@ export const serializeOverrides = (cols: ColumnOverrideUI[]): any[] =>
 
 /** Canonical unit dropdown options shared by panel config and the dialog. */
 export const getUnitOptions = (
-  t: (key: string) => string,
-): Array<{ label: string; value: string | null }> => [
+  t: TranslateFn,
+): Array<{ label: I18nText; value: string | null }> => [
   { label: t("dashboard.default"), value: null },
   { label: t("dashboard.numbers"), value: "numbers" },
   { label: t("dashboard.localeFormat"), value: "locale" },

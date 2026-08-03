@@ -70,7 +70,7 @@ export const pagerdutyConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.pagerdutyIntegrationKey",
       type: "password",
       required: true,
-      hint: "Get your integration key from PagerDuty service settings",
+      hintKey: "alerts.prebuiltDestinations.pagerdutyIntegrationKeyHelp",
       validator: (key: string) =>
         key.length === 32 || {
           key: "alerts.prebuiltDestinations.pagerdutyIntegrationKeyLength",

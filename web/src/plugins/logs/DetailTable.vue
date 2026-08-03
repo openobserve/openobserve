@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tabItem.name"
             :data-test="tabItem.dataTest"
             :name="tabItem.name"
-            :label="tabItem.label"
+            :label="raw(tabItem.label)"
           />
         </OTabs>
       </div>
@@ -429,7 +429,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -575,14 +575,14 @@ export default defineComponent({
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "table");
     const selectedRelativeValue = ref<number>(10);
-    const recordSizeOptions = ref<Array<{ label: string; value: number }>>([
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "200", value: 200 },
-      { label: "500", value: 500 },
-      { label: "1000", value: 1000 },
+    const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
+      { label: raw("10"), value: 10 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
+      { label: raw("200"), value: 200 },
+      { label: raw("500"), value: 500 },
+      { label: raw("1000"), value: 1000 },
     ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
@@ -1000,6 +1000,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       router,

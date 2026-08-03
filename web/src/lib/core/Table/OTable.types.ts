@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { Component } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
 
@@ -206,7 +208,7 @@ export interface OTableProps<TData = any> {
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
   /** Label shown bold in the footer as "N footerTitle" (e.g. "2 Dashboards") */
-  footerTitle?: string;
+  footerTitle?: I18nText;
 
   // ── Selection ──
   selection?: OTableSelectionMode;
@@ -290,7 +292,7 @@ export interface OTableProps<TData = any> {
   streaming?: boolean;
   error?: string | null;
   /** Text shown when data is empty and not loading */
-  emptyMessage?: string;
+  emptyMessage?: I18nText;
   dense?: boolean;
   bordered?: boolean;
   /**

@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OStep
                   data-test="cipher-key-key-store-detils-step"
                   :name="1"
-                  :title="step1Title"
+                  :title="raw(step1Title)"
                   icon="edit"
                   :done="step > 1"
                 >
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { ref, computed, onMounted, onActivated } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import AddOpenobserveType from "@/components/cipherkeys/AddOpenobserveType.vue";
@@ -204,8 +204,8 @@ const pendingContinue = ref(false);
 const originalData = ref("");
 
 const cipherKeyTypes = [
-  { label: "OpenObserve", value: "local" },
-  { label: "Akeyless", value: "akeyless" },
+  { label: raw("OpenObserve"), value: "local" },
+  { label: raw("Akeyless"), value: "akeyless" },
 ];
 
 const dialog = ref({

@@ -199,8 +199,8 @@ export default defineComponent({
 
     const copyToClipboardFn = (content: any) => {
       copyToClipboard(content.innerText, t, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {

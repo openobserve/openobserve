@@ -25,6 +25,8 @@
  * trivially unit-testable.
  */
 
+import type { I18nKey } from "@/types/i18n";
+
 // ── Stream + field config (the single source of truth) ────────────────────
 
 export const SYNTHETIC_RESULTS_STREAM = "synthetics_results";
@@ -55,10 +57,10 @@ export const STATUS_VALUES = {
  * Canonical set of known device IDs and their display properties.
  * When the backend adds new devices, add them here only.
  */
-export const KNOWN_DEVICES: Record<string, { label: string; icon: string }> = {
-  desktop: { label: "Desktop", icon: "computer" },
-  tablet: { label: "Tablet", icon: "tablet" },
-  mobile: { label: "Mobile", icon: "smartphone" },
+export const KNOWN_DEVICES: Record<string, { labelKey: I18nKey; icon: string }> = {
+  desktop: { labelKey: "synthetics.browserDevices.desktop", icon: "computer" },
+  tablet: { labelKey: "synthetics.browserDevices.tablet", icon: "tablet" },
+  mobile: { labelKey: "synthetics.browserDevices.mobile", icon: "smartphone" },
 };
 
 /**
@@ -70,11 +72,11 @@ export function deviceIconName(deviceId: string): string {
 }
 
 /**
- * Resolve a device ID to its human-readable label.
- * Preserves casing of the stored label; falls back to the raw ID.
+ * Resolve a device ID to its label's i18n key; undefined for unknown IDs (the
+ * caller shows the raw ID). Key-only so this module stays pure (no vue-i18n).
  */
-export function deviceLabel(deviceId: string): string {
-  return KNOWN_DEVICES[deviceId]?.label ?? deviceId;
+export function deviceLabelKey(deviceId: string): I18nKey | undefined {
+  return KNOWN_DEVICES[deviceId]?.labelKey;
 }
 
 // ── Typed UI models (stable regardless of stream schema) ─────────────────

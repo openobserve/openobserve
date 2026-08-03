@@ -28,6 +28,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
+import { raw } from "@/types/i18n";
 
 // Walk the WHERE clause AST and replace column references whose name matches
 // a key in the fieldMapping (original field → stream-specific field).
@@ -638,7 +639,7 @@ export const useSearchQuery = () => {
           breakdownField: null,
           breakdownSeries: null,
           chartParams: {
-            title: "",
+            title: raw(""),
             unparsed_x_data: [],
             timezone: "",
           },

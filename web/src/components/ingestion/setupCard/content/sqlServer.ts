@@ -21,6 +21,8 @@
 // receiver connect, the single-receiver config exports, and `sqlserver_*` metric
 // streams land in OpenObserve. Reference: https://openobserve.ai/blog/monitor-sql-server-with-otel/
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
@@ -82,14 +84,14 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
     steps: [
       {
         id: "prepare",
-        title: "Prepare SQL Server",
-        description: "Create the monitoring login — run it in a SQL client, **not** your shell.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.prepareSqlServerTitle",
+        descriptionKey: "ingestion.setupCard.prepareSqlServerDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         completeOn: "copy",
         variants: [
           {
             id: "sqlcmd",
-            label: "sqlcmd",
+            label: raw("sqlcmd"),
             icon: tool.terminal,
             code: {
               lang: "bash",
@@ -99,7 +101,7 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
           },
           {
             id: "docker",
-            label: "Docker",
+            label: raw("Docker"),
             icon: tool.docker,
             code: {
               lang: "bash",
@@ -110,7 +112,7 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
           },
           {
             id: "sql-client",
-            label: "SQL Client (GUI)",
+            labelKey: "ingestion.setupCard.sqlClientGuiVariant",
             icon: getImageURL("images/ingestion/sqlserver.png"),
             code: { lang: "sql", raw: GRANT_SQL },
           },
@@ -119,9 +121,9 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         // No own toggle — follow the OS picked at the install step.
@@ -131,15 +133,15 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
         inputs: [
           {
             id: "server",
-            label: "SQL Server Host",
+            labelKey: "ingestion.setupCard.sqlServerHostLabel",
             default: "localhost",
-            placeholder: "localhost",
+            placeholder: raw("localhost"),
           },
           {
             id: "port",
-            label: "Port",
+            labelKey: "ingestion.setupCard.portLabel",
             default: "1433",
-            placeholder: "1433",
+            placeholder: raw("1433"),
             width: "sm",
           },
         ],
@@ -147,17 +149,17 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or check Streams for the `sqlserver_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifySqlserverMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: [

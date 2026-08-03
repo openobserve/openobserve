@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           type="fieldType"
           :value="tokenType"
-          :label="tokenType"
+          :label="raw(tokenType)"
           class="wcp__type-badge shrink-0 font-mono font-bold"
         />
         <span class="wcp__title text-compact text-text-heading truncate font-semibold">{{
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { wildcardChipColor, wildcardLabel } from "@/composables/useLogs/useTemplateTokenizer";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { WildcardDisplayValue } from "./useWildcardHover";

@@ -50,7 +50,7 @@
                   >
                     <!-- PromQL editor colours: teal functions, plain brackets -->
                     <AxisFieldChipLabel
-                      :label="computedLabel(element)"
+                      :label="raw(computedLabel(element))"
                       fn-class="text-promql-function"
                       bracket-class="text-text-body"
                       leading-fn
@@ -83,7 +83,7 @@
                         v-if="param.type === 'number'"
                         v-model.number="element.params[paramIndex] as number"
                         type="number"
-                        :label="param.name"
+                        :label="raw(param.name)"
                         class="showLabelOnTop mb-1.5"
                         :data-test="`promql-operation-param-${paramIndex}`"
                       />
@@ -92,8 +92,8 @@
                       <OInput
                         v-else-if="param.type === 'string'"
                         v-model="element.params[paramIndex] as string"
-                        :label="param.name"
-                        :placeholder="param.placeholder"
+                        :label="raw(param.name)"
+                        :placeholder="paramPlaceholder(param)"
                         class="showLabelOnTop mb-1.5"
                         :data-test="`promql-operation-param-${paramIndex}`"
                       />
@@ -103,7 +103,7 @@
                         v-else-if="param.type === 'select'"
                         v-model="element.params[paramIndex] as string[]"
                         :options="availableLabels"
-                        :label="param.name"
+                        :label="raw(param.name)"
                         multiple
                         searchable
                         class="operation-label-selector showLabelOnTop no-case mb-1.5"
@@ -167,7 +167,7 @@
           :key="category"
           :data-test="`operations-list-category-${category}`"
         >
-          <OCollapsible :default-open="true" :label="category">
+          <OCollapsible :default-open="true" :label="raw(category)">
             <div>
               <div
                 v-for="op in getFilteredOperationsForCategory(category)"
@@ -204,9 +204,9 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
-import { PromqlStep, PromqlStepSpec } from "@/components/promql/types";
+import { PromqlStep, PromqlStepArgSpec, PromqlStepSpec } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 
 const props = defineProps<{
@@ -261,6 +261,13 @@ const getItemKey = (item: PromqlStep, index: number) => {
 const getStepSpec = (id: string): PromqlStepSpec | undefined => {
   return promqlRenderer.getStepSpec(id);
 };
+
+// The step catalog is built once by a module-level singleton, so it stores an
+// i18n KEY (`placeholderKey`) for prose placeholders rather than resolved text.
+// Translate it HERE, on every render, so it follows the active locale. Example
+// values ("5m", "0.95") stay in `placeholder` — they are code tokens.
+const paramPlaceholder = (param: PromqlStepArgSpec): I18nText | undefined =>
+  param.placeholderKey ? t(param.placeholderKey) : param.placeholder;
 
 const getFilteredOperationsForCategory = (category: string): PromqlStepSpec[] => {
   const operations = promqlRenderer.getStepsForGroup(category);

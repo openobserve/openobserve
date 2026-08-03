@@ -684,12 +684,12 @@ const usageTemplates = [
 ];
 
 const operators = [
-  { label: ">", value: "gt" },
-  { label: ">=", value: "gte" },
-  { label: "<", value: "lt" },
-  { label: "<=", value: "lte" },
-  { label: "=", value: "eq" },
-  { label: "!=", value: "neq" },
+  { label: raw(">"), value: "gt" },
+  { label: raw(">="), value: "gte" },
+  { label: raw("<"), value: "lt" },
+  { label: raw("<="), value: "lte" },
+  { label: raw("="), value: "eq" },
+  { label: raw("!="), value: "neq" },
 ];
 
 // ── Field-array operations (whole-array setFieldValue; `formTiers`

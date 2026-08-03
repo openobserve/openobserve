@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { ref, onMounted, watch, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -203,7 +203,7 @@ const { getStreams } = useStreams(t);
 const createNewStream = ref(false);
 const isUpdating = ref(false);
 const isFetchingStreams = ref(false);
-const indexOptions = ref<{ label: string; value: string; disabled: boolean }[]>([]);
+const indexOptions = ref<{ label: I18nText; value: string; disabled: boolean }[]>([]);
 const schemaList = ref([]);
 const streams: any = ref({});
 const usedStreams: any = ref([]);
@@ -369,7 +369,7 @@ async function getStreamList() {
     streams.value[streamType] = res.list;
     schemaList.value = res.list;
     indexOptions.value = res.list.map((stream: any) => ({
-      label: stream.name,
+      label: raw(stream.name),
       value: stream.name,
       disabled: stream.isDisable || false,
     }));

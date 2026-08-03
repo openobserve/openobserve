@@ -43,14 +43,17 @@ import { formatLargeNumber } from "@/utils/formatters";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
 export const useHistogram = () => {
   const store = useStore();
+  const { t } = useI18nTyped();
   let { searchObj, notificationMsg, histogramMappedData, histogramResults, searchAggData } =
     searchState();
 
   const { fnParsedSQL, hasAggregation } = logsUtils();
 
-  const getHistogramTitle = () => {
+  const getHistogramTitle = (): I18nText => {
     try {
       const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
       const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
@@ -111,35 +114,31 @@ export const useHistogram = () => {
       const scanSizeLabel =
         searchObj.data.queryResults.result_cache_ratio !== undefined &&
         searchObj.data.queryResults.result_cache_ratio > 0
-          ? "Delta Scan Size"
-          : "Scan Size";
+          ? t("search.deltaScanSize")
+          : t("search.scanSize");
 
-      let title =
-        "Showing " +
-        startCount +
-        " to " +
-        endCount +
-        " out of " +
-        formatLargeNumber(totalCount) +
-        plusSign +
-        " events in " +
-        searchObj.data.queryResults.took +
-        " ms.";
+      // `plusSign` is a data suffix ("1.2K+"), not copy, so it rides along with
+      // the interpolated values rather than being a separate message part.
+      const titleParams = {
+        start: startCount,
+        end: endCount,
+        total: formatLargeNumber(totalCount) + plusSign,
+        took: searchObj.data.queryResults.took,
+      };
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {
-        title +=
-          " (" +
-          scanSizeLabel +
-          ": " +
-          formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-          plusSign +
-          ")";
+        return t("search.histogramTitleWithScan", {
+          ...titleParams,
+          scanLabel: scanSizeLabel,
+          scanSize: formatSizeFromMB(searchObj.data.queryResults.scan_size) + plusSign,
+        });
       }
-      return title;
+
+      return t("search.histogramTitle", titleParams);
     } catch (e: any) {
       console.error("Error while generating histogram title", e);
-      notificationMsg.value = "Error while generating histogram title.";
-      return "";
+      notificationMsg.value = t("search.histogramTitleError");
+      return raw("");
     }
   };
 

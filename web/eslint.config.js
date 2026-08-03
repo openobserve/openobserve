@@ -73,68 +73,6 @@ const noLegacyO2Tokens = {
   },
 };
 
-// User-facing text props. `vue/no-bare-strings-in-template` checks these as STATIC
-// attributes (label="Save"); the custom rule below checks the SAME names as BOUND
-// literals (:label="'Save'" / :label=`Save`). One list feeds both, so "what counts
-// as translatable text passed to a component" is defined in exactly one place —
-// add a prop name here when a component takes user-facing text through a new prop.
-// The a11y/native entries reproduce the built-in rule's defaults (we replace, not
-// extend, its attribute map). Component props are evidence-based (scan of web/src).
-const TEXT_ATTRS = [
-  "title",
-  "aria-label",
-  "aria-placeholder",
-  "aria-roledescription",
-  "aria-valuetext",
-  "alt",
-  "label",
-  "sub-label",
-  "sublabel",
-  "placeholder",
-  "hint",
-  "tooltip",
-  "message",
-  "content",
-  "help-text",
-  "caption",
-  "description",
-  "subtitle",
-  "header",
-  "empty-label",
-  "error-message",
-  "button-label",
-  "primary-button-label",
-  "secondary-button-label",
-  "confirm-text",
-  "cancel-text",
-  // Additional O2/app text props, discovered by scanning web/src for every
-  // `:prop="t(...)"` — a prop a dev already wraps in t() is by definition
-  // translatable text, so its STATIC / bound-literal form must be guarded too.
-  // Re-run that scan when adding text-carrying props and keep this in sync.
-  "sub-title",
-  "footer-title",
-  "dirty-title",
-  "action-label",
-  "ok-label",
-  "firing-label",
-  "neutral-button-label",
-  "filter-label",
-  "empty-message",
-  "no-match-text",
-  "search-placeholder",
-  "ai-placeholder",
-  "ai-tooltip",
-  "disable-ai-reason",
-  "full-time-prefix",
-  "legend-healthy",
-  "legend-avg",
-  "reveal-tooltip",
-  "hide-tooltip",
-  "unstable-dimension-tooltip",
-  "date-disabled-tooltip",
-];
-const TEXT_ATTR_SET = new Set(TEXT_ATTRS);
-
 // Non-translatable literal tokens — code/syntax/units that must stay identical in
 // every language (a CSS unit, a fixed filename, a documented template-variable token).
 // Fed to BOTH i18n rules so they pass WITHOUT a scattered inline eslint-disable
@@ -224,10 +162,12 @@ const BARE_STRING_DEFAULT_ALLOWLIST = [
 
 // Bans hardcoded text left directly in a <template> that the built-in
 // `vue/no-bare-strings-in-template` (STATIC attrs + text nodes only) can't see:
-//   • a BOUND text prop        — :label="'Save'" / :label=`Go`
 //   • a v-text / v-html literal — v-text="'Save'"
 //   • a text interpolation      — {{ 'Save' }}
-// so a dev can't dodge the check by adding a `:`, a v-text, or mustaches. t()-bound
+// so a dev can't dodge the check with a v-text or mustaches. (Bound text PROPS are
+// no longer checked here — every text prop is declared I18nText, which rejects a
+// bare literal, a composed expression, AND a plain string variable at type-check.)
+// t()-bound
 // and variable-bound values are expressions (not bare literals) so they correctly
 // pass; a literal with no letters (punctuation like '—') is skipped. Only BARE
 // literals are caught — composed expressions (:label="'a'+b", ternaries, `${x} y`)
@@ -298,12 +238,10 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
         const text = bareText(node.value && node.value.expression);
         if (text == null) return;
         if (dir === "bind") {
-          const arg = node.key.argument; // only :prop / v-bind:prop in the text-attr set
-          if (!arg || arg.type !== "VIdentifier" || !TEXT_ATTR_SET.has(arg.name)) return;
-          context.report({
-            node,
-            message: `Hardcoded text "${text}" in bound prop :${arg.name} — use t('...') with a key in en-US.json.`,
-          });
+          // Bound text props are now guarded by the TYPE, not by a name list: a
+          // prop declared `I18nText` rejects a bare literal (and a plain string
+          // variable) at type-check. See src/types/i18n.ts.
+          return;
         } else if (dir === "text" || dir === "html") {
           context.report({
             node,
@@ -399,19 +337,24 @@ export default [
       "@intlify/vue-i18n/no-missing-keys": "error",
       //
       // `no-bare-strings-in-template` (ERROR): no user-facing string typed straight
-      // into a <template> — text nodes AND static text props (label="Save"). We
-      // REPLACE the built-in attribute map with TEXT_ATTRS so component props, not
-      // just native title/alt/placeholder, are covered. Bound props (:label="'x'")
-      // are caught by the local rule below. (@intlify's own `no-raw-text` is NOT
-      // used — it flags ~1800 literals/punctuation and is too noisy to gate.)
+      // into a <template> TEXT NODE. (@intlify's own `no-raw-text` is NOT used —
+      // it flags ~1800 literals/punctuation and is too noisy to gate.)
+      //
+      // Props are NOT listed here any more. Every text-carrying prop is declared
+      // `I18nText` (src/types/i18n.ts), so `label="Save"`, `:label="'Save'"`,
+      // composed expressions, and even a plain `string` variable are all rejected
+      // by `type-check:app` — strictly more than the old hand-maintained name list
+      // could catch, and with nothing to keep in sync. A text NODE has no prop to
+      // annotate, which is why this rule still runs.
       "vue/no-bare-strings-in-template": [
         "error",
         {
-          attributes: { "/.+/": TEXT_ATTRS },
+          attributes: {},
           allowlist: [...BARE_STRING_DEFAULT_ALLOWLIST, ...NON_TRANSLATABLE],
         },
       ],
-      // The bound-prop half of the same rule (see TEXT_ATTRS above).
+      // Text-position interpolation `{{ 'Save' }}` and v-text/v-html only; the
+      // bound-prop half retired with TEXT_ATTRS (the type covers it).
       "local/no-bare-bound-text-props": "error",
       //
       // `t` must come from the typed wrapper, otherwise it returns an unbranded

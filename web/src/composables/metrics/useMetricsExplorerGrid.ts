@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
-import type { TranslateFn } from "@/types/i18n";
+import { type TranslateFn, I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
@@ -51,7 +51,7 @@ import {
 import { createPreviewQueue, isCancelled, PRIORITY } from "./useMetricsPreviewQueue";
 
 export interface LabelFilter {
-  label: string;
+  label: I18nText;
   value: string;
   operator?: string;
 }
@@ -670,7 +670,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   // Derived once per stream list, not per card test. The assignment comes from
   // the grouping module itself — re-deriving it here would let the rail's facet
   // counts drift out of step with what the grid actually filters.
-  const prefixAssignment = computed(() => computePrefixAssignment(cards.value.map((c) => c.name)));
+  const prefixAssignment = computed(() =>
+    computePrefixAssignment(
+      cards.value.map((c) => c.name),
+      t,
+    ),
+  );
 
   const prefixOf = (name: string) => prefixAssignment.value.groupOf.get(name) ?? MISC_GROUP_ID;
   const suffixOf = (name: string) => {

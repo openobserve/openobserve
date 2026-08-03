@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
-          <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
+          <OTooltip :content="raw(`${t('search.autoRefresh')}: ${selectedLabel}`)" />
         </OButton>
       </template>
       <div class="w-75 p-2">
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
                 align="center"
                 max-width="18.75rem"
-                :content="minRangeRestrictionMessageVal"
+                :content="raw(minRangeRestrictionMessageVal)"
               />
               {{ item.label }}
             </OButton>
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
                 align="center"
                 max-width="18.75rem"
-                :content="minRangeRestrictionMessageVal"
+                :content="raw(minRangeRestrictionMessageVal)"
               />
               {{ item.label }}
             </OButton>
@@ -174,7 +174,7 @@ import {
   onMounted,
   type PropType,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -362,6 +362,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       router,
       btnRefreshInterval,

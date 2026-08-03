@@ -10,16 +10,16 @@
 
 import { computed, ref } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = withDefaults(
   defineProps<{
     value: unknown;
     /** Show the hover copy button. Default true. */
     copy?: boolean;
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
-  { copy: true, emptyLabel: "—" },
+  { copy: true, emptyLabel: raw("—") },
 );
 
 const text = computed(() => {

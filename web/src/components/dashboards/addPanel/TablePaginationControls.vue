@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -140,12 +140,13 @@ export default defineComponent({
 
     const formattedPaginationOptions = computed(() =>
       props.paginationOptions.map((opt) => ({
-        label: opt === 0 ? "All" : String(opt),
+        label: opt === 0 ? t("common.all") : raw(String(opt)),
         value: opt,
       })),
     );
 
     return {
+      raw,
       countDisplay,
       formattedPaginationOptions,
       t,

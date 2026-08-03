@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="o2-input mb-4">
               <!-- eslint-disable vue/no-bare-strings-in-template -- example URL format, not translatable content -->
               <OFormInput
-                placeholder="https://api.example.com/mcp/"
+                :placeholder="raw('https://api.example.com/mcp/')"
                 data-test="ai-toolset-mcp-url"
                 name="mcp.url"
                 :label="t('aiToolset.mcpUrl')"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="o2-input mb-4">
               <!-- eslint-disable vue/no-bare-strings-in-template -- example CLI command name, not translatable content -->
               <OFormInput
-                placeholder="kubectl"
+                :placeholder="raw('kubectl')"
                 data-test="ai-toolset-cli-command"
                 name="cli.command"
                 :label="t('aiToolset.cliCommand')"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="o2-input mb-4">
               <!-- eslint-disable vue/no-bare-strings-in-template -- example CLI subcommand names, not translatable content -->
               <OFormInput
-                placeholder="get, describe, logs"
+                :placeholder="raw('get, describe, logs')"
                 name="cli.allowed_subcommands_raw"
                 :label="t('aiToolset.allowedSubcommands')"
                 :helpText="t('aiToolset.subcommandsHint')"
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   :name="`cli.credFiles[${idx}].key`"
                   :label="t('aiToolset.credEnvVar')"
-                  helpText="e.g. KUBECONFIG"
+                  :helpText="raw('e.g. KUBECONFIG')"
                   class="o2-input w-48"
                 />
                 <OButton
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -378,9 +378,9 @@ export default defineComponent({
     const isEditing = ref(false);
 
     const kindOptions = [
-      { label: "MCP Server", value: "mcp" },
-      { label: "CLI Tool", value: "cli" },
-      { label: "Skill", value: "skill" },
+      { label: t("aiToolset.kindMcp"), value: "mcp" },
+      { label: t("aiToolset.kindCli"), value: "cli" },
+      { label: t("aiToolset.kindSkill"), value: "skill" },
     ];
 
     // -----------------------------------------------------------------------
@@ -445,7 +445,7 @@ export default defineComponent({
       try {
         if (isEditing.value && editingId.value) {
           await aiToolsetsService.update(org, editingId.value, {
-            description: value.description || undefined,
+            description: value.description ? raw(value.description) : undefined,
             data,
           });
           toast({
@@ -456,7 +456,7 @@ export default defineComponent({
           await aiToolsetsService.create(org, {
             name: value.name,
             kind: value.kind as ToolsetKind,
-            description: value.description || undefined,
+            description: value.description ? raw(value.description) : undefined,
             data,
           });
           toast({
@@ -654,6 +654,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       // Exposed for the theme-aware footer background (`store.state.theme`).
       store,

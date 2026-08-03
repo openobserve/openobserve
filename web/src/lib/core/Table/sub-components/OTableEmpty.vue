@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
@@ -9,7 +9,7 @@ const { t } = useI18nTyped();
 
 withDefaults(
   defineProps<{
-    message?: string;
+    message?: I18nText;
     /**
      * Reserve a minimum height so the empty state has presence in
      * content-sized (non-fill-height) tables. Fill-height tables turn this

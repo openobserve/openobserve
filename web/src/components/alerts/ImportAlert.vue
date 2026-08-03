@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OInput
                         data-test="alert-import-name-input"
                         :model-value="userSelectedAlertName[index] || ''"
-                        :label="t('alerts.name') + ' *'"
+                        :label="raw(t('alerts.name') + ' *')"
                         :error="!userSelectedAlertName[index]?.toString().trim()"
                         :error-message="t('alerts.validation.fieldRequired')"
                         @update:model-value="
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-import-stream-name-input"
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
-                        :label="t('alerts.stream_name') + ' *'"
+                        :label="raw(t('alerts.stream_name') + ' *')"
                         searchable
                         :error="!userSelectedStreamName[index]"
                         :error-message="t('alerts.validation.fieldRequired')"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-import-stream-type-input"
                         :model-value="userSelectedStreamType[index] || ''"
                         :options="streamTypes"
-                        :label="t('alerts.streamType') + ' *'"
+                        :label="raw(t('alerts.streamType') + ' *')"
                         class="w-75!"
                         :error="!userSelectedStreamType[index]"
                         :error-message="t('alerts.validation.fieldRequired')"
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "../../services/alerts";
@@ -347,10 +347,10 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type alertCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
 
@@ -400,7 +400,7 @@ export default defineComponent({
     const organizationDataList = computed(() => {
       return store.state.organizations.map((org: any) => {
         return {
-          label: org.identifier,
+          label: raw(org.identifier),
           value: org.identifier,
           disabled:
             !org.identifier || org.identifier !== store.state.selectedOrganization.identifier,
@@ -568,13 +568,17 @@ export default defineComponent({
         };
         await anomalyDetectionService.create(org, payload);
         alertCreators.value.push({
-          message: `Anomaly Detection - ${index}: "${jsonObj.name}" imported successfully`,
+          message: t("alerts.import.anomalyImportSuccess", { index, name: jsonObj.name }),
           success: true,
         });
         return true;
       } catch (e: any) {
         alertCreators.value.push({
-          message: `Anomaly Detection - ${index}: "${jsonObj.name}" import failed — ${e?.response?.data?.message || "Unknown Error"}`,
+          message: t("alerts.import.anomalyImportFailed", {
+            index,
+            name: jsonObj.name,
+            reason: e?.response?.data?.message || t("alerts.import.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -608,12 +612,12 @@ export default defineComponent({
     };
 
     const validateAlertInputs = async (input: any, index: number) => {
-      let alertErrors: (string | { message: string; field: string })[] = [];
+      let alertErrors: (string | ErrorMessage)[] = [];
 
       // 1. Validate 'name' field
       if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
         alertErrors.push({
-          message: `Alert - ${index}: Name is mandatory and should be a valid string.`,
+          message: t("alerts.import.nameRequired", { index }),
           field: "alert_name",
         });
       }
@@ -626,7 +630,10 @@ export default defineComponent({
         input.org_id != store.state.selectedOrganization.identifier
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier}.`,
+          message: t("alerts.import.orgIdInvalid", {
+            index,
+            orgId: store.state.selectedOrganization.identifier,
+          }),
           field: "org_id",
         });
       }
@@ -635,7 +642,7 @@ export default defineComponent({
       const validStreamTypes = ["logs", "metrics", "traces"];
       if (!input.stream_type || !validStreamTypes.includes(input.stream_type)) {
         alertErrors.push({
-          message: `Alert - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`,
+          message: t("alerts.import.streamTypeInvalid", { index }),
           field: "stream_type",
         });
       }
@@ -658,7 +665,7 @@ export default defineComponent({
         !streamList.value.includes(input.stream_name)
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Stream Name is mandatory, should exist in the stream list and should be a valid string.`,
+          message: t("alerts.import.streamNameInvalid", { index }),
           field: "stream_name",
         });
       }
@@ -895,17 +902,17 @@ export default defineComponent({
         input.destinations.length === 0
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Destinations are required and should be an array.`,
+          message: t("alerts.import.destinationsRequired", { index }),
           field: "destination_name",
         });
       }
 
       if (typeof input.enabled !== "boolean") {
-        alertErrors.push(`Alert - ${index}: Enabled should be Boolean.`);
+        alertErrors.push(t("alerts.import.enabledBoolean", { index }));
       }
 
       if (input.tz_offset && (typeof input.tz_offset !== "number" || input.tz_offset < 0)) {
-        alertErrors.push(`Alert - ${index}: Timezone offset should be a number.`);
+        alertErrors.push(t("alerts.import.tzOffsetNumber", { index }));
       }
 
       if (
@@ -914,7 +921,7 @@ export default defineComponent({
         input.trigger_condition.timezone === ""
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Timezone is required when frequency type is 'cron'.`,
+          message: t("alerts.import.timezoneRequiredForCron", { index }),
           field: "timezone",
         });
       }
@@ -922,7 +929,7 @@ export default defineComponent({
       input.destinations.forEach((destination: any) => {
         if (!checkDestinationInList(props.destinations, destination)) {
           alertErrors.push({
-            message: `Alert - ${index}: "${destination}" destination does not exist`,
+            message: t("alerts.import.destinationNotExist", { index, destination }),
             field: "destination_name",
           });
         }
@@ -1006,7 +1013,7 @@ export default defineComponent({
 
         // Success
         alertCreators.value.push({
-          message: `Alert - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file`,
+          message: t("alerts.import.createSuccess", { index, name: input.name }),
           success: true,
         });
         // Emit update after each successful creation
@@ -1016,7 +1023,11 @@ export default defineComponent({
       } catch (error: any) {
         // Failure
         alertCreators.value.push({
-          message: `Alert - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("alerts.import.createFailed", {
+            index,
+            name: input.name,
+            reason: error?.response?.data?.message || t("alerts.import.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -1134,6 +1145,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       importJson,
       router,
       baseImportRef,

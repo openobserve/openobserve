@@ -159,7 +159,7 @@
                     size="sm"
                     :required="formValues.samplingMode !== 'all'"
                     :disabled="formValues.samplingMode === 'all'"
-                    :help-text="samplingValueHelp"
+                    :help-text="raw(samplingValueHelp)"
                     data-test="job-form-sampling-value-input"
                   />
                 </div>
@@ -224,7 +224,7 @@
                     type="number"
                     :min="MIN_COMPLETION_IDLE_WINDOW_SECS"
                     size="sm"
-                    :help-text="idleWindowHelp"
+                    :help-text="raw(idleWindowHelp)"
                     data-test="job-form-idle-window-input"
                   />
                 </div>
@@ -235,7 +235,7 @@
                     type="number"
                     min="1"
                     size="sm"
-                    :help-text="maxAgeHelp"
+                    :help-text="raw(maxAgeHelp)"
                     data-test="job-form-max-age-input"
                   />
                 </div>
@@ -321,7 +321,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -518,10 +518,10 @@ const RESERVED_EVAL_SOURCE_STREAMS = new Set([
   "errors",
   "data_retention_usage",
 ]);
-const streamFields = ref<Array<{ label: string; value: string; type: string }>>([]);
+const streamFields = ref<Array<{ label: I18nText; value: string; type: string }>>([]);
 
 const streamOptions = computed(() => {
-  const opts = traceStreams.value.map((name) => ({ label: name, value: name }));
+  const opts = traceStreams.value.map((name) => ({ label: raw(name), value: name }));
   // Ensure currently selected value is always present (e.g. on edit before list loads)
   if (
     formValues.value.stream &&
@@ -529,7 +529,7 @@ const streamOptions = computed(() => {
     !opts.some((o) => o.value === formValues.value.stream)
   ) {
     opts.unshift({
-      label: formValues.value.stream,
+      label: raw(formValues.value.stream),
       value: formValues.value.stream,
     });
   }
@@ -569,15 +569,15 @@ async function loadStreamFields() {
         const name = typeof field === "string" ? field : field?.name;
         if (!name) return null;
         return {
-          label: name,
+          label: raw(name),
           value: name,
           type: typeof field === "string" ? "Utf8" : field?.type || "Utf8",
         };
       })
       .filter(
         (
-          field: { label: string; value: string; type: string } | null,
-        ): field is { label: string; value: string; type: string } => field !== null,
+          field: { label: I18nText; value: string; type: string } | null,
+        ): field is { label: I18nText; value: string; type: string } => field !== null,
       );
   } catch {
     streamFields.value = [];

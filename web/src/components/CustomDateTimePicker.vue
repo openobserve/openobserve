@@ -98,7 +98,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import type { DropdownAlign } from "@/lib/overlay/Dropdown/ODropdown.types";
 import { ref, reactive, watch, computed } from "vue";
 import type { PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
@@ -106,7 +106,7 @@ const { t } = useI18nTyped();
 type PeriodKey = "s" | "m" | "h" | "d" | "w" | "M";
 
 interface RelativePeriod {
-  label: string;
+  label: I18nText;
   value: PeriodKey;
 }
 
@@ -137,7 +137,7 @@ const picker = reactive({
       relative: {
         value: 0,
         period: "m",
-        label: "Minutes",
+        label: t("common.minutes"),
       },
     },
   },
@@ -145,12 +145,12 @@ const picker = reactive({
 
 // Periods for selection
 const relativePeriods: RelativePeriod[] = [
-  { label: "Seconds", value: "s" },
-  { label: "Minutes", value: "m" },
-  { label: "Hours", value: "h" },
-  { label: "Days", value: "d" },
-  { label: "Weeks", value: "w" },
-  { label: "Months", value: "M" },
+  { label: t("common.seconds"), value: "s" },
+  { label: t("common.minutes"), value: "m" },
+  { label: t("common.hours"), value: "h" },
+  { label: t("common.days"), value: "d" },
+  { label: t("common.weeks"), value: "w" },
+  { label: t("common.months"), value: "M" },
 ];
 
 const relativeDates: Record<PeriodKey, number[]> = {
@@ -164,18 +164,18 @@ const relativeDates: Record<PeriodKey, number[]> = {
 
 // Options for custom period input
 const relativePeriodsSelect = ref([
-  { label: "Seconds", value: "s" },
-  { label: "Minutes", value: "m" },
-  { label: "Hours", value: "h" },
-  { label: "Days", value: "d" },
-  { label: "Weeks", value: "w" },
-  { label: "Months", value: "M" },
+  { label: t("common.seconds"), value: "s" },
+  { label: t("common.minutes"), value: "m" },
+  { label: t("common.hours"), value: "h" },
+  { label: t("common.days"), value: "d" },
+  { label: t("common.weeks"), value: "w" },
+  { label: t("common.months"), value: "M" },
 ]);
 
 // Function to map period values to their labels
 const getPeriodLabelFromValue = (periodValue: SelectModelValue | string) => {
   const period = relativePeriods.find((p) => p.value === periodValue);
-  return period ? period.label : "Minutes";
+  return period ? period.label : t("common.minutes");
 };
 
 // Watch modelValue to reflect the correct offset when passed in from parent
@@ -212,13 +212,20 @@ const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
   emit("update:modelValue", `${picker.data.selectedDate.relative.value}${newPeriod}`);
 };
 
-// Display the current selected offset
+// Display the current selected offset. Built from a parameterised message
+// rather than concatenation — word order around the value differs by language.
 const getDisplayValue = () => {
-  return `${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label} ago`;
+  return t("common.relativeTimeAgo", {
+    value: picker.data.selectedDate.relative.value,
+    unit: picker.data.selectedDate.relative.label,
+  });
 };
 
 const getTrimmedDisplayValue = () => {
-  return `Past ${picker.data.selectedDate.relative.value} ${picker.data.selectedDate.relative.label}`;
+  return t("common.relativeTimePast", {
+    value: picker.data.selectedDate.relative.value,
+    unit: picker.data.selectedDate.relative.label,
+  });
 };
 
 // Check if the current selection matches the modelValue
@@ -234,7 +241,7 @@ const getPeriodLabel = () => {
   const selectedPeriod = relativePeriods.find(
     (p) => p.value === picker.data.selectedDate.relative.period,
   );
-  return selectedPeriod ? selectedPeriod.label : "Minutes";
+  return selectedPeriod ? selectedPeriod.label : t("common.minutes");
 };
 
 const computedClass = computed(() => {

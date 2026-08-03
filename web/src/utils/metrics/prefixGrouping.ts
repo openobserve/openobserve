@@ -27,14 +27,24 @@
  *  - `matchesSearch`           — order-independent, multi-term substring matching
  *                                over a metric's name and help text.
  *
- * No imports from the app (no store, no vue) — safe to unit test and reuse anywhere.
+ * No app state (no store, no vue) — safe to unit test and reuse anywhere. The only
+ * dependency is i18n, to translate the catch-all bucket's label.
  */
 
 /** The id used for metrics that do not share a qualifying prefix with any other metric. */
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+
 export const MISC_GROUP_ID = "misc";
 
-/** Human-facing label for the {@link MISC_GROUP_ID} bucket. */
-export const MISC_GROUP_LABEL = "Other";
+/**
+ * i18n key for the {@link MISC_GROUP_ID} bucket's label.
+ *
+ * The KEY is the constant, not the text: resolving it here (at module scope)
+ * would freeze the label in whatever locale happened to be active when this
+ * module first loaded. It is translated per call inside
+ * {@link computePrefixAssignment} instead.
+ */
+export const MISC_GROUP_LABEL_KEY: I18nKey = "metrics.explorer.miscGroup";
 
 /** Default number of underscore-delimited segments considered for a prefix. */
 export const DEFAULT_MAX_DEPTH = 2;
@@ -47,7 +57,7 @@ export interface PrefixGroup {
   /** The prefix itself (e.g. `node_cpu`), or `misc` for the catch-all bucket. */
   id: string;
   /** Display label — the prefix for real groups, `Other` for the catch-all bucket. */
-  label: string;
+  label: I18nText;
   /** Number of distinct metric names assigned to this group. */
   count: number;
   /** Segment count of the prefix (1 or 2 by default); `0` for the catch-all bucket. */
@@ -59,7 +69,7 @@ export interface SuffixGroup {
   /** The suffix segment (e.g. `total`, `bucket`). */
   id: string;
   /** Display label — same as `id`. */
-  label: string;
+  label: I18nText;
   /** Number of distinct metric names ending with this suffix. */
   count: number;
 }
@@ -134,6 +144,7 @@ function candidatePrefixes(name: string, maxDepth: number): string[] {
  */
 export function computePrefixAssignment(
   metricNames: string[],
+  t: TranslateFn,
   opts: PrefixGroupOptions = {},
 ): { groups: PrefixGroup[]; groupOf: Map<string, string> } {
   const maxDepth = Math.max(1, Math.floor(opts.maxDepth ?? DEFAULT_MAX_DEPTH));
@@ -204,7 +215,7 @@ export function computePrefixAssignment(
   for (const [id, members] of namesByGroup) {
     groups.push({
       id,
-      label: id === MISC_GROUP_ID ? MISC_GROUP_LABEL : id,
+      label: id === MISC_GROUP_ID ? t(MISC_GROUP_LABEL_KEY) : raw(id),
       count: members.length,
       depth: depths.get(id) ?? 0,
     });
@@ -249,7 +260,7 @@ export function computeSuffixGroups(metricNames: string[]): SuffixGroup[] {
 
   const groups: SuffixGroup[] = [];
   for (const [id, count] of counts) {
-    groups.push({ id, label: id, count });
+    groups.push({ id, label: raw(id), count });
   }
 
   return groups.sort((a, b) => {

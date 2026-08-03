@@ -1,10 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import { ref } from "vue";
 
 export interface ConfirmDialogOptions {
-  title: string;
-  message: string;
+  title: I18nText;
+  message: I18nText;
   confirmLabel?: string;
   cancelLabel?: string;
   persistent?: boolean;

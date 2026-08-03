@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="true"
     @update:open="onOpenChange"
-    :title="title"
+    :title="raw(title)"
     :width="drawerWidth"
     :size="drawerSize"
     :show-close="true"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";

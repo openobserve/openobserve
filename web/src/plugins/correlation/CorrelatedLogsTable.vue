@@ -295,7 +295,7 @@ import {
   resolveSetId,
   type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -555,7 +555,7 @@ const highlightQuery = computed(() => {
 const getFilterOptions = (
   key: string,
   currentValue: string,
-): Array<{ label: string; value: string }> => {
+): Array<{ label: I18nText; value: string }> => {
   const uniqueValues = new Set<string>();
 
   // Always include wildcard option
@@ -589,7 +589,7 @@ const getFilterOptions = (
 
   // Convert to { label, value } format for the select with map-options
   return Array.from(uniqueValues).map((val) => ({
-    label: val === SELECT_ALL_VALUE ? "All Values" : val,
+    label: val === SELECT_ALL_VALUE ? t("correlation.logs.allValues") : raw(val),
     value: val,
   }));
 };
@@ -952,7 +952,7 @@ const handleRowClick = () => {};
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData, t, {
-    successMessage: "Content Copied Successfully!",
+    successMessage: t("common.contentCopiedSuccessfully"),
     timeout: 1000,
   });
 };
@@ -1226,7 +1226,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
       (key) =>
         ({
           key,
-          label: dimensionDisplayLabel(key),
+          label: raw(dimensionDisplayLabel(key)),
           value: chipDimensionSource.value[key],
           kind: "context" as DimensionChip["kind"],
         }) as DimensionChip,

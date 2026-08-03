@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="cat in aiCategories"
                 :key="cat.slug"
                 :name="cat.slug"
-                :label="cat.name"
+                :label="raw(cat.name)"
                 :data-test="`ai-integrations-category-${cat.slug}`"
               />
             </OTabs>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="integration in filteredIntegrations"
                       :key="integration.slug"
                       :name="integration.routeName"
-                      :label="integration.name"
+                      :label="raw(integration.name)"
                       :data-test="`ai-integrations-item-${integration.slug}`"
                     >
                       <template #icon>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onBeforeMount } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
@@ -215,6 +215,7 @@ export default defineComponent({
     );
 
     return {
+      raw,
       t,
       store,
       isDark,

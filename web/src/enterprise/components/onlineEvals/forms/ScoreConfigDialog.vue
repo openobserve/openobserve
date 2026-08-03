@@ -8,7 +8,7 @@
     side="right"
     :width="50"
     data-test="score-config-dialog"
-    :title="drawerTitle"
+    :title="raw(drawerTitle)"
     form-id="score-config-form"
     :secondary-button-label="t('onlineEvals.buttons.cancel')"
     :primary-button-label="t('onlineEvals.buttons.save')"
@@ -232,7 +232,7 @@
                 type="number"
                 size="sm"
                 field-width="xs"
-                :placeholder="String(defaultGteValue)"
+                :placeholder="raw(String(defaultGteValue))"
                 data-test="score-config-gte-value-input"
                 @focus="form.setFieldValue('healthyDirection', 'gte')"
               />
@@ -263,7 +263,7 @@
                 type="number"
                 size="sm"
                 field-width="xs"
-                :placeholder="String(defaultLteValue)"
+                :placeholder="raw(String(defaultLteValue))"
                 data-test="score-config-lte-value-input"
                 @focus="form.setFieldValue('healthyDirection', 'lte')"
               />
@@ -383,7 +383,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

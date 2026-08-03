@@ -166,7 +166,7 @@ const isImporting = ref(false);
 const selectedProviderId = ref("");
 
 const providerOptions = computed(() =>
-  props.providers.map((p) => ({ label: p.name, value: p.id })),
+  props.providers.map((p) => ({ label: raw(p.name), value: p.id })),
 );
 
 onMounted(loadCatalog);

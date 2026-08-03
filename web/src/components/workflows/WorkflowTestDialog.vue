@@ -165,9 +165,9 @@ const runFromOptions = computed(() => {
     const type = n.data?.node_type;
     seen[type] = (seen[type] || 0) + 1;
     const base = t(nodeMeta(type)?.titleKey || type);
-    const numbered = totals[type] > 1 ? `${base} ${seen[type]}` : base;
+    const numbered = totals[type] > 1 ? raw(`${base} ${seen[type]}`) : base;
     const detail = nodeDetail(n);
-    return { label: detail ? `${numbered} · ${detail}` : numbered, value: n.id };
+    return { label: detail ? raw(`${numbered} · ${detail}`) : numbered, value: n.id };
   });
   return [{ label: t("workflow.test.runFromBeginning"), value: RUN_FROM_BEGINNING }, ...opts];
 });

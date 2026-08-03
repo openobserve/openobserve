@@ -135,21 +135,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
-const props = withDefaults(
-  defineProps<{
-    history: Array<{ status: string; timestamp: number }>;
-    // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
-    // workflows pass "Failed"/"Success".
-    firingLabel?: string;
-    okLabel?: string;
-  }>(),
-  { firingLabel: "Firing", okLabel: "Ok" },
-);
-const { firingLabel, okLabel } = props;
+const props = defineProps<{
+  history: Array<{ status: string; timestamp: number }>;
+  // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
+  // workflows pass "Failed"/"Success".
+  firingLabel?: I18nText;
+  okLabel?: I18nText;
+}>();
+
+// Resolved here rather than as `withDefaults` defaults: a default is evaluated
+// once at module scope, which would freeze the wording in whatever locale
+// happened to be active when the module first loaded.
+const firingLabel = computed(() => props.firingLabel ?? t("alerts.historyTimeline.firing"));
+const okLabel = computed(() => props.okLabel ?? t("alerts.historyTimeline.ok"));
 
 const hoveredIndex = ref<number | null>(null);
 
@@ -167,10 +169,10 @@ function isOk(s: string) {
 
 function normalizeStatus(s: string): string {
   const v = s?.toLowerCase();
-  if (isFiring(v)) return firingLabel;
-  if (isOk(v)) return okLabel;
-  if (v === "skipped") return "Skipped";
-  return s?.replace(/_/g, " ") ?? "Unknown";
+  if (isFiring(v)) return firingLabel.value;
+  if (isOk(v)) return okLabel.value;
+  if (v === "skipped") return t("alerts.historyTimeline.skipped");
+  return s?.replace(/_/g, " ") ?? t("alerts.historyTimeline.unknown");
 }
 
 function blockColor(status: string): string {

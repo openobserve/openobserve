@@ -18,16 +18,18 @@ import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
+import enLocale from "@/locales/languages/en-US.json";
 
-// Create i18n instance
+// Create i18n instance.
+// The real `search` messages are used rather than a stub: the histogram title is
+// built from them and SearchResult.vue parses that title back into chips, so the
+// exact wording is part of the contract these tests guard.
 const i18n = createI18n({
   legacy: false,
   locale: "en",
   messages: {
     en: {
-      search: {
-        queryRangeRestrictionMsg: "Query range restricted to {range}",
-      },
+      search: enLocale.search,
     },
   },
 });
@@ -167,6 +169,49 @@ describe("useHistogram Composable", () => {
 
     it("should have isHistogramEnabled function", () => {
       expect(typeof wrapper.vm.isHistogramEnabled).toBe("function");
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // getHistogramTitle — exact wording is parsed back by SearchResult.vue
+  // (recordsChips splits on "Showing ", " events in ", " ms." and "(…)"),
+  // so these assertions pin the rendered English string, not just the shape.
+  // --------------------------------------------------------------------------
+  describe("getHistogramTitle", () => {
+    beforeEach(() => {
+      mockState.searchObj.data.queryResults.total = 250;
+      mockState.searchObj.data.queryResults.took = 42;
+    });
+
+    it("renders the title with the scan size in logs mode", () => {
+      mockState.searchObj.meta.logsVisualizeToggle = "logs";
+
+      expect(wrapper.vm.getHistogramTitle()).toBe(
+        "Showing 1 to 100 out of 250 events in 42 ms. (Scan Size: 0 MB)",
+      );
+    });
+
+    it("labels the scan size as delta when a result cache ratio is present", () => {
+      mockState.searchObj.meta.logsVisualizeToggle = "logs";
+      mockState.searchObj.data.queryResults.result_cache_ratio = 50;
+
+      expect(wrapper.vm.getHistogramTitle()).toBe(
+        "Showing 1 to 100 out of 250 events in 42 ms. (Delta Scan Size: 0 MB)",
+      );
+    });
+
+    it("omits the scan size outside logs mode", () => {
+      mockState.searchObj.meta.logsVisualizeToggle = "visualize";
+
+      expect(wrapper.vm.getHistogramTitle()).toBe("Showing 1 to 100 out of 250 events in 42 ms.");
+    });
+
+    it("returns an empty title and sets a notification when it throws", () => {
+      // resultGrid is read first inside the try block — removing it forces the catch.
+      mockState.searchObj.data.resultGrid = undefined as any;
+
+      expect(wrapper.vm.getHistogramTitle()).toBe("");
+      expect(mockState.notificationMsg.value).toBe("Error while generating histogram title.");
     });
   });
 

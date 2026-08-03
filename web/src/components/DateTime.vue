@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         side="right"
                         align="center"
                         max-width="300px"
-                        :content="queryRangeRestrictionMsg"
+                        :content="raw(queryRangeRestrictionMsg)"
                       />
                     </OButton>
                   </div>
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     align="center"
                     max-width="300px"
                     v-if="queryRangeRestrictionInHour > 0"
-                    :content="queryRangeRestrictionMsg"
+                    :content="raw(queryRangeRestrictionMsg)"
                   />
 
                   <div class="flex min-w-0 flex-1 gap-2">
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   align="center"
                   max-width="300px"
                   v-if="queryRangeRestrictionInHour > 0"
-                  :content="queryRangeRestrictionMsg"
+                  :content="raw(queryRangeRestrictionMsg)"
                 />
                 <div class="flex justify-center px-3 py-2">
                   <ODateRangeCalendar
@@ -315,7 +315,7 @@ import {
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 interface ConsumableDateTime {
@@ -466,7 +466,7 @@ export default defineComponent({
     const isTimezoneSelectOpen = ref(false);
 
     const timezoneSelectOptions = computed(() =>
-      timezoneOptions.map((tz: string) => ({ label: tz, value: tz })),
+      timezoneOptions.map((tz: string) => ({ label: raw(tz), value: tz })),
     );
 
     let relativePeriods = [
@@ -1283,6 +1283,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       menuOpen,
       onMenuOpenChange,

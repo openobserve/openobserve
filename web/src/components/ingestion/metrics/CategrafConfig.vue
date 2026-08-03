@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
     <IngestionDocLink href="https://github.com/flashcatcloud/categraf">
       {{ t("ingestion.categrafDocLinkText") }}
     </IngestionDocLink>
@@ -30,7 +30,7 @@ import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "categraf-config",
@@ -63,6 +63,7 @@ basic_auth_user = "[EMAIL]"
 basic_auth_pass = "[PASSCODE]"`;
 
     return {
+      raw,
       t,
       content,
     };

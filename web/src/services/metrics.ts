@@ -56,6 +56,7 @@ const labelValues = ({
   signal,
 }: {
   org_identifier: string;
+  // a PromQL label name that goes into the request URL — data, never UI text
   label: string;
   match: string;
   start_time: number;

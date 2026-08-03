@@ -120,7 +120,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
 
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -158,7 +158,7 @@ const props = defineProps({
 
 const activeTab = ref<string>("breadcrumbs");
 const tabs: Array<{
-  label: string;
+  label: I18nText;
   value: string;
   icon: string;
   style: Record<string, string>;
@@ -203,10 +203,10 @@ const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustratio
 const searchEvent = ref<string>("");
 
 const eventOptions = [
-  { label: "Error", value: "error" },
-  { label: "Action", value: "action" },
-  { label: "View", value: "view" },
-  { label: "Frustration", value: "frustration" },
+  { label: t("rum.playerEvents.error"), value: "error" },
+  { label: t("rum.playerEvents.action"), value: "action" },
+  { label: t("rum.playerEvents.view"), value: "view" },
+  { label: t("rum.playerEvents.frustration"), value: "frustration" },
 ];
 
 const searchEvents = (value: string | number | null) => {

@@ -112,7 +112,7 @@
 <script lang="ts">
 import { defineComponent, ref, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -252,7 +252,7 @@ export default defineComponent({
       const added = new Set((formFields.value ?? []).map((f) => f.name));
       return (props.availableFields || [])
         .filter((name) => !added.has(name))
-        .map((name) => ({ label: name, value: name }));
+        .map((name) => ({ label: raw(name), value: name }));
     });
 
     function onFieldSelect(value: string) {

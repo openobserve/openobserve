@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     :width="70"
-    :title="row?.name"
+    :title="raw(row?.name)"
     :title-data-test="'scorer-detail-name-badge'"
     :sub-title="t('onlineEvals.scorer.detail.eyebrow')"
     data-test="scorer-detail"
@@ -346,7 +346,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -507,9 +507,9 @@ const agents = ref<AgentFilterSelection[]>([]);
 const agentKey = ref(ALL_AGENTS_VALUE);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("onlineEvals.quality.allAgents"), value: ALL_AGENTS_VALUE },
   ...agents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -646,7 +646,7 @@ const runColumns = computed<OTableColumnDef<RunRow>[]>(() => [
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() => {
+const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(() => {
   const k = kpis.value;
   return [
     {

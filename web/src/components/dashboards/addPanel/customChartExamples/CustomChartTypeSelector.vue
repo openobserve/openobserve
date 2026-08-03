@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <img
                         :src="chart.asset"
-                        :alt="chart.label"
+                        :alt="t(chart.labelKey)"
                         class="h-full w-full object-cover"
                         loading="lazy"
                       />
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OCardSection>
                   <OCardSection class="px-2 pt-0 pb-2">
                     <div class="text-center text-xs font-medium">
-                      {{ chart.label }}
+                      {{ t(chart.labelKey) }}
                     </div>
                   </OCardSection>
                 </OCard>
@@ -218,8 +218,10 @@ export default defineComponent({
       const filtered: ChartCategory[] = [];
 
       chartCategories.value.forEach((category) => {
+        // Search the RESOLVED name, not the key — otherwise typing "line" would
+        // match the dotted path rather than what the user can actually see.
         const filteredCharts = category.type.filter((chart) =>
-          chart.label.toLowerCase().includes(query),
+          t(chart.labelKey).toLowerCase().includes(query),
         );
 
         if (filteredCharts.length > 0) {

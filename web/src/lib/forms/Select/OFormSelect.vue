@@ -5,9 +5,17 @@ import { inject } from "vue";
 import OSelect from "./OSelect.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw, type I18nText } from "@/types/i18n";
 import type { FormSelectProps } from "./OFormSelect.types";
 
 defineOptions({ inheritAttrs: false });
+
+// Validation messages come from the form schema (already translated there); this
+// only re-brands them, keeping `undefined` when there is nothing to show.
+const errorText = (errors: readonly unknown[] | undefined): I18nText | undefined => {
+  const message = firstFieldError(errors);
+  return message ? raw(message) : undefined;
+};
 
 // OSelect defaults `searchable` to true. Because OFormSelect re-declares it as a
 // boolean prop, an OMITTED `searchable` would be cast to `false` (Vue's
@@ -43,7 +51,7 @@ if (import.meta.env.DEV && !form) {
         :model-value="field.state.value"
         :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0 ? firstFieldError(field.state.meta.errors) : undefined
+          field.state.meta.errors.length > 0 ? errorText(field.state.meta.errors) : undefined
         "
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"

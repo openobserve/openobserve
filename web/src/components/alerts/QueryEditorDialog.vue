@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       side="top"
                       align="center"
                       :max-width="'520px'"
-                      :content="localSqlQueryErrorMsg || sqlQueryErrorMsg"
+                      :content="raw(localSqlQueryErrorMsg || sqlQueryErrorMsg)"
                     />
                   </div>
                 </div>
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query="vrlFunctionContent"
                       :hide-nl-toggle="false"
                       :disable-ai="false"
-                      :disable-ai-reason="''"
+                      :disable-ai-reason="raw('')"
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :debounce-time="300"
@@ -514,7 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, type PropType, onMounted, inject, type Ref } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";

@@ -107,7 +107,7 @@
 </template>
 
 <script lang="ts" setup>
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { inject } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -157,24 +157,39 @@ const addRow = () => form.pushFieldValue(props.formFieldName, makeStreamFieldRow
 const removeRow = (index: number) => form.removeFieldValue(props.formFieldName, index);
 
 const streamIndexType = [
-  { label: "Full text search", value: "fullTextSearchKey" },
-  { label: "Secondary index", value: "secondaryIndexKey" },
-  { label: "Bloom filter", value: "bloomFilterKey" },
-  { label: "KeyValue partition", value: "keyPartition" },
-  { label: "Prefix partition", value: "prefixPartition" },
-  { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
-  { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
-  { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
-  { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
-  { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
+  { label: t("logStream.indexTypeOptions.fullTextSearch"), value: "fullTextSearchKey" },
+  { label: t("logStream.indexTypeOptions.secondaryIndex"), value: "secondaryIndexKey" },
+  { label: t("logStream.indexTypeOptions.bloomFilter"), value: "bloomFilterKey" },
+  { label: t("logStream.indexTypeOptions.keyValuePartition"), value: "keyPartition" },
+  { label: t("logStream.indexTypeOptions.prefixPartition"), value: "prefixPartition" },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 8 }),
+    value: "hashPartition_8",
+  },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 16 }),
+    value: "hashPartition_16",
+  },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 32 }),
+    value: "hashPartition_32",
+  },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 64 }),
+    value: "hashPartition_64",
+  },
+  {
+    label: t("logStream.indexTypeOptions.hashPartition", { buckets: 128 }),
+    value: "hashPartition_128",
+  },
 ];
 
 const dataTypes = [
-  { label: "Utf8", value: "Utf8" },
-  { label: "Int64", value: "Int64" },
-  { label: "Uint64", value: "Uint64" },
-  { label: "Float64", value: "Float64" },
-  { label: "Boolean", value: "Boolean" },
+  { label: raw("Utf8"), value: "Utf8" },
+  { label: raw("Int64"), value: "Int64" },
+  { label: raw("Uint64"), value: "Uint64" },
+  { label: raw("Float64"), value: "Float64" },
+  { label: raw("Boolean"), value: "Boolean" },
 ];
 
 const getIndexTypeOptions = (field: any) => {

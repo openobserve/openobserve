@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -134,7 +134,7 @@ function toggleSteps(executionId: string) {
     :open="open"
     size="lg"
     :title="t('synthetics.runDetail.title')"
-    :sub-title="fmtTime(scheduledTs)"
+    :sub-title="raw(fmtTime(scheduledTs))"
     @update:open="
       (v) => {
         if (!v) emit('close');

@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
@@ -568,7 +568,7 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: { name: 'synthetics' },
@@ -602,7 +602,7 @@ function onClearResults() {
             v-model="startUrl"
             :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
             :error="!!urlError"
-            :error-message="urlError"
+            :error-message="raw(urlError)"
             data-test="synthetics-create-url-input"
             @update:model-value="clearUrlError"
             @blur="validateGateUrl"

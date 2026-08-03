@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 
 defineOptions({ name: "OrgStorageEditor" });
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
@@ -457,18 +457,18 @@ const availableProviders = computed(() => {
 });
 
 const providerDefinitions: Array<{
-  label: string;
+  label: I18nText;
   value: string;
   image?: string;
   icon?: string;
 }> = [
   {
-    label: "AWS Credentials",
+    label: t("settings.orgStorageSettings.awsCredentials"),
     value: "AwsCredentials",
     image: getImageURL("images/org_storage/aws_plain_without_bg.png"),
   },
   {
-    label: "Azure Credentials",
+    label: t("settings.orgStorageSettings.azureCredentials"),
     value: "AzureCredentials",
     image: getImageURL("images/org_storage/azure.png"),
   },
@@ -481,7 +481,7 @@ const providerDefinitions: Array<{
   //   image: getImageURL("images/org_storage/gcp.png"),
   // },
   {
-    label: "AWS Role ARN",
+    label: t("settings.orgStorageSettings.awsRoleArn"),
     value: "AwsRoleArn",
     image: getImageURL("images/org_storage/aws_iam.png"),
   },

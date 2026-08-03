@@ -150,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { ref, computed, watch, useSlots } from "vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
@@ -158,7 +159,7 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
-  label: string;
+  label: I18nText;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;
@@ -167,8 +168,8 @@ interface BackTarget {
 const props = withDefaults(
   defineProps<{
     // Header (from props)
-    title?: string;
-    subtitle?: string;
+    title?: I18nText;
+    subtitle?: I18nText;
     icon?: IconName;
     back?: BackTarget;
     titleDataTest?: string;

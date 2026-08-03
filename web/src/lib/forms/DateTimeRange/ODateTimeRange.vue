@@ -51,7 +51,8 @@ const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   hideTime: false,
   showTimezone: false,
   disabled: false,
-  placeholder: "Select date range",
+  // No default here: t() cannot run at module scope, so the English fallback is
+  // resolved reactively below (see `placeholderText`).
 });
 
 const emit = defineEmits<DateTimeRangeEmits>();
@@ -182,6 +183,10 @@ function selectTimezone(tz: string) {
 }
 
 // ── Trigger label ──────────────────────────────────────────────
+// Caller-supplied placeholder wins; otherwise fall back to the translated
+// default (resolved here, not in withDefaults, so it follows the locale).
+const placeholderText = computed((): string => props.placeholder ?? t("common.selectDateRange"));
+
 const triggerLabel = computed((): string => {
   if (props.mode === "relative" && (props.relativeAmount ?? 0) > 0) {
     return formatRelativeLabel(props.relativeUnit, props.relativeAmount);
@@ -192,7 +197,7 @@ const triggerLabel = computed((): string => {
     if (start && end) return `${start} → ${end}`;
     return start || end;
   }
-  return props.placeholder ?? "Select date range";
+  return placeholderText.value;
 });
 
 function formatRelativeLabel(unit: RelativeUnit, amount: number): string {
@@ -287,9 +292,7 @@ function handleApply() {
 
 // ── Trigger styling ────────────────────────────────────────────
 const hasError = computed(() => !!props.errorMessage);
-const isPlaceholder = computed(
-  () => triggerLabel.value === (props.placeholder ?? "Select date range"),
-);
+const isPlaceholder = computed(() => triggerLabel.value === placeholderText.value);
 
 const triggerClasses = computed(() => [
   "flex items-center gap-2 w-full min-h-10 px-3 rounded-default border text-sm transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring bg-datepicker-bg",

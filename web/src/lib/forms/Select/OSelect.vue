@@ -53,12 +53,12 @@ import {
   setActiveOverlay,
   clearActiveOverlay,
 } from "@/lib/overlay/Dropdown/ODropdown.context";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
 type NormalizedOption = {
-  label: string;
+  label: I18nText;
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
@@ -67,7 +67,7 @@ type NormalizedOption = {
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
   /** Secondary description text shown below the label in the dropdown item. */
-  subLabel?: string;
+  subLabel?: I18nText;
   /** When true, renders subLabel on the same line as the label (name – url style). */
   subLabelInline?: boolean;
   /** Array of CSS color strings used to render a gradient swatch below the label. */
@@ -99,7 +99,6 @@ const props = withDefaults(defineProps<SelectProps>(), {
   hideSelected: false,
   collapsibleGroups: false,
   creatable: false,
-  searchPlaceholder: "Search...",
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
   iconKey: undefined,
@@ -163,26 +162,26 @@ function toRekaString(v: SelectPrimitiveValue): string {
   return String(v);
 }
 
-function normalizeOption(raw: unknown): NormalizedOption | null {
-  if (isPrimitiveSelectValue(raw)) {
+function normalizeOption(input: unknown): NormalizedOption | null {
+  if (isPrimitiveSelectValue(input)) {
     return {
-      label: String(raw),
-      value: raw,
+      label: raw(String(input)),
+      value: input,
       disabled: false,
       header: false,
     };
   }
 
-  if (!raw || typeof raw !== "object") return null;
+  if (!input || typeof input !== "object") return null;
 
-  const option = raw as Record<string, unknown>;
+  const option = input as Record<string, unknown>;
   const rawLabel = option[props.labelKey];
 
   // Group header: items with header:true or isTab:true are non-selectable labels
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
     return {
-      label: rawLabel === undefined || rawLabel === null ? "" : String(rawLabel),
+      label: raw(rawLabel === undefined || rawLabel === null ? "" : String(rawLabel)),
       value: `__header__${String(rawLabel)}`,
       disabled: true,
       header: true,
@@ -201,13 +200,13 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   const rawSubLabelInline = option["subLabelInline"];
   const rawColorPalette = option["colorPalette"];
   return {
-    label: rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel),
+    label: raw(rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel)),
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
     icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
     iconComponent: rawIconComponent ?? undefined,
-    subLabel: typeof rawSubLabel === "string" ? rawSubLabel : undefined,
+    subLabel: typeof rawSubLabel === "string" ? raw(rawSubLabel) : undefined,
     subLabelInline: rawSubLabelInline === true,
     colorPalette: Array.isArray(rawColorPalette) ? (rawColorPalette as string[]) : undefined,
     badge: typeof option["badge"] === "string" ? (option["badge"] as string) : undefined,
@@ -223,7 +222,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
 const normalizedOptions = computed<NormalizedOption[]>(() => {
   if (!props.options?.length) return [];
   return props.options
-    .map((raw) => normalizeOption(raw))
+    .map((option) => normalizeOption(option))
     .filter((opt): opt is NormalizedOption => opt !== null);
 });
 
@@ -248,6 +247,13 @@ const filterDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 const pinnedSelected = ref<Set<string>>(new Set());
 
 const inputEnabled = computed(() => props.searchable);
+
+// Resolved at render time rather than as a `withDefaults` default: a default is
+// evaluated once at module scope, which would freeze the placeholder in whatever
+// locale happened to be active when the module first loaded.
+const resolvedSearchPlaceholder = computed(
+  () => props.searchPlaceholder ?? t("common.searchEllipsis"),
+);
 
 const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;
@@ -1255,7 +1261,7 @@ const fieldWidthClass = computed(() => {
                     'border-input-border border-b',
                     heightClasses[size ?? 'md'],
                   ]"
-                  :placeholder="searchPlaceholder"
+                  :placeholder="resolvedSearchPlaceholder"
                   @keydown="handleDropdownKeydown"
                 />
 

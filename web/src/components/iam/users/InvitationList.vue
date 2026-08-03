@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="row.expires_at"
               unit="us"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
           <template #cell-actions="{ row }">
@@ -421,6 +421,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       store,
       invitations,

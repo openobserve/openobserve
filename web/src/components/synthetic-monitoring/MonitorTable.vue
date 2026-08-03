@@ -14,8 +14,8 @@
     :persist-columns="true"
     table-id="synthetic-monitoring-table"
     :enable-column-resize="true"
-    :footer-title="footerTitle"
-    :empty-message="emptyMessage"
+    :footer-title="resolvedFooterTitle"
+    :empty-message="resolvedEmptyMessage"
     :data-test="dataTest"
     :horizontal-scroll="true"
     show-index
@@ -176,7 +176,7 @@
     <template #cell-locations="{ row }">
       <OTooltip
         v-if="(row as any).locations?.length"
-        :content="formatLocationsList((row as any).locations)"
+        :content="raw(formatLocationsList((row as any).locations))"
         content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
         :delay="0"
       >
@@ -348,7 +348,7 @@
               total: data.length,
             })
           }}</template>
-          <template v-else>{{ data.length }} {{ footerTitle }}</template>
+          <template v-else>{{ data.length }} {{ resolvedFooterTitle }}</template>
         </span>
         <template v-if="localSelectedIds.length > 0">
           <OButton
@@ -441,7 +441,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -464,8 +464,8 @@ const props = withDefaults(
     mode: Mode;
     data: any[];
     loading?: boolean;
-    footerTitle?: string;
-    emptyMessage?: string;
+    footerTitle?: I18nText;
+    emptyMessage?: I18nText;
     dataTest?: string;
     toggleLoadingMap?: Record<string, boolean>;
     triggerLoadingMap?: Record<string, boolean>;
@@ -480,8 +480,6 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
-    footerTitle: "Checks",
-    emptyMessage: "No results found.",
     dataTest: "monitor-table",
     toggleLoadingMap: () => ({}),
     triggerLoadingMap: () => ({}),
@@ -516,6 +514,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+// Resolved here rather than as `withDefaults` defaults: a default is evaluated
+// once at module scope, which would freeze the copy in whatever locale happened
+// to be active when the module first loaded.
+const resolvedFooterTitle = computed(
+  () => props.footerTitle ?? t("synthetics.table.checksFooterTitle"),
+);
+const resolvedEmptyMessage = computed(() => props.emptyMessage ?? t("search.noResult"));
 
 const localSelectedIds = computed({
   get: () => props.selectedIds ?? [],

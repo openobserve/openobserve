@@ -511,7 +511,7 @@ const { formatTimestamp, formatId, getStatusIcon, getStatusColorClass, getEventT
 const copyAttributesToClipboard = () => {
   copyToClipboard(JSON.stringify(props.rawEvent, null, 2), t, {
     successMessage: t("common.copyToClipboard") + " - " + t("common.success"),
-    errorMessage: "Error while copying content.",
+    errorMessage: t("common.copyContentError"),
     timeout: 1500,
   });
 };
@@ -523,18 +523,18 @@ const networkResources = computed(() => {
 const actionFields = computed(() => [
   {
     key: "action_type",
-    label: "Action Type",
+    label: t("common.actionType"),
     value: props.rawEvent?.action_type || t("common.notAvailable"),
     valueClass: "capitalize",
   },
   {
     key: "action_target_name",
-    label: "Target",
+    label: t("common.actionTarget"),
     value: props.rawEvent?.action_target_name || t("common.notAvailable"),
   },
   {
     key: "action_id",
-    label: "Action ID",
+    label: t("common.actionId"),
     value: props.rawEvent?.action_id,
     slot: true,
   },

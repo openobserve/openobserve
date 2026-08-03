@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="mb-3 flex items-center justify-between">
       <div>
-        <div class="text-base font-bold">{{ title }}</div>
+        <div class="text-base font-bold">{{ resolvedTitle }}</div>
         <div v-if="subtitle" class="text-text-muted text-xs">
           {{ subtitle }}
         </div>
@@ -100,7 +100,7 @@
 <script lang="ts">
 import { defineComponent, ref, computed, type PropType } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -121,12 +121,13 @@ export default defineComponent({
       default: () => [],
     },
     title: {
-      type: String,
-      default: "Cross-Links",
+      type: String as unknown as PropType<I18nText>,
+      // Resolved in setup so the fallback is translated, not frozen at load.
+      default: undefined,
     },
     subtitle: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     readonly: {
       type: Boolean,
@@ -145,6 +146,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
+    const resolvedTitle = computed(() => props.title ?? t("common.crossLinks"));
     const showAddDialog = ref(false);
     const editingLink = ref<CrossLink | null>(null);
     const editingOriginalName = ref("");
@@ -192,6 +194,9 @@ export default defineComponent({
     }
 
     return {
+      resolvedTitle,
+
+      raw,
       t,
       store,
       links,

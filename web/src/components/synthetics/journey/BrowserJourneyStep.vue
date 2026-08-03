@@ -1,15 +1,15 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { BrowserStep, SelectorType, StepReplayResult, WireStep } from "@/types/synthetics";
 import {
   ACTION_ICONS,
-  ACTION_LABELS,
+  ACTION_LABEL_KEYS,
   SELECTOR_ACTIONS,
   VALUE_ACTIONS,
-  VALUE_LABELS,
+  VALUE_LABEL_KEYS,
   SELECTOR_TYPE_OPTIONS,
   actionOptions,
 } from "@/constants/synthetics";
@@ -56,15 +56,17 @@ const emit = defineEmits<{
 
 // ── Computed from shared constants ──────────────────────────────────
 const selectorTypeOptions = SELECTOR_TYPE_OPTIONS;
+const actionSelectOptions = computed(() => actionOptions(t));
 const actionIcon = computed(() => ACTION_ICONS[props.step.action]);
-const actionLabel = computed(() => ACTION_LABELS[props.step.action]);
+const actionLabel = computed(() => t(ACTION_LABEL_KEYS[props.step.action]));
 const displayName = computed(() => props.step.name || actionLabel.value);
 const selectorPreview = computed(() => props.step.selector || props.step.value || "");
 const showSelector = computed(() => SELECTOR_ACTIONS.includes(props.step.action));
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
-const valueLabel = computed(
-  () => VALUE_LABELS[props.step.action] || t("synthetics.journey.valueFallback"),
-);
+const valueLabel = computed(() => {
+  const key = VALUE_LABEL_KEYS[props.step.action];
+  return key ? t(key) : t("synthetics.journey.valueFallback");
+});
 
 function update(patch: Partial<BrowserStep>) {
   // Patch edited fields into wire instead of clearing it, so replay still has
@@ -412,7 +414,7 @@ function toggleExpanded() {
       <OSelect
         v-model="actionComputed"
         :label="t('synthetics.journey.actionLabel')"
-        :options="actionOptions"
+        :options="actionSelectOptions"
         class="w-[25rem]!"
         data-test="synthetics-journey-step-action-select"
       />
@@ -449,8 +451,8 @@ function toggleExpanded() {
       <OInput
         v-if="showValue"
         v-model="valueComputed"
-        :label="valueLabel"
-        :placeholder="valueLabel"
+        :label="raw(valueLabel)"
+        :placeholder="raw(valueLabel)"
         data-test="synthetics-journey-step-value-input"
       />
 

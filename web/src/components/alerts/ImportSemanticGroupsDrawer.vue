@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="import-semantic-groups-drawer-group-dialog"
     v-model:open="showGroupDialog"
     size="md"
-    :title="selectedGroup?.display"
+    :title="raw(selectedGroup?.display)"
     :sub-title="t('common.idPrefix', { id: selectedGroup?.id })"
     :primary-button-label="t('common.close')"
     @click:primary="showGroupDialog = false"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="import-semantic-groups-drawer-modification-dialog"
     v-model:open="showModificationDialog"
     size="lg"
-    :title="selectedModification?.proposed.display"
+    :title="raw(selectedModification?.proposed.display)"
     :sub-title="t('correlation.compareChanges')"
     :primary-button-label="t('common.close')"
     @click:primary="showModificationDialog = false"
@@ -320,7 +320,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 

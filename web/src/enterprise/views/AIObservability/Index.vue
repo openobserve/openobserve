@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -152,7 +152,7 @@ const activeSectionItem = computed(() =>
 // Group order: Monitor before Evaluate.
 const sectionGroupOrder = ["Monitor", "Evaluate"];
 
-const groupLabels = computed<Record<string, string>>(() => ({
+const groupLabels = computed<Record<string, I18nText>>(() => ({
   Monitor: t("aiObservability.sections.monitor"),
   Evaluate: t("aiObservability.sections.evaluate"),
 }));
@@ -170,7 +170,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   };
   return [...buckets.keys()]
     .sort((a, b) => rank(a) - rank(b))
-    .map((key) => ({ label: groupLabels.value[key] ?? key, items: buckets.get(key)! }));
+    .map((key) => ({ label: groupLabels.value[key] ?? raw(key), items: buckets.get(key)! }));
 });
 
 // Reserved for future per-section header chrome wiring (mirrors Settings'

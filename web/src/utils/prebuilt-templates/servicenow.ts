@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { raw } from "@/types/i18n";
+
 import { PrebuiltConfig } from "./types";
 
 const isValidServiceNowIncidentUrl = (url: string): boolean => {
@@ -92,7 +94,7 @@ export const servicenowConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.servicenowInstanceUrl",
       type: "text",
       required: true,
-      hint: "https://your-instance.service-now.com/api/now/table/incident",
+      hint: raw("https://your-instance.service-now.com/api/now/table/incident"),
       validator: (url: string) =>
         isValidServiceNowIncidentUrl(url) || {
           key: "alerts.prebuiltDestinations.servicenowInstanceUrlFormat",
@@ -103,7 +105,7 @@ export const servicenowConfig: PrebuiltConfig = {
       labelKey: "common.username",
       type: "text",
       required: true,
-      hint: "ServiceNow username with incident creation permissions",
+      hintKey: "alerts.prebuiltDestinations.servicenowUsernameHelp",
       validator: (value: string) =>
         value.trim().length > 0 || {
           key: "alerts.prebuiltDestinations.usernameRequired",
@@ -114,7 +116,7 @@ export const servicenowConfig: PrebuiltConfig = {
       labelKey: "common.password",
       type: "password",
       required: true,
-      hint: "ServiceNow password or API token",
+      hintKey: "alerts.prebuiltDestinations.servicenowPasswordHelp",
       validator: (value: string) =>
         value.trim().length > 0 || {
           key: "alerts.prebuiltDestinations.passwordRequired",
@@ -125,7 +127,7 @@ export const servicenowConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.servicenowAssignmentGroup",
       type: "text",
       required: false,
-      hint: "Group to assign incidents to (e.g., IT Operations)",
+      hintKey: "alerts.prebuiltDestinations.servicenowAssignmentGroupHelp",
     },
   ],
 };

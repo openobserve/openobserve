@@ -26,6 +26,8 @@
 //     ndjson` into the agent's TCP receiver. That daemon is the thing to check
 //     when host metrics arrive but unified log entries do not.
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
@@ -56,20 +58,18 @@ export default function macosCard(subs: CardSubstitutions): RichCardContent {
     steps: [
       {
         id: "install",
-        title: "Install the Agent",
-        description:
-          "Run this on the Mac with `sudo`. It installs the agent as a launchd daemon, plus a second daemon that bridges the macOS unified log into it.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.installAgentTitle",
+        descriptionKey: "ingestion.setupCard.installAgentMacosDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         code: agentCode(install, subs, "bash"),
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Both daemons start on install. Give it a few seconds, then hit Test — host metrics arrive as `system_*` streams and the unified log lands in the `macos_unified` stream.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyMacosAgentDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["Unified Log", "System Logs", "CPU", "Memory", "Disk", "Network"],

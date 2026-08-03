@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateDestinationName(val, index);
                           }
                         "
-                        :label="t('alert_destinations.import.destinationName') + ' *'"
+                        :label="raw(t('alert_destinations.import.destinationName') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateDestinationUrl(val, index);
                           }
                         "
-                        :label="t('alert_destinations.import.destinationUrl') + ' *'"
+                        :label="raw(t('alert_destinations.import.destinationUrl') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="destinationTypes"
-                        :label="t('alert_destinations.destination_type') + ' *'"
+                        :label="raw(t('alert_destinations.destination_type') + ' *')"
                         class="showLabelOnTop no-case py-2"
                       />
                     </div>
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="destinationMethods"
-                        :label="t('alert_destinations.import.destinationMethod') + ' *'"
+                        :label="raw(t('alert_destinations.import.destinationMethod') + ' *')"
                         class="showLabelOnTop no-case py-2"
                       />
                     </div>
@@ -170,10 +170,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="filteredTemplates"
-                        :label="t('alert_destinations.import.templates') + ' *'"
+                        :label="raw(t('alert_destinations.import.templates') + ' *')"
                         class="showLabelOnTop no-case py-2"
                         :error="!!templateErrors[index]"
-                        :error-message="templateErrors[index]"
+                        :error-message="raw(templateErrors[index])"
                         @search="filterTemplates"
                       />
                     </div>
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateDestinationEmails(val, index);
                           }
                         "
-                        :label="t('alert_destinations.import.emails') + ' *'"
+                        :label="raw(t('alert_destinations.import.emails') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -224,12 +224,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="filteredActions"
-                        :label="t('alert_destinations.import.actions') + ' *'"
+                        :label="raw(t('alert_destinations.import.actions') + ' *')"
                         labelKey="label"
                         valueKey="value"
                         class="showLabelOnTop no-case w-75! py-2"
                         :error="!!actionErrors[index]"
-                        :error-message="actionErrors[index]"
+                        :error-message="raw(actionErrors[index])"
                         @search="filterActions"
                       />
                     </div>
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, reactive, onMounted } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import destinationService from "@/services/alert_destination";
@@ -331,10 +331,10 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type destinationCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
     type destinationErrors = (ErrorMessage | string)[][];
@@ -402,7 +402,7 @@ export default defineComponent({
         userSelectedActionOptions.value = actionsData.list
           .filter((action: any) => action.execution_details_type === "service")
           .map((action: any) => ({
-            label: action.name,
+            label: raw(action.name),
             value: action.id,
           }));
         filteredActions.value = userSelectedActionOptions.value;
@@ -622,7 +622,7 @@ export default defineComponent({
       value ? "" : t("alerts.validation.fieldRequired");
 
     const validateDestinationInputs = async (input: any, index: number) => {
-      let destinationErrors: (string | { message: string; field: string })[] = [];
+      let destinationErrors: (string | ErrorMessage)[] = [];
 
       // Validate name
       if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
@@ -831,6 +831,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       importJson,
       router,

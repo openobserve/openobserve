@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="deleteDialog.show"
       size="xs"
-      :title="deleteDialog.title"
+      :title="raw(deleteDialog.title)"
       data-test="delete-source-maps-dialog"
       :secondary-button-label="t('common.cancel')"
       :primary-button-label="t('common.ok')"
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 defineOptions({ name: "SourceMaps" });
 
 import { ref, onMounted, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
@@ -424,8 +424,13 @@ const formatTimestamp = (timestamp: number) => {
 const confirmDeleteSourceMap = (sourceMap: any) => {
   deleteDialog.value = {
     show: true,
-    title: "Delete Source Maps",
-    message: `Are you sure you want to delete all source maps for ${sourceMap.service} (${sourceMap.version}) in ${sourceMap.env} environment? This will delete ${sourceMap.fileCount} file(s).`,
+    title: t("rum.deleteSourceMapsTitle"),
+    message: t("rum.deleteSourceMapsConfirm", {
+      service: sourceMap.service,
+      version: sourceMap.version,
+      env: sourceMap.env,
+      count: sourceMap.fileCount,
+    }),
     data: sourceMap,
   };
 };

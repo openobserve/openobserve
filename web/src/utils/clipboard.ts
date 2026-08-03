@@ -1,11 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, type TranslateFn } from "@/types/i18n";
+import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface CopyToClipboardOptions {
   successMessage?: string;
-  errorMessage?: string;
+  errorMessage?: I18nText;
   timeout?: number;
   silent?: boolean;
 }

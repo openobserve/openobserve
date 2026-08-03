@@ -1,5 +1,5 @@
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
 
 /**
  * Builds a time-of-day greeting using the user's local timezone.
@@ -27,7 +27,10 @@ export function useGreeting(email: () => string | undefined) {
   });
 
   const greeting = computed(() => {
-    const key = `aiAssistant.greeting.${period.value}`;
+    // Annotated so the built key is checked against I18nKey: `period` is a
+    // literal union, so TS expands this to the four real keys and a rename or
+    // deletion of any of them fails the build instead of rendering the path.
+    const key: I18nKey = `aiAssistant.greeting.${period.value}`;
     const phrase = t(key);
     return displayName.value ? `${phrase}, ${displayName.value}` : phrase;
   });

@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw, type I18nKey } from "@/types/i18n";
+
 export interface CloudFormationTemplate {
   name: string;
-  description: string;
+  descriptionKey: I18nKey;
   url: string;
 }
 
 export interface ComponentOption {
   name: string;
-  description: string;
+  descriptionKey: I18nKey;
   component: string; // Component name/path
 }
 
@@ -30,7 +32,7 @@ export interface AWSIntegration {
   name: string;
   displayName: string;
   icon: string;
-  description: string;
+  descriptionKey: I18nKey;
   cloudFormationTemplate: string;
   cloudFormationTemplates?: CloudFormationTemplate[]; // Multiple templates option
   componentOptions?: ComponentOption[]; // Multiple component options
@@ -48,7 +50,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "CloudTrail",
     displayName: "AWS CloudTrail",
     icon: "",
-    description: "Monitor AWS account activity and API usage across your infrastructure",
+    descriptionKey: "ingestion.integrations.aws.cloudtrail.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudtrail_o2.yaml",
     hasDashboard: true,
@@ -65,7 +67,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "WAF",
     displayName: "AWS WAF",
     icon: "",
-    description: "Protect web applications from common web exploits and bots",
+    descriptionKey: "ingestion.integrations.aws.waf.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudformation_waf.yaml",
     hasDashboard: true,
@@ -81,7 +83,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "ALB",
     displayName: "Application Load Balancer",
     icon: "",
-    description: "Monitor ALB access logs for request patterns, errors, and latency",
+    descriptionKey: "ingestion.integrations.aws.alb.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_alb.yaml",
     hasDashboard: true,
@@ -97,7 +99,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "CloudWatch Logs",
     displayName: "CloudWatch Logs",
     icon: "",
-    description: "Stream CloudWatch logs to OpenObserve for analysis",
+    descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudwatch-logs-to-openobserve.yaml",
     hasDashboard: false,
@@ -110,7 +112,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "CloudWatch Metrics",
     displayName: "CloudWatch Metrics",
     icon: "",
-    description: "Collect and analyze CloudWatch metrics",
+    descriptionKey: "ingestion.integrations.aws.cloudwatch-metrics.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/CloudWatch_All_Metrics.yaml",
     hasDashboard: false,
@@ -123,17 +125,17 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "VPC Flow Logs",
     displayName: "VPC Flow Logs",
     icon: "",
-    description: "Analyze network traffic in your VPC",
+    descriptionKey: "ingestion.integrations.aws.vpc-flow-logs.description",
     cloudFormationTemplate: "",
     cloudFormationTemplates: [
       {
         name: "CloudWatch Integration",
-        description: "Stream VPC Flow Logs via CloudWatch to OpenObserve",
+        descriptionKey: "ingestion.integrations.aws.vpc-flow-logs.cloudwatchIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/vpc-flowlogs-to-openobserve-cloudwatch.yaml",
       },
       {
         name: "Firehose Integration",
-        description: "Stream VPC Flow Logs directly via Kinesis Firehose",
+        descriptionKey: "ingestion.integrations.aws.vpc-flow-logs.firehoseIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/vpc-flowlogs-to-openobserve-firehose.yaml",
       },
     ],
@@ -149,29 +151,29 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "EC2",
     displayName: "EC2 Instance Logs",
     icon: "",
-    description: "Collect logs from EC2 instances",
+    descriptionKey: "ingestion.integrations.aws.ec2.description",
     cloudFormationTemplate: "",
     cloudFormationTemplates: [
       {
         name: "CloudWatch via SSM",
-        description: "Deploy CloudWatch agent to EC2 instances via AWS Systems Manager",
+        descriptionKey: "ingestion.integrations.aws.ec2.cloudwatchViaSsmDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/ec2-cloudwatch-via-ssm.yaml",
       },
       {
         name: "OpenTelemetry via SSM",
-        description: "Deploy OpenTelemetry collector to EC2 instances via AWS Systems Manager",
+        descriptionKey: "ingestion.integrations.aws.ec2.opentelemetryViaSsmDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/ec2-otel-via-ssm.yaml",
       },
     ],
     componentOptions: [
       {
         name: "Windows (Manual Install)",
-        description: "Manually install OpenObserve collector on Windows EC2 instances",
+        descriptionKey: "ingestion.integrations.aws.ec2.windowsManualInstallDescription",
         component: "WindowsConfig",
       },
       {
         name: "Linux/Unix/MacOS (Manual Install)",
-        description: "Manually install OpenObserve collector on Linux/Unix/MacOS EC2 instances",
+        descriptionKey: "ingestion.integrations.aws.ec2.linuxUnixMacosManualInstallDescription",
         component: "LinuxConfig",
       },
     ],
@@ -185,7 +187,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "RDS",
     displayName: "RDS Logs",
     icon: "",
-    description: "Monitor RDS database logs",
+    descriptionKey: "ingestion.integrations.aws.rds.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/rds-logs-to-openobserve.yaml",
     hasDashboard: true,
@@ -200,7 +202,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "S3",
     displayName: "S3 Access Logs",
     icon: "",
-    description: "Track S3 bucket access and operations",
+    descriptionKey: "ingestion.integrations.aws.s3.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/s3-access-logs-to-openobserve.yaml",
     hasDashboard: false,
@@ -213,7 +215,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "Lambda",
     displayName: "Lambda Logs",
     icon: "",
-    description: "Monitor AWS Lambda function logs",
+    descriptionKey: "ingestion.integrations.aws.lambda.description",
     cloudFormationTemplate: "",
     hasDashboard: false,
     documentationUrl: "https://openobserve.ai/docs/ingestion/logs/lambda/",
@@ -225,7 +227,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "API Gateway",
     displayName: "API Gateway Logs",
     icon: "",
-    description: "Analyze API Gateway access logs",
+    descriptionKey: "ingestion.integrations.aws.api-gateway.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/apigateway-logs-to-openobserve.yaml",
     hasDashboard: true,
@@ -240,7 +242,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "Cognito",
     displayName: "Cognito",
     icon: "",
-    description: "Monitor Cognito authentication events",
+    descriptionKey: "ingestion.integrations.aws.cognito.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cognito-events-to-openobserve.yaml",
     hasDashboard: false,
@@ -253,17 +255,17 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "DynamoDB",
     displayName: "DynamoDB Logs",
     icon: "",
-    description: "Track DynamoDB operations",
+    descriptionKey: "ingestion.integrations.aws.dynamodb.description",
     cloudFormationTemplate: "",
     cloudFormationTemplates: [
       {
         name: "Lambda Integration",
-        description: "Stream DynamoDB data to OpenObserve via Lambda",
+        descriptionKey: "ingestion.integrations.aws.dynamodb.lambdaIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/dynamodb-streams-to-openobserve-lambda.yaml",
       },
       {
         name: "Direct Integration",
-        description: "Stream DynamoDB data directly to OpenObserve",
+        descriptionKey: "ingestion.integrations.aws.dynamodb.directIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/dynamodb-streams-to-openobserve.yaml",
       },
     ],
@@ -277,17 +279,17 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "CloudFront",
     displayName: "CloudFront Logs",
     icon: "",
-    description: "Analyze CloudFront access logs",
+    descriptionKey: "ingestion.integrations.aws.cloudfront.description",
     cloudFormationTemplate: "", // Keep empty when using cloudFormationTemplates
     cloudFormationTemplates: [
       {
         name: "Direct Integration",
-        description: "Stream CloudFront logs directly to OpenObserve",
+        descriptionKey: "ingestion.integrations.aws.cloudfront.directIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudfront-to-openobserve.yaml",
       },
       {
         name: "S3 Integration",
-        description: "Ingest CloudFront logs from S3 bucket",
+        descriptionKey: "ingestion.integrations.aws.cloudfront.s3IntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cloudfront-to-openobserve-s3.yaml",
       },
     ],
@@ -303,7 +305,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "Route53",
     displayName: "Route53 Query Logs",
     icon: "",
-    description: "Monitor DNS query logs",
+    descriptionKey: "ingestion.integrations.aws.route53.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/route53-logs-to-openobserve.yaml",
     hasDashboard: true,
@@ -318,7 +320,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "EventBridge",
     displayName: "EventBridge Events",
     icon: "",
-    description: "Capture EventBridge/CloudWatch events",
+    descriptionKey: "ingestion.integrations.aws.eventbridge.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/eventbridge-to-openobserve.yaml",
     hasDashboard: false,
@@ -331,7 +333,7 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "Cost and Usage Reports",
     displayName: "AWS Cost & Usage Reports",
     icon: "",
-    description: "Monitor AWS costs and usage with detailed billing analytics",
+    descriptionKey: "ingestion.integrations.aws.cost-cur.description",
     cloudFormationTemplate:
       "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/cost-cur-to-openobserve.yaml",
     hasDashboard: true,
@@ -346,17 +348,17 @@ export const awsIntegrations: AWSIntegration[] = [
     name: "Kinesis",
     displayName: "Kinesis Streams",
     icon: "",
-    description: "Integrate with Kinesis data streams",
+    descriptionKey: "ingestion.integrations.aws.kinesis.description",
     cloudFormationTemplate: "",
     cloudFormationTemplates: [
       {
         name: "Lambda Integration",
-        description: "Stream Kinesis data to OpenObserve via Lambda",
+        descriptionKey: "ingestion.integrations.aws.kinesis.lambdaIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/kinesis-to-openobserve-lambda.yaml",
       },
       {
         name: "Firehose Integration",
-        description: "Stream Kinesis data directly via Kinesis Firehose",
+        descriptionKey: "ingestion.integrations.aws.kinesis.firehoseIntegrationDescription",
         url: "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/kinesis-to-openobserve-firehose.yaml",
       },
     ],

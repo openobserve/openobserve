@@ -28,14 +28,14 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 
 interface Column {
   alias: string;
-  label: string;
+  label: I18nText;
   format?: (val: unknown) => string;
 }
 

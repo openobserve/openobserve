@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OUserCell — person column (owner / author / created-by / user). For now it
@@ -14,19 +15,20 @@ const props = withDefaults(
     value: unknown;
     /** Explicit display name. When set it's shown instead of the email. */
     name?: string;
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
-  { emptyLabel: "—" },
+  { emptyLabel: raw("—") },
 );
 
-const raw = computed(() => String(props.value ?? "").trim());
-const isEmpty = computed(() => raw.value === "");
+// Named `identity` (not `raw`) so it doesn't shadow the `raw()` i18n helper.
+const identity = computed(() => String(props.value ?? "").trim());
+const isEmpty = computed(() => identity.value === "");
 const displayText = computed(() =>
-  props.name && props.name.trim() ? props.name.trim() : raw.value,
+  props.name && props.name.trim() ? props.name.trim() : identity.value,
 );
 </script>
 
 <template>
   <span v-if="isEmpty" class="text-text-body">{{ emptyLabel }}</span>
-  <span v-else class="text-text-body whitespace-nowrap" :title="raw">{{ displayText }}</span>
+  <span v-else class="text-text-body whitespace-nowrap" :title="identity">{{ displayText }}</span>
 </template>

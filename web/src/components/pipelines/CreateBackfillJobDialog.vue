@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="rounded-default text-badge-blue-soft-text bg-badge-blue-soft-bg inline-block px-2 py-1 font-semibold"
       >
         {{ pipelineName }}
-        <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="pipelineName" />
+        <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="raw(pipelineName)" />
       </span>
     </template>
 
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     name="chunkPeriodMinutes"
                     type="number"
-                    :placeholder="String(scheduleFrequency || 60)"
+                    :placeholder="raw(String(scheduleFrequency || 60))"
                     data-test="chunk-period-input"
                   >
                     <template #icon-right>

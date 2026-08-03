@@ -29,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="size-5!"
       />
     </Transition>
-    <OTooltip side="top" align="center" :content="tooltipText" />
+    <OTooltip side="top" align="center" :content="raw(tooltipText)" />
   </OButton>
 </template>
 
 <script lang="ts">
 import { ref, watch, onMounted, computed, defineComponent } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -112,6 +112,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       store,
       darkMode,
       tooltipText,

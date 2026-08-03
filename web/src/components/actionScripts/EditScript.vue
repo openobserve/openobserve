@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, nextTick, onMounted, watch } from "vue";
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import {
   getUUID,
@@ -484,11 +484,11 @@ const formData = ref(defaultActionScript);
 
 const actionTypes = [
   {
-    label: "Scheduled",
+    label: t("home.scheduledAlert"),
     value: "scheduled",
   },
   {
-    label: "Real Time",
+    label: t("actions.realTime"),
     value: "service",
   },
 ];
@@ -502,11 +502,11 @@ const dialog = ref({
 
 const frequencyTabs = [
   {
-    label: "Cron Job",
+    label: t("actions.cronJob"),
     value: "repeat",
   },
   {
-    label: "Once",
+    label: t("reports.frequencyOnce"),
     value: "once",
   },
 ];
@@ -980,7 +980,7 @@ const handleActionScript = async () => {
   }
 };
 
-const filteredServiceAccounts: Ref<{ label: string; value: string }[]> = ref([]);
+const filteredServiceAccounts: Ref<{ label: I18nText; value: string }[]> = ref([]);
 const isFetchingServiceAccounts = ref(false);
 
 const serviceAccountsOptions: any[] = [];

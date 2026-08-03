@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useSlots, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -22,13 +22,13 @@ const props = withDefaults(
     isFirstPage: boolean;
     isLastPage: boolean;
     position?: "top" | "bottom";
-    title?: string;
+    title?: I18nText;
     /** When true, replace count + range text with skeleton bars */
     loading?: boolean;
   }>(),
   {
     position: "bottom",
-    title: "",
+    title: raw(""),
   },
 );
 
@@ -46,7 +46,7 @@ const pageSizeModel = computed({
 });
 
 const pageSizeSelectOptions = computed(() =>
-  props.pageSizeOptions.map((n) => ({ label: String(n), value: n })),
+  props.pageSizeOptions.map((n) => ({ label: raw(String(n)), value: n })),
 );
 </script>
 

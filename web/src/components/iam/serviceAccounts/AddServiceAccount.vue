@@ -108,7 +108,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AddRole from "@/components/iam/roles/AddRole.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import service_accounts from "@/services/service_accounts";
@@ -252,7 +252,7 @@ export default defineComponent({
     // still selected; only its permissions need to be granted manually.
     async onRoleAdded({ role_name, startFrom }: { role_name: string; startFrom?: string }) {
       if (!this.roleOptions.some((o: any) => o.value === role_name)) {
-        this.roleOptions.push({ label: role_name, value: role_name });
+        this.roleOptions.push({ label: raw(role_name), value: role_name });
       }
       const form = (this.$refs.saForm as any)?.form;
       if (form) {

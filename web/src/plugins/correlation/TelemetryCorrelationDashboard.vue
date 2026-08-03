@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="right"
     :width="90"
     :title="t('correlation.correlatedStreamsFor', { service: serviceName })"
-    :sub-title="formatTimeRange(timeRange)"
+    :sub-title="raw(formatTimeRange(timeRange))"
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="mr-0.5"
                             />
                             <component v-else :is="group.icon" />
-                            <span>{{ group.label }}</span>
+                            <span>{{ t(group.labelKey) }}</span>
                             <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
                           </div>
                           <div class="flex gap-1">
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="xs"
                         />
                         <component v-else :is="outerGroup.icon" />
-                        <span class="whitespace-nowrap">{{ outerGroup.label }}</span>
+                        <span class="whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
                       </div>
                       <span
                         v-if="outerTabResourceName[outerGroup.id]"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-1">
                       <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
                       <component v-else :is="group.icon" />
-                      <span>{{ group.label }}</span>
+                      <span>{{ t(group.labelKey) }}</span>
                       <OTag
                         type="tabChip"
                         :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
@@ -641,7 +641,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="mr-0.5"
                           />
                           <component v-else :is="group.icon" />
-                          <span>{{ group.label }}</span>
+                          <span>{{ t(group.labelKey) }}</span>
                           <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
                         </div>
                         <div class="flex gap-1">
@@ -736,7 +736,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                       />
                       <component v-else :is="outerGroup.icon" />
-                      <span class="text-xs whitespace-nowrap">{{ outerGroup.label }}</span>
+                      <span class="text-xs whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
                     </div>
                     <span
                       v-if="outerTabResourceName[outerGroup.id]"
@@ -766,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-1">
                     <component v-if="typeof group.icon !== 'string'" :is="group.icon" />
                     <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
-                    <span>{{ group.label }}</span>
+                    <span>{{ t(group.labelKey) }}</span>
                     <OTag
                       type="tabChip"
                       :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
@@ -986,7 +986,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="mr-0.5"
                 />
                 <component v-else :is="group.icon" />
-                <span>{{ group.label }}</span>
+                <span>{{ t(group.labelKey) }}</span>
                 <OTag type="fieldTag" class="ml-1">{{ group.streams.length }}</OTag>
               </div>
               <div class="flex gap-1">
@@ -1050,7 +1050,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, computed, watch, defineAsyncComponent, provide, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import useTraces from "@/composables/useTraces";
 import {
@@ -1118,7 +1118,7 @@ export interface TelemetryCorrelationDashboardProps {
   sourceEvent?: {
     timestamp?: number | string;
     severity?: string;
-    message?: string;
+    message?: I18nText;
   };
   metricStreams: StreamInfo[];
   logStreams?: StreamInfo[];
@@ -1606,7 +1606,7 @@ const originalValueForKey = (key: string): string => {
 type ChipKind = "context" | "subject";
 type DimensionChip = {
   key: string;
-  label: string;
+  label: I18nText;
   value: string;
   kind: ChipKind;
   active: boolean;
@@ -1674,7 +1674,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
         })();
       return {
         key,
-        label: dimensionDisplayLabel(key),
+        label: raw(dimensionDisplayLabel(key)),
         value: originalValueForKey(key),
         kind: isSubject ? "subject" : "context",
         active: isSubject ? activeSubject.value === key : contextActive,
@@ -1698,7 +1698,9 @@ const getSubjectButtonLabel = (semanticId: string): string => {
   if (!specs) return semanticId;
 
   const spec = specs.find((s) => s.semanticIds.includes(semanticId));
-  return spec?.label || semanticId;
+  if (!spec) return semanticId;
+  // labelKey wins: `label` only holds names that stay English (Pod, Cloud Run).
+  return spec.labelKey ? t(spec.labelKey) : (spec.label ?? semanticId);
 };
 
 const pinSubject = (newSubject: string | null, previousSubject: string | null) => {

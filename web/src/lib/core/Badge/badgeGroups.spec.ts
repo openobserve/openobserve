@@ -16,7 +16,7 @@ describe("badgeGroups", () => {
     expect(r.variant).toBe("blue-soft");
     expect(r.icon).toBe("bolt");
     expect(r.dot).toBe(false);
-    expect(r.label).toBe("Real-time");
+    expect(r.labelKey).toBe("components.badge.alertType.realtime");
   });
 
   it("resolves alertStatus to dot mode (no icon)", () => {
@@ -79,10 +79,12 @@ describe("badgeGroups", () => {
   it("resolves normalizeState boolean → primary/Normalized, default/Not Normalized", () => {
     const t = resolveBadge("normalizeState", true);
     expect(t.variant).toBe("primary");
-    expect(t.label).toBe("Normalized");
+    expect(t.labelKey).toBe("components.badge.normalizeState.true");
     const f = resolveBadge("normalizeState", false);
     expect(f.variant).toBe("default");
-    expect(f.label).toBe("Not Normalized");
+    // "Not Normalized" moved from a hardcoded `label` to a translatable `labelKey`,
+    // which OTag resolves via t() (label precedence: prop → labelKey → label).
+    expect(f.labelKey).toBe("components.badge.normalizeState.false");
   });
 
   it("resolves fieldDiffStatus (new→success, existing→default, sm)", () => {
@@ -182,8 +184,12 @@ describe("badgeGroups", () => {
   });
 
   it("alert 'condition_not_satisfied' resolves to the Ok label", () => {
-    expect(resolveBadge("alertState", "condition_not_satisfied").label).toBe("Ok");
-    expect(resolveBadge("alertState", "Condition Not Satisfied").label).toBe("Ok");
+    expect(resolveBadge("alertState", "condition_not_satisfied").labelKey).toBe(
+      "components.badge.alertState.ok",
+    );
+    expect(resolveBadge("alertState", "Condition Not Satisfied").labelKey).toBe(
+      "components.badge.alertState.ok",
+    );
   });
 
   it("resolves the groups added in the OTag type/value sweep", () => {

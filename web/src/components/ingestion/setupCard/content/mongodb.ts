@@ -16,6 +16,8 @@
 // MongoDB data-source setup card. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/monitor-mongodb-metrics-otel (requires MongoDB 4.0+).
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
@@ -71,15 +73,14 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
     steps: [
       {
         id: "prepare",
-        title: "Prepare MongoDB",
-        description:
-          "Create a monitoring user with clusterMonitor — run it in mongosh, **not** your shell.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.prepareMongodbTitle",
+        descriptionKey: "ingestion.setupCard.prepareMongodbDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         completeOn: "copy",
         variants: [
           {
             id: "mongosh",
-            label: "mongosh",
+            label: raw("mongosh"),
             icon: tool.terminal,
             code: {
               lang: "bash",
@@ -88,7 +89,7 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
           },
           {
             id: "docker",
-            label: "Docker",
+            label: raw("Docker"),
             icon: tool.docker,
             code: {
               lang: "bash",
@@ -97,7 +98,7 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
           },
           {
             id: "shell",
-            label: "Compass Shell",
+            label: raw("Compass Shell"),
             icon: getImageURL("images/ingestion/mongodb.svg"),
             code: { lang: "javascript", raw: USER_JS },
           },
@@ -106,32 +107,43 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
         variantToggle: false,
         inputs: [
-          { id: "host", label: "MongoDB Host", default: "localhost", placeholder: "localhost" },
-          { id: "port", label: "Port", default: "27017", placeholder: "27017", width: "sm" },
+          {
+            id: "host",
+            labelKey: "ingestion.setupCard.mongodbHostLabel",
+            default: "localhost",
+            placeholder: raw("localhost"),
+          },
+          {
+            id: "port",
+            labelKey: "ingestion.setupCard.portLabel",
+            default: "27017",
+            placeholder: raw("27017"),
+            width: "sm",
+          },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or check Streams for the `mongodb_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyMongodbMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["Connections", "Operations", "Cache Hits", "Cursors", "Documents"],

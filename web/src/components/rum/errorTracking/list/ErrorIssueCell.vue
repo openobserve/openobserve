@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
       <OTag
         v-if="issue.error_handling"
-        :label="issue.error_handling"
+        :label="raw(issue.error_handling)"
         :variant="isUnhandled ? 'error-outline' : 'warning-outline'"
         size="xs"
         shape="rounded"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       <OTag
         v-if="route"
-        :label="route"
+        :label="raw(route)"
         variant="default-soft"
         size="xs"
         shape="rounded"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { parseTopFrame, routeFromUrl } from "@/utils/rum/errorIssueUtils";
 

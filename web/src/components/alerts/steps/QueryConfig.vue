@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip
                         :content="
                           logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                            ?.tooltip || ''
+                            ?.tooltip || raw('')
                         "
                         :delay="400"
                       />
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip
                         :content="
                           logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                            ?.tooltip || ''
+                            ?.tooltip || raw('')
                         "
                         :delay="400"
                       />
@@ -584,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           v-if="cronTimezone"
-                          :content="cronTimezone"
+                          :content="raw(cronTimezone)"
                           :delay="300"
                           side="bottom"
                         />
@@ -964,7 +964,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           v-if="cronTimezone"
-                          :content="cronTimezone"
+                          :content="raw(cronTimezone)"
                           :delay="300"
                           side="bottom"
                         />
@@ -1176,7 +1176,7 @@ import {
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
   b64EncodeUnicode,
@@ -2087,11 +2087,11 @@ export default defineComponent({
             value: "custom",
           },
           {
-            label: "SQL",
+            label: raw("SQL"),
             value: "sql",
           },
           {
-            label: "PromQL",
+            label: raw("PromQL"),
             value: "promql",
           },
         ];
@@ -2104,7 +2104,7 @@ export default defineComponent({
           value: "custom",
         },
         {
-          label: "SQL",
+          label: raw("SQL"),
           value: "sql",
         },
       ];
@@ -2770,6 +2770,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       store,
       highlightedSqlQuery,

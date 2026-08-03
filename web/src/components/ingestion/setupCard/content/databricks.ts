@@ -17,6 +17,8 @@
 // https://openobserve.ai/blog/monitor-databricks/ — Databricks ships LOGS by
 // POSTing them from a notebook to OpenObserve's logs API (no OTel collector).
 
+import { raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
@@ -45,10 +47,9 @@ export default function databricksCard(subs: CardSubstitutions): RichCardContent
     steps: [
       {
         id: "notebook",
-        title: "Send Logs From Your Notebook",
-        description:
-          "Paste into a Databricks notebook cell — it POSTs records to OpenObserve's logs API.",
-        chip: { kind: "editor", label: "notebook.py" },
+        titleKey: "ingestion.setupCard.sendNotebookLogsTitle",
+        descriptionKey: "ingestion.setupCard.sendNotebookLogsDesc",
+        chip: { kind: "editor", label: raw("notebook.py") },
         completeOn: "copy",
         code: {
           lang: "python",
@@ -59,9 +60,9 @@ export default function databricksCard(subs: CardSubstitutions): RichCardContent
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or open Logs and search `source:databricks`.",
-        chip: { kind: "traces", label: "Logs" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyDatabricksLogsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
         pills: ["databricks_logs"],

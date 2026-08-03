@@ -28,17 +28,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
-import { computed, defineComponent } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { computed, defineComponent, type PropType } from "vue";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "GroupHeader",
   components: { OSeparator },
   props: {
+    // User-facing text: typed I18nText so a bare literal at the call site is a
+    // compile error. The double cast is required because `StringConstructor`
+    // returns plain `string`, which does not overlap the branded `I18nText` —
+    // `<script setup>` components can use `defineProps<{ title: I18nText }>()`
+    // directly and avoid this.
     title: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     iconPath: {
       type: String,

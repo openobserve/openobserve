@@ -34,6 +34,7 @@ vi.mock("@/utils/zincutils", () => ({
 import rumCard, { RUM_SDK_VERSION } from "./rum";
 import type { RumCardSubs } from "./rum";
 import type { RichCardContent } from "../types";
+import enLocale from "@/locales/languages/en-US.json";
 
 // ── shared substitutions ──────────────────────────────────────────────────────
 
@@ -107,13 +108,13 @@ describe("rumCard builder", () => {
     it("install step has chip with label 'Install'", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
-      expect(install.chip?.label).toBe("Install");
+      expect(install.chip?.labelKey).toBe("ingestion.setupCard.chipInstall");
     });
 
     it("init step has chip with label 'Editor'", () => {
       const card = buildCard();
       const init = card.steps.find((s) => s.id === "init")!;
-      expect(init.chip?.label).toBe("Editor");
+      expect(init.chip?.labelKey).toBe("ingestion.setupCard.chipEditor");
     });
 
     it("verify step has chip with label 'RUM'", () => {
@@ -537,9 +538,12 @@ describe("rumCard builder", () => {
       const exposureEntry = ts.find((e: any) => e.q.toLowerCase().includes("visible"));
 
       // The init step (both NPM and CDN tabs) states the token ships to
-      // visitors' browsers and can be rotated.
-      expect(init.description).toContain("ships to visitors' browsers");
-      expect(init.description).toContain("rotate");
+      // visitors' browsers and can be rotated. The step carries an i18n KEY
+      // (SetupCardRenderer translates it at render time), so assert on the
+      // en-US copy that key resolves to.
+      expect(init.descriptionKey).toBe("ingestion.setupCard.rumInitDesc");
+      expect(enLocale.ingestion.setupCard.rumInitDesc).toContain("ships to visitors' browsers");
+      expect(enLocale.ingestion.setupCard.rumInitDesc).toContain("rotate");
       // The troubleshooting entry explains it is write-only and rotatable.
       expect(exposureEntry).toBeDefined();
       expect(exposureEntry.a).toContain("write");

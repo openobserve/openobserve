@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsDevice } from "@/types/synthetics";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
@@ -29,9 +29,9 @@ function deviceLabelKey(label: string): string {
 
 const DEFAULT_BROWSERS = ["chromium", "firefox"];
 const DEFAULT_DEVICES: SyntheticsDevice[] = [
-  { id: "desktop", label: "Desktop", width: 1440, height: 900 },
-  { id: "tablet", label: "Tablet", width: 768, height: 1024 },
-  { id: "mobile", label: "Mobile", width: 375, height: 667 },
+  { id: "desktop", label: t("synthetics.browserDevices.desktop"), width: 1440, height: 900 },
+  { id: "tablet", label: t("synthetics.browserDevices.tablet"), width: 768, height: 1024 },
+  { id: "mobile", label: t("synthetics.browserDevices.mobile"), width: 375, height: 667 },
 ];
 
 const DEVICE_ICONS: Record<string, string> = {

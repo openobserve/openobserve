@@ -21,7 +21,7 @@ import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import useHistogram from "@/composables/useLogs/useHistogram";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   SearchAroundParams,
   StreamField,
@@ -163,7 +163,7 @@ export const useSearchAround = () => {
         })
         .then(async (res: { data: SearchAroundResponse }) => {
           searchObj.loading = false;
-          searchObj.data.histogram.chartParams.title = "";
+          searchObj.data.histogram.chartParams.title = raw("");
           if (res.data.from > 0) {
             searchObj.data.queryResults.from = res.data.from;
             searchObj.data.queryResults.scan_size += res.data.scan_size;
@@ -183,7 +183,7 @@ export const useSearchAround = () => {
             searchObj.data.searchAround.histogramHide = true;
           }
 
-          searchObj.data.histogram.chartParams.title = "";
+          searchObj.data.histogram.chartParams.title = raw("");
         })
         .catch((error: SearchAroundError) => {
           let traceId = "";

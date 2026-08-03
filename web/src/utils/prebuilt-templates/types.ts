@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { I18nKey } from "@/types/i18n";
+import type { I18nKey, I18nText } from "@/types/i18n";
 /**
  * Prebuilt destination types
  */
@@ -55,7 +55,15 @@ export interface CredentialField {
   labelKey: I18nKey;
   type: "text" | "password" | "email" | "select" | "toggle";
   required: boolean;
-  hint?: string;
+  /**
+   * Helper text. These config modules are plain, Vue-less objects evaluated at
+   * import time, so real copy belongs in {@link hintKey} (an i18n KEY resolved
+   * by the consumer at render time, like {@link labelKey}); `hint` is for text
+   * that must read identically in every language — a URL or example value.
+   */
+  hint?: I18nText;
+  /** i18n KEY for the helper text. Wins over {@link hint} when both are set. */
+  hintKey?: I18nKey;
   options?: Array<{ label: string; value: string; description?: string }>;
   validator?: (value: string) => CredentialValidatorResult;
 }
@@ -78,7 +86,7 @@ export interface PrebuiltConfig {
 export interface PrebuiltType {
   id: PrebuiltTypeId;
   name: string;
-  description: string;
+  description: I18nText;
   icon: string; // Icon name or component reference
   image?: string; // Image URL for logo
   popular?: boolean;

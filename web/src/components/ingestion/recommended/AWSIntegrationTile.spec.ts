@@ -133,7 +133,7 @@ const createMockIntegration = (overrides = {}) => ({
   id: "cloudwatch-logs",
   name: "CloudWatchLogs",
   displayName: "CloudWatch Logs",
-  description: "Collect CloudWatch logs",
+  descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
   category: "logs",
   cloudFormationTemplate: "https://example.com/cloudwatch.yaml",
   hasDashboard: true,
@@ -196,7 +196,7 @@ describe("AWSIntegrationTile.vue", () => {
 
     it("should render integration description", () => {
       wrapper = createWrapper();
-      expect(wrapper.text()).toContain("Collect CloudWatch logs");
+      expect(wrapper.text()).toContain("Stream CloudWatch logs to OpenObserve for analysis");
     });
 
     it("should render Add Source button when has CloudFormation", () => {
@@ -255,7 +255,11 @@ describe("AWSIntegrationTile.vue", () => {
       wrapper = createWrapper({
         cloudFormationTemplate: undefined,
         cloudFormationTemplates: [
-          { name: "Template", url: "https://example.com", description: "desc" },
+          {
+            name: "Template",
+            url: "https://example.com",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
         ],
       });
       const vm = wrapper.vm as any;
@@ -265,7 +269,13 @@ describe("AWSIntegrationTile.vue", () => {
     it("should be true when componentOptions array has items", () => {
       wrapper = createWrapper({
         cloudFormationTemplate: undefined,
-        componentOptions: [{ name: "Linux", component: "LinuxConfig", description: "Linux setup" }],
+        componentOptions: [
+          {
+            name: "Linux",
+            component: "LinuxConfig",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
+        ],
       });
       const vm = wrapper.vm as any;
       expect(vm.hasCloudFormation).toBe(true);
@@ -308,8 +318,16 @@ describe("AWSIntegrationTile.vue", () => {
       wrapper = createWrapper({
         cloudFormationTemplate: undefined,
         cloudFormationTemplates: [
-          { name: "Template A", url: "https://example.com/a.yaml", description: "A" },
-          { name: "Template B", url: "https://example.com/b.yaml", description: "B" },
+          {
+            name: "Template A",
+            url: "https://example.com/a.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
+          {
+            name: "Template B",
+            url: "https://example.com/b.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
         ],
       });
       const vm = wrapper.vm as any;
@@ -409,8 +427,16 @@ describe("AWSIntegrationTile.vue", () => {
       wrapper = createWrapper({
         cloudFormationTemplate: undefined,
         cloudFormationTemplates: [
-          { name: "Template A", url: "https://example.com/a.yaml", description: "A" },
-          { name: "Template B", url: "https://example.com/b.yaml", description: "B" },
+          {
+            name: "Template A",
+            url: "https://example.com/a.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
+          {
+            name: "Template B",
+            url: "https://example.com/b.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
         ],
       });
       const addSourceBtn = wrapper.find('[data-test="aws-cloudwatch-logs-add-source-btn"]');
@@ -425,8 +451,16 @@ describe("AWSIntegrationTile.vue", () => {
       wrapper = createWrapper({
         cloudFormationTemplate: undefined,
         cloudFormationTemplates: [
-          { name: "Template A", url: "https://example.com/a.yaml", description: "A" },
-          { name: "Template B", url: "https://example.com/b.yaml", description: "B" },
+          {
+            name: "Template A",
+            url: "https://example.com/a.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
+          {
+            name: "Template B",
+            url: "https://example.com/b.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
         ],
       });
       const vm = wrapper.vm as any;
@@ -447,8 +481,16 @@ describe("AWSIntegrationTile.vue", () => {
       wrapper = createWrapper({
         cloudFormationTemplate: undefined,
         cloudFormationTemplates: [
-          { name: "Template A", url: "https://example.com/a.yaml", description: "A" },
-          { name: "Template B", url: "https://example.com/b.yaml", description: "B" },
+          {
+            name: "Template A",
+            url: "https://example.com/a.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
+          {
+            name: "Template B",
+            url: "https://example.com/b.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
         ],
       });
       const vm = wrapper.vm as any;
@@ -458,7 +500,7 @@ describe("AWSIntegrationTile.vue", () => {
       vm.handleTemplateSelection({
         name: "Template A",
         url: "https://example.com/a.yaml",
-        description: "A",
+        descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
       });
       await wrapper.vm.$nextTick();
 
@@ -469,14 +511,20 @@ describe("AWSIntegrationTile.vue", () => {
     it("opens the component-content ODialog after handleComponentSelection", async () => {
       wrapper = createWrapper({
         cloudFormationTemplate: undefined,
-        componentOptions: [{ name: "Linux", component: "LinuxConfig", description: "Linux setup" }],
+        componentOptions: [
+          {
+            name: "Linux",
+            component: "LinuxConfig",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
+        ],
       });
       const vm = wrapper.vm as any;
 
       vm.handleComponentSelection({
         name: "Linux",
         component: "LinuxConfig",
-        description: "Linux setup",
+        descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
       });
       await wrapper.vm.$nextTick();
 
@@ -494,9 +542,19 @@ describe("AWSIntegrationTile.vue", () => {
       wrapper = createWrapper({
         cloudFormationTemplate: undefined,
         cloudFormationTemplates: [
-          { name: "Template A", url: "https://example.com/a.yaml", description: "A" },
+          {
+            name: "Template A",
+            url: "https://example.com/a.yaml",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
         ],
-        componentOptions: [{ name: "Linux", component: "LinuxConfig", description: "Linux setup" }],
+        componentOptions: [
+          {
+            name: "Linux",
+            component: "LinuxConfig",
+            descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
+          },
+        ],
       });
       const vm = wrapper.vm as any;
       vm.showTemplateDialog = true;
@@ -505,7 +563,7 @@ describe("AWSIntegrationTile.vue", () => {
       vm.handleComponentSelection({
         name: "Linux",
         component: "LinuxConfig",
-        description: "Linux setup",
+        descriptionKey: "ingestion.integrations.aws.cloudwatch-logs.description",
       });
       await wrapper.vm.$nextTick();
 

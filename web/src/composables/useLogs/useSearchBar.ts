@@ -374,7 +374,7 @@ export const useSearchBar = (t: TranslateFn) => {
           breakdownField: null,
           breakdownSeries: null,
           chartParams: {
-            title: "",
+            title: raw(""),
             unparsed_x_data: [],
             timezone: "",
           },

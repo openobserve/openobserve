@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
                   {{ hasNoData ? t("common.notAvailableShort") : traceId }}
-                  <OTooltip v-if="!hasNoData" :content="traceId" />
+                  <OTooltip v-if="!hasNoData" :content="raw(traceId)" />
                 </div>
               </div>
             </div>
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="errorMessage"
         variant="error"
         icon="error"
-        :content="errorMessage"
+        :content="raw(errorMessage)"
         class="mb-2.5 shrink-0"
         data-test="inspector-error-banner"
       />
@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -780,6 +780,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       loading,
       errorMessage,
       profileData,

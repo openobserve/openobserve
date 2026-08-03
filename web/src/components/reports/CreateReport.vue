@@ -187,9 +187,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OFormSelect
                             :name="`dashboards[${index}].report_type`"
                             :options="[
-                              { label: 'PDF (default)', value: 'pdf' },
-                              { label: 'PNG (Image)', value: 'png' },
-                              { label: 'CSV (Data)', value: 'csv' },
+                              { label: raw('PDF (default)'), value: 'pdf' },
+                              { label: raw('PNG (Image)'), value: 'png' },
+                              { label: raw('CSV (Data)'), value: 'csv' },
                             ]"
                             :label="t('reports.reportType')"
                             color="input-border"
@@ -613,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeMount } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useLocalTimezone } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
@@ -752,23 +752,23 @@ const dialog = ref({
 
 const timeTabs = [
   {
-    label: "Schedule now",
+    label: t("reports.scheduleNow"),
     value: "scheduleNow",
   },
   {
-    label: "Schedule later",
+    label: t("reports.scheduleLater"),
     value: "scheduleLater",
   },
 ];
 
 const frequencyTabs = [
-  { label: "Cron Job", value: "cron" },
-  { label: "Once", value: "once" },
-  { label: "Hourly", value: "hours" },
-  { label: "Daily", value: "days" },
-  { label: "Weekly", value: "weeks" },
-  { label: "Monthly", value: "months" },
-  { label: "Custom", value: "custom" },
+  { label: t("reports.cron"), value: "cron" },
+  { label: t("reports.frequencyOnce"), value: "once" },
+  { label: t("reports.frequencyHourly"), value: "hours" },
+  { label: t("reports.frequencyDaily"), value: "days" },
+  { label: t("reports.frequencyWeekly"), value: "weeks" },
+  { label: t("reports.frequencyMonthly"), value: "months" },
+  { label: t("reports.frequencyCustom"), value: "custom" },
 ];
 
 // frequencyType, selectedTimeTab and the dashboards rows are form-owned; read
@@ -783,13 +783,12 @@ const dashboardRows = form.useStore((s: any): any[] => s.values?.dashboards ?? [
 
 const filteredTimezone: any = ref([]);
 
-const folderOptions: Ref<{ label: string; value: string }[]> = ref([]);
+const folderOptions: Ref<{ label: I18nText; value: string }[]> = ref([]);
 
-const dashboardOptions: Ref<{ label: string; value: string; tabs: any[]; version: number }[]> = ref(
-  [],
-);
+const dashboardOptions: Ref<{ label: I18nText; value: string; tabs: any[]; version: number }[]> =
+  ref([]);
 
-const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
+const dashboardTabOptions: Ref<{ label: I18nText; value: string }[]> = ref([]);
 
 const options: Ref<{ [key: string]: any[] }> = ref({});
 
@@ -1059,12 +1058,12 @@ const setDashboardOptions = (id: string) => {
           .forEach(
             (dashboard: { title: string; dashboardId: string; tabs: any[]; version: number }) => {
               dashboardOptions.value.push({
-                label: dashboard.title,
+                label: raw(dashboard.title),
                 value: dashboard.dashboardId,
                 tabs: dashboard?.tabs?.map((tab) => ({
-                  label: tab.name,
+                  label: raw(tab.name),
                   value: tab.tabId,
-                })) || [{ label: "Default", value: "default" }],
+                })) || [{ label: t("reports.destinationDefault"), value: "default" }],
                 version: dashboard.version,
               });
               options.value["dashboards"] = [...dashboardOptions.value];
@@ -1086,7 +1085,7 @@ const onDashboardSelection = (dashboardId: any, index = 0) => {
 };
 
 const setDashboardTabOptions = (dashboardId: any) => {
-  const defaultTabs = [{ label: "Default", value: "default" }];
+  const defaultTabs = [{ label: t("reports.destinationDefault"), value: "default" }];
 
   const match = dashboardOptions.value.find((dashboard) => dashboard.value === dashboardId);
   dashboardTabOptions.value = match?.tabs || defaultTabs;
@@ -1107,20 +1106,20 @@ const allDashboardsArePdf = computed(
 // Returns the available attachment type options for a given report type.
 // Inline is disabled for PDF since the report server does not support it.
 const attachmentTypeOptions = (rType: string | undefined) => [
-  { label: "Standard — downloadable attachment (default)", value: "standard" },
+  { label: t("reports.attachmentStandard"), value: "standard" },
   {
-    label: "Inline — embedded in email body",
+    label: t("reports.attachmentInline"),
     value: "inline",
     disable: rType === "pdf",
   },
 ];
 
-const customFrequencyOptions = [
-  { label: "days", value: "days" },
-  { label: "hours", value: "hours" },
-  { label: "weeks", value: "weeks" },
-  { label: "months", value: "months" },
-];
+const customFrequencyOptions = computed(() => [
+  { label: t("reports.frequencyUnits.days"), value: "days" },
+  { label: t("reports.frequencyUnits.hours"), value: "hours" },
+  { label: t("reports.frequencyUnits.weeks"), value: "weeks" },
+  { label: t("reports.frequencyUnits.months"), value: "months" },
+]);
 
 const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
@@ -1163,7 +1162,7 @@ const getDashboaordFolders = () => {
       .then((res) => {
         res.data.list.forEach((folder: { name: string; folderId: string }) => {
           folderOptions.value.push({
-            label: folder.name,
+            label: raw(folder.name),
             value: folder.folderId,
           });
           options.value["folders"] = [...folderOptions.value];

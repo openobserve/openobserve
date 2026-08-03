@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           ref="svcGridRef"
-          class="flex flex-row gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          class="flex [scrollbar-width:none] flex-row gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden"
           @scroll="onSvcScroll"
         >
           <div

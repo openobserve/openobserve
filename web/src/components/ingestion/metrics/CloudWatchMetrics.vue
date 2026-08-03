@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
     <IngestionDocLink
       href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-metric-streams-setup-datalake.html"
     >
@@ -36,7 +36,7 @@ import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincut
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "cloudwatchMetrics",
@@ -66,6 +66,7 @@ export default defineComponent({
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/cloudwatch_metrics/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
     return {
+      raw,
       t,
       store,
       config,

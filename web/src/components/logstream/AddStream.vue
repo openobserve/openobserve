@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
@@ -137,9 +137,9 @@ import { makeAddStreamSchema, addStreamDefaults, type AddStreamForm } from "./Ad
 const { t } = useI18nTyped();
 
 const streamTypes = [
-  { label: "Logs", value: "logs" },
-  { label: "Metrics", value: "metrics" },
-  { label: "Traces", value: "traces" },
+  { label: t("common.logs"), value: "logs" },
+  { label: t("common.metrics"), value: "metrics" },
+  { label: t("common.traces"), value: "traces" },
 ];
 
 const emits = defineEmits(["streamAdded", "close", "added:stream-added", "update:open"]);

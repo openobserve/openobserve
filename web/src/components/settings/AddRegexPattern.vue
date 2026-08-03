@@ -445,7 +445,8 @@ export default defineComponent({
       const payload = {
         name: value.name,
         pattern: value.pattern,
-        description: value.description ?? "",
+        // User-entered free text on its way to the API — never translated.
+        description: raw(value.description ?? ""),
       };
       try {
         const response = props.isEdit

@@ -70,13 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OInput
                         data-test="pipeline-import-name-input"
                         :model-value="userSelectedPipelineName[index] || ''"
-                        :label="t('alerts.name') + ' *'"
+                        :label="t('pipeline.importLabels.name')"
                         class="showLabelOnTop"
                         :error="touchedPipelineName[index] && !userSelectedPipelineName[index]"
                         :error-message="
                           touchedPipelineName[index] && !userSelectedPipelineName[index]
                             ? t('common.nameIsRequired')
-                            : ''
+                            : raw('')
                         "
                         tabindex="0"
                         @update:model-value="
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-source-stream-name-input"
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
-                        :label="t('alerts.stream_name') + ' *'"
+                        :label="t('pipeline.importLabels.streamName')"
                         class="showLabelOnTop no-case py-2"
                         @update:model-value="
                           (val) => {
@@ -127,14 +127,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-source-stream-type-input"
                         :model-value="userSelectedStreamType[index] || ''"
                         :options="streamTypes"
-                        :label="t('alerts.streamType') + ' *'"
+                        :label="t('pipeline.importLabels.streamType')"
                         class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="touchedStreamType[index] && !userSelectedStreamType[index]"
                         :error-message="
                           touchedStreamType[index] && !userSelectedStreamType[index]
                             ? t('common.streamTypeIsRequired')
-                            : ''
+                            : raw('')
                         "
                         @update:model-value="
                           (val: any) => {
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedDestinationStreamType[index] || ''"
                         :options="destinationStreamTypes"
-                        :label="t('alerts.streamType') + ' *'"
+                        :label="t('pipeline.importLabels.streamType')"
                         class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           touchedDestinationStreamType[index] &&
                           !userSelectedDestinationStreamType[index]
                             ? t('common.streamTypeIsRequired')
-                            : ''
+                            : raw('')
                         "
                         @update:model-value="
                           (val: any) => {
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           touchedFunctionName[errorMessage.nodeIndex] &&
                           !userSelectedFunctionName[errorMessage.nodeIndex]
                             ? t('common.functionNameIsRequired')
-                            : ''
+                            : raw('')
                         "
                         @update:model-value="
                           (val: any) => {
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-message="
                           touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]
                             ? t('common.remoteDestinationIsRequired')
-                            : ''
+                            : raw('')
                         "
                         @update:model-value="
                           (val: any) => {
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-message="
                           touchedTimezone[index] && !userSelectedTimezone[index]
                             ? t('common.timezoneIsRequired')
-                            : ''
+                            : raw('')
                         "
                         @update:model-value="
                           (val: any) => {
@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import pipelinesService from "../../services/pipelines";
@@ -453,12 +453,12 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
       nodeIndex?: any;
       currentValue?: string;
     };
     type pipelineCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
 
@@ -512,7 +512,7 @@ export default defineComponent({
     const organizationData = computed(() => {
       return store.state.organizations.map((org: any) => {
         return {
-          label: org.identifier,
+          label: raw(org.identifier),
           value: org.identifier,
           disable:
             !org.identifier || org.identifier !== store.state.selectedOrganization.identifier,
@@ -822,7 +822,7 @@ export default defineComponent({
       let pipelineErrors: (
         | string
         | {
-            message: string;
+            message: I18nText;
             field: string;
             nodeIndex?: number;
             currentValue?: string;
@@ -832,7 +832,7 @@ export default defineComponent({
       // 1. validate name it should not be empty
       if (!input.name.trim() || input.name.trim() === "") {
         pipelineErrors.push({
-          message: `Pipeline - ${index}: Name is required`,
+          message: t("pipeline.importErrors.nameRequired", { index }),
           field: "pipeline_name",
         });
       }
@@ -844,7 +844,7 @@ export default defineComponent({
         !validStreamTypes.includes(input.stream_type)
       ) {
         pipelineErrors.push({
-          message: `Pipeline - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`,
+          message: t("pipeline.importErrors.streamTypeInvalid", { index }),
           field: "source_stream_type",
         });
       }
@@ -855,7 +855,7 @@ export default defineComponent({
           (await validateSourceStream(input.source.stream_name, [])))
       ) {
         pipelineErrors.push({
-          message: `Pipeline - ${index}: Source stream name is required `,
+          message: t("pipeline.importErrors.sourceStreamNameRequired", { index }),
           field: "source_stream_name",
         });
       }
@@ -875,7 +875,7 @@ export default defineComponent({
           !input.sql_query)
       ) {
         pipelineErrors.push({
-          message: `Pipeline - ${index}: SQL query is required`,
+          message: t("pipeline.importErrors.sqlQueryRequired", { index }),
           field: "sql_query_missing",
         });
       }
@@ -899,7 +899,7 @@ export default defineComponent({
         !input.source.trigger_condition.timezone
       ) {
         pipelineErrors.push({
-          message: `Pipeline - ${index}: Timezone is required`,
+          message: t("pipeline.importErrors.timezoneRequired", { index }),
           field: "source_timezone",
         });
       }
@@ -976,7 +976,10 @@ export default defineComponent({
         input.source.org_id != store.state.selectedOrganization.identifier
       ) {
         pipelineErrors.push({
-          message: `Pipeline - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier} `,
+          message: t("pipeline.importErrors.orgIdInvalid", {
+            index,
+            orgId: store.state.selectedOrganization.identifier,
+          }),
           field: "org_id",
         });
       }
@@ -998,7 +1001,10 @@ export default defineComponent({
 
             if (!node.data.name || !existingFunctions.value.includes(node.data.name)) {
               pipelineErrors.push({
-                message: `Pipeline - ${pipelineIndex}, Function-${functionCounter}: Function name is required and should be in the existing functions list`,
+                message: t("pipeline.importErrors.functionNameRequired", {
+                  index: pipelineIndex,
+                  counter: functionCounter,
+                }),
                 field: `function_name_${nodeIndex}`,
                 nodeIndex: nodeIndex,
               });
@@ -1015,7 +1021,7 @@ export default defineComponent({
             // Check if conditions exist
             if (!node.data.conditions) {
               pipelineErrors.push({
-                message: `Pipeline - ${index}, Node ${nodeIndex}: Condition is required`,
+                message: t("pipeline.importErrors.conditionRequired", { index, nodeIndex }),
                 field: "empty_condition",
               });
               hasErrors = true;
@@ -1027,7 +1033,10 @@ export default defineComponent({
               if (item.filterType === "group") {
                 if (!Array.isArray(item.conditions)) {
                   pipelineErrors.push({
-                    message: `Pipeline - ${index}, Node ${nodeIndex}: V2 group must have a conditions array.`,
+                    message: t("pipeline.importErrors.v2GroupConditionsArray", {
+                      index,
+                      nodeIndex,
+                    }),
                     field: "condition_format",
                   });
                   return false;
@@ -1036,7 +1045,7 @@ export default defineComponent({
               } else if (item.filterType === "condition") {
                 if (!item.column || !item.operator || item.value === undefined) {
                   pipelineErrors.push({
-                    message: `Pipeline - ${index}, Node ${nodeIndex}: V2 condition must have column, operator, and value.`,
+                    message: t("pipeline.importErrors.v2ConditionFields", { index, nodeIndex }),
                     field: "condition_format",
                   });
                   return false;
@@ -1054,7 +1063,7 @@ export default defineComponent({
                 const conditions = condition.and || condition.or;
                 if (!Array.isArray(conditions)) {
                   pipelineErrors.push({
-                    message: `Pipeline - ${index}, Node ${nodeIndex}: V1 'and'/'or' conditions must be an array.`,
+                    message: t("pipeline.importErrors.v1ConditionsArray", { index, nodeIndex }),
                     field: "condition_format",
                   });
                   return false;
@@ -1074,7 +1083,7 @@ export default defineComponent({
               });
               if (!valid) {
                 pipelineErrors.push({
-                  message: `Pipeline - ${index}, Node ${nodeIndex}: V0 format - each condition must have column, operator, and value.`,
+                  message: t("pipeline.importErrors.v0ConditionFields", { index, nodeIndex }),
                   field: "condition_format",
                 });
                 hasErrors = true;
@@ -1088,14 +1097,17 @@ export default defineComponent({
               // V1 format
               if (!validateV1Condition(conditionsToValidate)) {
                 pipelineErrors.push({
-                  message: `Pipeline - ${index}, Node ${nodeIndex}: Invalid V1 condition format.`,
+                  message: t("pipeline.importErrors.v1ConditionInvalid", { index, nodeIndex }),
                   field: "condition_format",
                 });
                 hasErrors = true;
               }
             } else {
               pipelineErrors.push({
-                message: `Pipeline - ${index}, Node ${nodeIndex}: Unrecognized condition format.`,
+                message: t("pipeline.importErrors.conditionFormatUnrecognized", {
+                  index,
+                  nodeIndex,
+                }),
                 field: "condition_format",
               });
               hasErrors = true;
@@ -1111,7 +1123,7 @@ export default defineComponent({
       const isValidRemoteDestination = validateRemoteDestination(input);
       if (!isValidRemoteDestination) {
         pipelineErrors.push({
-          message: `Pipeline - ${index}: Remote destination is required`,
+          message: t("pipeline.importErrors.remoteDestinationRequired", { index }),
           field: "remote_destination",
         });
       }
@@ -1179,7 +1191,7 @@ export default defineComponent({
 
         // Success
         pipelineCreators.value.push({
-          message: `Pipeline - ${index}: "${input.name}" created successfully \nNote: please remove the created pipeline object ${input.name} from the json file`,
+          message: t("pipeline.importErrors.createSuccess", { index, name: input.name }),
           success: true,
         });
 
@@ -1191,7 +1203,11 @@ export default defineComponent({
       } catch (error: any) {
         // Failure
         pipelineCreators.value.push({
-          message: `Pipeline - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("pipeline.importErrors.createFailed", {
+            index,
+            name: input.name,
+            reason: error?.response?.data?.message || t("pipeline.importErrors.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -1222,7 +1238,7 @@ export default defineComponent({
         //this is used to disable the stream names which are already used in the source stream
         streamList.value = streamsNames.map((stream: any) => {
           return {
-            label: stream,
+            label: raw(stream),
             value: stream,
             disable: usedStreamNames.includes(stream),
           };
@@ -1325,6 +1341,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       importJson,
       router,
       baseImportRef,

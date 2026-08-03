@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="lastTriggeredAt > 0"
               icon="schedule"
               :label="t('synthetics.results.jumpToLatestData')"
-              :sublabel="lastTriggeredAtSublabel"
+              :sublabel="raw(lastTriggeredAtSublabel)"
               data-test="monitor-runs-empty-jump-latest"
               @click="handleJumpToLatestData"
             />
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="b.name">
+                          <OTooltip :content="raw(b.name)">
                             <span
                               class="text-text-body w-20 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="l.name">
+                          <OTooltip :content="raw(l.name)">
                             <span
                               class="text-text-body w-40 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -505,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="d.name">
+                          <OTooltip :content="raw(d.name)">
                             <span
                               class="text-text-body text-capitalize w-18 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -547,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="d.name">
+                          <OTooltip :content="raw(d.name)">
                             <span
                               class="text-text-body w-34 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -710,7 +710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="(row as VisibleRun).scheduledTs"
                       unit="ms"
                       mode="absolute"
-                      empty-label="—"
+                      :empty-label="raw('—')"
                     />
                   </template>
                   <template #cell-last_run_at="{ row }">
@@ -718,7 +718,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="(row as VisibleRun).lastRunTs"
                       unit="ms"
                       mode="absolute"
-                      empty-label="—"
+                      :empty-label="raw('—')"
                     />
                   </template>
                   <template #cell-duration="{ row }">
@@ -741,7 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-device="{ row }">
                     <span class="text-text-body inline-flex items-center gap-1 text-sm">
                       <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
-                      {{ deviceLabel((row as VisibleRun).device) }}
+                      {{ deviceDisplay((row as VisibleRun).device) }}
                     </span>
                   </template>
                   <template #cell-trigger_type="{ row }">
@@ -766,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <EmptyStateActionCard
                             icon="schedule"
                             :label="t('synthetics.results.jumpToLastRun')"
-                            :sublabel="lastRunLabel"
+                            :sublabel="raw(lastRunLabel)"
                             data-test="monitor-runs-empty-jump-last-run"
                             @click="handleEmptyStateAction('jump-to-last-run')"
                           />
@@ -1044,7 +1044,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -1073,7 +1073,7 @@ import MonitorStatusTimeline from "@/views/synthetics/MonitorStatusTimeline.vue"
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
-import { deviceIconName, deviceLabel } from "@/composables/synthetics/syntheticResultsSchema";
+import { deviceIconName, deviceLabelKey } from "@/composables/synthetics/syntheticResultsSchema";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -1088,6 +1088,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 defineOptions({ name: "SyntheticMonitorRuns" });
 
 const { t } = useI18nTyped();
+
+// Known device IDs translate; unknown ones display verbatim.
+const deviceDisplay = (id: string): I18nText => {
+  const key = deviceLabelKey(id);
+  return key ? t(key) : raw(id);
+};
 
 const emit = defineEmits<{
   (e: "edit"): void;
@@ -1320,7 +1326,7 @@ function uniqueValues(key: "browser" | "device" | "location"): string[] {
 const browserOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allBrowsers"), value: "all", icon: "language" },
   ...uniqueValues("browser").map((v) => ({
-    label: v,
+    label: raw(v),
     value: v,
     icon: browserIcon(v),
   })),
@@ -1328,7 +1334,7 @@ const browserOptions = computed<SelectOption[]>(() => [
 const deviceOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allDevices"), value: "all", icon: "devices" },
   ...uniqueValues("device").map((v) => ({
-    label: deviceLabel(v),
+    label: deviceDisplay(v),
     value: v,
     icon: deviceIconName(v),
   })),
@@ -1336,7 +1342,7 @@ const deviceOptions = computed<SelectOption[]>(() => [
 const locationOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allLocations"), value: "all", icon: "location-on" },
   ...uniqueValues("location").map((v) => ({
-    label: locationLabel(v),
+    label: raw(locationLabel(v)),
     value: v,
     icon: locationIcon(v),
   })),
@@ -1439,7 +1445,7 @@ const failCount = computed(() => String(synthetics.kpi.value.failedRuns));
 
 interface KpiCard {
   key: string;
-  label: string;
+  label: I18nText;
   value: string;
   unit?: string;
   valueClass?: string;
@@ -1559,7 +1565,7 @@ interface TimelineSegment {
   runId: string;
   status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   color: string;
-  title: string;
+  title: I18nText;
   /** Epoch ms of the first execution in this logical run. */
   timestampMs: number;
   executions: TimelineExecution[];
@@ -1788,7 +1794,7 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
   return Array.from(groups.entries()).map(([id, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
     return {
-      name: deviceLabel(id),
+      name: deviceDisplay(id),
       icon: deviceIconName(id),
       pct: pct + "%",
       barColor: "var(--color-status-success-text)",
@@ -1997,7 +2003,7 @@ const failedStepOptions = computed<SelectOption[]>(() => {
   const withLocator = stepNames().filter((n) => meta[n].locator);
   return [
     { label: t("synthetics.filters.anyFailedStep"), value: "all" },
-    ...withLocator.map((n) => ({ label: n, value: n })),
+    ...withLocator.map((n) => ({ label: raw(n), value: n })),
   ];
 });
 
@@ -2056,7 +2062,7 @@ const visibleRuns = computed<VisibleRun[]>(() => {
       locationName: locationLabel(run.location),
       browser: run.browser,
       device: run.device,
-      deviceName: deviceLabel(run.device),
+      deviceName: deviceDisplay(run.device),
     };
   });
 });

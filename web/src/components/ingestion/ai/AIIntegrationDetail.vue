@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import useIngestion from "@/composables/useIngestion";
@@ -84,9 +84,9 @@ const richContent = computed(() =>
       :logo-url="integration.logo"
       :logo-url-dark="integration.logoDark"
     />
-    <AIIntegrationCard v-else-if="cardContent" :content="cardContent" :doc-url="docURL" />
+    <AIIntegrationCard v-else-if="cardContent" :content="raw(cardContent)" :doc-url="docURL" />
     <div v-else class="text-base">
-      <CopyContent :content="aiContent" />
+      <CopyContent :content="raw(aiContent)" />
       <div class="pt-6 pb-2 font-bold">
         {{ t("ingestion.ai.viewDocsPrefix") }}
         <a

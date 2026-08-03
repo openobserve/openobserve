@@ -418,10 +418,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip
                               v-if="row.index_type && row.index_type.length > 0"
                               :content="
-                                streamIndexType
-                                  .filter((opt) => row.index_type.includes(opt.value))
-                                  .map((opt) => opt.label)
-                                  .join(', ')
+                                raw(
+                                  streamIndexType
+                                    .filter((opt) => row.index_type.includes(opt.value))
+                                    .map((opt) => opt.label)
+                                    .join(', '),
+                                )
                               "
                             />
                           </div>
@@ -787,7 +789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { computed, defineComponent, onBeforeMount, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { convertUnixToDateFormat as convertUnixToFormat, formatTimestamp } from "@/utils/date";
@@ -982,16 +984,16 @@ export default defineComponent({
     const redDaysList = ref<ExtendedRetentionRange[]>([]);
     const resultTotal = ref<number>(0);
     const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
+      { label: raw("250"), value: 250 },
+      { label: raw("500"), value: 500 },
     ];
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
 
-    const changePagination = (val: { label: string; value: any }) => {
+    const changePagination = (val: { label: I18nText; value: any }) => {
       selectedPerPage.value = val.value;
     };
 
@@ -1131,17 +1133,32 @@ export default defineComponent({
     const computedSchemaFieldsName = "All Fields";
 
     const streamIndexType = [
-      { label: "Full text search", value: "fullTextSearchKey" },
-      { label: "Secondary index", value: "secondaryIndexKey" },
-      { label: "Bloom filter", value: "bloomFilterKey" },
-      { label: "KeyValue partition", value: "keyPartition" },
-      { label: "Prefix partition", value: "prefixPartition" },
+      { label: t("logStream.indexTypeOptions.fullTextSearch"), value: "fullTextSearchKey" },
+      { label: t("logStream.indexTypeOptions.secondaryIndex"), value: "secondaryIndexKey" },
+      { label: t("logStream.indexTypeOptions.bloomFilter"), value: "bloomFilterKey" },
+      { label: t("logStream.indexTypeOptions.keyValuePartition"), value: "keyPartition" },
+      { label: t("logStream.indexTypeOptions.prefixPartition"), value: "prefixPartition" },
 
-      { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
-      { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
-      { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
-      { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
-      { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 8 }),
+        value: "hashPartition_8",
+      },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 16 }),
+        value: "hashPartition_16",
+      },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 32 }),
+        value: "hashPartition_32",
+      },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 64 }),
+        value: "hashPartition_64",
+      },
+      {
+        label: t("logStream.indexTypeOptions.hashPartition", { buckets: 128 }),
+        value: "hashPartition_128",
+      },
     ];
     const { getStream, getUpdatedSettings } = useStreams(t);
 
@@ -2420,6 +2437,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       config,
       dateChangeValue,

@@ -1,4 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
+import { raw } from "@/types/i18n";
+
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { agentOptionKey, ALL_AGENTS_VALUE } from "./llmAgentFilter";
@@ -38,13 +40,15 @@ export function buildAgentSelectOptions(
   }
   const result: SelectOption[] = [];
   if (options.includeAllAgents) {
-    result.push({ label: t("traces.allAgents"), value: ALL_AGENTS_VALUE });
+    // `t` is the caller-injected translator (plain `(k) => string`), so the text
+    // is already translated by the time it lands here — `raw` only re-brands it.
+    result.push({ label: raw(t("traces.allAgents")), value: ALL_AGENTS_VALUE });
   }
   for (const [name, variants] of byName) {
-    result.push({ label: name, header: true });
+    result.push({ label: raw(name), header: true });
     for (const agent of variants) {
       result.push({
-        label: variantLabel(agent, t),
+        label: raw(variantLabel(agent, t)),
         value: agentOptionKey(agent),
         agent,
       });
@@ -74,7 +78,7 @@ export function buildStreamSelectOptions(
     counts.set(a.source_stream, (counts.get(a.source_stream) ?? 0) + 1);
   }
   return streams.map((s) => ({
-    label: s,
+    label: raw(s),
     value: s,
     agentCount: counts.get(s) ?? 0,
   }));

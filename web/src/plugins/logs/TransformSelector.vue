@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :disabled="!searchObj.data.transformType"
         />
-        <OTooltip :content="getTransformLabelTooltip" :side-offset="2" />
+        <OTooltip :content="raw(getTransformLabelTooltip)" :side-offset="2" />
       </div>
       <ODropdown v-model:open="functionModel" side="bottom" align="start">
         <template #trigger>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OIcon v-else :name="transformIcon" size="sm" />
             <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
-            <OTooltip :content="transformsLabel" :side-offset="2" />
+            <OTooltip :content="raw(transformsLabel)" :side-offset="2" />
           </OButton>
         </template>
         <div data-test="logs-search-saved-function-list" class="py-0">
@@ -134,7 +134,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";

@@ -16,7 +16,7 @@
 import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-// import { useI18nTyped } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
@@ -39,7 +39,7 @@ export interface CrossLink {
 export interface Transform {
   name?: string;
   function?: string;
-  content?: string;
+  content?: I18nText;
   id?: string;
   [key: string]: unknown;
 }
@@ -59,7 +59,7 @@ export interface ActionItem {
 }
 
 export interface RefreshTimeItem {
-  label: string;
+  label: I18nText;
   value: number;
 }
 
@@ -79,7 +79,7 @@ export interface HistogramData {
   breakdownField: string | null;
   breakdownSeries: Map<string, number[]> | null;
   chartParams: {
-    title: string;
+    title: I18nText;
     unparsed_x_data: unknown[];
     timezone: string;
   };
@@ -372,7 +372,7 @@ export const searchState = () => {
       breakdownField: null,
       breakdownSeries: null,
       chartParams: {
-        title: "",
+        title: raw(""),
         unparsed_x_data: [],
         timezone: "",
       },

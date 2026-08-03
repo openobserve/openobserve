@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OStatCard — the reusable KPI / stat tile. The ONE stat primitive across the
@@ -24,7 +25,7 @@ import type { StatTone, StatTrend } from "./OStatStrip.types";
 
 const props = withDefaults(
   defineProps<{
-    label?: string;
+    label?: I18nText;
     value?: string | number;
     icon?: IconName;
     tone?: StatTone;

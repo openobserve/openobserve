@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSelect
                 :name="`filters[${idx}].field`"
                 :options="filteredStreamFields"
-                :placeholder="filter.field ? '' : t('alerts.anomaly.fieldPlaceholder')"
+                :placeholder="filter.field ? raw('') : t('alerts.anomaly.fieldPlaceholder')"
                 class="alert-v3-select filter-field-select"
                 style="width: 200px"
                 :loading="loadingFields"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :show-auto-complete="true"
                 :disable-ai="!config.stream_name"
                 :disable-ai-reason="
-                  !config.stream_name ? t('alerts.anomaly.selectStreamFirst') : ''
+                  !config.stream_name ? t('alerts.anomaly.selectStreamFirst') : raw('')
                 "
                 editor-height="100%"
                 data-test="anomaly-custom-sql"
@@ -184,7 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="detectionFunction && detectionFunction !== 'count'"
                 name="detection_function_field"
                 :options="filteredDetectionFields"
-                :placeholder="detectionFunctionField ? '' : t('alerts.anomaly.fieldPlaceholder')"
+                :placeholder="
+                  detectionFunctionField ? raw('') : t('alerts.anomaly.fieldPlaceholder')
+                "
                 :loading="loadingFields"
                 data-test="anomaly-detection-function-field"
                 class="alert-v3-select"
@@ -562,11 +564,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label-always
                     markers
                     :marker-labels="[
-                      { value: 0, label: '0' },
-                      { value: 25, label: '25' },
-                      { value: 50, label: '50' },
-                      { value: 75, label: '75' },
-                      { value: 100, label: '100' },
+                      { value: 0, label: raw('0') },
+                      { value: 25, label: raw('25') },
+                      { value: 50, label: raw('50') },
+                      { value: 75, label: raw('75') },
+                      { value: 100, label: raw('100') },
                     ]"
                     class="sensitivity-range-slider mt-3.5 h-36.25! [--color-slider-thumb-border:white] [--color-slider-thumb:var(--color-accent)] [--color-slider-track-fill:var(--color-accent)] [--color-slider-value:var(--color-text-secondary)]"
                     data-test="anomaly-threshold-range"
@@ -583,7 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import streamService from "@/services/stream";
 import {
@@ -647,7 +649,7 @@ export default defineComponent({
     // "SQL" stays a literal — a proper noun, not translatable copy.
     const queryTabOptions = computed(() => [
       { label: t("alerts.queryBuilder"), value: "filters" },
-      { label: "SQL", value: "custom_sql" },
+      { label: raw("SQL"), value: "custom_sql" },
     ]);
 
     const filterOperators = ANOMALY_FILTER_OPERATORS;
@@ -1192,6 +1194,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       store,
       form,

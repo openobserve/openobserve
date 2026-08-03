@@ -4,6 +4,7 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
+import enUS from "@/locales/languages/en-US.json";
 
 import SourceMaps from "./SourceMaps.vue";
 
@@ -52,11 +53,13 @@ const createMockRouter = () =>
     ],
   });
 
+// Real en-US messages: this spec asserts rendered copy (dialog labels, the
+// delete confirmation), so an empty message set would silently pass on raw keys.
 const createMockI18n = () =>
   createI18n({
     legacy: false,
     locale: "en",
-    messages: { en: {} },
+    messages: { en: enUS },
   });
 
 const notifyMock = vi.fn();
@@ -322,11 +325,14 @@ describe("SourceMaps.vue", () => {
 
       wrapper = await mountComponent();
 
-      // OTable is always rendered; when data is empty it renders #empty slot with OEmptyState.
-      // The i18n keys are not translated in the test environment, so we verify the
-      // empty state component is rendered rather than checking for translated text.
+      // OTable is always rendered; when data is empty it renders #empty slot with
+      // OEmptyState. This spec loads the real en-US messages, so assert the copy the
+      // user actually sees — the previous `toContain("emptyState")` only passed
+      // because the message set was empty and t() echoed the key back.
       expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain("emptyState");
+      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain(
+        "No source maps uploaded",
+      );
     });
 
     it("shows OTable when grouped source maps exist", async () => {
@@ -434,8 +440,8 @@ describe("SourceMaps.vue", () => {
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("open")).toBe(false);
       expect(dialog.props("size")).toBe("xs");
-      expect(dialog.props("primaryButtonLabel")).toBe("common.ok");
-      expect(dialog.props("secondaryButtonLabel")).toBe("common.cancel");
+      expect(dialog.props("primaryButtonLabel")).toBe("OK");
+      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
     });
 
     it("confirmDeleteSourceMap opens dialog and populates title/message/data", async () => {
@@ -457,7 +463,7 @@ describe("SourceMaps.vue", () => {
       expect((wrapper.vm as any).deleteDialog.message).toContain("svc-a");
       expect((wrapper.vm as any).deleteDialog.message).toContain("1.0.0");
       expect((wrapper.vm as any).deleteDialog.message).toContain("prod");
-      expect((wrapper.vm as any).deleteDialog.message).toContain("2 file(s)");
+      expect((wrapper.vm as any).deleteDialog.message).toContain("2 files");
       expect((wrapper.vm as any).deleteDialog.data).toEqual(row);
     });
 

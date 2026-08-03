@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useAiIcon } from "@/composables/useAiIcon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -335,9 +335,9 @@ const props = withDefaults(
     /** Override the default "broken-panel" illustration (hero size only). */
     illustration?: IllustrationName;
     /** Override the error code's default title. */
-    title?: string;
+    title?: I18nText;
     /** Override the error code's default description. */
-    description?: string;
+    description?: I18nText;
   }>(),
   { size: "hero", aiEnabled: false },
 );

@@ -27,7 +27,7 @@ import {
 } from "@/ts/interfaces/query";
 import { logsErrorMessage } from "@/utils/common";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
@@ -589,7 +589,7 @@ export const useSearchResponseHandler = () => {
     trace_id,
     defaultMessage,
   }: {
-    message?: string;
+    message?: I18nText;
     code?: number;
     trace_id?: string;
     defaultMessage: string;

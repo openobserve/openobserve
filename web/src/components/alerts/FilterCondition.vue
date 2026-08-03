@@ -113,8 +113,8 @@ const props = defineProps({
     required: true,
   },
   label: {
-    type: String,
-    default: "",
+    type: String as unknown as PropType<I18nText>,
+    default: raw(""),
     required: true,
   },
   depth: {
@@ -156,8 +156,8 @@ const props = defineProps({
   },
 });
 
-import { ref, computed, watch, inject } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { ref, computed, watch, inject, type PropType } from "vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 

@@ -28,12 +28,14 @@
  * silently. It is a bare enum in a types module with no imports of its own.
  */
 
+import { raw, type I18nKey, type I18nText } from "@/types/i18n";
+
 import { PromqlStepId } from "@/components/promql/types";
 import type { PromqlBuilderQuery, PromqlLabelMatcher, PromqlStep } from "@/components/promql/types";
 
 /** A filter as callers pass it in: label/value plus an optional operator. */
 interface FilterInput {
-  label: string;
+  label: I18nText;
   value: string;
   operator?: string;
 }
@@ -43,7 +45,7 @@ type FiltersArg = FilterInput[] | Record<string, string> | undefined;
 
 /** A matcher after normalization: validated label, operator and value. */
 interface NormalizedMatcher {
-  label: string;
+  label: I18nText;
   operator: PromqlOperator;
   value: string;
 }
@@ -61,11 +63,22 @@ interface VariantQuery {
   builder?: PromqlBuilderQuery;
 }
 
-/** One variant of a card: an ordered set of queries and its chart shape. */
+/**
+ * One variant of a card: an ordered set of queries and its chart shape.
+ *
+ * This module is deliberately Vue-free (see the file header), so it cannot call
+ * `t()` — and it is imported at module load, so any text it resolved would
+ * freeze at the boot locale. User-facing variant names are therefore stored as
+ * an i18n KEY (`labelKey`) and translated by the one consumer that displays
+ * them, `FunctionConfigDialog.vue`, at render time. `label` stays for the cases
+ * a key cannot express: a name built from live data (`Top 5 by ${label}`).
+ * Exactly one of the pair is set; `labelKey` wins when both are.
+ */
 interface Variant {
   id: string;
   footerLabel: string;
-  label: string;
+  label?: I18nText;
+  labelKey?: I18nKey;
   queries: VariantQuery[];
   chartType: string;
   unit?: string;
@@ -491,7 +504,7 @@ function escapePromqlString(value: unknown): string {
  * cache key stable.
  *
  * @param {string} metricName
- * @param {Array<{label: string, value: string, operator?: string}>|Record<string,string>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended verbatim as `=` matchers
  * @returns {string} e.g. `{__name__="http_requests_total",job="api"}`
  */
@@ -520,9 +533,9 @@ export function buildSelector(
  * panel editor's PromQL builder stores. Sharing this step is what keeps the two
  * from drifting apart.
  *
- * @param {Array<{label: string, value: string, operator?: string}>|Record<string,string>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended as `=` matchers
- * @returns {Array<{label: string, operator: string, value: string}>}
+ * @returns {Array<{label: I18nText, operator: string, value: string}>}
  */
 function normalizeMatchers(
   filters?: FiltersArg,
@@ -533,12 +546,12 @@ function normalizeMatchers(
     list.push(...filters);
   } else if (filters && typeof filters === "object") {
     for (const [label, value] of Object.entries(filters)) {
-      list.push({ label, value });
+      list.push({ label: raw(label), value });
     }
   }
   if (extraMatchers && typeof extraMatchers === "object") {
     for (const [label, value] of Object.entries(extraMatchers)) {
-      list.push({ label, value });
+      list.push({ label: raw(label), value });
     }
   }
 
@@ -555,7 +568,7 @@ function normalizeMatchers(
       if (!isPromqlOperator(operator)) {
         throw new Error(`buildSelector: invalid operator "${operator}"`);
       }
-      return { label, operator, value: String(f.value ?? "") };
+      return { label: raw(label), operator, value: String(f.value ?? "") };
     })
     .sort((a, b) =>
       a.label === b.label ? a.value.localeCompare(b.value) : a.label.localeCompare(b.label),
@@ -569,7 +582,7 @@ function normalizeMatchers(
  * Values are handed over RAW: the query modeller escapes them itself when it
  * renders, so escaping here would double it.
  *
- * @returns {Array<{label: string, op: string, value: string}>}
+ * @returns {Array<{label: I18nText, op: string, value: string}>}
  */
 export function builderLabelsOf(filters?: FiltersArg): PromqlLabelMatcher[] {
   return normalizeMatchers(filters).map(({ label, operator, value }) => ({
@@ -623,7 +636,7 @@ export function isRateBasedKind(cardKind: string): boolean {
  * empty only when the window truly holds nothing.
  *
  * @param {string} streamName
- * @param {Array<{label: string, value: string, operator?: string}>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string}>} [filters]
  * @returns {string} PromQL
  */
 export function buildPresenceQuery(streamName: string, filters?: FiltersArg): string {
@@ -926,21 +939,21 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "avg",
           footerLabel: "avg",
-          label: "Average",
+          labelKey: "metrics.explorer.variants.average",
           queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
           chartType: "line",
         },
         {
           id: "sum",
           footerLabel: "sum",
-          label: "Sum",
+          labelKey: "metrics.explorer.variants.sum",
           queries: [q(`sum(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Sum)]))],
           chartType: "line",
         },
         {
           id: "minmax",
           footerLabel: "min / max",
-          label: "Min / Max",
+          labelKey: "metrics.explorer.variants.minMax",
           queries: [
             q(`min(${sel})`, "min", b(metricName, [AGG(PromqlStepId.Min)])),
             q(`max(${sel})`, "max", b(metricName, [AGG(PromqlStepId.Max)])),
@@ -950,14 +963,14 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "stddev",
           footerLabel: "stddev",
-          label: "Std dev",
+          labelKey: "metrics.explorer.variants.stddev",
           queries: [q(`stddev(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Stddev)]))],
           chartType: "line",
         },
         {
           id: "percentiles",
           footerLabel: "percentiles",
-          label: "Percentiles",
+          labelKey: "metrics.explorer.variants.percentiles",
           // A query per OFFERED percentile, not per default-checked one. The
           // dialog builds its checkboxes from `availablePercentiles`, and
           // `resolveVariant` narrows these queries down to the checked set — so
@@ -974,11 +987,13 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
       ];
 
     case CARD_KIND.COUNTER_RATE: {
-      const variants = [
+      // Annotated: the literal entries all carry `labelKey`, so without this TS
+      // narrows the element type and rejects the data-derived `label` pushed below.
+      const variants: Variant[] = [
         {
           id: "rate-sum",
           footerLabel: "sum(rate)",
-          label: "Rate (sum)",
+          labelKey: "metrics.explorer.variants.rateSum",
           queries: [
             q(
               `sum(rate(${sel}[${w}]))`,
@@ -991,7 +1006,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "rate-avg",
           footerLabel: "avg(rate)",
-          label: "Rate (avg)",
+          labelKey: "metrics.explorer.variants.rateAvg",
           queries: [
             q(
               `avg(rate(${sel}[${w}]))`,
@@ -1004,7 +1019,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "increase",
           footerLabel: "sum(increase)",
-          label: "Increase",
+          labelKey: "metrics.explorer.variants.increase",
           queries: [
             q(
               `sum(increase(${sel}[${w}]))`,
@@ -1022,7 +1037,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         variants.push({
           id: "topk",
           footerLabel: `topk(5) by ${topkLabel}`,
-          label: `Top 5 by ${topkLabel}`,
+          label: raw(`Top 5 by ${topkLabel}`),
           queries: [
             q(
               `topk(5, sum by (${topkLabel}) (rate(${sel}[${w}])))`,
@@ -1041,7 +1056,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "heatmap",
           footerLabel: "heatmap",
-          label: "Heatmap",
+          labelKey: "metrics.explorer.variants.heatmap",
           queries: [
             q(
               `sum by (le) (rate(${sel}[${w}]))`,
@@ -1059,7 +1074,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "percentiles",
           footerLabel: "percentiles",
-          label: "Percentiles",
+          labelKey: "metrics.explorer.variants.percentiles",
           queries: DEFAULT_PERCENTILES.map((p) =>
             q(
               `histogram_quantile(${p / 100}, sum by (le) (rate(${sel}[${w}])))`,
@@ -1074,7 +1089,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "count-rate",
           footerLabel: "sum(rate) of count",
-          label: "Rate of count",
+          labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
               `sum(rate(${countSel}[${w}]))`,
@@ -1098,7 +1113,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "count-rate",
           footerLabel: "sum(rate) of count",
-          label: "Rate of count",
+          labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
               `sum(rate(${countSel}[${w}]))`,
@@ -1118,7 +1133,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "mean",
           footerLabel: "avg",
-          label: "Average",
+          labelKey: "metrics.explorer.variants.average",
           queries: [
             q(
               `sum(rate(${sel}[${w}])) / sum(rate(${countSel}[${w}]))`,
@@ -1134,7 +1149,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "count-rate",
           footerLabel: "sum(rate) of count",
-          label: "Rate of count",
+          labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
               `sum(rate(${countSel}[${w}]))`,
@@ -1158,7 +1173,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
           // mergeable. The copy says "avg of reported quantiles" and the pXX
           // vocabulary is deliberately withheld — that is reserved for
           // histogram_quantile.
-          label: "Avg of reported quantiles",
+          labelKey: "metrics.explorer.variants.avgReportedQuantiles",
           queries: [
             q(
               `avg by (quantile) (${sel})`,
@@ -1171,7 +1186,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "raw-quantiles",
           footerLabel: "raw quantiles",
-          label: "Reported quantiles (raw)",
+          labelKey: "metrics.explorer.variants.reportedQuantilesRaw",
           // {quantile} alone would duplicate legend names across targets.
           queries: [q(sel, "{instance} {quantile}", b(metricName, []))],
           chartType: "line",
@@ -1188,7 +1203,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
           {
             id: "buckets",
             footerLabel: "buckets",
-            label: "Buckets",
+            labelKey: "metrics.explorer.variants.buckets",
             queries: [
               q(`sum by (le) (${sel})`, "{le}", b(metricName, [AGG(PromqlStepId.Sum, ["le"])])),
             ],
@@ -1204,7 +1219,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
           {
             id: "avg",
             footerLabel: "avg",
-            label: "Average",
+            labelKey: "metrics.explorer.variants.average",
             queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
             chartType: "line",
           },
@@ -1221,7 +1236,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "avg",
           footerLabel: "avg",
-          label: "Average",
+          labelKey: "metrics.explorer.variants.average",
           queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
           chartType: "line",
         },
@@ -1232,7 +1247,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "count",
           footerLabel: "count",
-          label: "Count of series",
+          labelKey: "metrics.explorer.variants.countOfSeries",
           // An info metric carries its payload in its LABELS; the value is
           // always 1. Charting the value would therefore draw a flat line at 1
           // for every such metric — true, and useless. What carries information
@@ -1244,7 +1259,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "series",
           footerLabel: "series",
-          label: "Series (labels)",
+          labelKey: "metrics.explorer.variants.seriesLabels",
           // The label sets themselves. Not previewable: a card renders through
           // ECharts, which does not draw a table at all — and there is no room
           // for one at 120px anyway. Reachable from the ⚙ dialog, and the
@@ -1286,7 +1301,7 @@ const FOOTER_LABEL = {
  * @param {{
  *   streamNames?: Set<string>,   // feeds the `_sum` sibling check
  *   familyType?: string,         // the family's declared type
- *   filters?: Array<{label: string, value: string, operator?: string}>,
+ *   filters?: Array<{label: I18nText, value: string, operator?: string}>,
  *   rateWindow?: string,         // PromQL duration; defaults to the 4m floor
  *   labels?: string[],           // the stream's label names, when known
  *   applyNanGuard?: boolean, // retry mode: guard the selector against NaN samples

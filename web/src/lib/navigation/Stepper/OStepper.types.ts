@@ -4,6 +4,8 @@
  * It also provides context and a registration API to child OStep components.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { Component } from "vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
@@ -47,7 +49,7 @@ export interface OStepperSlots {
 /** Data each OStep registers with its parent OStepper */
 export interface StepRegistration {
   name: number;
-  title: string;
+  title: I18nText;
   icon: StepIcon;
   done: boolean;
   error: boolean;

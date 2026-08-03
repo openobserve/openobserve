@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : searchObj.data.stream.selectedStream
           "
           :options="streamOptions"
-          :placeholder="placeHolderText"
+          :placeholder="raw(placeHolderText)"
           :multiple="selectionMode === 'multi'"
           :row-click-single-select="selectionMode === 'multi'"
           class="w-full"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           side="bottom"
           align="start"
           max-width="280px"
-          :content="searchObj.data.stream.selectedStream.join(', ')"
+          :content="raw(searchObj.data.stream.selectedStream.join(', '))"
         />
       </div>
     </div>
@@ -261,7 +261,7 @@ import {
   nextTick,
   defineAsyncComponent,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
@@ -1812,6 +1812,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       router,

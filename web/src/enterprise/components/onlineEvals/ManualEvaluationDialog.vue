@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
   type EvalJob,
   type EvalTargetScope,
@@ -100,7 +100,7 @@ const loadError = ref("");
 const compatibleJobs = computed(() => loadedJobs.value.filter(isCompatibleJob));
 const jobOptions = computed(() =>
   compatibleJobs.value.map((job) => ({
-    label: job.name,
+    label: raw(job.name),
     value: job.id,
   })),
 );

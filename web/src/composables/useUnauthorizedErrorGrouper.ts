@@ -16,7 +16,7 @@
 import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast";
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
-import { gt, type I18nKey } from "@/types/i18n";
+import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 
 // ── Friendly name overrides ──────────────────────────────────────────────────
 //
@@ -46,7 +46,7 @@ const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
 // ── URL → {label, urlPath} extraction ───────────────────────────────────────
 
 function extractResourceInfo(rawUrl: string): ToastDetail {
-  let label: string = gt("toastMessages.composables.resourceFallback");
+  let label: I18nText = gt("toastMessages.composables.resourceFallback");
   let urlPath = rawUrl;
 
   try {
@@ -66,7 +66,7 @@ function extractResourceInfo(rawUrl: string): ToastDetail {
       // Special namespace (_meta, etc.) — no org segment
       const remaining = segments.slice(idx + 1);
       if (remaining.length > 0) {
-        label = capitalize(remaining[remaining.length - 1]);
+        label = raw(capitalize(remaining[remaining.length - 1]));
       }
     } else if (candidate) {
       // Skip org identifier
@@ -82,7 +82,9 @@ function extractResourceInfo(rawUrl: string): ToastDetail {
           FRIENDLY_NAME_KEYS[joined] ?? FRIENDLY_NAME_KEYS[resourceNames[resourceNames.length - 1]];
         // Unknown resources fall back to the capitalised URL segment — a path
         // token, not prose, so it is deliberately left untranslated.
-        label = friendlyKey ? gt(friendlyKey) : capitalize(resourceNames[resourceNames.length - 1]);
+        label = friendlyKey
+          ? gt(friendlyKey)
+          : raw(capitalize(resourceNames[resourceNames.length - 1]));
       }
     }
   } catch {

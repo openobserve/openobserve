@@ -220,9 +220,9 @@ const numericRangeFixers = reactive<Record<number, { min: string; max: string }>
 const categoriesFixers = reactive<Record<number, string>>({});
 
 const dataTypeOptions = [
-  { label: "Numeric", value: "numeric" },
-  { label: "Categorical", value: "categorical" },
-  { label: "Boolean", value: "boolean" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.numeric"), value: "numeric" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.categorical"), value: "categorical" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.boolean"), value: "boolean" },
 ];
 
 const editorHeights = computed(() => ({
@@ -319,7 +319,7 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     }
   }
 
-  const prepared = prepareScoreConfigImport(rawItems, existingScoreConfigs.value);
+  const prepared = prepareScoreConfigImport(rawItems, existingScoreConfigs.value, t);
 
   // Seed inline fixers from current values so users see the existing data
   // they're about to overwrite, rather than empty inputs.

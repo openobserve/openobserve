@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { EvalTargetScope, Scorer } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf } from "../../utils/evalEntity";
@@ -44,7 +44,7 @@ const { t } = useI18nTyped();
 
 const options = computed(() =>
   props.scorers.map((scorer) => ({
-    label: scorer.name,
+    label: raw(scorer.name),
     value: entityId(scorer),
     badge: `${scorerTypeOf(scorer).replace("_", " ")} · v${scorer.version}`,
   })),

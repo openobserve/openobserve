@@ -2,11 +2,11 @@
   <IngestionContent>
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
-      <ContentCopy :content="getOtelHttpConfig" />
+      <ContentCopy :content="raw(getOtelHttpConfig)" />
     </div>
     <div class="flex flex-col gap-2" v-if="config.isCloud == 'false'">
       <div class="text-base font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
-      <ContentCopy :content="getOtelGrpcConfig" />
+      <ContentCopy :content="raw(getOtelGrpcConfig)" />
     </div>
   </IngestionContent>
 </template>
@@ -17,7 +17,7 @@ import ContentCopy from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 

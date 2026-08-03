@@ -178,7 +178,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { defineComponent, watch, onMounted, inject, ref, computed, markRaw, PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
@@ -191,7 +191,7 @@ import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 
 export interface StreamOption {
-  label: string;
+  label: I18nText;
   value: string;
 }
 
@@ -303,7 +303,7 @@ export default defineComponent({
     const streamOptions = ref<StreamOption[]>([]);
     const operationOptions = [...JOIN_OPERATIONS];
     const operationSelectOptions = operationOptions.map((op) => ({
-      label: op,
+      label: raw(op),
       value: op,
     }));
 
@@ -439,7 +439,7 @@ export default defineComponent({
 
         streamOptions.value = response.list.map(
           (stream: StreamListEntry): StreamOption => ({
-            label: stream.name,
+            label: raw(stream.name),
             value: stream.name,
           }),
         );

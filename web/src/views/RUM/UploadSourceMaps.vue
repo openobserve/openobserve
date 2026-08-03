@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="bg-surface-base"
     :title="t('rum.uploadSourceMaps')"
-    :back="{ label: 'Source Maps', onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
+    :back="{ label: t('rum.sourceMaps'), onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
     bleed
   >
     <OForm

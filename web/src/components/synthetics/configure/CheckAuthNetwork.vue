@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -212,7 +212,7 @@ function removeCookie(index: number) {
                 :type="variable.secure ? 'password' : 'text'"
                 :placeholder="
                   variable.secure && !variable.value
-                    ? variable.example || t('synthetics.authNetwork.passwordPlaceholder')
+                    ? raw(variable.example) || t('synthetics.authNetwork.passwordPlaceholder')
                     : t('synthetics.authNetwork.variableValuePlaceholder')
                 "
                 :data-test="`synthetics-check-auth-network-variable-value-${index}-input`"

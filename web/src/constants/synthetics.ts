@@ -2,20 +2,20 @@
 
 import type { StepAction, SelectorType, SyntheticCheckType } from "@/types/synthetics";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { I18nKey } from "@/types/i18n";
+import { raw, type I18nKey, I18nText, type TranslateFn } from "@/types/i18n";
 
-// ── Action labels (capitalized) ──────────────────────────────────────────
-export const ACTION_LABELS: Record<StepAction, string> = {
-  navigate: "Navigate",
-  click: "Click",
-  type: "Type",
-  select: "Select",
-  press: "Press",
-  hover: "Hover",
-  scroll: "Scroll",
-  wait: "Wait",
-  assert: "Assert",
-  screenshot: "Screenshot",
+// ── Action labels — i18n keys, resolved with t() by the consumer ─────────
+export const ACTION_LABEL_KEYS: Record<StepAction, I18nKey> = {
+  navigate: "synthetics.journey.actionLabels.navigate",
+  click: "synthetics.journey.actionLabels.click",
+  type: "synthetics.journey.actionLabels.type",
+  select: "synthetics.journey.actionLabels.select",
+  press: "synthetics.journey.actionLabels.press",
+  hover: "synthetics.journey.actionLabels.hover",
+  scroll: "synthetics.journey.actionLabels.scroll",
+  wait: "synthetics.journey.actionLabels.wait",
+  assert: "synthetics.journey.actionLabels.assert",
+  screenshot: "synthetics.journey.actionLabels.screenshot",
 };
 
 // ── Action icons ─────────────────────────────────────────────────────────
@@ -52,32 +52,35 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
 ];
 
 // ── Action dropdown options ──────────────────────────────────────────────
-export const actionOptions = (Object.keys(ACTION_LABELS) as StepAction[]).map((a) => ({
-  label: ACTION_LABELS[a],
-  value: a,
-}));
+// Takes t so the labels resolve in the caller's (reactive) locale — call it
+// inside a computed.
+export const actionOptions = (t: TranslateFn) =>
+  (Object.keys(ACTION_LABEL_KEYS) as StepAction[]).map((a) => ({
+    label: t(ACTION_LABEL_KEYS[a]),
+    value: a,
+  }));
 
 // ── Selector type options ────────────────────────────────────────────────
 export const SELECTOR_TYPE_OPTIONS: readonly {
-  label: string;
+  label: I18nText;
   value: SelectorType;
 }[] = [
-  { label: "CSS", value: "CSS" },
-  { label: "XPath", value: "XPath" },
-  { label: "Text", value: "Text" },
-  { label: "TestID", value: "TestID" },
-  { label: "Role", value: "Role" },
+  { label: raw("CSS"), value: "CSS" },
+  { label: raw("XPath"), value: "XPath" },
+  { label: raw("Text"), value: "Text" },
+  { label: raw("TestID"), value: "TestID" },
+  { label: raw("Role"), value: "Role" },
 ];
 
 // ── Value field labels (action-specific) ─────────────────────────────────
-export const VALUE_LABELS: Record<string, string> = {
-  navigate: "URL",
-  type: "Text to type",
-  select: "Option",
-  press: "Key",
-  scroll: "To (px or selector)",
-  wait: "Duration (ms)",
-  assert: "Expected",
+export const VALUE_LABEL_KEYS: Record<string, I18nKey> = {
+  navigate: "synthetics.journey.valueLabels.navigate",
+  type: "synthetics.journey.valueLabels.type",
+  select: "synthetics.journey.valueLabels.select",
+  press: "synthetics.journey.valueLabels.press",
+  scroll: "synthetics.journey.valueLabels.scroll",
+  wait: "synthetics.journey.valueLabels.wait",
+  assert: "synthetics.journey.valueLabels.assert",
 };
 
 // ── Value field widths ───────────────────────────────────────────────────

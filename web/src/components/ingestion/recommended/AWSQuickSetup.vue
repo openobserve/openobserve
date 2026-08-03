@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OCheckbox
                     v-model="enabledServices"
                     :value="service.flag"
-                    :label="service.label"
+                    :label="raw(service.label)"
                   />
                 </div>
               </div>
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OSelect
           v-model="selectedRegion"
-          :options="AWS_REGIONS"
+          :options="regionOptions"
           valueKey="value"
           labelKey="label"
           class="max-w-xs"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OSelect
             v-model="selectedRegion"
-            :options="AWS_REGIONS"
+            :options="regionOptions"
             valueKey="value"
             labelKey="label"
             class="max-w-xs"
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OCheckbox
                       v-model="targetRegions"
                       :value="region.value"
-                      :label="`${region.label} (${region.value})`"
+                      :label="raw(`${region.label} (${region.value})`)"
                     />
                   </div>
                 </div>
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -368,6 +368,13 @@ export default defineComponent({
     const showParamHelper = ref(false);
     const showTargetRegions = ref(false);
     const showServices = ref(false);
+
+    // AWS region names are AWS's own proper nouns ("US East (N. Virginia)") —
+    // they read identically in every language, so they are never translated.
+    const regionOptions = AWS_REGIONS.map((region) => ({
+      value: region.value,
+      label: raw(region.label),
+    }));
 
     // Colors resolve via theme-aware design tokens, so these class strings are
     // theme-independent (dark handled automatically by dark.css).
@@ -439,7 +446,6 @@ export default defineComponent({
 
     const copyParam = (value: string) => {
       copyToClipboard(value, t, {
-        successMessage: "Copied to clipboard",
         timeout: 1500,
       });
     };
@@ -540,6 +546,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       quickInstallBgClass,
       descriptionClass,
@@ -560,6 +567,7 @@ export default defineComponent({
       showServices,
       stackSetParams,
       AWS_REGIONS,
+      regionOptions,
       QUICK_SETUP_SERVICES,
       selectAll,
       deselectAll,

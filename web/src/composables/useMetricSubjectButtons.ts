@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw, type I18nText, type I18nKey } from "@/types/i18n";
+
 import type { FieldAlias, StreamInfo } from "@/services/service_streams";
 
 /**
@@ -51,8 +53,16 @@ export type SubjectButtonSpec = {
   poolSemanticIds?: string[];
   /** Stable identifier for the button (used as a Vue key). */
   id: string;
-  /** Display label rendered on the chip, e.g. "Pod". */
-  label: string;
+  /**
+   * Display label rendered on the chip. `label` holds names that must read the
+   * same in every language — Kubernetes API kinds (`Pod`, `Node`) and cloud
+   * product names (`ECS Task`, `Cloud Run`). Ordinary nouns (`Host`, `Role`)
+   * use `labelKey` instead and are translated by the consumer.
+   * Exactly one of the pair is set; `labelKey` wins when both are.
+   */
+  label?: I18nText;
+  /** i18n KEY for the chip label, translated at render time. */
+  labelKey?: I18nKey;
   /** When true, this button's matching streams are pre-selected on load. */
   defaultActive?: boolean;
 };
@@ -77,34 +87,39 @@ export const SUBJECT_BUTTONS_BY_SET: Record<string, SubjectButtonSpec[]> = {
   // matched_set_id is `normalize_category_to_id(group)` on the backend, so for
   // semantic groups whose `group` field is "Kubernetes" the id is "kubernetes".
   kubernetes: [
-    { id: "pod", semanticIds: ["k8s-pod-name"], label: "Pod", defaultActive: true },
+    { id: "pod", semanticIds: ["k8s-pod-name"], label: raw("Pod"), defaultActive: true },
     {
       id: "node",
       semanticIds: ["k8s-node-name"],
       // Also pool pod-level metrics — they run on this node.
       poolSemanticIds: ["k8s-node-name", "k8s-pod-name"],
-      label: "Node",
+      label: raw("Node"),
     },
   ],
   aws: [
-    { id: "ecs-task", semanticIds: ["aws-ecs-task"], label: "ECS Task", defaultActive: true },
-    { id: "function", semanticIds: ["faas-name"], label: "Function" },
-    { id: "host", semanticIds: ["host"], label: "Host" },
+    { id: "ecs-task", semanticIds: ["aws-ecs-task"], label: raw("ECS Task"), defaultActive: true },
+    { id: "function", semanticIds: ["faas-name"], labelKey: "metrics.subjects.function" },
+    { id: "host", semanticIds: ["host"], labelKey: "metrics.subjects.host" },
   ],
   gcp: [
-    { id: "instance", semanticIds: ["gcp-instance"], label: "Instance", defaultActive: true },
-    { id: "cloud-run", semanticIds: ["gcp-cloud-run"], label: "Cloud Run" },
-    { id: "function", semanticIds: ["faas-name"], label: "Function" },
+    {
+      id: "instance",
+      semanticIds: ["gcp-instance"],
+      labelKey: "metrics.subjects.instance",
+      defaultActive: true,
+    },
+    { id: "cloud-run", semanticIds: ["gcp-cloud-run"], label: raw("Cloud Run") },
+    { id: "function", semanticIds: ["faas-name"], labelKey: "metrics.subjects.function" },
   ],
   azure: [
     {
       id: "resource-group",
       semanticIds: ["azure-resource-group"],
-      label: "Resource Group",
+      labelKey: "metrics.subjects.resourceGroup",
       defaultActive: true,
     },
-    { id: "role", semanticIds: ["azure-cloud-role"], label: "Role" },
-    { id: "function", semanticIds: ["faas-name"], label: "Function" },
+    { id: "role", semanticIds: ["azure-cloud-role"], labelKey: "metrics.subjects.role" },
+    { id: "function", semanticIds: ["faas-name"], labelKey: "metrics.subjects.function" },
   ],
 };
 

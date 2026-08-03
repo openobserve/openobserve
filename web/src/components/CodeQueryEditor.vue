@@ -58,6 +58,7 @@ import {
   onActivated,
   watch,
   computed,
+  type PropType,
 } from "vue";
 
 import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
@@ -86,7 +87,7 @@ import { useTheme } from "@/composables/useTheme";
 import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { type I18nText, useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
@@ -168,8 +169,8 @@ export default defineComponent({
       default: false,
     },
     disableAiReason: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
   },
   emits: [

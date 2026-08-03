@@ -7,11 +7,11 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { TranslateFn } from "@/types/i18n";
+import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface PayloadFormData {
   name: string;
-  description: string;
+  description: I18nText;
   is_real_time: boolean | string;
   trigger_condition: {
     threshold: number | string;
@@ -122,7 +122,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
 
-  payload.description = formData.description.trim();
+  payload.description = raw(formData.description.trim());
 
   if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
     payload.query_condition.aggregation = null;

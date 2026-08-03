@@ -433,13 +433,15 @@ describe("AlertHistory.vue", () => {
         expect(r.variant, s).toBe("success-soft");
         expect(r.icon, s).toBe("check-circle-outline");
       }
-      expect(resolveBadge("alertState", "ok").label).toBe("Ok");
+      // "Ok" moved from a hardcoded `label` to a translatable `labelKey`,
+      // which OTag resolves via t() (label precedence: prop → labelKey → label).
+      expect(resolveBadge("alertState", "ok").labelKey).toBe("components.badge.alertState.ok");
     });
 
     it("condition_not_satisfied → green 'Ok' (matches the histogram count)", () => {
       const r = resolveBadge("alertState", "condition_not_satisfied");
       expect(r.variant).toBe("success-soft");
-      expect(r.label).toBe("Ok");
+      expect(r.labelKey).toBe("components.badge.alertState.ok");
       expect(r.icon).toBe("check-circle-outline");
     });
 

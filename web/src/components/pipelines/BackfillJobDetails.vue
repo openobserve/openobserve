@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 type="deletionStatus"
                 :value="typeof job.deletion_status === 'object' ? 'failed' : job.deletion_status"
-                :label="getDeletionStatusLabel(job.deletion_status)"
+                :label="raw(getDeletionStatusLabel(job.deletion_status))"
               />
             </div>
             <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
@@ -158,20 +158,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTimeline>
           <OTimelineItem
             :title="t('pipeline.jobCreated')"
-            :subtitle="formatTimestampFull(job.created_at)"
+            :subtitle="raw(formatTimestampFull(job.created_at))"
             icon="add-circle"
           />
           <OTimelineItem
             v-if="job.deletion_status && job.deletion_status !== 'not_required'"
-            :title="getDeletionTimelineTitle"
-            :subtitle="getDeletionTimelineSubtitle"
+            :title="raw(getDeletionTimelineTitle)"
+            :subtitle="raw(getDeletionTimelineSubtitle)"
             :icon="getDeletionTimelineIcon"
             :variant="getDeletionTimelineColor"
           />
           <OTimelineItem
             v-if="job.progress_percent > 20 || job.deletion_status === 'completed'"
             :title="t('pipeline.backfillStarted')"
-            :subtitle="getBackfillStartTime"
+            :subtitle="raw(getBackfillStartTime)"
             icon="play-arrow"
           />
           <OTimelineItem
@@ -235,7 +235,7 @@ import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.type
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 interface Props {
   modelValue: boolean;
@@ -307,8 +307,8 @@ const canCancelJob = computed(() => {
 
 const confirmCancelJob = async () => {
   const ok = await confirm({
-    title: "Cancel Backfill Job",
-    message: "Are you sure you want to cancel this backfill job?",
+    title: t("pipeline.cancelBackfillJobTitle"),
+    message: t("pipeline.cancelBackfillJobConfirm"),
   });
   if (ok) {
     await cancelJob();
@@ -388,27 +388,28 @@ const estimatedCompletion = computed(() => {
 });
 
 const getDeletionTimelineTitle = computed(() => {
-  if (!job.value?.deletion_status) return "";
+  if (!job.value?.deletion_status) return raw("");
 
-  if (job.value.deletion_status === "completed") return "Deletion Completed";
-  if (job.value.deletion_status === "in_progress") return "Deleting Data";
-  if (job.value.deletion_status === "pending") return "Deletion Pending";
+  if (job.value.deletion_status === "completed") return t("pipeline.backfillDetails.deletionCompleted");
+  if (job.value.deletion_status === "in_progress") return t("pipeline.backfillDetails.deletingData");
+  if (job.value.deletion_status === "pending") return t("pipeline.backfillDetails.deletionPending");
   if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
-    return "Deletion Failed";
+    return t("pipeline.backfillDetails.deletionFailed");
   }
-  return "";
+  return raw("");
 });
 
 const getDeletionTimelineSubtitle = computed(() => {
-  if (!job.value?.deletion_status) return "";
+  if (!job.value?.deletion_status) return raw("");
 
-  if (job.value.deletion_status === "completed") return "All existing data deleted";
-  if (job.value.deletion_status === "in_progress") return "Deletion in progress";
-  if (job.value.deletion_status === "pending") return "Waiting to start deletion";
+  if (job.value.deletion_status === "completed") return t("pipeline.backfillDetails.allDataDeleted");
+  if (job.value.deletion_status === "in_progress") return t("pipeline.backfillDetails.deletionInProgress");
+  if (job.value.deletion_status === "pending") return t("pipeline.backfillDetails.waitingToStartDeletion");
   if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
-    return job.value.deletion_status.failed;
+    // Backend-provided failure detail, shown verbatim.
+    return raw(job.value.deletion_status.failed);
   }
-  return "";
+  return raw("");
 });
 
 const getDeletionTimelineIcon = computed(() => {
@@ -431,7 +432,7 @@ const getDeletionTimelineColor = computed<TimelineItemVariant>(() => {
 
 const getBackfillStartTime = computed(() => {
   // This is approximate - would need actual timestamps from backend
-  return "After deletion completed";
+  return t("pipeline.backfillDetails.afterDeletionCompleted");
 });
 
 // Helper functions
@@ -444,19 +445,19 @@ const getStatusKey = (status: string, deletionStatus?: any): string => {
 
 const getStatusLabel = (status: string, deletionStatus?: any) => {
   if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
-    return "Deletion Failed";
+    return t("pipeline.backfillDetails.deletionFailed");
   }
 
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
 const getDeletionStatusLabel = (status?: any) => {
-  if (!status || status === "not_required") return "Not Required";
-  if (typeof status === "object" && "failed" in status) return "Failed";
-  if (status === "completed") return "Completed";
-  if (status === "in_progress") return "In Progress";
-  if (status === "pending") return "Pending";
-  return "Unknown";
+  if (!status || status === "not_required") return t("pipeline.backfillDetails.statusNotRequired");
+  if (typeof status === "object" && "failed" in status) return t("pipeline.backfillDetails.statusFailed");
+  if (status === "completed") return t("pipeline.backfillDetails.statusCompleted");
+  if (status === "in_progress") return t("pipeline.backfillDetails.statusInProgress");
+  if (status === "pending") return t("pipeline.backfillDetails.statusPending");
+  return t("pipeline.backfillDetails.statusUnknown");
 };
 
 const formatTimestamp = (timestamp?: number) => {

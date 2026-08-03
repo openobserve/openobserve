@@ -46,7 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span v-else class="truncate" :title="anomalyConfig.name">
                 {{ anomalyConfig.name }}
-                <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
+                <OTooltip
+                  v-if="anomalyConfig.name?.length > 24"
+                  :content="raw(anomalyConfig.name)"
+                />
               </span>
             </template>
           </template>
@@ -525,6 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { raw } from "@/types/i18n";
 import { defineComponent, computed, watch, provide } from "vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -691,6 +695,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       ...alertForm,
       isAnomalyDetectionEnabled,
       alertTypeOptions,

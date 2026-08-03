@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-else-if="error" class="p-4">
-              <OBanner variant="error" icon="error" :content="error" />
+              <OBanner variant="error" icon="error" :content="raw(error)" />
             </div>
 
             <!-- EXPLAIN ANALYZE view -->
@@ -180,7 +180,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -596,6 +596,7 @@ export default defineComponent({
     );
 
     return {
+      raw,
       t,
       showDialog,
       loading,

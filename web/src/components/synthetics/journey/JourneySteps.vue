@@ -30,7 +30,7 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
-import { ACTION_LABELS, ACTION_ICONS } from "@/constants/synthetics";
+import { ACTION_LABEL_KEYS, ACTION_ICONS } from "@/constants/synthetics";
 
 const { t } = useI18nTyped();
 
@@ -119,7 +119,7 @@ function actionIcon(row: TData): string {
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
   return isStepAction(action)
-    ? ACTION_LABELS[action]
+    ? t(ACTION_LABEL_KEYS[action])
     : action.charAt(0).toUpperCase() + action.slice(1);
 }
 
