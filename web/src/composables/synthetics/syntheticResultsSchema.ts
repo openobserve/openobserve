@@ -29,6 +29,15 @@
 
 export const SYNTHETIC_RESULTS_STREAM = "synthetics_results";
 
+/** One row per (execution, step) — the step-grain stream (B10).
+ *
+ *  The Steps tab's numbers live inside `last_attempt_steps`, a JSON array, and
+ *  o2 cannot `unnest` one. The tab therefore downloaded up to 5000 execution
+ *  rows and tallied them here, which reported on ~28% of the stated window on
+ *  the worst check and shipped ~18 MB of blob to do it. Against this stream the
+ *  same numbers are a `GROUP BY step_id` over the FULL window. */
+export const SYNTHETIC_STEP_RESULTS_STREAM = "synthetics_step_results";
+
 export const SYNTHETIC_FIELDS = {
   monitorId: "synthetics_id",
   monitorName: "synthetics_name",
@@ -1353,6 +1362,194 @@ export function foldStepDefs(
     }
   }
   return defs;
+}
+
+const STEP_TABLE = `"${SYNTHETIC_STEP_RESULTS_STREAM}"`;
+
+/**
+ * Per-step scalars — the Fail Rate / Flaky Rate / Avg / p95 / Max columns.
+ *
+ * Grouped by `step_id` ALONE, deliberately. Counts and sums compose across
+ * groups, so the dimension and sparkline queries below can be grouped more
+ * finely and folded together — but **percentiles do not**. The p95 of a union is
+ * not derivable from per-group p95s, so it has to come from a query that groups
+ * only by the dimension it is reported at.
+ *
+ * No LIMIT. That is the point of the whole change: the old path capped at 5000
+ * execution rows, so every number on the tab was computed from the newest ~28%
+ * of a "7 days" window.
+ */
+export function buildStepAggregateSql(monitorId: string): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT step_id,
+       min(step_index) AS step_index,
+       count(*) AS executions,
+       sum(CASE WHEN status <> 'passed' THEN 1 ELSE 0 END) AS failures,
+       sum(CASE WHEN failed_in_prior_attempt THEN 1 ELSE 0 END) AS flaky,
+       avg(duration_ms) AS avg_duration_ms,
+       approx_percentile_cont(duration_ms, 0.95) AS p95_duration_ms,
+       max(duration_ms) AS max_duration_ms
+FROM ${STEP_TABLE}
+WHERE synthetics_id = '${id}' AND kind = 'step'
+GROUP BY step_id`;
+}
+
+/**
+ * Per-step × browser × location counts, for the two dimension breakdowns.
+ *
+ * Counts only — they compose, so one query answers both `browserStats` and
+ * `locationStats` by folding the same rows twice. Result size is
+ * steps × engines × locations, which is tens of rows, not thousands.
+ */
+export function buildStepDimensionSql(monitorId: string): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT step_id, engine, location,
+       count(*) AS total,
+       sum(CASE WHEN status <> 'passed' THEN 1 ELSE 0 END) AS failures,
+       sum(CASE WHEN failed_in_prior_attempt THEN 1 ELSE 0 END) AS flaky
+FROM ${STEP_TABLE}
+WHERE synthetics_id = '${id}' AND kind = 'step'
+GROUP BY step_id, engine, location`;
+}
+
+/**
+ * The most recent executions per step, for the sparkline.
+ *
+ * The only query here that is bounded, and correctly so: `recentRates` is "the
+ * last N runs", not an aggregate over the window, so a cap is the definition
+ * rather than a truncation. Ordered newest-first and reversed when folded.
+ */
+export function buildStepSparklineSql(monitorId: string, limit = 2000): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT step_id, status, failed_in_prior_attempt, _timestamp
+FROM ${STEP_TABLE}
+WHERE synthetics_id = '${id}' AND kind = 'step'
+ORDER BY _timestamp DESC
+LIMIT ${limit}`;
+}
+
+/**
+ * Folds the three step-stream queries into the shape the Steps tab already
+ * renders.
+ *
+ * Returns `StepStatsResult` unchanged so the view does not move: the tab reads
+ * `stepGroups` and `coverage`, and both keep their meaning. The other five
+ * fields of that interface are populated empty — they are computed by the old
+ * client-side tally and consumed by nothing (verified across views/ and
+ * components/), so reproducing them here would be building dead code against a
+ * new stream.
+ *
+ * `coverage.truncated` is now always false: there is no row cap to bind. That is
+ * the headline of B10 — the numbers describe the whole window rather than its
+ * newest quarter.
+ */
+export function foldStepStream(
+  aggregateHits: Record<string, unknown>[],
+  dimensionHits: Record<string, unknown>[],
+  sparklineHits: Record<string, unknown>[],
+  stepDefs?: Map<string, { name: string; selector: string | null }>,
+): StepStatsResult {
+  const byStep = new Map<string, StepGroup>();
+  let executionsTotal = 0;
+
+  for (const hit of aggregateHits) {
+    const stepId = str(hit.step_id);
+    if (!stepId) continue;
+    const executions = num(hit.executions);
+    const failures = num(hit.failures);
+    const flaky = num(hit.flaky);
+    executionsTotal += executions;
+    const def = stepDefs?.get(stepId);
+    byStep.set(stepId, {
+      key: `step-${stepId}`,
+      name: def?.name || stepId,
+      sub: def?.selector ?? null,
+      // Guarded because a step present in the dimension query but absent here
+      // would otherwise divide by zero; also keeps a 0-execution step at 0%
+      // rather than NaN, which renders as an empty cell.
+      failRate: executions > 0 ? failures / executions : 0,
+      flakyRate: executions > 0 ? flaky / executions : 0,
+      flakyCount: flaky,
+      failCount: failures,
+      totalExecutions: executions,
+      avgDurationMs: num(hit.avg_duration_ms),
+      p95DurationMs: num(hit.p95_duration_ms),
+      maxDurationMs: num(hit.max_duration_ms),
+      recentRates: [],
+      browserStats: [],
+      locationStats: [],
+    });
+  }
+
+  // Dimension rows fold twice — once per axis — because counts compose.
+  const dims = new Map<string, { browser: Map<string, StepDimensionStat>; location: Map<string, StepDimensionStat> }>();
+  for (const hit of dimensionHits) {
+    const stepId = str(hit.step_id);
+    if (!stepId || !byStep.has(stepId)) continue;
+    if (!dims.has(stepId)) dims.set(stepId, { browser: new Map(), location: new Map() });
+    const entry = dims.get(stepId)!;
+    const total = num(hit.total);
+    const failures = num(hit.failures);
+    const flaky = num(hit.flaky);
+    for (const [axis, name] of [
+      ["browser", str(hit.engine)],
+      ["location", str(hit.location)],
+    ] as const) {
+      if (!name) continue;
+      const map = entry[axis];
+      const prev = map.get(name) ?? { name, total: 0, failures: 0, flaky: 0 };
+      prev.total += total;
+      prev.failures += failures;
+      prev.flaky += flaky;
+      map.set(name, prev);
+    }
+  }
+  for (const [stepId, entry] of dims) {
+    const group = byStep.get(stepId);
+    if (!group) continue;
+    group.browserStats = [...entry.browser.values()];
+    group.locationStats = [...entry.location.values()];
+  }
+
+  // Sparkline: newest-first from SQL, reversed so the line reads left-to-right
+  // in chronological order like every other trend in the product.
+  const spark = new Map<string, number[]>();
+  for (const hit of sparklineHits) {
+    const stepId = str(hit.step_id);
+    if (!stepId) continue;
+    const failed = str(hit.status) !== "passed";
+    const flaky = hit.failed_in_prior_attempt === true || hit.failed_in_prior_attempt === "true";
+    const list = spark.get(stepId) ?? [];
+    list.push(failed || flaky ? 1 : 0);
+    spark.set(stepId, list);
+  }
+  for (const [stepId, list] of spark) {
+    const group = byStep.get(stepId);
+    if (group) group.recentRates = list.reverse();
+  }
+
+  const stepGroups = [...byStep.values()].sort((a, b) => {
+    const ai = aggregateHits.find((h) => `step-${str(h.step_id)}` === a.key);
+    const bi = aggregateHits.find((h) => `step-${str(h.step_id)}` === b.key);
+    return num(ai?.step_index) - num(bi?.step_index);
+  });
+
+  const stamps = sparklineHits.map((h) => num(h._timestamp)).filter((n) => n > 0);
+  return {
+    stepGroups,
+    stepFailures: [],
+    stepDurations: [],
+    flakySteps: [],
+    trendBuckets: [],
+    failureInstances: [],
+    coverage: {
+      executions: executionsTotal,
+      fromMs: stamps.length ? Math.min(...stamps) / 1000 : 0,
+      toMs: stamps.length ? Math.max(...stamps) / 1000 : 0,
+      // No cap to bind — this is what B10 buys.
+      truncated: false,
+    },
+  };
 }
 
 export function buildStepDefsSql(monitorId: string, limit = 100): string {

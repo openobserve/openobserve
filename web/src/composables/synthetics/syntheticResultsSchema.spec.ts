@@ -44,6 +44,10 @@ import {
   stepOwnDetail,
   mergeLocatorLadder,
   type EvidenceEvent,
+  buildStepAggregateSql,
+  buildStepDimensionSql,
+  buildStepSparklineSql,
+  foldStepStream,
 } from "./syntheticResultsSchema";
 
 /** Shim: the old mapKpi took one aggregate row; the tiles are now summed from
