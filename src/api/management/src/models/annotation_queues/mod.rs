@@ -8,10 +8,13 @@
 use infra::table::score_configs::ScoreConfigDataType;
 use openobserve_core::llm_evaluations::annotation_queues::{
     AnnotationQueue, AnnotationQueueItem, AnnotationQueueItemSelection, CreateAnnotationQueue,
-    EnqueueAnnotationQueueItem, PinnedScoreConfig, UpdateAnnotationQueue,
+    CreateQueueReview, EnqueueAnnotationQueueItem, PinnedScoreConfig, QueueReviewSubmission,
+    UpdateAnnotationQueue,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
+
+use super::annotations::{AnnotationScoreRequestBody, AnnotationTargetMetadataRequestBody};
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -98,6 +101,28 @@ pub struct AnnotationQueueItemSelectionRequestBody {
     pub item_ids: Vec<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReviewAnnotationQueueItemRequestBody {
+    /// Client-generated idempotency key shared by all N Score events. Reuse it
+    /// only when retrying the identical logical submission.
+    pub submission_id: String,
+    pub source_stream: String,
+    pub scores: Vec<AnnotationScoreRequestBody>,
+    #[serde(default)]
+    pub comments: Option<String>,
+    #[serde(default)]
+    pub target_metadata: Option<AnnotationTargetMetadataRequestBody>,
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListQueueReviewsResponseBody {
+    pub list: Vec<QueueReviewSubmission>,
+}
+
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveAnnotationQueueItemsResponseBody {
@@ -172,6 +197,19 @@ impl From<AnnotationQueueItemSelectionRequestBody> for AnnotationQueueItemSelect
     fn from(value: AnnotationQueueItemSelectionRequestBody) -> Self {
         Self {
             item_ids: value.item_ids,
+        }
+    }
+}
+
+impl From<ReviewAnnotationQueueItemRequestBody> for CreateQueueReview {
+    fn from(value: ReviewAnnotationQueueItemRequestBody) -> Self {
+        Self {
+            submission_id: value.submission_id,
+            source_stream: value.source_stream,
+            scores: value.scores.into_iter().map(Into::into).collect(),
+            comments: value.comments,
+            target_metadata: value.target_metadata.unwrap_or_default().into(),
+            metadata: value.metadata,
         }
     }
 }

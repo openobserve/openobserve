@@ -19,6 +19,8 @@ pub mod ai;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;
+#[cfg(feature = "enterprise")]
+pub mod annotations;
 #[cfg(feature = "cloud")]
 pub mod billings;
 pub mod dashboards;

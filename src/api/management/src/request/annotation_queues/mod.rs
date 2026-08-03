@@ -16,17 +16,22 @@ use openobserve_core::{
     llm_evaluations::annotation_queues::{
         self, AnnotationQueueError, ListAnnotationQueueItemsFilter,
     },
+    self_reporting::llm_scores_writer,
 };
 
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-    models::annotation_queues::{
-        AnnotationQueueItemResponseBody, AnnotationQueueItemSelectionRequestBody,
-        AnnotationQueueResponseBody, ArchiveAnnotationQueueItemsResponseBody,
-        ClearAnnotationQueueItemsResponseBody, CreateAnnotationQueueRequestBody,
-        EnqueueAnnotationQueueItemRequestBody, ListAnnotationQueueItemsQuery,
-        ListAnnotationQueueItemsResponseBody, ListAnnotationQueuesResponseBody,
-        UpdateAnnotationQueueRequestBody,
+    models::{
+        annotation_queues::{
+            AnnotationQueueItemResponseBody, AnnotationQueueItemSelectionRequestBody,
+            AnnotationQueueResponseBody, ArchiveAnnotationQueueItemsResponseBody,
+            ClearAnnotationQueueItemsResponseBody, CreateAnnotationQueueRequestBody,
+            EnqueueAnnotationQueueItemRequestBody, ListAnnotationQueueItemsQuery,
+            ListAnnotationQueueItemsResponseBody, ListAnnotationQueuesResponseBody,
+            ListQueueReviewsResponseBody, ReviewAnnotationQueueItemRequestBody,
+            UpdateAnnotationQueueRequestBody,
+        },
+        annotations::AnnotateResponseBody,
     },
 };
 
@@ -35,6 +40,18 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
         AnnotationQueueError::Database(err) => {
             log::error!("[AnnotationQueue] internal error: {err}");
             MetaHttpResponse::internal_error("Internal server error")
+        }
+        AnnotationQueueError::Publish(err) => {
+            log::error!("[AnnotationQueue] failed to publish review Scores: {err}");
+            MetaHttpResponse::internal_error("Failed to publish review Scores")
+        }
+        AnnotationQueueError::Search(err) => {
+            log::error!("[AnnotationQueue] failed to query review Scores: {err}");
+            MetaHttpResponse::internal_error("Failed to query review Scores")
+        }
+        AnnotationQueueError::MalformedReviewScore(err) => {
+            log::error!("[AnnotationQueue] malformed review Score: {err}");
+            MetaHttpResponse::internal_error("Malformed review Score")
         }
         error @ (AnnotationQueueError::MissingName
         | AnnotationQueueError::MissingScoreConfigs
@@ -46,7 +63,8 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
         | AnnotationQueueError::QueueItemRefTypeNotAllowed(_)
         | AnnotationQueueError::MissingQueueItemIds
         | AnnotationQueueError::InvalidQueueItemIds
-        | AnnotationQueueError::DuplicateQueueItemIds) => MetaHttpResponse::bad_request(error),
+        | AnnotationQueueError::DuplicateQueueItemIds
+        | AnnotationQueueError::Annotation(_)) => MetaHttpResponse::bad_request(error),
         error @ AnnotationQueueError::InvalidScoreConfigRowIds(_) => {
             MetaHttpResponse::bad_request(error)
         }
@@ -54,9 +72,12 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
             MetaHttpResponse::bad_request(error)
         }
         AnnotationQueueError::NotFound => MetaHttpResponse::not_found("Annotation Queue not found"),
-        error @ (AnnotationQueueError::DuplicateName | AnnotationQueueError::StaleBindings) => {
-            MetaHttpResponse::conflict(error)
+        AnnotationQueueError::QueueItemNotFound => {
+            MetaHttpResponse::not_found("Annotation Queue Item not found")
         }
+        error @ (AnnotationQueueError::DuplicateName
+        | AnnotationQueueError::StaleBindings
+        | AnnotationQueueError::ArchivedQueueItem) => MetaHttpResponse::conflict(error),
     }
 }
 
@@ -92,6 +113,82 @@ pub async fn enqueue_annotation_queue_item(
     }
 }
 
+/// ReviewAnnotationQueueItem
+#[utoipa::path(
+    post,
+    path = "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
+    context_path = "/api",
+    tag = "AnnotationQueues",
+    operation_id = "ReviewAnnotationQueueItem",
+    summary = "Submit one complete N/N Workbench review",
+    description = "Validates exact pinned Score Config coverage, writes the immutable review to _llm_scores, and then advances the QueueItem workflow projection to reviewed.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("queue_id" = String, Path, description = "Annotation Queue ID"),
+        ("queue_item_id" = String, Path, description = "Annotation Queue Item ID"),
+    ),
+    request_body(content = inline(ReviewAnnotationQueueItemRequestBody), description = "Complete N/N review"),
+    responses(
+        (status = 200, body = inline(AnnotateResponseBody)),
+        (status = 400, description = "Incomplete or invalid review", body = ()),
+        (status = 404, description = "Queue or Queue Item not found", body = ()),
+        (status = 409, description = "Stale bindings or archived Queue Item", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "update"}))),
+)]
+pub async fn review_annotation_queue_item(
+    Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+    axum::Json(body): axum::Json<ReviewAnnotationQueueItemRequestBody>,
+) -> Response {
+    match annotation_queues::submit_review(
+        &org_id,
+        &queue_id,
+        &queue_item_id,
+        &user.user_id,
+        body.into(),
+        |publish_org_id, records| async move {
+            llm_scores_writer::publish(&publish_org_id, &records).await
+        },
+    )
+    .await
+    {
+        Ok(prepared) => MetaHttpResponse::json(AnnotateResponseBody::from(&prepared)),
+        Err(err) => annotation_queue_error_response(err),
+    }
+}
+
+/// ListAnnotationQueueItemReviews
+#[utoipa::path(
+    get,
+    path = "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
+    context_path = "/api",
+    tag = "AnnotationQueues",
+    operation_id = "ListAnnotationQueueItemReviews",
+    summary = "List complete Workbench reviews from _llm_scores",
+    description = "Reads the authoritative annotation Score events, collapses idempotent retries, groups them by review submission ID, and omits incomplete N/N groups.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("queue_id" = String, Path, description = "Annotation Queue ID"),
+        ("queue_item_id" = String, Path, description = "Annotation Queue Item ID"),
+    ),
+    responses(
+        (status = 200, description = "Complete review submissions"),
+        (status = 404, description = "Queue or Queue Item not found", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "list"}))),
+)]
+pub async fn list_annotation_queue_item_reviews(
+    Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,
+) -> Response {
+    match annotation_queues::list_reviews(&org_id, &queue_id, &queue_item_id).await {
+        Ok(list) => MetaHttpResponse::json(ListQueueReviewsResponseBody { list }),
+        Err(err) => annotation_queue_error_response(err),
+    }
+}
+
 /// ArchiveAnnotationQueueItems
 #[utoipa::path(
     post,
@@ -100,7 +197,7 @@ pub async fn enqueue_annotation_queue_item(
     tag = "AnnotationQueues",
     operation_id = "ArchiveAnnotationQueueItems",
     summary = "Archive selected Annotation Queue Items",
-    description = "Soft-removes selected Queue Items from the active workflow by setting archivedAt. Existing review submissions and analytics scores are retained.",
+    description = "Soft-removes selected Queue Items from the active workflow by setting archivedAt. Existing review Scores in _llm_scores are retained.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -134,7 +231,7 @@ pub async fn archive_annotation_queue_items(
     tag = "AnnotationQueues",
     operation_id = "ClearAnnotationQueueItems",
     summary = "Clear selected Annotation Queue Items",
-    description = "Permanently removes selected QueueItem workflow rows. Existing immutable review submissions and analytics scores are retained.",
+    description = "Permanently removes selected QueueItem workflow rows. Existing immutable review Scores in _llm_scores are retained.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
