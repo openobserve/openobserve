@@ -375,12 +375,18 @@ describe("WorkflowStepResultDrawer", () => {
       expect(tooltipFor(wrapper, t("workflow.test.stepResult.useAsTestInputNoOutput"))).toBeTruthy();
     });
 
-    it("is hidden in history mode (a past run can't seed a new test)", () => {
+    it("is ALSO available in history mode — it drops the user into a fresh test", async () => {
       setup({ result: okResult(), input: "" });
       workflowObj.testRun.result = { ...okResult(), mode: "history" } as any;
+      workflowObj.testRun.show = false;
       const wrapper = mountDrawer();
-      expect(useInputBtn(wrapper).exists()).toBe(false);
-      expect(useOutputBtn(wrapper).exists()).toBe(false);
+      expect(useInputBtn(wrapper).exists()).toBe(true);
+      expect(useOutputBtn(wrapper).exists()).toBe(true);
+
+      await useInputBtn(wrapper).trigger("click");
+      // seeds the flow payload with the historical node's input and opens the Test dialog
+      expect(JSON.parse(workflowObj.testRun.input)).toEqual([rec(2)]);
+      expect(workflowObj.testRun.show).toBe(true);
     });
   });
 
@@ -475,11 +481,11 @@ describe("WorkflowStepResultDrawer", () => {
       expect(JSON.parse(outputEditor(mountDrawer()).props("query"))).toEqual([rec(3)]);
     });
 
-    it("hides Replay and Use-as-input (a past run is read-only)", () => {
+    it("hides Replay (read-only) but KEEPS Use-as-input (seed a fresh test)", () => {
       setup({ result: historyResult() });
       const wrapper = mountDrawer();
       expect(replayBtn(wrapper).exists()).toBe(false);
-      expect(useInputBtn(wrapper).exists()).toBe(false);
+      expect(useInputBtn(wrapper).exists()).toBe(true);
     });
 
     it("still shows the error output for the past run", () => {

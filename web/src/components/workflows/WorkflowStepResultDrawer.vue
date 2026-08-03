@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-text-body mb-2 flex items-center justify-between text-sm font-bold">
             <div>{{ t("workflow.test.stepResult.input") }}</div>
             <div class="flex items-center gap-1">
-              <OTooltip v-if="!isHistory" :content="useInputTooltip" :delay="300" side="top">
+              <OTooltip :content="useInputTooltip" :delay="300" side="top">
                 <OButton
                   variant="outline"
                   size="icon"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-text-body mb-2 flex items-center justify-between text-sm font-bold">
             <div>{{ t("workflow.test.stepResult.output") }}</div>
             <div class="flex items-center gap-1">
-              <OTooltip v-if="!isHistory" :content="useOutputTooltip" :delay="300" side="top">
+              <OTooltip :content="useOutputTooltip" :delay="300" side="top">
                 <OButton
                   variant="outline"
                   size="icon"

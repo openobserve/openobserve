@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -146,6 +146,17 @@ const onTest = () => {
   selectedRunId.value = "";
   workflowObj.testRun.show = true;
 };
+
+// A live test result (from the header Test button, or a step drawer's "Use as Test
+// Input" which drops the user into a fresh test) replaces the historical run on the
+// canvas. Deselect the run so the list stops highlighting a row that no longer
+// matches what's shown. A history load keeps `mode: "history"`, so it's left alone.
+watch(
+  () => workflowObj.testRun.result,
+  (result: any) => {
+    if (result && result.mode !== "history") selectedRunId.value = "";
+  },
+);
 
 // Deliberate switch to the editor — the only bridge between inspect and build.
 const onEditWorkflow = () => {
