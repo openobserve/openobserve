@@ -796,12 +796,17 @@ function openChromeExtensions() {
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="rounded-default bg-warning-50 mx-3 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] py-3"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-3 mb-3 flex flex-col gap-3 border py-3"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="visibility-off" size="sm" class="text-warning-600" aria-hidden="true" />
+        <OIcon
+          name="visibility-off"
+          size="sm"
+          class="text-badge-warning-ol-text"
+          aria-hidden="true"
+        />
         <span class="text-text-heading text-sm font-semibold">{{
           t("synthetics.journey.incognitoTitle")
         }}</span>
@@ -859,12 +864,12 @@ function openChromeExtensions() {
     -->
     <div
       v-else-if="blockedReason"
-      class="rounded-default bg-warning-50 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] px-3 py-3"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mb-3 flex flex-col gap-3 border px-3 py-3"
       role="alert"
       data-test="synthetics-journey-preflight-warning"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="error_outline" size="sm" class="text-warning-600" aria-hidden="true" />
+        <OIcon name="error_outline" size="sm" class="text-badge-warning-ol-text" aria-hidden="true" />
         <span class="text-text-heading text-sm font-semibold">
           {{
             blockedReason === "in-progress"
