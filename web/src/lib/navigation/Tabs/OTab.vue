@@ -15,6 +15,7 @@ defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<OTabProps>(), {
   disable: false,
+  disableDrag: false,
 });
 
 defineSlots<OTabSlots>();
@@ -25,6 +26,8 @@ const isActive = computed<boolean>(() => context?.value.modelValue === props.nam
 const isDense = computed<boolean>(() => context?.value.dense ?? false);
 const isVertical = computed<boolean>(() => context?.value.isVertical ?? false);
 const isReorderable = computed<boolean>(() => context?.value.reorderable ?? false);
+/** Reorderable, and this tab hasn't opted out (e.g. while its label is edited). */
+const isDraggable = computed<boolean>(() => isReorderable.value && !props.disableDrag);
 /** This tab is the one being dragged → dim it. */
 const isDragging = computed<boolean>(
   () => isReorderable.value && context?.value.draggingName === props.name,
@@ -143,10 +146,11 @@ const heightClasses = computed<string>(() => {
         baseClasses,
         stateClasses,
         heightClasses,
-        isReorderable ? 'cursor-grab active:cursor-grabbing' : '',
+        isDraggable ? 'cursor-grab active:cursor-grabbing' : '',
+        isReorderable && disableDrag ? 'cursor-text' : '',
         isDragging ? 'opacity-40' : '',
       ]"
-      :draggable="isReorderable || undefined"
+      :draggable="isDraggable || undefined"
       :data-otab-name="name"
       v-bind="$attrs"
     >
