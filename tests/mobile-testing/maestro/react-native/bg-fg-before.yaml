@@ -1,0 +1,10 @@
+# Background/foreground — part 1: launch and record a view BEFORE backgrounding.
+appId: com.o2rumtester
+---
+- launchApp:
+    clearState: false
+- assertVisible: "O2 RUM Tester"
+- tapOn: "Go to Details →"
+- assertVisible: "Details"
+- tapOn: "← Back to Home"
+- assertVisible: "O2 RUM Tester"

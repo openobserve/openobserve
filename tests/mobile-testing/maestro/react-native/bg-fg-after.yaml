@@ -1,0 +1,9 @@
+# Background/foreground — part 2: record a view AFTER foregrounding.
+# No launchApp — the app is already foregrounded via `am start` (same process, no restart),
+# so the session must continue.
+appId: com.o2rumtester
+---
+- assertVisible: "O2 RUM Tester"
+- tapOn: "Go to Checkout form →"
+- assertVisible: "Checkout (masking test)"
+- tapOn: "← Back to Home"

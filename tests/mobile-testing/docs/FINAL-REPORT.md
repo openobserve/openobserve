@@ -38,8 +38,11 @@ UI     (Playwright → RUM dashboard)    →  assert product renders   ← where
 | Handled JS error (A5) | Maestro+API | ✅ |
 | Named view tracking | Maestro+API | ✅ |
 | Session Replay PII masking (MASK_ALL) | Maestro+API+UI | ✅ |
+| Attributes tagging (env/service/version) | Maestro+API | ✅ |
+| Background/foreground session continuity | Maestro+adb+API | ✅ |
+| No-phone-home (zero Datadog hosts in APK) | adb+scan | ✅ |
 
-Run: `npm run test:rn-android`. Runtime ~4–14 min depending on retries.
+9 tests. Run: `npm run test:rn-android`. Runtime ~5–15 min depending on retries.
 
 ## 4. Coverage vs. browser-RUM feature surface (the evaluation)
 
@@ -56,10 +59,12 @@ Legend: ✅ automated · 🟡 partial/data-only · ⬜ gap · ❌ blocked by a k
 | Session Replay record + playback | ✅ | ✅ | |
 | Replay PII masking | ✅ | ✅ | verified at MASK_ALL |
 | Breadcrumbs timeline | 🟡 | ⬜ | intermittent-empty bug; no dedicated assertion |
-| Frustration signals (rage/dead) | ⬜ | ⬜ | not covered |
-| User identity (setUser) | ⬜ | ⬜ | not covered (was "Unknown") |
-| Attributes (env/service/version) | 🟡 | 🟡 | set but not asserted in a spec |
-| Geo/IP enrichment | ⬜ | ⬜ | not covered |
+| Frustration signals (rage/dead) | ⬜ | ⬜ | not covered (needs app trigger) |
+| User identity (setUser) | ⬜ | ⬜ | not covered (was "Unknown"; needs app change) |
+| Attributes (env/service/version) | ✅ | — | asserted (env=testing, service, version) |
+| Background/foreground continuity | ✅ | — | true bg/fg keeps one session |
+| No-phone-home (no Datadog host) | ✅ | — | APK scan; zero Datadog hosts |
+| Geo/IP enrichment | ⬜ | ⬜ | not covered (emulator has no public IP) |
 | Traces linking | ⬜ | ❌ | Traces tab HTTP 400 (#2289) |
 | Source maps / symbolication | ⬜ | ❌ | v1 out-of-scope + tab bug |
 | Performance / Web Vitals | n/a | ❌ | schema-error bug; browser-only metrics |
