@@ -583,7 +583,7 @@ import {
   encodeMetricsConfig,
   decodeMetricsConfig,
 } from "@/composables/metrics/metricsUrlState";
-import { PANEL_RATE_WINDOW } from "@/utils/metrics/metricDefaults";
+import { PANEL_PERCENTILE_WINDOW, PANEL_RATE_WINDOW } from "@/utils/metrics/metricDefaults";
 import { BADGE_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import {
   EXPLORER_FILTER_PARAM_KEYS,
@@ -1180,8 +1180,20 @@ export default defineComponent({
       // panel arrives frozen at whatever the range happened to be on the card —
       // and a 4-minute rate window sampled every 30 minutes on a 7-day view is
       // not a chart of anything.
+      //
+      // EXCEPT when the card only charted because it widened its window: the
+      // editor resolves `$__rate_interval` from the org's scrape interval — the
+      // very value whose overstatement forced the widening — so handing it the
+      // variable would resolve straight back to the window that returned
+      // nothing, and the drill-in would open on an empty chart of a metric the
+      // card is visibly charting. The concrete widened window goes over
+      // instead. It IS frozen to the card's range, but frozen-and-charting
+      // beats adaptive-and-blank, and it keeps the drill-in contract: the
+      // editor opens on what the card actually shows.
+      const widenedRateWindow = grid.previews.value[card.name]?.widenedRateWindow;
       const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
-        rateWindow: PANEL_RATE_WINDOW,
+        rateWindow: widenedRateWindow ?? PANEL_RATE_WINDOW,
+        percentileWindow: PANEL_PERCENTILE_WINDOW,
       });
       if (!resolved) return;
 
@@ -1287,8 +1299,13 @@ export default defineComponent({
       for (const name of grid.favorites.value) {
         const card = byName.get(name);
         if (!card) continue;
+        // Same rule as the drill-in: a card that only charted through a widened
+        // window must hand the panel that concrete window, or the dashboard is
+        // born with a permanently blank panel for a metric the card charts.
+        const widenedRateWindow = grid.previews.value[name]?.widenedRateWindow;
         const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
-          rateWindow: PANEL_RATE_WINDOW,
+          rateWindow: widenedRateWindow ?? PANEL_RATE_WINDOW,
+          percentileWindow: PANEL_PERCENTILE_WINDOW,
         });
         if (!resolved) continue;
         const data = buildPanelDataForCard(card, resolved, defaults.bucketUnit);
@@ -1304,6 +1321,12 @@ export default defineComponent({
     // Managed keys are wiped first — a cleared filter must leave the URL, and
     // anything else (org_identifier) rides along untouched. Defaults serialize
     // to nothing, so an unfiltered grid keeps a bare /metrics URL.
+    //
+    // The ONE exception is `mode`. Explore -> Visualize is in-page (no route
+    // change: mode is a query param on `metrics`), so replacing here overwrote
+    // the Explore entry and Back skipped past the whole page to whatever came
+    // before it — in practice /logs. A mode switch is a navigation the user
+    // expects Back to undo, so it pushes; everything else still replaces.
     const syncUrlState = () => {
       const query: Record<string, any> = { ...route.query };
       for (const key of MANAGED_PARAM_KEYS) delete query[key];
@@ -1312,7 +1335,13 @@ export default defineComponent({
       const changed =
         Object.keys(query).some((k) => String(query[k]) !== String(route.query[k] ?? "")) ||
         Object.keys(route.query).some((k) => !(k in query));
-      if (changed) router.replace({ query }).catch(() => {});
+      if (!changed) return;
+
+      // `explore` serializes to an ABSENT key, so compare against "" — not
+      // `undefined` vs "explore", which would read as a change on every sync.
+      const modeChanged = String(query.mode ?? "") !== String(route.query.mode ?? "");
+      const navigate = modeChanged ? router.push : router.replace;
+      navigate.call(router, { query }).catch(() => {});
     };
 
     // A getter, not an array of refs: reading `.value` inside it tracks every

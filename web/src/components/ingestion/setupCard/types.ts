@@ -288,6 +288,12 @@ export interface RichCardStreamInput {
   default: string;
   /** Placeholder (falls back to `default`). */
   placeholder?: I18nText;
+  /**
+   * Literal helper text. Only for AI-authored markdown cards, whose prose is
+   * written in the source file and has no locale key — hand-written content
+   * uses `helpKey`.
+   */
+  help?: I18nText;
   /** i18n key for the helper text under the field, translated by the renderer. */
   helpKey?: I18nKey;
 }

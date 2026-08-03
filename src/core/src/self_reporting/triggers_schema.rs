@@ -165,15 +165,26 @@ mod tests {
         assert!(field_names.contains(&"status".to_string()));
         assert!(field_names.contains(&"next_run_at".to_string()));
 
-        // Verify count matches struct fields (26 total: 21 original + 5 dedup/grouping fields)
-        assert_eq!(field_names.len(), 26);
+        // Value context (T-9, alerts_2.md §7.5) — these must be in the
+        // reflection sample or orgs created after the change get a triggers
+        // stream schema without them.
+        assert!(field_names.contains(&"actual_value".to_string()));
+        assert!(field_names.contains(&"threshold_value".to_string()));
+        assert!(field_names.contains(&"threshold_operator".to_string()));
+        assert!(field_names.contains(&"level".to_string()));
+        assert!(field_names.contains(&"group_label".to_string()));
+        assert!(field_names.contains(&"value_is_lower_bound".to_string()));
+
+        // Verify count matches struct fields
+        // (32 total: 21 original + 5 dedup/grouping + 6 value-context)
+        assert_eq!(field_names.len(), 32);
 
         // Verify no duplicate fields
         let unique_count = field_names
             .iter()
             .collect::<std::collections::HashSet<_>>()
             .len();
-        assert_eq!(unique_count, 26);
+        assert_eq!(unique_count, field_names.len());
     }
 
     #[tokio::test]

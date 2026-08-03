@@ -533,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! [scrollbar-gutter:stable]! overflow-x-hidden! overflow-y-auto!"
+                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! overflow-x-hidden! overflow-y-auto! [scrollbar-gutter:stable]!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"

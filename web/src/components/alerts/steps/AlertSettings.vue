@@ -97,7 +97,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @create-destination="routeToCreateDestination"
                 @create-workflow="routeToCreateWorkflow"
               />
-              <div v-if="destinationsError" class="text-red-8 text-2xs pt-1 leading-3">
+              <!-- role="alert": focusOnFirstError finds stranded errors by this
+                   marker to bring the owning tab forward — without it a
+                   destination-only error can't pull the user back to this tab. -->
+              <div
+                v-if="destinationsError"
+                class="text-red-8 text-2xs pt-1 leading-3"
+                data-test="alert-settings-destinations-error"
+                role="alert"
+              >
                 {{ destinationsError }}
               </div>
             </div>
@@ -209,7 +217,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @create-destination="routeToCreateDestination"
                 @create-workflow="routeToCreateWorkflow"
               />
-              <div v-if="destinationsError" class="text-red-8 text-2xs pt-1 leading-3">
+              <!-- role="alert": focusOnFirstError finds stranded errors by this
+                   marker to bring the owning tab forward — without it a
+                   destination-only error can't pull the user back to this tab. -->
+              <div
+                v-if="destinationsError"
+                class="text-red-8 text-2xs pt-1 leading-3"
+                data-test="alert-settings-destinations-error"
+                role="alert"
+              >
                 {{ destinationsError }}
               </div>
             </div>

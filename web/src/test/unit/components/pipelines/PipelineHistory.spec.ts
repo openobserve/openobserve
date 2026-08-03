@@ -88,7 +88,7 @@ describe("PipelineHistory.vue", () => {
             template: '<div data-test="pipeline-history-date-picker"></div>',
             emits: ["on:date-change"],
           },
-          QTablePagination: {
+          Pagination: {
             template: '<div data-test="pagination-stub"></div>',
           },
           NoData: {

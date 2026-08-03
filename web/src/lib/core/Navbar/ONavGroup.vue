@@ -171,21 +171,40 @@ function childPath(name: string): string | null {
   }
 }
 
-function isChildActive(child: SubnavChild): boolean {
+// At most ONE child is active, resolved for the whole flyout rather than per
+// child. Deciding per child lit up ancestors too: any section whose path is a
+// prefix of another's matched both, which is right for a drill-down like
+// /alerts/detail/:id but wrong for a sibling that merely sits underneath.
+//
+// Exact route-name match wins outright; otherwise the DEEPEST path prefix wins,
+// so a nested route is attributed to its own section, not a shallower sibling.
+const activeChild = computed<SubnavChild | null>(() => {
   const route = router.currentRoute.value;
-  // Exact route-name match — precise for query-tab routes (AI evals).
-  if (route.name === child.name) {
-    return !child.tab || route.query.tab === child.tab;
+
+  const exact = props.children.find(
+    (c) => route.name === c.name && (!c.tab || route.query.tab === c.tab),
+  );
+  if (exact) return exact;
+
+  let best: SubnavChild | null = null;
+  let bestLen = 0;
+  for (const child of props.children) {
+    if (child.tab) continue; // query-tab children only match by exact name
+    const base = childPath(child.name);
+    if (!base || base === "/") continue;
+    if (route.path !== base && !route.path.startsWith(`${base}/`)) continue;
+    if (base.length > bestLen) {
+      best = child;
+      bestLen = base.length;
+    }
   }
-  // Otherwise the section is still "active" when the current route is nested
-  // under it — drill-down editors, the ingestion ("Data sources") tab routes
-  // (e.g. ingestLogs under /ingestion), pipeline editors, etc.
-  if (child.tab) return false; // query-tab children only match by exact name
-  const base = childPath(child.name);
-  if (!base || base === "/") return false;
-  return route.path === base || route.path.startsWith(`${base}/`);
+  return best;
+});
+
+function isChildActive(child: SubnavChild): boolean {
+  return activeChild.value === child;
 }
-const isGroupActive = computed(() => props.children.some(isChildActive));
+const isGroupActive = computed(() => activeChild.value !== null);
 
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 

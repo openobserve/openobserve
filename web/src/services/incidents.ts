@@ -71,13 +71,27 @@ export interface IncidentAlert {
   incident_id: string;
   alert_id: string;
   alert_name: string;
+  alert_kind?: "internal" | "external";
   alert_fired_at: number;
   correlation_reason: "service_discovery" | "primary_match" | "secondary_match" | "alert_id";
   created_at: number;
+  source_url?: string | null;
+  labels?: Record<string, string> | null;
+  detected_source?: string | null;
 }
 
 export interface IncidentWithAlerts extends Incident {
   alerts: IncidentAlert[];
+  triggers: IncidentAlert[];
+}
+
+export interface ExternalAlertPayload {
+  id: string;
+  detected_source: string;
+  source_url: string | null;
+  first_seen_at: number;
+  last_seen_at: number;
+  last_payload: unknown;
 }
 
 export interface UpdateSeverityResponse extends Incident {
@@ -152,6 +166,15 @@ const incidents = {
   get: (org_identifier: string, incident_id: string) => {
     return http().get<IncidentWithAlerts>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}`,
+    );
+  },
+
+  /**
+   * Get the raw webhook payload originally received for an external alert
+   */
+  getExternalAlertPayload: (org_identifier: string, external_alert_id: string) => {
+    return http().get<ExternalAlertPayload>(
+      `/api/v2/${org_identifier}/alerts/incidents/external-alerts/${external_alert_id}/payload`,
     );
   },
 

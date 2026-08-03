@@ -438,11 +438,16 @@ describe("AlertHistory.vue", () => {
       expect(resolveBadge("alertState", "ok").labelKey).toBe("components.badge.alertState.ok");
     });
 
-    it("condition_not_satisfied → green 'Ok' (matches the histogram count)", () => {
+    // Legacy `condition_not_satisfied` and current `normal` are the same state
+    // and must read identically, so pre-rename rows do not use different wording.
+    it("condition_not_satisfied → green 'Normal' (same as the current `normal`)", () => {
       const r = resolveBadge("alertState", "condition_not_satisfied");
       expect(r.variant).toBe("success-soft");
-      expect(r.labelKey).toBe("components.badge.alertState.ok");
+      // "Normal" moved from a hardcoded `label` to a translatable `labelKey`,
+      // which OTag resolves via t() (label precedence: prop → labelKey → label).
+      expect(r.labelKey).toBe("components.badge.alertState.normal");
       expect(r.icon).toBe("check-circle-outline");
+      expect(resolveBadge("alertState", "normal").variant).toBe("success-soft");
     });
 
     it("error / firing / anomaly → red error-soft", () => {
@@ -483,10 +488,22 @@ describe("AlertHistory.vue", () => {
       expect(() => resolveBadge("alertState", undefined as any)).not.toThrow();
     });
 
-    it("completed → green success-soft + check icon (not red)", () => {
+    // `completed` was the legacy spelling of "the alert fired" for
+    // condition-bearing modules. Rendering it green contradicted the backend
+    // AND the timeline, which already aggregated it under firing.
+    // The wording moved from a hardcoded `label` to a translatable `labelKey`,
+    // which OTag resolves via t() (label precedence: prop → labelKey → label).
+    it("completed → red error-soft, labelled Firing (it is a firing state)", () => {
       const r = resolveBadge("alertState", "completed");
-      expect(r.variant).toBe("success-soft");
-      expect(r.icon).toBe("check-circle-outline");
+      expect(r.variant).toBe("error-soft");
+      expect(r.labelKey).toBe("components.badge.alertState.firing");
+      expect(r.icon).toBe("error-outline");
+    });
+
+    it("notify_failed → red error-soft (condition matched, delivery failed)", () => {
+      const r = resolveBadge("alertState", "notify_failed");
+      expect(r.variant).toBe("error-soft");
+      expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
     });
   });
 

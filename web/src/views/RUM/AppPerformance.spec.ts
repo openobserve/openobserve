@@ -261,8 +261,6 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QSeparator: { template: "<hr />" },
-            QBtn: { template: "<button></button>" },
             AutoRefreshInterval: { template: "<div></div>" },
             AppTabs: { template: "<div></div>" },
             DateTimePickerDashboard: { template: "<div></div>" },
@@ -285,8 +283,6 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QSeparator: { template: "<hr />" },
-            QBtn: { template: "<button></button>" },
             AutoRefreshInterval: { template: "<div></div>" },
             AppTabs: { template: "<div></div>" },
             DateTimePickerDashboard: { template: "<div></div>" },

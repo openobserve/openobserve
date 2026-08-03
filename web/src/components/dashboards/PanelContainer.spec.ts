@@ -369,10 +369,16 @@ describe("PanelContainer", () => {
       wrapper = createWrapper({ viewOnly: false });
 
       await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseover");
-      expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(true);
+      // The controls stay mounted so the title's truncation point never moves as
+      // the pointer enters/leaves; they are hidden via `invisible`, not v-if.
+      const btn = wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.classes()).not.toContain("invisible");
 
       await wrapper.find('[data-test="dashboard-panel-container"]').trigger("mouseleave");
-      expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]').classes()).toContain(
+        "invisible",
+      );
     });
 
     it("should open fullscreen view when fullscreen button is clicked", async () => {

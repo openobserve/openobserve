@@ -43,7 +43,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     }
 
     // Navigate directly to alert destinations page
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/settings/alert_destinations?org_identifier=${getOrgIdentifier()}`);
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/alert-destinations?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
     // Anchor on the list title rendering — deterministic signal that the destinations page is ready.
     await pm.alertDestinationsPage.expectDestinationsListTitleVisible();

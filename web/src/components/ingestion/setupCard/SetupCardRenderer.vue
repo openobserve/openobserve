@@ -266,6 +266,9 @@ const stepDescription = (step: RichCardStep): I18nText =>
   step.descriptionKey ? t(step.descriptionKey) : (step.description ?? raw(""));
 const variantLabel = (variant: RichCardStepVariant): I18nText =>
   variant.labelKey ? t(variant.labelKey) : (variant.label ?? raw(""));
+// AI-markdown cards carry literal help prose; hand-written content uses a key.
+const streamInputHelp = (input: RichCardStreamInput): I18nText | undefined =>
+  input.helpKey ? t(input.helpKey) : input.help;
 const inputLabel = (input: RichCardInput | RichCardStreamInput): I18nText =>
   input.labelKey ? t(input.labelKey) : (input.label ?? raw(""));
 const chipLabel = (chip: { label?: I18nText; labelKey?: I18nKey }): I18nText =>
@@ -522,7 +525,7 @@ function fireConfetti() {
           v-model="streamName"
           :label="inputLabel(content.streamInput)"
           :placeholder="raw(content.streamInput.placeholder || content.streamInput.default)"
-          :help-text="!streamNameError && content.streamInput.helpKey ? t(content.streamInput.helpKey) : undefined"
+          :help-text="!streamNameError ? streamInputHelp(content.streamInput) : undefined"
           :error="!!streamNameError"
           :error-message="streamNameError"
           size="sm"

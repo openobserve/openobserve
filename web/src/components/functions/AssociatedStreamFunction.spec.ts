@@ -110,7 +110,7 @@ describe("AssociatedStreamFunction", () => {
   };
 
   const globalStubs = {
-    QTablePagination: true,
+    Pagination: true,
     SchemaIndex: true,
     NoData: true,
     ODrawer: ODrawerStub,

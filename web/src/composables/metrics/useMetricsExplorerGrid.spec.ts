@@ -1150,16 +1150,21 @@ describe("useMetricsExplorerGrid", () => {
 
       // Round 1: the card's own `sum(rate(...))` — empty.
       // Round 2: the presence probe — the metric is right there.
+      // Rounds 3-4: the widened-window retries — still nothing to rate.
       await landRounds(
         grid.requestPreview(cardNamed(grid, "lat_seconds_count")),
         NO_SERIES,
         SERIES,
+        NO_SERIES,
+        NO_SERIES,
       );
 
       expect(names(grid)).toContain("lat_seconds_count");
       expect(grid.emptyHiddenCount.value).toBe(0);
       // Not "No data": the card says what is actually wrong with it.
       expect(grid.previews.value["lat_seconds_count"].sparse).toBe(true);
+      // No rung worked, so the drill-in has nothing better than the default.
+      expect(grid.previews.value["lat_seconds_count"].widenedRateWindow).toBe(null);
     });
 
     it("so a histogram with real data never renders NO card at all", async () => {
@@ -1173,7 +1178,13 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.cards.value.map((c: any) => c.name)).not.toContain("lat_seconds"); // the phantom base: correctly suppressed, so the components are all there is
 
       for (const member of ["lat_seconds_bucket", "lat_seconds_count"]) {
-        await landRounds(grid.requestPreview(cardNamed(grid, member)), NO_SERIES, SERIES);
+        await landRounds(
+          grid.requestPreview(cardNamed(grid, member)),
+          NO_SERIES,
+          SERIES,
+          NO_SERIES,
+          NO_SERIES,
+        );
       }
 
       expect(names(grid)).toEqual(
@@ -1194,7 +1205,61 @@ describe("useMetricsExplorerGrid", () => {
       expect(inFlight.map((q) => q.query)).toEqual(['count({__name__="lat_seconds_count"})']);
 
       inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await flush();
+      // The probe saying "samples exist" sends the card into the widened-window
+      // retries; landing the first one settles the preview.
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
       await preview;
+    });
+
+    it("retries with a widened window and charts the data instead of giving up", async () => {
+      // The org's scrape_interval setting is a claim, not a measurement. Data
+      // arriving every 60s under a 15s setting gets a window that almost never
+      // holds the two samples `rate()` needs — the card said "too few samples"
+      // for a metric that charts perfectly well over a wider window.
+      const grid = await setup();
+      const preview = grid.requestPreview(cardNamed(grid, "lat_seconds_count"));
+
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES)); // rate: empty
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES)); // probe: samples exist
+      await flush();
+
+      // 1h range, 50 points, 15s scrape → standard window [1m27s], first retry 4x.
+      expect(inFlight.map((q) => q.query).join()).toContain("[5m48s]");
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await preview;
+
+      const settled = grid.previews.value["lat_seconds_count"];
+      expect(settled.sparse).toBe(false);
+      expect(settled.results.some((r: any) => r.result.length)).toBe(true);
+      expect(names(grid)).toContain("lat_seconds_count");
+      // Carried for the drill-in: the editor resolves `$__rate_interval` from
+      // the same overstated scrape interval, so it needs the window that
+      // actually worked.
+      expect(settled.widenedRateWindow).toBe("5m48s");
+    });
+
+    it("escalates to a second, wider window before conceding sparseness", async () => {
+      const grid = await setup();
+      const preview = grid.requestPreview(cardNamed(grid, "lat_seconds_count"));
+
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES)); // rate
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES)); // probe
+      await flush();
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES)); // 4x: still nothing
+      await flush();
+
+      expect(inFlight.map((q) => q.query).join()).toContain("[23m12s]"); // 16x
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await preview;
+
+      expect(grid.previews.value["lat_seconds_count"].sparse).toBe(false);
+      expect(grid.previews.value["lat_seconds_count"].widenedRateWindow).toBe("23m12s");
+      expect(names(grid)).toContain("lat_seconds_count");
     });
 
     it("still hides a metric the probe agrees is empty", async () => {

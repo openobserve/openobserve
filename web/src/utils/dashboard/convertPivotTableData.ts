@@ -394,6 +394,7 @@ export const convertPivotTableData = (
       align: "left",
       sortable: true,
       _isRowField: true,
+      mono: timestampFieldAliases.has(xField.alias),
     };
     if (timestampFieldAliases.has(xField.alias)) {
       col.format = (val: any) => parseTimestampValue(val, timezone) || val;
@@ -436,6 +437,7 @@ export const convertPivotTableData = (
         label,
         align: "right",
         sortable: true,
+        mono: true,
         _groupStart: isGroupStart,
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
         format: (val: any) =>
@@ -473,6 +475,7 @@ export const convertPivotTableData = (
         label,
         align: "right",
         sortable: true,
+        mono: true,
         _groupStart: tIdx === 0,
         _isTotalColumn: true,
         _totalColRightIndex: yFields.length - 1 - tIdx,

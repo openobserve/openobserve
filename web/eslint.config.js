@@ -94,6 +94,7 @@ const NON_TRANSLATABLE = [
   "fx",
   // Decorative glyphs / emoji — visual only, no language content.
   "●",
+  "…", // ellipsis marking a truncated list
   "🕑",
   "$_",
   // Protocol / standard identifiers — defined by a spec, identical in every locale.

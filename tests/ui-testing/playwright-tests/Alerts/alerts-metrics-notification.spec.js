@@ -359,7 +359,7 @@ test.describe("Metrics Alert Notification Chain", () => {
 
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const org = getOrgIdentifier();
-        await page.goto(`${baseUrl}/web/settings/templates?org_identifier=${org}`);
+        await page.goto(`${baseUrl}/web/alert-templates?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
         await pm.alertsPage.searchTemplate(TEMPLATE_NAME);
@@ -387,7 +387,7 @@ test.describe("Metrics Alert Notification Chain", () => {
 
         testLogger.info('=== PHASE 3: Navigate back to templates list ===');
 
-        await page.goto(`${baseUrl}/web/settings/templates?org_identifier=${org}`);
+        await page.goto(`${baseUrl}/web/alert-templates?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
         testLogger.info('=== TEMPLATE VERIFICATION COMPLETE ===');

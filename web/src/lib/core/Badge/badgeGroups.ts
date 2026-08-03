@@ -127,6 +127,49 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Alert PRIORITY (Feature 2, PT-3) — how much humans care about this alert,
+  // set at configuration time.
+  //
+  // A THIRD axis, distinct from both neighbours below: `alertState` is the run
+  // outcome ("did it fire?"), `alertLevel` is the evaluated severity right now
+  // ("how bad?"), and this is neither — a P1 alert sitting at level Ok is
+  // perfectly normal, so these must never share a group.
+  //
+  // Palette follows the existing `severity` hot→cold ramp so P1–P4 read the
+  // same as they do on incidents, extended with a neutral P5 (that scale stops
+  // at P4).
+  alertPriority: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      p1: { variant: "error-soft", label: raw("P1") },
+      p2: { variant: "orange-soft", label: raw("P2") },
+      p3: { variant: "amber-soft", label: raw("P3") },
+      p4: { variant: "blue-soft", label: raw("P4") },
+      p5: { variant: "default-soft", label: raw("P5") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Alert severity LEVEL (alerts_2.md Feature 1) — dot, PILL.
+  //
+  // A separate axis from `alertState` above, which renders the run OUTCOME
+  // ("did it fire?"). This renders "how bad?". An alert can be `firing` at
+  // `warning`, so the two badges can and do appear side by side.
+  alertLevel: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      critical: { variant: "error-soft" },
+      warning: { variant: "warning-soft" },
+      ok: { variant: "success-soft", labelKey: "components.badge.alertLevel.ok" },
+      // Reserved: the policy that produces it ships in Phase 2. Neutral rather
+      // than warning-coloured — "we don't know" is not "we know it's bad".
+      nodata: { variant: "default-soft", labelKey: "components.badge.alertLevel.nodata" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Incident lifecycle. Labels are i18n keys (resolved by OTag).
   incidentStatus: {
     mode: "dot",
@@ -258,6 +301,33 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Pipeline execution outcome — dot.
+  //
+  // `RunOutcome` replaced the legacy trigger status vocabulary for every
+  // scheduler-backed module. Pipeline history must accept both generations
+  // while old rows remain in the triggers stream.
+  pipelineRunOutcome: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      // Current RunOutcome vocabulary.
+      firing: { variant: "success-soft" },
+      normal: { variant: "success-soft" },
+      succeeded: { variant: "success-soft" },
+      error: { variant: "error-soft" },
+      notifyfailed: { variant: "error-soft" },
+      skipped: { variant: "warning-soft" },
+      // Legacy trigger status vocabulary and older UI aliases.
+      completed: { variant: "success-soft" },
+      conditionnotsatisfied: { variant: "success-soft" },
+      failed: { variant: "error-soft" },
+      success: { variant: "success-soft" },
+      ok: { variant: "success-soft" },
+      warning: { variant: "warning-soft" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Service / node health — dot.
   serviceStatus: {
     mode: "dot",
@@ -269,11 +339,34 @@ export const BADGE_GROUPS = {
       online: { variant: "success-soft" },
       degraded: { variant: "warning-soft" },
       warning: { variant: "amber-soft" },
+      // A cluster node that is starting up but not yet serving.
+      prepare: { variant: "warning-soft" },
       critical: { variant: "error-soft" },
       offline: { variant: "error-soft" },
       failed: { variant: "error-soft" },
       down: { variant: "error-soft" },
       unknown: { variant: "default-soft" },
+    },
+  },
+
+  // Cluster node roles — plain (a role is a category, not a severity), one stable
+  // colour per role so the same node type reads the same everywhere.
+  nodeRole: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      all: { variant: "primary-soft", labelKey: "components.badge.nodeRole.all" },
+      ingester: { variant: "teal-soft" },
+      querier: { variant: "blue-soft" },
+      compactor: { variant: "purple-soft" },
+      flattencompactor: {
+        variant: "purple-soft",
+        labelKey: "components.badge.nodeRole.flattencompactor",
+      },
+      router: { variant: "orange-soft" },
+      alertmanager: { variant: "amber-soft", labelKey: "components.badge.nodeRole.alertmanager" },
+      actionserver: { variant: "lime-soft", labelKey: "components.badge.nodeRole.actionserver" },
+      script: { variant: "default-soft" },
     },
   },
 
@@ -1155,39 +1248,71 @@ export const BADGE_GROUPS = {
   },
 
   // Alert run state (alert history) — icon, PILL (status badge).
+  //
+  // The backend vocabulary is `firing | normal | succeeded | error |
+  // notify_failed | skipped` (RunOutcome). The legacy values below
+  // (`completed`, `condition_not_satisfied`, `failed`, `ok`, `success`) are kept
+  // so history rows written before the rename still render, and can be dropped
+  // once those rows age out of the triggers stream's retention window.
   alertState: {
     mode: "icon",
     shape: "pill",
     values: {
+      // ── firing states ──
       firing: { variant: "error-soft", icon: "error-outline" },
-      error: { variant: "error-soft", icon: "error-outline" },
       anomaly: { variant: "error-soft", icon: "error-outline" },
-      // `completed` = a finished/OK run → GREEN. It is NOT a firing state for the
-      // badge (the timeline aggregates it under firing separately, but the per-row
-      // badge reads as Ok).
-      completed: { variant: "success-soft", icon: "check-circle-outline" },
+      // Condition matched but delivery failed — still a firing state, flagged
+      // distinctly so a broken destination is visible.
+      notifyfailed: {
+        variant: "error-soft",
+        icon: "sync-problem",
+        labelKey: "components.badge.alertState.notifyfailed",
+      },
+      // LEGACY: `completed` meant "the alert fired" for condition-bearing
+      // modules. It is a firing state — the previous green rendering
+      // contradicted both the backend and the timeline aggregation.
+      completed: {
+        variant: "error-soft",
+        icon: "error-outline",
+        labelKey: "components.badge.alertState.firing",
+      },
+
+      // ── non-firing states ──
+      // `normal` carries an explicit key rather than relying on the humanised
+      // fallback: `conditionnotsatisfied` below is the same state and resolves
+      // the same key, and humanisation is English-only — without this the two
+      // would read differently in every non-English locale, which is exactly
+      // the drift the shared key exists to prevent.
+      normal: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        labelKey: "components.badge.alertState.normal",
+      },
+      succeeded: { variant: "success-soft", icon: "check-circle-outline" },
+      // LEGACY aliases for `normal`.
       ok: {
         variant: "success-soft",
         icon: "check-circle-outline",
         labelKey: "components.badge.alertState.ok",
       },
       success: { variant: "success-soft", icon: "check-circle-outline" },
-      normal: { variant: "success-soft", icon: "check-circle-outline" },
-      // A non-firing/passed evaluation. The histogram counts these as "Ok", so
-      // the badge shows "Ok" too. Key MUST be normalised (no separators) so
-      // "condition_not_satisfied", "Condition Not Satisfied", etc. all resolve here.
       conditionnotsatisfied: {
         variant: "success-soft",
         icon: "check-circle-outline",
-        labelKey: "components.badge.alertState.ok",
+        labelKey: "components.badge.alertState.normal",
       },
+
+      // ── evaluation problems ──
+      error: { variant: "error-soft", icon: "cancel" },
+      failed: { variant: "error-soft", icon: "cancel" },
+
+      // ── neither ──
       skipped: { variant: "warning-soft", icon: "block" },
       flapping: {
         variant: "warning-soft",
         icon: "bolt",
         labelKey: "components.badge.alertState.flapping",
       },
-      failed: { variant: "error-soft", icon: "cancel" },
       pending: { variant: "blue-soft", icon: "schedule" },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },

@@ -120,6 +120,58 @@ describe("MetricCardChart builds the panel schema from its props", () => {
   });
 });
 
+/**
+ * `fixed` resolves to `fixedColor[0]` for EVERY series name (colorPalette.ts),
+ * and these charts carry no legend. So a multi-series variant — Percentiles,
+ * Min / Max — drew every line in one colour: three indistinguishable lines, or,
+ * when they coincided, something that looked like a single line and read as a
+ * bug in the query.
+ */
+describe("MetricCardChart colours multi-series charts per series", () => {
+  const matrix = (n: number) => [
+    {
+      resultType: "matrix",
+      result: Array.from({ length: n }, (_, i) => ({
+        metric: { le: String(i) },
+        values: [[1, "1"]],
+      })),
+    },
+  ];
+
+  it("keeps the card's accent colour when there is a single series", () => {
+    const color = panelProp(mountChart({ results: matrix(1) }), "panelSchema").config.color;
+    expect(color).toEqual({ mode: "fixed", fixedColor: ["#60a5fa"] });
+  });
+
+  it("switches to a per-series palette once there is more than one", () => {
+    const color = panelProp(mountChart({ results: matrix(3) }), "panelSchema").config.color;
+    expect(color.mode).toBe("palette-classic-by-series");
+  });
+
+  it("counts series ACROSS queries — one per percentile, one series each", () => {
+    // What the Percentiles variant actually returns: three separate responses.
+    const results = [50, 90, 99].map(() => ({
+      resultType: "matrix",
+      result: [{ metric: {}, values: [[1, "1"]] }],
+    }));
+    const wrapper = mountChart({
+      results,
+      queries: [50, 90, 99].map((p) => ({ expr: `q${p}`, legendTemplate: `p${p}` })),
+    });
+    expect(panelProp(wrapper, "panelSchema").config.color.mode).toBe("palette-classic-by-series");
+  });
+
+  it("re-evaluates when the results change", async () => {
+    const wrapper = mountChart({ results: matrix(1) });
+    expect(panelProp(wrapper, "panelSchema").config.color.mode).toBe("fixed");
+
+    await wrapper.setProps({ results: matrix(4) });
+    await nextTick();
+
+    expect(panelProp(wrapper, "panelSchema").config.color.mode).toBe("palette-classic-by-series");
+  });
+});
+
 describe("MetricCardChart feeds the queue's results in as injected data", () => {
   it("hands the results and the queried window (µs) to the panel", () => {
     const wrapper = mountChart();

@@ -560,6 +560,7 @@ import orgService from "@/services/organizations";
 import configService from "@/services/config";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
+import { formatEventCount } from "@/utils/formatters";
 import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -627,18 +628,6 @@ const animateValue = (targetRef: any, start: number, end: number, duration: numb
   animationId = requestAnimationFrame(animate);
 
   return () => cancelAnimationFrame(animationId);
-};
-
-const formatEventCount = (num: number): string => {
-  if (num < 100000) return num.toString();
-
-  const units = ["", "K", "M", "B", "T"];
-  let tier = Math.floor(Math.log10(num) / 3);
-
-  if (tier >= units.length) tier = units.length - 1;
-
-  const scaled = num / Math.pow(10, tier * 3);
-  return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
 };
 
 const getSummary = (org_id: any) => {

@@ -121,10 +121,15 @@ const globalStubs = {
   ConfirmDialog: ConfirmDialogStub,
   OPageHeader: {
     name: "OPageHeader",
-    props: ["title", "back"],
+    props: ["title", "subtitle", "back"],
+    // The name and mode/description now live in the #title and #subtitle slots
+    // (inline-edited), not in a `title` prop — render both so the OInlineEdit
+    // controls under test actually mount.
     template:
       '<div class="app-page-header" :data-title="title">' +
       '<button class="header-back" @click="back && back.onClick()" />' +
+      '<div class="header-title"><slot name="title" /></div>' +
+      '<div class="header-subtitle"><slot name="subtitle" /></div>' +
       '<slot name="title-trail" /><slot name="actions" /></div>',
   },
   OButton: {
@@ -318,7 +323,9 @@ describe("WorkflowEditor", () => {
       await flushPromises();
       workflowObj.nameError = true;
 
-      await wrapper.find('[data-test="workflow-editor-name"]').setValue("wf-a");
+      // The name is an inline-edited title: click to open the editor, then type.
+      await wrapper.find('[data-test="workflow-editor-name-trigger"]').trigger("click");
+      await wrapper.find('[data-test="workflow-editor-name-input"]').setValue("wf-a");
 
       expect(wf().name).toBe("wf-a");
       expect(workflowObj.nameError).toBe(false);
@@ -327,7 +334,8 @@ describe("WorkflowEditor", () => {
     it("binds the description input", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      await wrapper.find('[data-test="workflow-editor-description"]').setValue("d");
+      await wrapper.find('[data-test="workflow-editor-description-trigger"]').trigger("click");
+      await wrapper.find('[data-test="workflow-editor-description-input"]').setValue("d");
       expect(wf().description).toBe("d");
     });
   });
@@ -416,19 +424,25 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe("my workflow");
-      expect(wrapper.find('[data-test="workflow-editor-name"]').exists()).toBe(false);
+      // Edit mode is readonly: the name shows as plain heading text (a -value
+      // span), with no click-to-edit trigger and no input.
+      expect(wrapper.find('[data-test="workflow-editor-name-value"]').text()).toBe("my workflow");
+      expect(wrapper.find('[data-test="workflow-editor-name-trigger"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-editor-name-input"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="workflow-editor-history"]').exists()).toBe(true);
     });
 
-    it("falls back to the module title when the saved workflow has no name", async () => {
+    it("shows the name placeholder when the saved workflow has no name", async () => {
       hydrateWorkflow(savedGraph({ name: "" }));
       mockRouter.currentRoute.value = { query: { id: "wf-1" } };
 
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe(t("workflow.header"));
+      // A nameless workflow still renders a readonly title — the placeholder.
+      expect(wrapper.find('[data-test="workflow-editor-name-value"]').text()).toBe(
+        t("workflow.namePlaceholder"),
+      );
     });
   });
 

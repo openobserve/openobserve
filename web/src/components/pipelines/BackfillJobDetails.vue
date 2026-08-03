@@ -390,8 +390,10 @@ const estimatedCompletion = computed(() => {
 const getDeletionTimelineTitle = computed(() => {
   if (!job.value?.deletion_status) return raw("");
 
-  if (job.value.deletion_status === "completed") return t("pipeline.backfillDetails.deletionCompleted");
-  if (job.value.deletion_status === "in_progress") return t("pipeline.backfillDetails.deletingData");
+  if (job.value.deletion_status === "completed")
+    return t("pipeline.backfillDetails.deletionCompleted");
+  if (job.value.deletion_status === "in_progress")
+    return t("pipeline.backfillDetails.deletingData");
   if (job.value.deletion_status === "pending") return t("pipeline.backfillDetails.deletionPending");
   if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
     return t("pipeline.backfillDetails.deletionFailed");
@@ -402,9 +404,12 @@ const getDeletionTimelineTitle = computed(() => {
 const getDeletionTimelineSubtitle = computed(() => {
   if (!job.value?.deletion_status) return raw("");
 
-  if (job.value.deletion_status === "completed") return t("pipeline.backfillDetails.allDataDeleted");
-  if (job.value.deletion_status === "in_progress") return t("pipeline.backfillDetails.deletionInProgress");
-  if (job.value.deletion_status === "pending") return t("pipeline.backfillDetails.waitingToStartDeletion");
+  if (job.value.deletion_status === "completed")
+    return t("pipeline.backfillDetails.allDataDeleted");
+  if (job.value.deletion_status === "in_progress")
+    return t("pipeline.backfillDetails.deletionInProgress");
+  if (job.value.deletion_status === "pending")
+    return t("pipeline.backfillDetails.waitingToStartDeletion");
   if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
     // Backend-provided failure detail, shown verbatim.
     return raw(job.value.deletion_status.failed);
@@ -453,7 +458,8 @@ const getStatusLabel = (status: string, deletionStatus?: any) => {
 
 const getDeletionStatusLabel = (status?: any) => {
   if (!status || status === "not_required") return t("pipeline.backfillDetails.statusNotRequired");
-  if (typeof status === "object" && "failed" in status) return t("pipeline.backfillDetails.statusFailed");
+  if (typeof status === "object" && "failed" in status)
+    return t("pipeline.backfillDetails.statusFailed");
   if (status === "completed") return t("pipeline.backfillDetails.statusCompleted");
   if (status === "in_progress") return t("pipeline.backfillDetails.statusInProgress");
   if (status === "pending") return t("pipeline.backfillDetails.statusPending");

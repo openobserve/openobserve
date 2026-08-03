@@ -23,31 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'incident-detail-back-btn',
       }"
       :subtitle="t('alerts.incidents.incident')"
+      title-overflow="visible"
       bleed
     >
+      <!-- Incident name — click the title to rename, Enter or blur saves,
+           Escape restores. Replaces a hand-rolled input plus an Edit button and
+           a Save/Cancel pair in #actions: three affordances for one field, and
+           a mode the rest of the app no longer has. -->
       <template #title>
-        <!-- Incident name (inline-editable) -->
-        <input
-          class="max-w-125 min-w-75"
-          v-if="incidentDetails && isEditingTitle"
-          v-model="editableTitle"
-          ref="titleInputRef"
-          :class="[
-            'rounded-default border-2 px-2 py-1 font-bold outline-none',
-            'text-text-link bg-status-info-bg border-text-link',
-          ]"
-        />
-        <span
-          v-else-if="incidentDetails"
+        <OInlineEdit
+          v-if="incidentDetails"
+          :model-value="incidentDetails.title ?? ''"
           data-test="incident-detail-title"
-          :title="incidentDetails.title"
-        >
-          {{ incidentDetails.title }}
-          <OTooltip
-            v-if="incidentDetails && (incidentDetails.title?.length ?? 0) > 35"
-            :content="raw(incidentDetails.title)"
-          />
-        </span>
+          :aria-label="t('alerts.incidents.title_field')"
+          :edit-hint="t('alerts.incidents.editIncidentTitleTooltip')"
+          @edit-start="isEditingTitle = true"
+          @commit="saveTitleEdit"
+          @cancel="isEditingTitle = false"
+        />
       </template>
 
       <!-- Status, Severity, Alerts badges — trail immediately after the title
@@ -78,22 +71,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :content="t('alerts.incidents.correlatedAlertsCount', { count: triggers.length })"
             />
           </span>
+
+          <span v-if="externalSources.length" class="inline-flex cursor-default">
+            <OTag variant="default-outline" data-test="incident-external-source-badge">
+              <OIcon name="webhook" size="xs" />
+              {{ externalSources.join(", ") }}
+            </OTag>
+            <OTooltip
+              :content="
+                raw(t('alerts.incidents.externalSourceTooltip') + ': ' + externalSources.join(', '))
+              "
+            />
+          </span>
         </template>
       </template>
 
       <template #actions>
-        <!-- Save/Cancel when editing the title -->
-        <template v-if="incidentDetails && isEditingTitle">
-          <OButton variant="outline" size="sm-action" @click="cancelTitleEdit">{{
-            t("alerts.cancel")
-          }}</OButton>
-          <OButton variant="primary" size="sm-action" @click="saveTitleEdit">{{
-            t("alerts.save")
-          }}</OButton>
-        </template>
-
-        <!-- Incident actions otherwise -->
-        <template v-else-if="incidentDetails">
+        <template v-if="incidentDetails">
           <OButton
             v-if="incidentDetails.status === 'open'"
             variant="outline"
@@ -120,12 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="reopenIncident"
             ><OIcon name="refresh" size="sm" />{{ t("alerts.incidents.reopen")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')"
-          /></OButton>
-
-          <!-- Edit Title Button -->
-          <OButton variant="outline" size="sm" @click="startTitleEdit"
-            ><OIcon name="edit" size="sm" />{{ t("alerts.edit")
-            }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')"
           /></OButton>
         </template>
       </template>
@@ -1401,6 +1389,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1426,6 +1415,7 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OTag,
+    OInlineEdit,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
@@ -1465,8 +1455,6 @@ export default defineComponent({
 
     // Title editing
     const isEditingTitle = ref(false);
-    const editableTitle = ref("");
-    const titleInputRef = ref<HTMLInputElement | null>(null);
     const rcaLoading = ref(false);
     const rcaStreamContent = ref("");
 
@@ -1738,6 +1726,18 @@ export default defineComponent({
         const minutesBetween = Math.floor(durationSeconds / triggers.value.length / 60);
         return `1 Per ${minutesBetween} Mins`;
       }
+    });
+
+    // Distinct external sources (Grafana, Alertmanager, etc.) that fed this
+    // incident — empty when every contributing alert is an internal O2 alert.
+    const externalSources = computed(() => {
+      const sources = new Set<string>();
+      for (const trigger of triggers.value) {
+        if (trigger.alert_kind === "external" && trigger.detected_source) {
+          sources.add(trigger.detected_source);
+        }
+      }
+      return Array.from(sources);
     });
 
     // Helper: Get actual trigger count for a specific alert_id
@@ -2340,7 +2340,7 @@ export default defineComponent({
         const response = await incidentsService.get(org, incidentId);
 
         incidentDetails.value = response.data;
-        triggers.value = (response.data as any).triggers || [];
+        triggers.value = response.data.triggers || [];
         alerts.value = response.data.alerts || [];
 
         // Initialize editable status and severity from incident data
@@ -2524,37 +2524,29 @@ export default defineComponent({
     const resolveIncident = () => updateStatus("resolved");
     const reopenIncident = () => updateStatus("open");
 
-    // Title editing functions
-    const startTitleEdit = () => {
-      if (!incidentDetails.value) return;
-      editableTitle.value = incidentDetails.value.title ?? "";
-      isEditingTitle.value = true;
-      nextTick(() => {
-        titleInputRef.value?.focus();
-        titleInputRef.value?.select();
-      });
-    };
-
+    // Title editing. OInlineEdit owns the open/close and the Escape-restores
+    // behaviour; this only has to persist a committed value. `isEditingTitle`
+    // survives purely so the status/severity chips in #title-trail still step
+    // aside while the input is open.
     const cancelTitleEdit = () => {
       isEditingTitle.value = false;
-      editableTitle.value = "";
     };
 
-    const saveTitleEdit = async () => {
-      if (!incidentDetails.value || !editableTitle.value.trim()) {
-        cancelTitleEdit();
-        return;
-      }
+    const saveTitleEdit = async (value: string) => {
+      isEditingTitle.value = false;
+      const nextTitle = value.trim();
 
-      if (editableTitle.value.trim() === incidentDetails.value.title) {
-        cancelTitleEdit();
+      // Nothing to do for a blank name or an unchanged one. A blank commit
+      // leaves the stored title alone — OInlineEdit re-renders it from
+      // incidentDetails, so the field snaps back on its own.
+      if (!incidentDetails.value || !nextTitle || nextTitle === incidentDetails.value.title) {
         return;
       }
 
       try {
         const org = store.state.selectedOrganization.identifier;
         const response = await incidentsService.updateIncident(org, incidentDetails.value.id, {
-          title: editableTitle.value.trim(),
+          title: nextTitle,
         });
 
         // Update local state with the actual title from the API response
@@ -3404,6 +3396,7 @@ export default defineComponent({
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
+      externalSources,
       getTriggerCountForAlert,
       uniqueAlertsMap,
       uniqueAlertsCount,
@@ -3421,9 +3414,6 @@ export default defineComponent({
       resolveIncident,
       reopenIncident,
       isEditingTitle,
-      editableTitle,
-      titleInputRef,
-      startTitleEdit,
       cancelTitleEdit,
       saveTitleEdit,
       triggerRca,

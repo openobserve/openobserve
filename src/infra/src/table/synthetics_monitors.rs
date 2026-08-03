@@ -438,6 +438,94 @@ pub async fn update_last_check_status<C: ConnectionTrait>(
     Ok(())
 }
 
+/// The alert bookkeeping a completed run needs in order to decide whether to
+/// notify. Read and written by the ack path only.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AlertState {
+    /// Runs that failed back to back. Reset to 0 by a pass.
+    pub consecutive_failures: i32,
+    /// When a notification was last sent, in microseconds. 0 = never.
+    pub last_alert_at: i64,
+    /// Whether the check is currently in the alerting state.
+    pub alerting: bool,
+    /// When a degradation was last reported, in microseconds. 0 = not currently
+    /// degraded. Degradation persists for as long as the certificate takes to
+    /// expire, so it is suppressed by transition rather than by a time window.
+    pub degraded_notified_at: i64,
+}
+
+/// Reads the alert state without pulling the whole monitor (config, secrets and
+/// step definitions are several KB, and this runs on every ack).
+pub async fn get_alert_state<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<AlertState>, errors::Error> {
+    let row = Entity::find_by_id(id)
+        .select_only()
+        .column(Column::ConsecutiveFailures)
+        .column(Column::LastAlertAt)
+        .column(Column::Alerting)
+        .column(Column::DegradedNotifiedAt)
+        .into_tuple::<(i32, i64, bool, i64)>()
+        .one(conn)
+        .await?;
+    Ok(row.map(
+        |(consecutive_failures, last_alert_at, alerting, degraded_notified_at)| AlertState {
+            consecutive_failures,
+            last_alert_at,
+            alerting,
+            degraded_notified_at,
+        },
+    ))
+}
+
+/// Writes the alert state back after a run completes.
+/// Writes the alert state back, but only if it still holds `expected`.
+///
+/// Returns `true` when the write applied, `false` when another writer got there
+/// first and the caller's decision was made against a stale read.
+///
+/// This is a compare-and-swap because the caller does a read-modify-write with no
+/// transaction around it: `get_alert_state` then decide then write. Two runs of
+/// the SAME check can complete close together — a run takes longer than the
+/// interval whenever the target is slow, which is exactly when it is failing — and
+/// both would read `consecutive_failures = 2`, both write 3, and both conclude
+/// they were outside the cooldown. The streak would undercount and the
+/// notification would double.
+///
+/// The three columns are guarded, not just the counter: a lost `alerting`
+/// transition is what produces a recovery for an incident nobody was told about.
+///
+/// Compare `synthetics_runs::increment_jobs_done`, which is a single atomic
+/// `jobs_done = jobs_done + 1`. That shape is not available here because the new
+/// value depends on a policy decision, not on arithmetic over the old one.
+pub async fn update_alert_state_if<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    expected: AlertState,
+    state: AlertState,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(
+            Column::ConsecutiveFailures,
+            Expr::value(state.consecutive_failures),
+        )
+        .col_expr(Column::LastAlertAt, Expr::value(state.last_alert_at))
+        .col_expr(Column::Alerting, Expr::value(state.alerting))
+        .col_expr(
+            Column::DegradedNotifiedAt,
+            Expr::value(state.degraded_notified_at),
+        )
+        .filter(Column::Id.eq(id))
+        .filter(Column::ConsecutiveFailures.eq(expected.consecutive_failures))
+        .filter(Column::LastAlertAt.eq(expected.last_alert_at))
+        .filter(Column::Alerting.eq(expected.alerting))
+        .filter(Column::DegradedNotifiedAt.eq(expected.degraded_notified_at))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 async fn get_model<C: ConnectionTrait>(
@@ -616,6 +704,10 @@ mod tests {
             next_run_at: 0,
             last_triggered_at: 0,
             last_check_status: 0,
+            consecutive_failures: 0,
+            last_alert_at: 0,
+            alerting: false,
+            degraded_notified_at: 0,
             owner: None,
             created_at: 1750000000000000,
             updated_at: 1750000000000000,

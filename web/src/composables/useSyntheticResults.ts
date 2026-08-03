@@ -22,9 +22,13 @@ import {
   bucketInterval,
   buildHistogramSql,
   buildKpiSql,
+  buildRetryAttributionSql,
+  foldRetryAttribution,
   buildLastRunSql,
   buildRunsSql,
   buildRunsWithStepsSql,
+  buildStepDefsSql,
+  foldStepDefs,
   buildRunDetailSql,
   buildProtocolRunDetailSql,
   mapHistogram,
@@ -42,6 +46,17 @@ import {
 } from "@/composables/synthetics/syntheticResultsSchema";
 import useStreams from "@/composables/useStreams";
 
+/**
+ * Row cap on the runs-list query — the one that feeds the timeline, the
+ * breakdown cards, the table and the errors tab.
+ *
+ * Exported because consumers have to be able to say "this is the most recent
+ * N", not just render a truncated set as if it were everything: the KPI cards
+ * are computed by a separate aggregate query over the WHOLE window, so past
+ * this many executions the two legitimately disagree.
+ */
+export const RUNS_QUERY_LIMIT = 1000;
+
 const EMPTY_KPI: SyntheticKpi = {
   uptimePct: 0,
   p95Ms: 0,
@@ -51,6 +66,8 @@ const EMPTY_KPI: SyntheticKpi = {
   errorRuns: 0,
   totalRuns: 0,
   retriedRuns: 0,
+  flakyExecutions: 0,
+  degradedExecutions: 0,
   lastRunStatus: null,
   lastRunAt: null,
 };
@@ -100,6 +117,9 @@ export function useSyntheticResults(t: TranslateFn) {
     flakySteps: [],
     trendBuckets: [],
     failureInstances: [],
+    // Same shape `emptyStepStats()` returns; the initial value was missed when
+    // `coverage` was added, and only `tsconfig.app.json` is strict enough to say so.
+    coverage: { executions: 0, fromMs: 0, toMs: 0, truncated: false },
   });
 
   // ── Stream schema fields ─────────────────────────────────────────────────
@@ -109,16 +129,56 @@ export function useSyntheticResults(t: TranslateFn) {
   // is absent until a run has failed, …) and the search API rejects queries
   // naming absent fields. Query builders take this set and substitute
   // literals for missing columns. getStream caches, so repeat calls are cheap.
+  /**
+   * Field names present in the stream schema.
+   *
+   * On failure this returns an EMPTY set, which makes every optional column
+   * select a typed literal instead of its name. That is the only option that
+   * cannot fail — naming a column the schema lacks is rejected outright by the
+   * search API, and the schema genuinely lacks `status_reason` until some run
+   * has been a `warning`.
+   *
+   * The cost is that a schema-fetch failure is indistinguishable from a stream
+   * that has none of these fields: `init_ms` reads 0, `attempts` reads 0 and
+   * `retry_history` reads '', so the run detail renders with no init chip, no
+   * queue delay and no attempts strip — a fetch failure presented as a run that
+   * simply had none of those things.
+   *
+   * Hence the log. It is the only signal that the degraded render is a failure
+   * rather than the data, and it cost real debugging time to work that out once.
+   */
   async function fetchSchemaFields(): Promise<Set<string>> {
     try {
       const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
-      return new Set(((stream?.schema ?? []) as { name: string }[]).map((f) => f.name));
-    } catch {
-      // Schema not available — an empty set selects literals for every
-      // optional column, which cannot fail.
+      const fields = ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name);
+      if (!fields.length) {
+        console.warn(
+          "[synthetics] stream schema returned no fields; optional columns will render as empty",
+        );
+      }
+      return new Set(fields);
+    } catch (e: unknown) {
+      console.warn(
+        "[synthetics] stream schema unavailable — optional columns (init_ms, attempts, " +
+          "retry_history, …) will render as empty, NOT as absent data:",
+        e,
+      );
       return new Set();
     }
   }
+
+  /**
+   * The runs list came back full, so it is the most recent `RUNS_QUERY_LIMIT`
+   * executions rather than every one in the window.
+   *
+   * Reported by the composable, not re-derived by each consumer: the cap is
+   * this module's decision, and anything built from `runs` (the timeline, the
+   * breakdown cards) is a partial view whenever this is true — while the KPI
+   * cards beside them are aggregated server-side over the whole window.
+   */
+  const runsTruncated = computed(
+    () => runsHasLoadedOnce.value && runs.value.length >= RUNS_QUERY_LIMIT,
+  );
 
   // ── Effective p95 — falls back to client-side computation from runs ──────
   //
@@ -154,24 +214,76 @@ export function useSyntheticResults(t: TranslateFn) {
   ): Promise<StepStatsResult> {
     try {
       let hasRetryHistory = false;
+      let hasRetryAttribution = false;
+      let hasStatusReason = false;
       try {
         const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
         const schema: { name: string }[] = stream?.schema ?? [];
         hasRetryHistory = schema.some((f) => f.name === "retry_history");
+        hasRetryAttribution = schema.some((f) => f.name === "retry_step_ids");
+        hasStatusReason = schema.some((f) => f.name === "status_reason");
       } catch {
         // Schema not available — omit retry_history, which is safe.
       }
+      // C7 — once the probe writes `retry_step_ids`, the flaky column is
+      // answered by three scalars on the rows that actually retried, so the
+      // ~1 KB-per-attempt `retry_history` blob stops being fetched across all
+      // 5000 rows. Until then the old path still works, unchanged.
+      const useAttribution = hasRetryAttribution;
+      const selectRetryHistory = hasRetryHistory && !useAttribution;
+      /** Set when the attribution query failed, so its results are not treated
+       *  as "nothing retried". */
+      let attributionFailed = false;
 
       const STEP_RUNS_LIMIT = 5000;
-      const hits: Record<string, unknown>[] = await executeQuery(
-        buildRunsWithStepsSql(monitorId, STEP_RUNS_LIMIT, hasRetryHistory),
-        startTime,
-        endTime,
-        "logs",
-      );
+      // Two queries rather than one (P1a): the wide tally without
+      // `recorded_steps`, and a bounded fetch of the step definitions. Selecting
+      // the definitions on all 5000 rows shipped the same ~4 KB blob 5000 times
+      // — roughly 60% of this panel's payload.
+      const STEP_DEFS_LIMIT = 100;
+      const [hits, defHits, retryHits] = await Promise.all([
+        executeQuery(
+          buildRunsWithStepsSql(monitorId, STEP_RUNS_LIMIT, selectRetryHistory),
+          startTime,
+          endTime,
+          "logs",
+        ) as Promise<Record<string, unknown>[]>,
+        executeQuery(
+          buildStepDefsSql(monitorId, STEP_DEFS_LIMIT),
+          startTime,
+          endTime,
+          "logs",
+        ) as Promise<Record<string, unknown>[]>,
+        useAttribution
+          ? (executeQuery(
+              buildRetryAttributionSql(monitorId, STEP_RUNS_LIMIT, hasStatusReason),
+              startTime,
+              endTime,
+              "logs",
+            ).catch((e: unknown) => {
+              // Isolated deliberately. These three queries share a Promise.all,
+              // so an unhandled rejection here emptied the ENTIRE Steps tab —
+              // Fail Rate, durations and all — to report one missing column.
+              // Degrade the flaky column instead, and say so rather than
+              // rendering a silent zero.
+
+              console.warn("[synthetics] retry attribution query failed:", e);
+              attributionFailed = true;
+              return [] as Record<string, unknown>[];
+            }) as Promise<Record<string, unknown>[]>)
+          : Promise.resolve([] as Record<string, unknown>[]),
+      ]);
+      const stepDefs = foldStepDefs(defHits);
       if (!hits.length) return emptyStepStats();
 
-      return aggregateStepStats(hits, startTime, endTime);
+      return aggregateStepStats(
+        hits,
+        startTime,
+        endTime,
+        stepDefs,
+        useAttribution && !attributionFailed ? foldRetryAttribution(retryHits) : undefined,
+        STEP_RUNS_LIMIT,
+      );
     } catch {
       return emptyStepStats();
     }
@@ -185,16 +297,24 @@ export function useSyntheticResults(t: TranslateFn) {
       flakySteps: [],
       trendBuckets: [],
       failureInstances: [],
+      coverage: { executions: 0, fromMs: 0, toMs: 0, truncated: false },
     };
   }
 
+  /**
+   * Loads everything the Overview tab needs.
+   *
+   * Steps are deliberately NOT part of this: the step aggregation reads the
+   * REST /runs endpoint row by row and is the most expensive query on the page,
+   * while the Steps tab is the one the fewest visits ever open. Callers drive it
+   * separately through `fetchSteps` when the tab is actually in view.
+   */
   async function fetchAll(monitorId: string, startTime: number, endTime: number): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     loading.value = true;
     kpiLoading.value = true;
     histogramLoading.value = true;
     runsLoading.value = true;
-    stepsLoading.value = true;
     error.value = null;
 
     // Clear per-group errors on each fresh fetch so a successful retry
@@ -202,19 +322,24 @@ export function useSyntheticResults(t: TranslateFn) {
     kpiError.value = null;
     histogramError.value = null;
     runsError.value = null;
-    stepsError.value = null;
 
     try {
       const interval = bucketInterval(endTime - startTime);
 
       const schemaFields = await fetchSchemaFields();
       const hasAttemptsField = schemaFields.has("attempts");
+      const hasStatusReasonField = schemaFields.has("status_reason");
 
       // Group 1: KPI + last-run — both feed KPI cards. Resolves
       // independently so the KPI section renders as soon as these
       // fast queries complete, without waiting for the runs list.
       const kpiPromise = Promise.all([
-        executeQuery(buildKpiSql(monitorId, hasAttemptsField), startTime, endTime, "logs"),
+        executeQuery(
+          buildKpiSql(monitorId, hasAttemptsField, hasStatusReasonField),
+          startTime,
+          endTime,
+          "logs",
+        ),
         executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
       ])
         .then(([kpiRows, lastRunRows]) => {
@@ -252,7 +377,7 @@ export function useSyntheticResults(t: TranslateFn) {
       // Group 3: Runs list — feeds timeline, breakdown cards, table,
       // steps tab, and errors tab. Typically the slowest query.
       const runsPromise = executeQuery(
-        buildRunsSql(monitorId, 1000, schemaFields),
+        buildRunsSql(monitorId, RUNS_QUERY_LIMIT, schemaFields),
         startTime,
         endTime,
         "logs",
@@ -269,23 +394,9 @@ export function useSyntheticResults(t: TranslateFn) {
           runsHasLoadedOnce.value = true;
         });
 
-      // Group 4: Steps — fetched via REST /runs API because the log
-      // stream doesn't carry the step-level JSON fields.
-      const stepsPromise = fetchAndAggregateSteps(monitorId, startTime, endTime)
-        .then((stats) => {
-          stepStats.value = stats;
-        })
-        .catch((e: unknown) => {
-          stepsError.value = e instanceof Error ? e.message : String(e ?? "Steps query failed");
-        })
-        .finally(() => {
-          stepsLoading.value = false;
-          stepsHasLoadedOnce.value = true;
-        });
-
       // Wait for all to settle so callers that await fetchAll still
       // get a meaningful completion signal.
-      await Promise.all([kpiPromise, histogramPromise, runsPromise, stepsPromise]);
+      await Promise.all([kpiPromise, histogramPromise, runsPromise]);
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : "Failed to load results";
       kpi.value = { ...EMPTY_KPI };
@@ -357,13 +468,22 @@ export function useSyntheticResults(t: TranslateFn) {
     }
   }
 
+  /**
+   * Step aggregation for the Steps tab — fetched via the REST /runs API because
+   * the log stream doesn't carry the step-level JSON fields.
+   *
+   * Called on its own rather than from `fetchAll`, so the Steps tab pays for
+   * this only when it is opened or its window changes underneath it.
+   */
   async function fetchSteps(monitorId: string, startTime: number, endTime: number): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     stepsLoading.value = true;
+    stepsError.value = null;
     try {
       stepStats.value = await fetchAndAggregateSteps(monitorId, startTime, endTime);
-    } catch {
+    } catch (e: unknown) {
       stepStats.value = emptyStepStats();
+      stepsError.value = e instanceof Error ? e.message : String(e ?? "Steps query failed");
     } finally {
       stepsLoading.value = false;
       stepsHasLoadedOnce.value = true;
@@ -374,6 +494,7 @@ export function useSyntheticResults(t: TranslateFn) {
     kpi,
     buckets,
     runs,
+    runsTruncated,
     runDetail,
     protocolRunDetail,
     loading,

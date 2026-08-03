@@ -117,7 +117,7 @@ export function buildFromMarkdown(
           label: raw(str(si.label) ?? "Stream Name"),
           default: str(si.default) ?? "default",
           placeholder: rawStr(si.placeholder),
-          help: str(si.help),
+          help: rawStr(si.help),
         }
       : undefined,
     detect: {

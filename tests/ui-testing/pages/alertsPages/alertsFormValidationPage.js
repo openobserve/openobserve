@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { openNavFlyoutChild } = require('../commonActions.js');
 
 export class AlertsFormValidationPage {
   /**
@@ -10,9 +11,8 @@ export class AlertsFormValidationPage {
     this.page = page;
 
     // ── Navigation ──────────────────────────────────────────────────────────
-    this.settingsMenuItem = '[data-test="menu-link-\\/settings-item"]';
-    this.destinationsTab  = '[data-test="alert-destinations-tab"]';
-    this.templatesTab     = '[data-test="alert-templates-tab"]';
+    // Destinations and Templates left Settings for the Reliability nav group,
+    // so they are reached through its flyout rather than a settings tab.
 
     // ── Destinations list ────────────────────────────────────────────────────
     this.addDestinationBtn = '[data-test="alert-destination-list-add-alert-btn"]';
@@ -166,18 +166,14 @@ export class AlertsFormValidationPage {
   }
 
   async navigateToDestinations() {
-    testLogger.info('Navigating to Settings > Destinations');
-    await this.page.locator(this.settingsMenuItem).click();
-    await this.page.locator(this.destinationsTab).waitFor({ state: 'visible', timeout: 15000 });
-    await this.page.locator(this.destinationsTab).click();
+    testLogger.info('Navigating to Reliability > Notification Destinations');
+    await openNavFlyoutChild(this.page, 'destinations');
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async navigateToTemplates() {
-    testLogger.info('Navigating to Settings > Templates');
-    await this.page.locator(this.settingsMenuItem).click();
-    await this.page.locator(this.templatesTab).waitFor({ state: 'visible', timeout: 15000 });
-    await this.page.locator(this.templatesTab).click();
+    testLogger.info('Navigating to Reliability > Templates');
+    await openNavFlyoutChild(this.page, 'templates');
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
