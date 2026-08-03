@@ -1,5 +1,7 @@
 import searchService from "@/services/search";
 import { nextTick, ref } from "vue";
+import { PROMQL_CATALOG } from "@/utils/query/promqlCompletion";
+import { SORT_LANE } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
 
 const usePromqlSuggestions = () => {
@@ -19,7 +21,10 @@ const usePromqlSuggestions = () => {
     },
   });
   const store = useStore();
-  const autoCompletePromqlKeywords: any = ref([]);
+  // Seeded, not empty: this list is otherwise only filled by getSuggestions,
+  // which runs on a query update — so Ctrl+Space on a freshly opened PromQL
+  // editor offered nothing at all until the user typed a character.
+  const autoCompletePromqlKeywords: any = ref([...PROMQL_CATALOG]);
   const metricKeywords: any = ref([]);
 
   const parsePromQlQuery = (query: string) => {
@@ -163,7 +168,9 @@ const usePromqlSuggestions = () => {
       const metricName = parsedQuery?.metricName || "";
       const labels = parsedQuery?.label?.labels || {};
 
-      autoCompletePromqlKeywords.value = [];
+      // NOT cleared here. Two of the branches below return without
+      // refilling it, and an empty list is never the better answer: the
+      // catalog is the floor.
       const startISOTimestamp: any = autoCompleteData.value.dateTime.startTime;
       const endISOTimestamp: any = autoCompleteData.value.dateTime.endTime;
       // import search service and call search.get_promql_series
@@ -213,7 +220,9 @@ const usePromqlSuggestions = () => {
         .finally(() => {
           if (labelSuggestions) updatePromqlKeywords(labelSuggestions);
           else {
-            autoCompletePromqlKeywords.value = [];
+            // Back to the catalog rather than to nothing — the labels are
+            // unavailable, the language is not.
+            updatePromqlKeywords([]);
             autoCompleteData.value.popup.close("");
           }
         });
@@ -250,20 +259,12 @@ const usePromqlSuggestions = () => {
   };
 
   const updatePromqlKeywords = async (data: any[]) => {
-    autoCompletePromqlKeywords.value = [];
-    const functions = ["sum", "avg_over_time", "rate", "avg", "max", "topk", "histogram_quantile"];
-    if (!data.length) {
-      functions.forEach((fun) => {
-        autoCompletePromqlKeywords.value.push({
-          label: fun,
-          kind: "Function",
-          insertText: fun,
-        });
-      });
-      autoCompletePromqlKeywords.value.push(...metricKeywords.value);
-    } else {
-      autoCompletePromqlKeywords.value.push(...data);
-    }
+    // A caller with something contextual to show — label names, label values —
+    // replaces the list outright. Otherwise: the catalog, plus this org's
+    // metrics, which sort above it.
+    autoCompletePromqlKeywords.value = data.length
+      ? [...data]
+      : [...PROMQL_CATALOG, ...metricKeywords.value];
 
     await nextTick();
     autoCompleteData.value.popup.open("");
@@ -276,6 +277,9 @@ const usePromqlSuggestions = () => {
         label: metric.label + (metric.type ? `(${metric.type})` : ""),
         kind: "Variable",
         insertText: metric.label,
+        // The field lane. A metric is what the user came to type; behind 107
+        // catalog entries is the same as not offering it.
+        sortText: SORT_LANE.field + metric.label,
       });
     });
   };

@@ -113,6 +113,7 @@ import {
   wantsNumericColumn,
   rankNumericFieldsFirst,
 } from "@/utils/query/editorProviders";
+import { findDoubleQuoteIssues } from "@/utils/query/doubleQuoteWarnings";
 import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
 import { useStore } from "vuex";
@@ -948,13 +949,11 @@ export default defineComponent({
     };
 
     const disableSuggestionPopup = () => {
-      const escEvent = new KeyboardEvent("keydown", {
-        keyCode: 27,
-        code: "Escape",
-        key: "Escape",
-        bubbles: true,
-      });
-      editorRef.value.dispatchEvent(escEvent);
+      // monaco's own command, which this file already uses elsewhere. The
+      // synthetic Escape this replaced was a guess about monaco's internal key
+      // handling that nothing verified, and it bubbled out of the editor to
+      // anything else listening for Escape.
+      editorObj?.trigger("disableSuggestionPopup", "hideSuggestWidget", {});
     };
 
     const formatDocument = async () => {
@@ -1082,43 +1081,23 @@ export default defineComponent({
       const model = editorObj.getModel();
       if (!model) return;
 
+      // Deciding WHAT is wrong lives in utils/query/doubleQuoteWarnings.ts,
+      // where it is comment- and string-aware and can be tested without an
+      // editor. What is left here is the monaco half: offsets to positions,
+      // positions to markers.
       const text = model.getValue();
-      const markers: any[] = [];
-
-      // Two patterns are flagged — both only within value position (after a
-      // SQL comparison/membership operator). FROM "table" / SELECT "col" are
-      // intentionally NOT matched.
-      //
-      //  Pattern A — fully double-quoted:  field = "value"
-      //  Pattern B — mismatched quotes:    field = "value'  or  field = 'value"
-      //    Capture group 1: the invalid quoted token
-      const regex =
-        /(?:NOT\s+LIKE|NOT\s+IN\s*\(|!=|<>|>=|<=|=|>|<|LIKE|IN\s*\()\s*("[^'"]*'|'[^'"]*"|"[^"]*")/gi;
-
-      let match;
-      while ((match = regex.exec(text)) !== null) {
-        const quotedStr = match[1]; // the invalid quoted token
-        const startOffset = match.index + match[0].length - quotedStr.length;
-        const endOffset = startOffset + quotedStr.length;
-
-        const startPos = model.getPositionAt(startOffset);
-        const endPos = model.getPositionAt(endOffset);
-
-        const isMixed =
-          (quotedStr.startsWith('"') && quotedStr.endsWith("'")) ||
-          (quotedStr.startsWith("'") && quotedStr.endsWith('"'));
-
-        markers.push({
+      const markers = findDoubleQuoteIssues(text).map((issue) => {
+        const startPos = model.getPositionAt(issue.startOffset);
+        const endPos = model.getPositionAt(issue.endOffset);
+        return {
           severity: monaco.MarkerSeverity.Warning,
           startLineNumber: startPos.lineNumber,
           startColumn: startPos.column,
           endLineNumber: endPos.lineNumber,
           endColumn: endPos.column,
-          message: isMixed
-            ? "Mismatched quotes. Use matching single quotes for string values."
-            : "Double quotes are not valid for string values. Use single quotes instead.",
-        });
-      }
+          message: issue.message,
+        };
+      });
 
       monaco.editor.setModelMarkers(model, "dq-validation", markers);
     };

@@ -45,6 +45,7 @@
     "@openobserve/browser-rum": "0.4.1",
     "@openobserve/node-sql-parser": "^0.1.5",
     "@openobserve/rrweb-player": "^0.2.1",
+    "@prometheus-io/codemirror-promql": "^0.311.3",
     "@rudderstack/analytics-js": "3.6.0",
     "@tanstack/vue-form": "^1.29.1",
     "@tanstack/vue-table": "^8.21.3",
