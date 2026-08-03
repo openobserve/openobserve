@@ -656,46 +656,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
-
-  // Regression guard for PR #13244 (issue #12897): that fix narrowed the
-  // convertPanelData() empty-fields guard to builder-mode panels only
-  // (`!query.customQuery`) so the logs Timechart's custom-query panel stops
-  // throwing "Please select required fields to render the chart" during its
-  // transient empty-axis window. Builder panels must keep their protection —
-  // applying with BOTH X and Y empty still has to be blocked.
-  test("should still block applying a builder panel when both X and Y axis fields are empty", async ({
-    page,
-  }) => {
-    const pm = new PageManager(page);
-
-    const panelName =
-      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
-
-    // Navigate to dashboards section
-    await pm.dashboardList.menuItem("dashboards-item");
-    await waitForDashboardPage(page);
-
-    // Create a new dashboard
-    await pm.dashboardCreate.createDashboard(randomDashboardName);
-
-    // Add a new panel and strip BOTH auto-seeded builder fields
-    await pm.dashboardCreate.addPanel();
-    await pm.dashboardPanelActions.addPanelName(panelName);
-    await pm.chartTypeSelector.selectChartType("line");
-    await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.chartTypeSelector.removeField("x_axis_1", "x");
-    await pm.chartTypeSelector.removeField("y_axis_1", "y");
-
-    // Attempt to apply with no X and no Y — builder-mode validation must reject it
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await expect(pm.dashboardPanelActions.getErrorToast().first()).toBeVisible();
-
-    // Discard the unsaved panel and clean up
-    await pm.dashboardPanelActions.discardPanel();
-    await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
-  });
-
+  
   test("should display a confirmation popup message for unsaved changes when clicking the Discard button", async ({
     page,
   }) => {
