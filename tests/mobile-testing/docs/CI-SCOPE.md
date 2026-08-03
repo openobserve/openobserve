@@ -58,12 +58,12 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
 
-      # Build (or download) the test app
-      - name: Build O2RumTester APK
+      # Build the test app (its source lives in the suite; postinstall applies the SDK fix)
+      - name: Build o2-rum-tester APK
         run: |
-          cd O2RumTester && npm ci
-          node node_modules/@openobserve/mobile-react-native/scripts/replace-react-require.js || true
-          cd android && ./gradlew assembleRelease
+          cd tests/mobile-testing/apps/o2-rum-tester
+          npm install
+          (cd android && ./gradlew assembleRelease)
 
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -82,7 +82,7 @@ jobs:
           api-level: 34
           arch: x86_64
           script: |
-            adb install -r O2RumTester/android/app/build/outputs/apk/release/app-release.apk
+            adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
             export PATH="$HOME/.maestro/bin:$PATH"
             cd tests/mobile-testing && npm run test:rn-android
 

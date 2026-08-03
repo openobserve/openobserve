@@ -40,9 +40,15 @@ mobile-testing/
 
 - **Node 20+**, **JDK 17**, Android SDK + an emulator (AVD)
 - **Maestro** CLI: `curl -Ls "https://get.maestro.mobile.dev" | bash`
-- The app under test installed on the emulator (RN track uses `com.o2rumtester`, built from
-  `CBase/O2RumTester`)
-- A reachable OpenObserve instance with a RUM token wired into the app (see `.env`)
+- The app under test (`com.o2rumtester`) — its source lives **in this suite** at
+  `apps/o2-rum-tester/`. Build + install it:
+  ```bash
+  cd apps/o2-rum-tester && npm install    # postinstall auto-applies the SDK build fix
+  (cd android && ./gradlew assembleRelease)
+  adb install -r android/app/build/outputs/apk/release/app-release.apk
+  ```
+- A reachable OpenObserve instance with a RUM token wired into the app (see `.env` and
+  `apps/o2-rum-tester/App.tsx`)
 
 ## Setup
 
