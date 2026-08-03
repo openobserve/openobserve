@@ -41,7 +41,8 @@ use crate::{
 pub mod runtime;
 #[derive(Serialize, Deserialize)]
 pub struct InputMap {
-    node_map: HashMap<String, Vec<Value>>,
+    // even though a bad naming convention, node_map is
+    error_node_map: HashMap<String, Vec<Value>>,
     #[serde(default)]
     input_map: HashMap<String, Vec<Value>>,
 }
@@ -499,7 +500,7 @@ async fn execute_workflow(
     }
 
     let ip_map = InputMap {
-        node_map: errored_input_map,
+        error_node_map: errored_input_map,
         input_map: res.inputs,
     };
 
@@ -602,7 +603,7 @@ pub async fn retry_run(
 
     let node_id = from_node.as_ref().unwrap_or(&start_id);
 
-    let inputs = ip_map.node_map.remove(node_id).ok_or(anyhow::anyhow!(
+    let inputs = ip_map.input_map.remove(node_id).ok_or(anyhow::anyhow!(
         "node id {node_id} does not have any associated input data in the stored inputs"
     ))?;
 

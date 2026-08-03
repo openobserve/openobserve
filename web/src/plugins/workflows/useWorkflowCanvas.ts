@@ -472,10 +472,10 @@ export const nodeTestOutputBranches = (nodeId: string): NodeOutputBranch[] => {
 // EVERY node (not just error nodes):
 //   errors.data:     [{ node_id, error: string[] }]  — errored nodes + messages
 //   data.input_map:  { node_id: [records] }          — per-node INPUT (all nodes)
-//   data.node_map:   { node_id: [records] }          — legacy: errored node's input
+//   data.error_node_map:   { node_id: [records] }          — legacy: errored node's input
 // input_map is the same per-node `inputs` map a Test run produces, so we store it
 // under the same key and the whole drawer (Input + derived Output + badges) works
-// identically to Test — just read-only. Falls back to node_map for older runs.
+// identically to Test — just read-only. Falls back to error_node_map for older runs.
 export const loadWorkflowRun = async (opts: {
   orgId: string;
   workflowId: string;
@@ -506,8 +506,8 @@ export const loadWorkflowRun = async (opts: {
 
     // Per-node INPUT for the whole run (all nodes) — the same shape/semantics as a
     // Test run's `inputs`, so the drawer derives Output the same way. Older runs
-    // only carried node_map (errored node's input) — fall back to that.
-    const inputs = payload.data?.input_map || payload.data?.node_map || {};
+    // only carried error_node_map (errored node's input) — fall back to that.
+    const inputs = payload.data?.input_map || payload.data?.error_node_map || {};
 
     // GHOST NODES — the run references a node the workflow no longer has (it was
     // edited/deleted after the run). Its badge has nowhere to render, so an error

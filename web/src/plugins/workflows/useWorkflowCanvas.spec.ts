@@ -85,7 +85,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
       data: {
         errors: { run_id: "r1", data: [{ node_id: "n2", error: ["boom"] }] },
         // input_map = per-node input for ALL nodes (same shape as a Test run)
-        data: { input_map: { n1: envelope, n2: envelope, n3: envelope }, node_map: { n2: envelope } },
+        data: { input_map: { n1: envelope, n2: envelope, n3: envelope }, error_node_map: { n2: envelope } },
       },
     });
 
@@ -105,10 +105,10 @@ describe("loadWorkflowRun — history run response mapping", () => {
     expect(res.blockedNodeIds).not.toContain("n2");
   });
 
-  it("falls back to node_map for older runs that lack input_map", async () => {
+  it("falls back to error_node_map for older runs that lack input_map", async () => {
     const envelope = [{ meta: {}, data: [{ a: 1 }] }];
     mockRun.mockResolvedValue({
-      data: { errors: { data: [] }, data: { node_map: { n2: envelope } } },
+      data: { errors: { data: [] }, data: { error_node_map: { n2: envelope } } },
     });
     await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1b" });
     expect((workflowObj.testRun.result as any).inputs).toEqual({ n2: envelope });
@@ -118,7 +118,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
     mockRun.mockResolvedValue({
       data: {
         errors: { data: [{ node_id: "n2", error: "single" }] },
-        data: { node_map: {} },
+        data: { error_node_map: {} },
       },
     });
     await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r2" });
@@ -130,7 +130,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
 
   it("handles a clean run (no errors) with empty maps", async () => {
     mockRun.mockResolvedValue({
-      data: { errors: { data: [] }, data: { node_map: {} } },
+      data: { errors: { data: [] }, data: { error_node_map: {} } },
     });
     const r = await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r3" });
     expect(r.ok).toBe(true);
@@ -153,18 +153,18 @@ describe("loadWorkflowRun — history run response mapping", () => {
               { node_id: "deleted-node", error: ["gone"] },
             ],
           },
-          data: { node_map: {} },
+          data: { error_node_map: {} },
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1" });
       expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["deleted-node"]);
     });
 
-    it("also flags a ghost referenced only by node_map (no error)", async () => {
+    it("also flags a ghost referenced only by error_node_map (no error)", async () => {
       mockRun.mockResolvedValue({
         data: {
           errors: { data: [] },
-          data: { node_map: { n1: [], "old-node": [] } },
+          data: { error_node_map: { n1: [], "old-node": [] } },
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r2" });
@@ -175,18 +175,18 @@ describe("loadWorkflowRun — history run response mapping", () => {
       mockRun.mockResolvedValue({
         data: {
           errors: { data: [{ node_id: "n2", error: ["boom"] }] },
-          data: { node_map: { n1: [], n3: [] } },
+          data: { error_node_map: { n1: [], n3: [] } },
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r3" });
       expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([]);
     });
 
-    it("does not double-report a ghost referenced by BOTH errors and node_map", async () => {
+    it("does not double-report a ghost referenced by BOTH errors and error_node_map", async () => {
       mockRun.mockResolvedValue({
         data: {
           errors: { data: [{ node_id: "zombie", error: ["x"] }] },
-          data: { node_map: { zombie: [] } },
+          data: { error_node_map: { zombie: [] } },
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
