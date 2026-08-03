@@ -634,8 +634,12 @@ export default class DashboardPanelConfigs {
 
   /** Set the text/bg color for the conditional rule at ruleIdx (data-test driven). */
   async setConditionRuleColor(ruleIdx, kind, hex) {
+    // Exclude the swatch buttons (…-swatch-N) so a rule-N swatch can't be mistaken
+    // for the ColorSwatchPicker root, whose data-test ends in the same "-N".
     const wrapper = this.overrideDialog
-      .locator(`[data-test^="o2-format-cond-${kind}-"][data-test$="-${ruleIdx}"]`)
+      .locator(
+        `[data-test^="o2-format-cond-${kind}-"][data-test$="-${ruleIdx}"]:not([data-test*="-swatch-"])`
+      )
       .first();
     await wrapper.waitFor({ state: "visible", timeout: 5000 });
     const colorInput = wrapper.locator('input[type="color"]');
