@@ -1174,6 +1174,10 @@ function openChromeExtensions() {
           :step-number="stepNumberOf(row)"
           @retry-replay="emit('replay-up-to', stepNumberOf(row))"
         />
+        <!-- `selector-error-message` is field-scoped, not step-scoped: it renders
+             inside the step it describes, so naming that step again only crowds
+             out the one sentence that says what to do. `selectorRequired` keeps
+             the name — it is the toast, which fires with no step in view. -->
         <BrowserJourneyStepEditor
           class="px-8 pt-3 pb-3"
           :step="row"
@@ -1184,15 +1188,8 @@ function openChromeExtensions() {
           "
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
-            (selectorErrors.has(row.id)
-              ? t('synthetics.validation.selectorRequired', {
-                  step:
-                    row.name ||
-                    t('synthetics.results.steps.step', {
-                      step: props.modelValue.indexOf(row) + 1,
-                    }),
-                })
-              : '') || fieldError(row.id, 'selector')
+            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : '') ||
+            fieldError(row.id, 'selector')
           "
           :value-error-message="fieldError(row.id, 'value')"
           :expected-error-message="fieldError(row.id, 'assertion.expected')"

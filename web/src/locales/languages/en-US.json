@@ -9864,6 +9864,7 @@
       "locatorOverridePlaceholder": "#my-button or [data-test=\"sign-in\"]",
       "locatorEmptyLabel": "How to find this element",
       "locatorEmptyPlaceholder": "#my-button or [data-test=\"sign-in\"]",
+      "locatorDraftPending": "Press Enter or + to add this to the list",
       "locatorOrderHelp": "Tried in order, top first. The first one that matches is used.",
       "locatorOrigin": {
         "recorded": "Recorded",
@@ -10656,7 +10657,8 @@
       "firstStepMustNavigate": "First step must be \"Navigate\"",
       "locationsRequired": "Select at least one location",
       "nameRequired": "Name is required",
-      "selectorRequired": "Selector is required for \"{step}\"",
+      "locatorRequired": "Add at least one locator so this step knows which element to act on",
+      "selectorRequired": "\"{step}\" does not say which element to act on",
       "stepNameRequired": "Give this step a name — it is what run results show",
       "typeTextRequired": "Enter the text this step should type",
       "expectedRequired": "Enter the value this assertion should expect",
