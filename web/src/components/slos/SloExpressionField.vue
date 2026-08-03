@@ -61,7 +61,7 @@
         language="sql"
         :keywords="keywords"
         :suggestions="suggestions ?? undefined"
-        :field-value-resolver="fieldValueResolver ?? null"
+        :field-value-resolver="fieldValueResolver ?? undefined"
         :show-line-numbers="false"
         :sticky-scroll="false"
         :data-test="`${dataTest}-editor`"

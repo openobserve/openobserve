@@ -85,6 +85,13 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     register: vi.fn(),
     setMonarchTokensProvider: vi.fn(),
     registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
+    // setupEditor registers all three providers in a row. The mock predates the
+    // signature-help and hover ones, so it was a `.mock` short of the component
+    // it stands in for, and `dangerouslyIgnoreUnhandledErrors` in the vitest
+    // config means the resulting "not a function" is swallowed rather than
+    // reported.
+    registerSignatureHelpProvider: vi.fn(() => ({ dispose: vi.fn() })),
+    registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
   KeyMod: { CtrlCmd: 1 },
   KeyCode: { Enter: 13 },

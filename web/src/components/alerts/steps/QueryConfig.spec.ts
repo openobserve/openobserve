@@ -137,29 +137,29 @@ vi.mock("@/composables/useSuggestions", async () => {
   // component as the wrapper object itself.
   const { ref: vueRef } = await vi.importActual<typeof import("vue")>("vue");
   return {
-  default: vi.fn(() => ({
-    autoCompleteData: {
-      value: {
-        query: "",
-        cursorIndex: 0,
-        org: "",
-        streamType: "",
-        streamName: "",
-        popup: { open: null },
+    default: vi.fn(() => ({
+      autoCompleteData: {
+        value: {
+          query: "",
+          cursorIndex: 0,
+          org: "",
+          streamType: "",
+          streamName: "",
+          popup: { open: null },
+        },
       },
-    },
-    autoCompleteIsSuggesting: { value: false },
-    // Deliberately DISTINCT arrays: a test can then tell whether the template
-    // binds the base list or the context-aware view (tmp/code.md N1).
-    autoCompleteKeywords: vueRef([{ label: "BASE_FIELD", kind: "Field" }]),
-    autoCompleteSuggestions: vueRef([{ label: "BASE_FN", kind: "Function" }]),
-    effectiveKeywords: vueRef([{ label: "CONTEXT_VALUE", kind: "Value" }]),
-    effectiveSuggestions: vueRef([]),
-    updateFieldValues: vi.fn(),
-    updateFieldKeywords: vi.fn(),
-    updateStreamKeywords: vi.fn(),
-    getSuggestions: vi.fn().mockResolvedValue([]),
-  })),
+      autoCompleteIsSuggesting: { value: false },
+      // Deliberately DISTINCT arrays: a test can then tell whether the template
+      // binds the base list or the context-aware view (tmp/code.md N1).
+      autoCompleteKeywords: vueRef([{ label: "BASE_FIELD", kind: "Field" }]),
+      autoCompleteSuggestions: vueRef([{ label: "BASE_FN", kind: "Function" }]),
+      effectiveKeywords: vueRef([{ label: "CONTEXT_VALUE", kind: "Value" }]),
+      effectiveSuggestions: vueRef([]),
+      updateFieldValues: vi.fn(),
+      updateFieldKeywords: vi.fn(),
+      updateStreamKeywords: vi.fn(),
+      getSuggestions: vi.fn().mockResolvedValue([]),
+    })),
   };
 });
 

@@ -220,11 +220,14 @@ watch(
 watch(
   () => props.labels.map((label) => label.label).join(","),
   () => {
-    if (!props.metric) return;
+    // Read into a local: the narrowing from the guard does not survive into the
+    // callback, where TypeScript has to assume the prop may have changed.
+    const metric = props.metric;
+    if (!metric) return;
     props.labels
       .map((label) => label.label)
       .filter(Boolean)
-      .forEach((label) => void fetchPromQLLabelValues(props.metric, label));
+      .forEach((label) => void fetchPromQLLabelValues(metric, label));
   },
   { immediate: true },
 );

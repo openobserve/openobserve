@@ -94,7 +94,7 @@
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
         :suggestions="suggestions"
-        :field-value-resolver="fieldValueResolver"
+        :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
         @run-query="emit('run-query')"

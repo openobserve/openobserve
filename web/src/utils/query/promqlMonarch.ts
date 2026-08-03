@@ -210,19 +210,8 @@ export const language: any = {
     whitespace: [[/[ \t\r\n]+/, "white"]],
   },
 };
-// noinspection JSUnusedGlobalSymbols
-export var completionItemProvider = {
-  provideCompletionItems: function () {
-    // To simplify, we made the choice to never create automatically the parenthesis behind keywords
-    // It is because in PromQL, some keywords need parenthesis behind, some don't, some can have but it's optional.
-    var suggestions = keywords.map(function (value) {
-      return {
-        label: value,
-        kind: languages.CompletionItemKind.Keyword,
-        insertText: value,
-        insertTextRules: languages.CompletionItemInsertTextRule.InsertAsSnippet,
-      };
-    });
-    return { suggestions: suggestions };
-  },
-};
+// Upstream also exports a `completionItemProvider` here. It is not reproduced:
+// PromQL completion in this app comes from promqlCompletion.ts, which knows the
+// stream's labels and values, where upstream's only offers bare keywords. The
+// vendored copy also referenced a `languages` import it never declared, so it
+// could not have type-checked in this tree.

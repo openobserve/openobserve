@@ -58,6 +58,7 @@ import {
   watch,
   computed,
 } from "vue";
+import type { PropType } from "vue";
 
 import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
 
@@ -205,9 +206,13 @@ export default defineComponent({
       type: String,
       default: "",
     },
-    /** Resolves the values of one field, awaited by the completion provider. */
+    /**
+     * Resolves the values of one field, awaited by the completion provider.
+     * Absent on surfaces that have none — pass `undefined`, not `null`, so the
+     * declared default applies.
+     */
     fieldValueResolver: {
-      type: Function,
+      type: Function as PropType<(field: string) => Promise<string[]>>,
       default: null,
     },
   },
@@ -1188,8 +1193,8 @@ export default defineComponent({
    `layout(width, type.clientHeight + docs.clientHeight)` and assigns that height
    to THIS element (suggestWidgetDetails.js:161) — arithmetic that assumes
    content-box. The app's global reset makes everything border-box, so the
-   panel's own 1px top and bottom borders eat 2px of the content it just
-   measured, and the documentation scrolls by exactly that sliver every time.
+   panel's own hairline top and bottom borders eat two pixels of the content it
+   just measured, and the documentation scrolls by that sliver every time.
    Restoring content-box for this one node is less fragile than trying to
    out-compute the library. */
 .logs-query-editor :deep(.suggest-details) {

@@ -953,7 +953,6 @@ describe("hiding the suggestion popup uses monaco's own command", () => {
   });
 });
 
-
 // ─── tmp/code.md section E — the double-quote warning is WIRED ───────────────
 // doubleQuoteWarnings.spec.ts proves the scan itself. This proves the editor
 // calls it — the gap that shipped three times in this workstream (Alerts bound
@@ -971,7 +970,9 @@ describe("double-quote warnings reach the model", () => {
     const before = createFn.mock.calls.length;
     setMarkers.mockClear();
 
-    spy = vi.spyOn(document, "getElementById").mockImplementation(() => document.createElement("div"));
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
     mount(CodeQueryEditor, {
       props: { editorId, language: "sql", query },
       global: { plugins: [store8] },
@@ -981,10 +982,10 @@ describe("double-quote warnings reach the model", () => {
       interval: 25,
     });
     // Give the tail of setupEditor a chance to run after create resolves.
-    await vi.waitFor(
-      () => expect(setMarkers.mock.calls.length).toBeGreaterThan(0),
-      { timeout: 15000, interval: 25 },
-    );
+    await vi.waitFor(() => expect(setMarkers.mock.calls.length).toBeGreaterThan(0), {
+      timeout: 15000,
+      interval: 25,
+    });
     const calls = setMarkers.mock.calls.filter((c: any[]) => c[1] === "dq-validation");
     return calls.at(-1)?.[2] ?? null;
   };
@@ -1003,7 +1004,6 @@ describe("double-quote warnings reach the model", () => {
     expect(markers).toEqual([]);
   });
 });
-
 
 // ─── Phase 5 (tmp/code.md D10) — the list must be re-queried, not re-filtered ─
 // Monaco only calls a provider again mid-word when the previous result said
@@ -1038,7 +1038,8 @@ describe("completion results invite monaco to ask again", () => {
       interval: 25,
     });
     return {
-      provide: registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1].provideCompletionItems,
+      provide: registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1]
+        .provideCompletionItems,
       model: createdEditors.at(-1)!.getModel(),
     };
   };
