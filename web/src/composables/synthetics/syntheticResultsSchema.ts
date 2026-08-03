@@ -1518,7 +1518,9 @@ export function foldStepStream(
     const stepId = str(hit.step_id);
     if (!stepId) continue;
     const failed = str(hit.status) !== "passed";
-    const flaky = hit.failed_in_prior_attempt === true || hit.failed_in_prior_attempt === "true";
+    // Native boolean, not a string — confirmed against a live store, where the
+    // column round-trips as `true`/`false` and is null when absent.
+    const flaky = hit.failed_in_prior_attempt === true;
     const list = spark.get(stepId) ?? [];
     list.push(failed || flaky ? 1 : 0);
     spark.set(stepId, list);

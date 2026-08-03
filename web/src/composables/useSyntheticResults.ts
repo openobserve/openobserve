@@ -28,6 +28,10 @@ import {
   buildRunsWithStepsSql,
   buildStepDefsSql,
   foldStepDefs,
+  buildStepAggregateSql,
+  buildStepDimensionSql,
+  buildStepSparklineSql,
+  foldStepStream,
   buildRunDetailSql,
   buildProtocolRunDetailSql,
   mapHistogram,
@@ -36,6 +40,7 @@ import {
   mapRun,
   mapRunDetail,
   SYNTHETIC_RESULTS_STREAM,
+  SYNTHETIC_STEP_RESULTS_STREAM,
   type ProtocolRunDetail,
   type StepStatsResult,
   type SyntheticBucket,
@@ -206,12 +211,82 @@ export function useSyntheticResults() {
   //
   // The retry_history column is conditionally included — it may not exist
   // on instances where the probe hasn't written it yet.
+  /**
+   * B10 — the Steps tab answered from the step-grain stream.
+   *
+   * Three `GROUP BY`s over the WHOLE window, in place of downloading 5000
+   * execution rows and tallying their JSON blobs in the browser. Measured on the
+   * busiest check in introspection: 18 079 executions over 7 days, so the 5000-row
+   * cap covered 4.0 of the 7 days and reported a 56.3% fail rate where the true
+   * figure over the window was 33.7%. The win is correctness, not speed — the old
+   * numbers were a recency-biased sample, not a slow-but-right answer.
+   *
+   * Returns null when the stream has nothing for this check, and the caller falls
+   * back to the tally below. That fallback is not scaffolding to delete on a
+   * timer: the stream starts empty with no backfill and fills only as probe
+   * fleets take the build that writes it, so cutting it hard would blank the tab
+   * for every check whose agents have not been upgraded.
+   *
+   * While a fleet is mixed, these numbers describe only the executions that came
+   * from an upgraded agent. `coverage.executions` is the count they were computed
+   * from, so the tab states what it measured rather than implying it saw
+   * everything.
+   */
+  async function fetchStepStreamStats(
+    monitorId: string,
+    startTime: number,
+    endTime: number,
+  ): Promise<StepStatsResult | null> {
+    try {
+      const stream: any = await getStream(SYNTHETIC_STEP_RESULTS_STREAM, "logs", true);
+      const schema: { name: string }[] = stream?.schema ?? [];
+      // Gated on the grain column, not on "the stream resolved". A stream can
+      // exist by name while predating the columns read below, and naming an
+      // absent column is rejected outright by the search API — so a weaker check
+      // would turn a partially-created stream into four failed queries.
+      if (!schema.some((f) => f.name === "step_id")) return null;
+    } catch {
+      return null;
+    }
+
+    try {
+      const [aggHits, dimHits, sparkHits, defHits] = await Promise.all([
+        executeQuery(buildStepAggregateSql(monitorId), startTime, endTime, "logs") as Promise<
+          Record<string, unknown>[]
+        >,
+        executeQuery(buildStepDimensionSql(monitorId), startTime, endTime, "logs") as Promise<
+          Record<string, unknown>[]
+        >,
+        executeQuery(buildStepSparklineSql(monitorId), startTime, endTime, "logs") as Promise<
+          Record<string, unknown>[]
+        >,
+        // Step names and selectors still live on the execution record's
+        // `recorded_steps` — the step stream carries ids, not the journey
+        // definition, because a definition repeated on every step row would be
+        // the same blob duplication this change removes.
+        executeQuery(buildStepDefsSql(monitorId, 100), startTime, endTime, "logs") as Promise<
+          Record<string, unknown>[]
+        >,
+      ]);
+      // No rows means this check has not been run by an upgraded agent yet. Fall
+      // back rather than render an empty tab over a populated execution stream.
+      if (!aggHits.length) return null;
+      return foldStepStream(aggHits, dimHits, sparkHits, foldStepDefs(defHits));
+    } catch (e: unknown) {
+      console.warn("[synthetics] step stream query failed, falling back:", e);
+      return null;
+    }
+  }
+
   async function fetchAndAggregateSteps(
     monitorId: string,
     startTime: number,
     endTime: number,
   ): Promise<StepStatsResult> {
     try {
+      const fromStream = await fetchStepStreamStats(monitorId, startTime, endTime);
+      if (fromStream) return fromStream;
+
       let hasRetryHistory = false;
       let hasRetryAttribution = false;
       let hasStatusReason = false;
