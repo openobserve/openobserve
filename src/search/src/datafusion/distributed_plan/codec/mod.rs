@@ -25,7 +25,6 @@ mod deduplication_exec;
 mod empty_exec;
 mod enrichment_exec;
 mod physical_plan_node;
-#[cfg(feature = "enterprise")]
 mod streaming_aggs_exec;
 mod tmp_exec;
 
