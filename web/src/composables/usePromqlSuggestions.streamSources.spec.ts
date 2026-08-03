@@ -162,13 +162,21 @@ describe("label NAMES come from the stream schema", () => {
   });
 
   it("does not offer a label the query already filters on", async () => {
+    // Written with the CLOSING BRACE, because that is what is really in the
+    // editor: monaco auto-closes `{`, so the user is typing inside `{...}`.
+    // An earlier draft used `{service="api",` — unterminated — which
+    // parsePromQlQuery cannot read at all (it returns no labels), so the test
+    // was demanding dedupe behaviour that has never existed and that this item
+    // is not about. The shape matters more than the assertion here.
     const c = usePromqlSuggestions();
-    atLabelName(c, 'cpu_utilization_percent{service="api",');
+    const query = 'cpu_utilization_percent{service="api",}';
+    c.autoCompleteData.value.query = query;
+    c.autoCompleteData.value.position.cursorIndex = query.length - 2;
     await c.getSuggestions();
     await flushPromises();
     const labels = offered(c).map((k) => k.label);
-    expect(labels).not.toContain("service");
-    expect(labels).toContain("environment");
+    expect(labels, "no labels offered at all").toContain("environment");
+    expect(labels, "re-offered a label the query already filters on").not.toContain("service");
   });
 
   it("asks the schema once per metric, not once per keystroke", async () => {

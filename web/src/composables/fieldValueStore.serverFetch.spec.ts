@@ -31,10 +31,20 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// A DB that actually remembers. Asserting "mergeValues was called" would pin
+// which writer the implementation picks; asserting the value comes back out
+// pins what the caller can rely on.
+const cached = vi.hoisted(() => new Map<string, string[]>());
 vi.mock("@/composables/fieldValueDB", () => ({
-  mergeValues: vi.fn().mockResolvedValue(undefined),
-  mergeMultipleValues: vi.fn().mockResolvedValue(undefined),
-  getValues: vi.fn().mockResolvedValue([]),
+  mergeValues: vi.fn(async (key: string, values: string[]) => {
+    cached.set(key, [...new Set([...(cached.get(key) ?? []), ...values])]);
+  }),
+  mergeMultipleValues: vi.fn(async (entries: any[]) => {
+    entries.forEach((e) =>
+      cached.set(e.key, [...new Set([...(cached.get(e.key) ?? []), ...e.values])]),
+    );
+  }),
+  getValues: vi.fn(async (key: string) => cached.get(key) ?? []),
   evictExpired: vi.fn().mockResolvedValue(0),
   trimToMaxFields: vi.fn().mockResolvedValue(undefined),
 }));
@@ -44,15 +54,31 @@ vi.mock("@/services/stream", () => ({
 }));
 
 import streamService from "@/services/stream";
-import * as fieldValueDB from "@/composables/fieldValueDB";
-import { requestFieldValues, __resetFieldValueRequests } from "./fieldValueStore";
+
+/**
+ * A fresh copy of the module per test.
+ *
+ * In-flight requests and the negative cache are module-level state by design —
+ * they must be shared by every editor on the page — so tests cannot share a
+ * copy. The alternative was exporting a `__reset` from production code, which
+ * is a test seam sitting in the shipped API; this keeps the seam here.
+ */
+const freshStore = async () => {
+  vi.resetModules();
+  return await import("./fieldValueStore");
+};
 
 const ctx = { org: "myorg", streamType: "metrics", streamName: "cache_hit_ratio" };
 
 /** The shape the values endpoint actually returns, verified against a live one. */
 const apiResponse = (values: string[]) => ({
   data: {
-    hits: [{ field: "environment", values: values.map((v, i) => ({ zo_sql_key: v, zo_sql_num: 10 - i })) }],
+    hits: [
+      {
+        field: "environment",
+        values: values.map((v, i) => ({ zo_sql_key: v, zo_sql_num: 10 - i })),
+      },
+    ],
   },
 });
 
@@ -64,22 +90,22 @@ const settle = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // In-flight and negative-cache state is module-level by design — it must be
-  // shared across every editor on the page — so each test starts it clean.
-  __resetFieldValueRequests();
-  vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse(["development", "staging"]) as any);
+  cached.clear();
+  vi.mocked(streamService.fieldValues).mockResolvedValue(
+    apiResponse(["development", "staging"]) as any,
+  );
 });
 
 describe("requestFieldValues — asking the server", () => {
   it("returns the values it fetched", async () => {
-    await expect(requestFieldValues(ctx, "environment")).resolves.toEqual([
+    await expect((await freshStore()).requestFieldValues(ctx, "environment")).resolves.toEqual([
       "development",
       "staging",
     ]);
   });
 
   it("asks for the right stream, field and type", async () => {
-    await requestFieldValues(ctx, "environment");
+    await (await freshStore()).requestFieldValues(ctx, "environment");
     const [args] = vi.mocked(streamService.fieldValues).mock.calls[0] as any[];
     expect(args.org_identifier).toBe("myorg");
     expect(args.stream_name).toBe("cache_hit_ratio");
@@ -89,7 +115,7 @@ describe("requestFieldValues — asking the server", () => {
   });
 
   it("asks for the last fifteen minutes", async () => {
-    await requestFieldValues(ctx, "environment");
+    await (await freshStore()).requestFieldValues(ctx, "environment");
     const [args] = vi.mocked(streamService.fieldValues).mock.calls[0] as any[];
     // Microseconds, as this endpoint takes them. Asserted as a WIDTH, because
     // the absolute values depend on when the test runs.
@@ -99,22 +125,22 @@ describe("requestFieldValues — asking the server", () => {
   });
 
   it("asks for few values, not a page of them", async () => {
-    await requestFieldValues(ctx, "environment");
+    await (await freshStore()).requestFieldValues(ctx, "environment");
     const [args] = vi.mocked(streamService.fieldValues).mock.calls[0] as any[];
     // A dropdown shows a handful; the endpoint charges for the rest.
     expect(args.size).toBeGreaterThan(0);
     expect(args.size).toBeLessThanOrEqual(50);
   });
 
-  it("writes what it fetched into the cache", async () => {
-    // The point of fetching HERE: the next lookup, on any surface and in the
-    // next session, is local.
-    await requestFieldValues(ctx, "environment");
+  it("leaves the values in the cache for the next reader", async () => {
+    // The point of fetching HERE: the next lookup — any surface, next session —
+    // is local. Asserted through the public read, not through the writer.
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
     await settle();
-    expect(fieldValueDB.mergeValues).toHaveBeenCalled();
-    const [key, values] = vi.mocked(fieldValueDB.mergeValues).mock.calls[0] as any[];
-    expect(key).toBe("myorg|metrics|cache_hit_ratio|environment");
-    expect(values).toEqual(expect.arrayContaining(["development", "staging"]));
+    await expect(store.getFieldValuesForSuggestion(ctx, "environment")).resolves.toEqual(
+      expect.arrayContaining(["development", "staging"]),
+    );
   });
 });
 
@@ -122,12 +148,12 @@ describe("requestFieldValues — not asking twice", () => {
   it("makes ONE request when several editors ask at once", async () => {
     // Every keystroke re-invokes the provider. Without this, a slow endpoint
     // gets a request per character.
-    const all = Promise.all([
-      requestFieldValues(ctx, "environment"),
-      requestFieldValues(ctx, "environment"),
-      requestFieldValues(ctx, "environment"),
+    const store = await freshStore();
+    await Promise.all([
+      store.requestFieldValues(ctx, "environment"),
+      store.requestFieldValues(ctx, "environment"),
+      store.requestFieldValues(ctx, "environment"),
     ]);
-    await all;
     expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
   });
 
@@ -135,45 +161,50 @@ describe("requestFieldValues — not asking twice", () => {
     // A field that genuinely has no values in the window must not be re-queried
     // on every keystroke for the rest of the session.
     vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse([]) as any);
-    await requestFieldValues(ctx, "environment");
-    await requestFieldValues(ctx, "environment");
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
+    await store.requestFieldValues(ctx, "environment");
     expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
   });
 
   it("does not ask again after a failure", async () => {
     vi.mocked(streamService.fieldValues).mockRejectedValue(new Error("500"));
-    await requestFieldValues(ctx, "environment");
-    await requestFieldValues(ctx, "environment");
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
+    await store.requestFieldValues(ctx, "environment");
     expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
   });
 
   it("treats a different field as a different question", async () => {
-    await requestFieldValues(ctx, "environment");
-    await requestFieldValues(ctx, "service");
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
+    await store.requestFieldValues(ctx, "service");
     expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
   });
 
   it("treats a different stream as a different question", async () => {
-    await requestFieldValues(ctx, "environment");
-    await requestFieldValues({ ...ctx, streamName: "cache_size_bytes" }, "environment");
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
+    await store.requestFieldValues({ ...ctx, streamName: "cache_size_bytes" }, "environment");
     expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
   });
 });
 
 describe("requestFieldValues — refusing to ask", () => {
   it("does not call the endpoint without a complete stream context", async () => {
+    const store = await freshStore();
     for (const partial of [
       { ...ctx, org: "" },
       { ...ctx, streamType: "" },
       { ...ctx, streamName: "" },
     ]) {
-      await expect(requestFieldValues(partial, "environment")).resolves.toEqual([]);
+      await expect(store.requestFieldValues(partial, "environment")).resolves.toEqual([]);
     }
     expect(streamService.fieldValues).not.toHaveBeenCalled();
   });
 
   it("does not call the endpoint without a field", async () => {
-    await expect(requestFieldValues(ctx, "")).resolves.toEqual([]);
+    await expect((await freshStore()).requestFieldValues(ctx, "")).resolves.toEqual([]);
     expect(streamService.fieldValues).not.toHaveBeenCalled();
   });
 });
@@ -181,20 +212,25 @@ describe("requestFieldValues — refusing to ask", () => {
 describe("requestFieldValues — when things go wrong", () => {
   it("resolves to an empty list rather than throwing", async () => {
     vi.mocked(streamService.fieldValues).mockRejectedValue(new Error("network"));
-    await expect(requestFieldValues(ctx, "environment")).resolves.toEqual([]);
+    await expect((await freshStore()).requestFieldValues(ctx, "environment")).resolves.toEqual([]);
   });
 
   it("survives a payload that is not the shape it expects", async () => {
     for (const junk of [{}, { data: {} }, { data: { hits: [] } }, { data: { hits: [{}] } }]) {
-      __resetFieldValueRequests();
+      // A fresh copy per shape on purpose here: the negative cache would
+      // otherwise suppress every request after the first, and the loop would
+      // assert nothing.
       vi.mocked(streamService.fieldValues).mockResolvedValue(junk as any);
-      await expect(requestFieldValues(ctx, "environment")).resolves.toEqual([]);
+      await expect((await freshStore()).requestFieldValues(ctx, "environment")).resolves.toEqual(
+        [],
+      );
     }
   });
 
   it("drops empty keys rather than offering a blank row", async () => {
-    __resetFieldValueRequests();
     vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse(["", "prod"]) as any);
-    await expect(requestFieldValues(ctx, "environment")).resolves.toEqual(["prod"]);
+    await expect((await freshStore()).requestFieldValues(ctx, "environment")).resolves.toEqual([
+      "prod",
+    ]);
   });
 });
