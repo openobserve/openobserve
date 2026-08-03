@@ -640,14 +640,14 @@ describe("MonitorTable", () => {
     // ── Name cell ──────────────────────────────────────────────────────
 
     describe("name cell", () => {
-      it("renders OTooltip wrapping the name with cursor-help when name is present", () => {
+      it("renders OTooltip wrapping the name with cursor-pointer when name is present", () => {
         wrapper = mountMonitorTable();
         // Per row: name=idx+0, url=idx+1, locations=idx+2, then 4 action OTooltips.
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
         expect(tooltips.length).toBeGreaterThanOrEqual(3);
         const nameTooltip = tooltips[0];
         expect(nameTooltip.props("content")).toBe("HTTP Health Check");
-        expect(nameTooltip.find("span.cursor-help").exists()).toBe(true);
+        expect(nameTooltip.find("span.cursor-pointer").exists()).toBe(true);
       });
 
       it("renders em-dash fallback span without OTooltip when name is absent", () => {
@@ -665,12 +665,12 @@ describe("MonitorTable", () => {
     // ── URL cell ───────────────────────────────────────────────────────
 
     describe("url cell", () => {
-      it("renders OTooltip wrapping the URL with cursor-help when URL is present", () => {
+      it("renders OTooltip wrapping the URL with cursor-pointer when URL is present", () => {
         wrapper = mountMonitorTable();
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
         const urlTooltip = tooltips[1];
         expect(urlTooltip.props("content")).toBe("https://example.com/health");
-        expect(urlTooltip.find("span.cursor-help").exists()).toBe(true);
+        expect(urlTooltip.find("span.cursor-pointer").exists()).toBe(true);
       });
 
       it("renders em-dash fallback span without OTooltip when URL is absent", () => {
@@ -719,12 +719,12 @@ describe("MonitorTable", () => {
         expect(locTooltip.props("content")).toBe("US East\neu-west-1");
       });
 
-      it("shows first location label and cursor-help class", () => {
+      it("shows first location label and cursor-pointer class", () => {
         wrapper = mountMonitorTable();
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
         const locTooltip = tooltips[2];
         expect(locTooltip.text()).toContain("us-east-1");
-        expect(locTooltip.find(".cursor-help").exists()).toBe(true);
+        expect(locTooltip.find(".cursor-pointer").exists()).toBe(true);
       });
 
       it("shows +N badge when more than one location", () => {

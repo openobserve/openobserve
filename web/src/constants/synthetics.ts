@@ -110,7 +110,7 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
  * false green. `screenshot` is redundant with the per-run capture setting.
  * `wait` is the hard sleep this whole design exists to remove.
  *
- * Kept in ACTION_LABELS/ACTION_ICONS so existing monitors still RENDER; removed
+ * Kept in ACTION_LABEL_KEYS/ACTION_ICONS so existing monitors still RENDER; removed
  * from the picker so no new journey can contain one. Stored monitors keep
  * executing them until migrated (spec Q-10).
  */

@@ -199,6 +199,11 @@ const timeoutBelowDefault = computed(() => {
 
 function updateLocator(locator: StepLocator) {
   update({ locator });
+  // The host clears its "this step names no element" error on this event. Without
+  // it the message outlives the author fixing the very thing it complains about —
+  // and since the error also force-expands the step, a stale one keeps re-opening
+  // a row that is already correct.
+  emit("selector-edited");
 }
 
 function updateAssertion(assertion: StepAssertion) {
@@ -422,10 +427,17 @@ const hasAdvancedChanges = computed(
 
     <!-- Target — the locator bundle is the only way a step names its element.
            `stepNeedsTarget` is the same rule the save-time validator uses, so the
-           block appears exactly when a target is required. -->
+           block appears exactly when a target is required.
+
+           `selectorErrorMessage` was passed by the host and bound by nothing from
+           D7 onward: the v1 Selector field it used to render on was deleted, and
+           the error lost its render site rather than moving to the block that
+           replaced it. So the save named a step, expanded it, and then showed the
+           author no reason on any field inside it. -->
     <BrowserJourneyLocator
       v-if="showTarget"
       :locator="effectiveLocator"
+      :error-message="selectorErrorMessage"
       class="mt-2 w-full max-w-200"
       @update:locator="updateLocator"
     />

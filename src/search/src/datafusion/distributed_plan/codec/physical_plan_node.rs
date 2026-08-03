@@ -22,15 +22,14 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::exec::StreamingAggsExec;
 use prost::Message;
 use proto::cluster_rpc;
 
 use crate::datafusion::{
     distributed_plan::{
         aggregate_topk_exec::AggregateTopkExec, empty_exec::NewEmptyExec,
-        enrichment_exec::EnrichmentExec, tmp_exec::TmpExec,
+        enrichment_exec::EnrichmentExec, streaming_aggs_exec::exec::StreamingAggsExec,
+        tmp_exec::TmpExec,
     },
     plan::deduplication_exec::DeduplicationExec,
 };
@@ -61,7 +60,6 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(node)) => {
                 super::aggregate_topk_exec::try_decode(node, inputs, ctx)
             }
-            #[cfg(feature = "enterprise")]
             Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
                 super::streaming_aggs_exec::try_decode(node, inputs, ctx)
             }
@@ -71,10 +69,6 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             Some(cluster_rpc::physical_plan_node::Plan::EnrichmentExec(node)) => {
                 super::enrichment_exec::try_decode(node, inputs, ctx)
             }
-            #[cfg(not(feature = "enterprise"))]
-            Some(_) => {
-                internal_err!("Not supported")
-            }
             None => {
                 internal_err!("PhysicalPlanNode is required")
             }
@@ -82,7 +76,6 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
     }
 
     fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
-        #[cfg(feature = "enterprise")]
         if node.downcast_ref::<NewEmptyExec>().is_some() {
             super::empty_exec::try_encode(node, buf)
         } else if node.downcast_ref::<DeduplicationExec>().is_some() {
@@ -91,20 +84,6 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
             super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.downcast_ref::<StreamingAggsExec>().is_some() {
             super::streaming_aggs_exec::try_encode(node, buf)
-        } else if node.downcast_ref::<TmpExec>().is_some() {
-            super::tmp_exec::try_encode(node, buf)
-        } else if node.downcast_ref::<EnrichmentExec>().is_some() {
-            super::enrichment_exec::try_encode(node, buf)
-        } else {
-            internal_err!("Not supported")
-        }
-        #[cfg(not(feature = "enterprise"))]
-        if node.downcast_ref::<NewEmptyExec>().is_some() {
-            super::empty_exec::try_encode(node, buf)
-        } else if node.downcast_ref::<DeduplicationExec>().is_some() {
-            super::deduplication_exec::try_encode(node, buf)
-        } else if node.downcast_ref::<AggregateTopkExec>().is_some() {
-            super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.downcast_ref::<TmpExec>().is_some() {
             super::tmp_exec::try_encode(node, buf)
         } else if node.downcast_ref::<EnrichmentExec>().is_some() {

@@ -22,7 +22,6 @@ import {
   aggregateStepStats,
   bucketInterval,
   buildHistogramSql,
-  buildKpiSql,
   buildLastRunSql,
   buildRunsSql,
   buildRunsWithStepsSql,
@@ -36,7 +35,7 @@ import {
   deviceIconName,
   deviceLabelKey,
   mapHistogram,
-  mapKpi,
+  deriveKpiFromHistogram,
   mapRun,
   evidenceOriginTs,
   evidenceSeverity,
@@ -44,11 +43,23 @@ import {
   stepOwnDetail,
   mergeLocatorLadder,
   type EvidenceEvent,
+  buildStepAggregateSql,
+  buildStepDimensionSql,
+  buildStepSparklineSql,
+  foldStepStream,
 } from "./syntheticResultsSchema";
+
+/** Shim: the old mapKpi took one aggregate row; the tiles are now summed from
+ *  histogram buckets. One bucket carrying the same counts is the equivalent
+ *  input, and the same row still supplies p95. */
+const deriveKpiFromHistogramCompat = (
+  row: Record<string, unknown> | null | undefined,
+  lastRun: Record<string, unknown> | null | undefined,
+) => deriveKpiFromHistogram(row ? [row] : [], row, lastRun);
 
 describe("syntheticResultsSchema query builders", () => {
   it("should reference the configured stream and fields in the KPI SQL", () => {
-    const sql = buildKpiSql("mon-1");
+    const sql = buildHistogramSql("mon-1", "1 hour");
     expect(sql).toContain(`FROM "${SYNTHETIC_RESULTS_STREAM}"`);
     expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon-1'`);
     expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.passed}')`);
@@ -59,13 +70,13 @@ describe("syntheticResultsSchema query builders", () => {
   });
 
   it("should include retried_runs clause when attempts field exists in schema", () => {
-    const sql = buildKpiSql("mon-1", true);
+    const sql = buildHistogramSql("mon-1", "1 hour", true);
     expect(sql).toContain("WHERE attempts > 1");
     expect(sql).toContain("retried_runs");
   });
 
   it("should omit retried_runs clause when attempts field is absent from schema", () => {
-    const sql = buildKpiSql("mon-1", false);
+    const sql = buildHistogramSql("mon-1", "1 hour", false);
     expect(sql).not.toContain("attempts");
     expect(sql).not.toContain("retried_runs");
   });
@@ -120,7 +131,7 @@ describe("syntheticResultsSchema query builders", () => {
   });
 
   it("should escape single quotes in the monitor id to prevent injection", () => {
-    const sql = buildKpiSql("mon'1");
+    const sql = buildHistogramSql("mon'1", "1 hour");
     expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon''1'`);
   });
 });
@@ -135,7 +146,7 @@ describe("bucketInterval", () => {
 
 describe("mapKpi", () => {
   it("should compute uptime from passed/total and map the last run", () => {
-    const kpi = mapKpi(
+    const kpi = deriveKpiFromHistogramCompat(
       {
         total_runs: 288,
         passed_runs: 287,
@@ -153,7 +164,7 @@ describe("mapKpi", () => {
   });
 
   it("should yield a zeroed kpi with null last run when there is no data", () => {
-    const kpi = mapKpi(null, null);
+    const kpi = deriveKpiFromHistogram([], null, null);
     expect(kpi.uptimePct).toBe(0);
     expect(kpi.totalRuns).toBe(0);
     expect(kpi.lastRunStatus).toBe(null);
@@ -161,7 +172,7 @@ describe("mapKpi", () => {
   });
 
   it("should coerce string field values from the search response", () => {
-    const kpi = mapKpi(
+    const kpi = deriveKpiFromHistogramCompat(
       { total_runs: "10", passed_runs: "9", failed_runs: "1", p95_duration: "120" },
       null,
     );
@@ -662,7 +673,7 @@ describe("mapRunDetail — evidence the probe already writes (Phase 4)", () => {
 
 describe("KPI: warning is two unrelated things", () => {
   it("splits flaky from degraded when status_reason is in the schema", () => {
-    const sql = buildKpiSql("mon-1", true, true);
+    const sql = buildHistogramSql("mon-1", "1 hour", true, true);
     expect(sql).toContain("as flaky_runs");
     expect(sql).toContain("as degraded_runs");
     // Both clauses hang off the scan the query already performs.
@@ -672,12 +683,12 @@ describe("KPI: warning is two unrelated things", () => {
   it("omits both clauses when the field is absent from the schema", () => {
     // The search API rejects a query naming a field the stream doesn't have,
     // which would take the whole KPI panel down rather than one tile.
-    const sql = buildKpiSql("mon-1", true, false);
+    const sql = buildHistogramSql("mon-1", "1 hour", true, false);
     expect(sql).not.toContain("status_reason");
   });
 
   it("counts flaky and degraded separately, against the execution denominator", () => {
-    const kpi = mapKpi(
+    const kpi = deriveKpiFromHistogramCompat(
       {
         total_runs: 100,
         passed_runs: 80,
@@ -1277,5 +1288,148 @@ describe("stepOwnDetail locator ladder", () => {
     );
     expect(d?.candidatesTried).toHaveLength(1);
     expect(d?.candidatesTried[0].outcome).toBe("used_as_primary");
+  });
+});
+
+describe("step-stream query builders", () => {
+  const MON = "3HORp1V1zqa1CxwYYXzp6ohP2UA";
+
+  it("aggregates over the WHOLE window — no LIMIT", () => {
+    // The entire point of B10. The old path capped at 5000 execution rows, so on
+    // the busiest check measured (18 079 executions / 7 days) it described 4.0 of
+    // the 7 days and reported a 33.7% fail rate as 56.3%. A LIMIT creeping back
+    // in here restores that silently — the numbers stay plausible, just wrong.
+    const sql = buildStepAggregateSql(MON);
+    expect(sql).not.toContain("LIMIT");
+    expect(sql).toContain(`FROM "synthetics_step_results"`);
+    expect(sql).toContain("GROUP BY step_id");
+    // `kind` is populated with 'step' only today, but the column exists so
+    // protocol assertions can share this stream later without a grain migration.
+    // Without this filter the tab would silently start counting them.
+    expect(sql).toContain("kind = 'step'");
+  });
+
+  it("selects every column the Steps table renders, plus the window bounds", () => {
+    const sql = buildStepAggregateSql(MON);
+    for (const col of [
+      "executions",
+      "failures",
+      "flaky",
+      "avg_duration_ms",
+      "p95_duration_ms",
+      "max_duration_ms",
+      "step_index",
+      // Coverage reads these; deriving them from the capped sparkline reported a
+      // 7-day range as the newest ~100 minutes.
+      "first_ts",
+      "last_ts",
+    ]) {
+      expect(sql).toContain(col);
+    }
+    // Percentiles do not compose across groups, so p95 must come from a query
+    // grouped only by the dimension it is reported at.
+    expect(sql).toContain("approx_percentile_cont(duration_ms, 0.95)");
+  });
+
+  it("groups the dimension query by both axes and counts only", () => {
+    // Counts compose, so one query answers browserStats and locationStats by
+    // folding the same rows twice. A percentile here would not be foldable.
+    const sql = buildStepDimensionSql(MON);
+    expect(sql).toContain("GROUP BY step_id, engine, location");
+    expect(sql).not.toContain("approx_percentile_cont");
+    expect(sql).toContain("kind = 'step'");
+  });
+
+  it("bounds the sparkline, and only the sparkline", () => {
+    // "The last N runs" is this query's definition rather than a truncation, so
+    // its cap is correct where the aggregate's would not be.
+    const sql = buildStepSparklineSql(MON, 2000);
+    expect(sql).toContain("LIMIT 2000");
+    expect(sql).toContain("ORDER BY _timestamp DESC");
+    expect(sql).toContain("failed_in_prior_attempt");
+  });
+
+  it("escapes the monitor id in all three", () => {
+    for (const sql of [
+      buildStepAggregateSql("mon'1"),
+      buildStepDimensionSql("mon'1"),
+      buildStepSparklineSql("mon'1"),
+    ]) {
+      expect(sql).toContain("synthetics_id = 'mon''1'");
+    }
+  });
+});
+
+describe("foldStepStream coverage", () => {
+  const agg = (
+    stepId: string,
+    stepIndex: number,
+    executions: number,
+    first: number,
+    last: number,
+  ) => ({
+    step_id: stepId,
+    step_index: stepIndex,
+    executions,
+    failures: 0,
+    flaky: 0,
+    avg_duration_ms: 1,
+    p95_duration_ms: 1,
+    max_duration_ms: 1,
+    first_ts: first,
+    last_ts: last,
+  });
+
+  it("counts EXECUTIONS, not step rows", () => {
+    // One execution writes one row per step. Summing the per-step counts would
+    // report a 3-step check as 3x its real execution count, which is what the
+    // banner would then show the user.
+    const r = foldStepStream(
+      [
+        agg("s1", 0, 100, 1_000, 2_000),
+        agg("s2", 1, 100, 1_000, 2_000),
+        agg("s3", 2, 90, 1_000, 2_000),
+      ],
+      [],
+      [],
+    );
+    expect(r.coverage.executions).toBe(100);
+  });
+
+  it("takes the window from the unbounded aggregate, not the capped sparkline", () => {
+    // The sparkline is LIMIT 2000; the aggregates are not. Deriving the window
+    // from the sparkline reported a 7-day range as the newest ~100 minutes.
+    const r = foldStepStream(
+      [agg("s1", 0, 10, 1_000_000, 9_000_000)],
+      [],
+      // Sparkline covers a deliberately narrower slice — it must not win.
+      [{ step_id: "s1", status: "passed", failed_in_prior_attempt: false, _timestamp: 8_000_000 }],
+    );
+    expect(r.coverage.fromMs).toBe(1_000);
+    expect(r.coverage.toMs).toBe(9_000);
+  });
+
+  it("puts failRate and flakyRate on the SAME scales the client-side tally uses", () => {
+    // `StepGroup` is consumed by one component that renders `failRate * 100` and
+    // `flakyRate * 10 / 10` — so failRate is a fraction and flakyRate is already
+    // a percentage. The asymmetry is inherited, not chosen, and it is invisible
+    // to the type checker because both are `number`.
+    //
+    // Emitting flakyRate as a fraction rendered a 25%-flaky step as "0.3%". Both
+    // paths feed the same component while the fallback exists, so they have to
+    // agree; this test is what notices when they stop.
+    const r = foldStepStream(
+      [{ ...agg("s1", 0, 200, 1_000, 2_000), failures: 50, flaky: 50 }],
+      [],
+      [],
+    );
+    const g = r.stepGroups[0];
+    expect(g.failRate).toBe(0.25); // fraction — component multiplies by 100
+    expect(g.flakyRate).toBe(25); // already a percentage — component does not
+  });
+
+  it("orders steps by step_index", () => {
+    const r = foldStepStream([agg("late", 5, 1, 1, 2), agg("early", 0, 1, 1, 2)], [], []);
+    expect(r.stepGroups.map((g) => g.key)).toEqual(["step-early", "step-late"]);
   });
 });

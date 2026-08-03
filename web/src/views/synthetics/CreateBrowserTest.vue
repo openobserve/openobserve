@@ -399,7 +399,9 @@ function stopActiveExtension() {
   if (journey?.stopActiveRecording()) {
     /* recording was stopped */
   }
-  if (recorder.replayPhase.value === "running") {
+  // "stopping" counts as live: the extension has been asked to stop but has not confirmed,
+  // so navigating away without the fire-and-forget stop can still orphan the replay.
+  if (recorder.replayPhase.value === "running" || recorder.replayPhase.value === "stopping") {
     recorder.stopReplayAndForget();
   }
 }
@@ -665,11 +667,10 @@ function runReplay(journey: BrowserStep[]) {
 }
 
 function onStopReplay() {
-  // Update UI state immediately — the SW has already stopped the replay.
-  // Don't wait for the replay promise to resolve (it may take seconds or
-  // never arrive if the port was disconnected from window focus changes).
-  recorder.replayPhase.value = "stopped";
-  recorder.isReplaying.value = false;
+  // The composable owns the stopping → stopped transition, the same way replay() owns
+  // running → passed/failed. Flipping straight to "stopped" here used to claim the run
+  // was over while the extension was still winding down, and left the mid-flight step
+  // showing as in-progress because nothing cleared activeStepId.
   recorder.stopReplay().catch(() => {});
 }
 

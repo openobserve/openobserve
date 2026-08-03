@@ -23,7 +23,7 @@ const groups = {
 };
 
 const roles = {
-  roles: [],
+  roles: [] as any[],
 };
 
 const permissions = {

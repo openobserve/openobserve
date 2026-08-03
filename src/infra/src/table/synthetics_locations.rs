@@ -20,7 +20,13 @@
 //! CRUD. `pool` is the queue routing key the scheduler writes jobs into and
 //! probes/agents lease from.
 
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr};
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr};
+use tokio::sync::RwLock;
 
 use super::{
     entity::synthetics_locations::{ActiveModel, Column, Entity, Model},
@@ -33,6 +39,89 @@ use crate::{
 
 pub const KIND_PUBLIC: &str = "public";
 pub const KIND_PRIVATE: &str = "private";
+
+/// Whole-table cache.
+///
+/// The locations registry is routing configuration: a couple of dozen rows that
+/// change only when an operator adds a region or an org creates a private
+/// location. It was being re-read on the hottest paths in the product —
+/// `dispatcher_pools()` ran `list_visible("")` **every 2 s** forever, and the
+/// scheduler called `get()` once *per location per firing check* (~200/min at
+/// 100 checks). See `docs/synthetics-lcl/2026-07-31-synthetics-caching-and-db-load.md`
+/// P3/P4.
+///
+/// Caching the whole table rather than one entry per key is deliberate: every
+/// read shape (`get` by id, `find_by_pool`, `list_visible` per org) is a
+/// different view of the same tiny row set, so one load serves all three and
+/// there is no per-key stampede to reason about.
+///
+/// TTL-based rather than event-invalidated: `coordinator::synthetics` does not
+/// exist yet, so a short TTL is what bounds staleness across pods. Writes in
+/// this module invalidate eagerly, so the TTL only covers changes made by a
+/// *different* node.
+/// The cached rows and the instant they were loaded, absent until first load.
+type CachedLocations = Option<(Vec<SyntheticsLocationRecord>, Instant)>;
+
+static LOCATIONS_CACHE: LazyLock<RwLock<CachedLocations>> = LazyLock::new(|| RwLock::new(None));
+
+const LOCATIONS_CACHE_TTL: Duration = Duration::from_secs(30);
+
+/// Drops the cached table. Called by every write path in this module so a
+/// change made on *this* node is visible immediately rather than after the TTL.
+pub async fn invalidate_cache() {
+    *LOCATIONS_CACHE.write().await = None;
+}
+
+/// Invalidates locally **and** tells every other node. Write paths call this;
+/// the coordinator watcher calls [`invalidate_cache`] so events do not echo.
+async fn invalidate_and_publish() {
+    invalidate_cache().await;
+    if let Err(e) = crate::coordinator::synthetics::emit_locations_changed().await {
+        log::error!("[synthetics] emit location cache event failed: {e}");
+    }
+}
+
+/// Refreshes the cached table if it is missing or past its TTL.
+///
+/// Two callers racing a cold cache will both query and the second write wins —
+/// harmless for an idempotent read, and cheaper than holding the write lock
+/// across a DB round trip.
+async fn ensure_fresh() -> Result<(), errors::Error> {
+    if let Some((_, loaded_at)) = LOCATIONS_CACHE.read().await.as_ref()
+        && loaded_at.elapsed() < LOCATIONS_CACHE_TTL
+    {
+        return Ok(());
+    }
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let rows: Vec<SyntheticsLocationRecord> = Entity::find()
+        .order_by_asc(Column::Kind)
+        .order_by_asc(Column::Label)
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .map(Into::into)
+        .collect();
+
+    *LOCATIONS_CACHE.write().await = Some((rows, Instant::now()));
+    Ok(())
+}
+
+/// Runs `f` over the cached rows, refreshing first if stale.
+///
+/// Callers project what they need under the read lock instead of cloning the
+/// whole table — `get`/`find_by_pool` run on every scheduler tick and every
+/// probe lease, so cloning ~20 records per call to return one would be the bulk
+/// of the work this cache exists to avoid.
+async fn with_cached<T>(
+    f: impl FnOnce(&[SyntheticsLocationRecord]) -> T,
+) -> Result<T, errors::Error> {
+    ensure_fresh().await?;
+    let guard = LOCATIONS_CACHE.read().await;
+    let rows = guard.as_ref().map(|(r, _)| r.as_slice()).unwrap_or(&[]);
+    Ok(f(rows))
+}
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SyntheticsLocationRecord {
@@ -78,6 +167,8 @@ pub async fn add(record: &SyntheticsLocationRecord) -> Result<(), errors::Error>
         label: Set(record.label.clone()),
         pool: Set(record.pool.clone()),
         enabled: Set(record.enabled),
+        // A new location has never been notified as down.
+        down_notified_at: Set(0),
         created_at: Set(record.created_at),
         updated_at: Set(record.updated_at),
     };
@@ -85,24 +176,31 @@ pub async fn add(record: &SyntheticsLocationRecord) -> Result<(), errors::Error>
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
+    invalidate_and_publish().await;
     Ok(())
 }
 
 /// Locations visible to an org: all public rows + the org's private rows.
+///
+/// Served from the whole-table cache; the org filter is applied in Rust. Note
+/// `list_visible("")` matches public rows only, which is how `dispatcher_pools()`
+/// enumerates the public net pools.
 pub async fn list_visible(org_id: &str) -> Result<Vec<SyntheticsLocationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let rows = Entity::find()
-        .filter(
-            Condition::any()
-                .add(Column::OrgId.is_null())
-                .add(Column::OrgId.eq(org_id)),
-        )
-        .order_by_asc(Column::Kind)
-        .order_by_asc(Column::Label)
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(rows.into_iter().map(Into::into).collect())
+    with_cached(|rows| {
+        rows.iter()
+            .filter(|r| match &r.org_id {
+                None => true,
+                Some(o) => o == org_id,
+            })
+            .cloned()
+            .collect()
+    })
+    .await
 }
 
 /// All private rows across orgs — used by the staleness watcher.
@@ -116,25 +214,14 @@ pub async fn list_private() -> Result<Vec<SyntheticsLocationRecord>, errors::Err
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
-/// Find one location by id.
+/// Find one location by id. Served from the whole-table cache.
 pub async fn get(id: &str) -> Result<Option<SyntheticsLocationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let row = Entity::find_by_id(id)
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(row.map(Into::into))
+    with_cached(|rows| rows.iter().find(|r| r.id == id).cloned()).await
 }
 
-/// Find one location by its pool routing key.
+/// Find one location by its pool routing key. Served from the whole-table cache.
 pub async fn find_by_pool(pool: &str) -> Result<Option<SyntheticsLocationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let row = Entity::find()
-        .filter(Column::Pool.eq(pool))
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(row.map(Into::into))
+    with_cached(|rows| rows.iter().find(|r| r.pool == pool).cloned()).await
 }
 
 /// Update label/enabled on a location.
@@ -150,6 +237,12 @@ pub async fn update(id: &str, label: &str, enabled: bool) -> Result<(), errors::
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
+    invalidate_and_publish().await;
     Ok(())
 }
 
@@ -158,6 +251,58 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_by_id(id)
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
+    invalidate_and_publish().await;
+    Ok(())
+}
+
+/// Claims the right to send this location's "location down" notification,
+/// returning whether THIS caller won it.
+///
+/// The staleness watcher runs on **every** alert_manager node. Its suppression
+/// flag used to be an in-process `HashSet`, so N nodes each decided
+/// independently that they had not notified yet and N notifications went out for
+/// one outage — repeating on every down → recover → down cycle.
+///
+/// `WHERE down_notified_at = 0` makes the transition a compare-and-swap: exactly
+/// one node flips 0 → now and gets `rows_affected == 1`; the rest see 0 and stay
+/// quiet. Same primitive as `synthetics_jobs::lease_batch` and
+/// `synthetics_checks::try_claim_slot`.
+///
+/// Deliberately NOT cached — `LOCATIONS_CACHE` serves definition reads, and a
+/// stale `down_notified_at` would reintroduce exactly the duplicate this fixes.
+pub async fn try_claim_down_notification(id: &str, now_us: i64) -> Result<bool, errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::update_many()
+        .col_expr(Column::DownNotifiedAt, Expr::value(now_us))
+        .filter(Column::Id.eq(id))
+        .filter(Column::DownNotifiedAt.eq(0i64))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Clears the down flag so a future outage notifies again.
+///
+/// Idempotent and unguarded on purpose: every node may call this on recovery and
+/// the result is the same. Guarding it would leave the flag set if the one node
+/// that "won" the clear died before the next tick, silencing the next outage.
+pub async fn clear_down_notification(id: &str) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::update_many()
+        .col_expr(Column::DownNotifiedAt, Expr::value(0i64))
+        .filter(Column::Id.eq(id))
+        .filter(Column::DownNotifiedAt.ne(0i64))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
