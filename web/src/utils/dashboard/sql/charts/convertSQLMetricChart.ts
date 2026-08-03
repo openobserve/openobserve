@@ -49,6 +49,17 @@ export const calculateMetricFontSize = (text: string, width: number, height: num
   return Math.max(fit, Math.min(floorCap, fullWidthFit));
 };
 
+// Style + geometry shared by BOTH sparkline renderers so they can't drift: the
+// ECharts-series path (buildMetricSparkline, single metric) and the grid's
+// per-cell primitive path (buildCellSparkline in convertSQLData).
+export const METRIC_SPARKLINE = {
+  fillOpacity: 0.15, // default area fill opacity
+  lineWidth: 1, // default line width
+  faintOpacity: 0.35, // line/bar/area opacity in the "background" layout
+  faintAreaFactor: 0.6, // area-fill multiplier in the "background" layout
+  bottomBandTopPct: 60, // "bottom" layout: the trend starts this % down the cell
+};
+
 export interface MetricSparkline {
   grid: any;
   xAxis: any[];
@@ -79,8 +90,10 @@ export const buildMetricSparkline = (
 
   const type = spark.type === "bar" || spark.type === "line" ? spark.type : "area";
   const color = spark.color || fallbackColor;
-  const fillOpacity = typeof spark.fillOpacity === "number" ? spark.fillOpacity : 0.15;
-  const lineWidth = typeof spark.lineWidth === "number" ? spark.lineWidth : 1;
+  const fillOpacity =
+    typeof spark.fillOpacity === "number" ? spark.fillOpacity : METRIC_SPARKLINE.fillOpacity;
+  const lineWidth =
+    typeof spark.lineWidth === "number" ? spark.lineWidth : METRIC_SPARKLINE.lineWidth;
   const layout = spark.layout === "background" ? "background" : "bottom";
   const faint = layout === "background";
 
@@ -96,17 +109,28 @@ export const buildMetricSparkline = (
     silent: true,
     symbol: "none",
     smooth: type !== "bar",
-    lineStyle: { width: lineWidth, color, opacity: faint ? 0.35 : 1 },
-    itemStyle: { color, opacity: faint ? 0.35 : 1 },
+    lineStyle: { width: lineWidth, color, opacity: faint ? METRIC_SPARKLINE.faintOpacity : 1 },
+    itemStyle: { color, opacity: faint ? METRIC_SPARKLINE.faintOpacity : 1 },
     ...(type === "area"
-      ? { areaStyle: { color, opacity: faint ? fillOpacity * 0.6 : fillOpacity } }
+      ? {
+          areaStyle: {
+            color,
+            opacity: faint ? fillOpacity * METRIC_SPARKLINE.faintAreaFactor : fillOpacity,
+          },
+        }
       : {}),
     ...(type === "bar" ? { barWidth: "55%" } : {}),
     z: 1,
   };
 
   return {
-    grid: { left: "3%", right: "3%", top: faint ? "0%" : "60%", bottom: "0%", containLabel: false },
+    grid: {
+      left: "3%",
+      right: "3%",
+      top: faint ? "0%" : `${METRIC_SPARKLINE.bottomBandTopPct}%`,
+      bottom: "0%",
+      containLabel: false,
+    },
     xAxis: [
       { type: "category", show: false, boundaryGap: type === "bar", data: data.map((_, i) => i) },
     ],

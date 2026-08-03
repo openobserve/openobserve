@@ -24,7 +24,7 @@
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
 import { chartColor } from "@/utils/chartTheme";
-import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
+import { calculateMetricFontSize, METRIC_SPARKLINE } from "./sql/charts/convertSQLMetricChart";
 import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
@@ -366,12 +366,15 @@ export const convertMultiSQLData = async (
       const max = Math.max(...data);
       const range = max - min || 1;
       const hpad = width * 0.06;
-      const bandTop = sparkBackground ? top : top + height * 0.6;
+      const bandTop = sparkBackground
+        ? top
+        : top + height * (METRIC_SPARKLINE.bottomBandTopPct / 100);
+      // Band height is intentionally cell-specific (not shared with the series path).
       const bandH = sparkBackground ? height : height * 0.33;
       const xAt = (i: number) => left + hpad + (i / (n - 1)) * (width - 2 * hpad);
       const yAt = (v: number) => bandTop + bandH - ((v - min) / range) * bandH;
       const color = cfg?.color || chartColor("--color-chart-metric-text");
-      const opacity = sparkBackground ? 0.35 : 1;
+      const opacity = sparkBackground ? METRIC_SPARKLINE.faintOpacity : 1;
       const out: any[] = [];
       if (cfg?.type === "bar") {
         const bw = ((width - 2 * hpad) / n) * 0.6;
@@ -388,13 +391,19 @@ export const convertMultiSQLData = async (
       } else {
         const points = data.map((v, i) => [xAt(i), yAt(v)]);
         if (cfg?.type === "area") {
-          const fillOpacity = typeof cfg?.fillOpacity === "number" ? cfg.fillOpacity : 0.15;
+          const fillOpacity =
+            typeof cfg?.fillOpacity === "number" ? cfg.fillOpacity : METRIC_SPARKLINE.fillOpacity;
           out.push({
             type: "polygon",
             shape: {
               points: [...points, [xAt(n - 1), bandTop + bandH], [xAt(0), bandTop + bandH]],
             },
-            style: { fill: color, opacity: sparkBackground ? fillOpacity * 0.6 : fillOpacity },
+            style: {
+              fill: color,
+              opacity: sparkBackground
+                ? fillOpacity * METRIC_SPARKLINE.faintAreaFactor
+                : fillOpacity,
+            },
             silent: true,
           });
         }
@@ -403,7 +412,8 @@ export const convertMultiSQLData = async (
           shape: { points },
           style: {
             stroke: color,
-            lineWidth: typeof cfg?.lineWidth === "number" ? cfg.lineWidth : 2,
+            lineWidth:
+              typeof cfg?.lineWidth === "number" ? cfg.lineWidth : METRIC_SPARKLINE.lineWidth,
             fill: "none",
             opacity,
           },
