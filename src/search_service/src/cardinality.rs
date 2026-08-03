@@ -353,6 +353,8 @@ mod tests {
 
     use super::*;
 
+    static CARDINALITY_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     #[test]
     fn test_generate_cache_key() {
         let key = generate_cache_key("test_org", StreamType::Logs, "test_stream", "test_field");
@@ -380,6 +382,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_cardinality_from_cache_expired_entry_returns_miss() {
+        let _guard = CARDINALITY_TEST_LOCK.lock().await;
         let now = now_micros();
         let org_id = "test_org_expired";
         let stream_type = StreamType::Logs;
@@ -410,6 +413,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_operations() {
+        let _guard = CARDINALITY_TEST_LOCK.lock().await;
         let org_id = "test_org";
         let stream_type = StreamType::Logs;
         let stream_name = "test_stream";
@@ -449,6 +453,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_cache_stats() {
+        let _guard = CARDINALITY_TEST_LOCK.lock().await;
         // Use unique test keys to avoid conflicts with other tests
         let test_prefix = format!("test_get_cache_stats_{}", now_micros());
 
@@ -541,6 +546,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_cardinality_cache() {
+        let _guard = CARDINALITY_TEST_LOCK.lock().await;
         let org_id = "test_org";
         let stream_type = StreamType::Logs;
         let stream_name = "test_stream";
@@ -581,7 +587,7 @@ mod tests {
                 assert_eq!(results.get(&field1), Some(&100.0));
                 assert_eq!(results.get(&field2), Some(&200.0));
                 // field3 should have value 0 due to calculation failure
-                assert_eq!(results.get(&field3), None);
+                assert_eq!(results.get(&field3), Some(&0.0));
             }
             Err(_) => {
                 // This is also acceptable since we don't have a real schema setup

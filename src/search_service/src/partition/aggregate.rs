@@ -13,55 +13,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-use {
-    crate::partition::sql_context::PartitionSqlContext,
-    config::meta::search::SearchPartitionRequest,
-    config::utils::sql::is_simple_aggregate_query,
-    config::{
-        ider,
-        meta::{
-            search::{CardinalityLevel, generate_aggregation_search_interval},
-            sql::resolve_stream_names,
-        },
+use ::search::{
+    cache::streaming_agg::{
+        self, StreamingAggsPartitionStrategy, create_aggregation_cache_file_path,
+        discover_cache_for_query, generate_optimal_partitions,
+        get_aggregation_cache_key_from_request,
     },
-    infra::errors::Error,
-    o2_enterprise::enterprise::search::cache_aggs_util,
-    o2_enterprise::enterprise::search::{
-        cache::streaming_agg::{
-            self, StreamingAggsPartitionStrategy, create_aggregation_cache_file_path,
-            discover_cache_for_query, generate_optimal_partitions,
-            get_aggregation_cache_key_from_request,
-        },
-        datafusion::distributed_plan::streaming_aggs_exec,
-    },
+    datafusion::distributed_plan::streaming_aggs_exec,
+    sql::visitor::streaming_aggregate,
 };
+use config::{
+    ider,
+    meta::{
+        search::{CardinalityLevel, SearchPartitionRequest, generate_aggregation_search_interval},
+        sql::resolve_stream_names,
+    },
+    utils::sql::is_simple_aggregate_query,
+};
+use infra::errors::Error;
+
+use crate::partition::sql_context::PartitionSqlContext;
 
 /// Determine whether a streaming aggregate query should be used for the given SQL query.
-#[cfg(feature = "enterprise")]
 pub fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
     let feature_query_streaming_aggs = config::get_config().common.feature_query_streaming_aggs;
     let mut is_cachable_aggs = is_simple_aggregate_query(sql).unwrap_or(false);
 
-    let res: Result<cache_aggs_util::CacheAggregationAnalysisResult, String> =
-        cache_aggs_util::analyze_count_aggregation_pattern(sql);
-    if let Ok(result) = res {
-        is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
+    if let Ok(matches_pattern) = streaming_aggregate::matches_streaming_aggregate_pattern(sql) {
+        is_cachable_aggs = matches_pattern || is_cachable_aggs;
     }
 
     ts_column.is_none() && is_cachable_aggs && feature_query_streaming_aggs
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub fn is_streaming_aggregate(_sql: &str, _ts_column: Option<&str>) -> bool {
-    false
 }
 
 /// Prepare streaming aggregate execution: discover cache, generate partition strategy,
 /// and initialize cache for the streaming aggregation pipeline.
 ///
 /// Returns `(streaming_aggs, streaming_id, partition_strategy)`.
-#[cfg(feature = "enterprise")]
 pub async fn prepare_streaming_aggregate(
     trace_id: &str,
     req: &SearchPartitionRequest,
