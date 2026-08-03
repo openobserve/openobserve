@@ -132,12 +132,18 @@ describe("requestFieldValues — asking the server", () => {
     expect(args.size).toBeLessThanOrEqual(50);
   });
 
-  it("leaves the values in the cache for the next reader", async () => {
-    // The point of fetching HERE: the next lookup — any surface, next session —
-    // is local. Asserted through the public read, not through the writer.
+  it("leaves the values where the next READ will find them", async () => {
+    // The real order matters and this test now follows it: the resolver reads
+    // first (missing, so the 60-second read cache is primed with an EMPTY
+    // list), and only then asks the server. An implementation that writes
+    // straight to IndexedDB without invalidating that entry passes a test which
+    // fetches before reading — and the user still sees nothing for a minute.
     const store = await freshStore();
+    await expect(store.getFieldValuesForSuggestion(ctx, "environment")).resolves.toEqual([]);
+
     await store.requestFieldValues(ctx, "environment");
     await settle();
+
     await expect(store.getFieldValuesForSuggestion(ctx, "environment")).resolves.toEqual(
       expect.arrayContaining(["development", "staging"]),
     );
@@ -173,6 +179,30 @@ describe("requestFieldValues — not asking twice", () => {
     await store.requestFieldValues(ctx, "environment");
     await store.requestFieldValues(ctx, "environment");
     expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
+  });
+
+  it("asks again once the cooldown has passed", async () => {
+    // Suppression has to expire. A permanent set also satisfies the two tests
+    // above, and would disable a field's values for the rest of the session
+    // after one transient 500 — or after one quiet fifteen-minute window, which
+    // every field has at some hour of the night.
+    vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse([]) as any);
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
+    await store.requestFieldValues(ctx, "environment");
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
+
+    // Advancing the CLOCK rather than running timers: the cooldown is a
+    // timestamp comparison, not a scheduled callback.
+    const realNow = Date.now;
+    try {
+      const advanced = realNow() + 5 * 60 * 1000;
+      Date.now = () => advanced;
+      await store.requestFieldValues(ctx, "environment");
+    } finally {
+      Date.now = realNow;
+    }
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
   });
 
   it("treats a different field as a different question", async () => {

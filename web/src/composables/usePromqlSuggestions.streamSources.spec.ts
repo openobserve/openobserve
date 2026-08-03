@@ -54,7 +54,20 @@ vi.mock("vuex", async (importOriginal) => {
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
 import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
-import usePromqlSuggestions from "./usePromqlSuggestions";
+
+/**
+ * A fresh copy of the composable module per test.
+ *
+ * Anything cached per METRIC belongs at module scope — one schema fetch per
+ * metric per page, not per editor — and that state would otherwise leak between
+ * tests: the first test to read a schema warms the cache and every later test
+ * sees zero calls, passing or failing by position in the file.
+ */
+const freshComposable = async () => {
+  vi.resetModules();
+  const mod = await import("./usePromqlSuggestions");
+  return mod.default();
+};
 
 /** What the schema endpoint returns for a metrics stream, verified live. */
 const METRIC_SCHEMA = {
@@ -94,7 +107,7 @@ beforeEach(() => {
 
 describe("PromQL no longer asks for every series", () => {
   it("does not call the series endpoint for a label name", async () => {
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelName(c, "cpu_utilization_percent{");
     await c.getSuggestions();
     await flushPromises();
@@ -102,7 +115,7 @@ describe("PromQL no longer asks for every series", () => {
   });
 
   it("does not call the series endpoint for a label value", async () => {
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelValue(c, 'cpu_utilization_percent{service="');
     await c.getSuggestions();
     await flushPromises();
@@ -112,7 +125,7 @@ describe("PromQL no longer asks for every series", () => {
 
 describe("label NAMES come from the stream schema", () => {
   it("reads the schema of the metric under the cursor", async () => {
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelName(c, "cpu_utilization_percent{");
     await c.getSuggestions();
     await flushPromises();
@@ -126,7 +139,7 @@ describe("label NAMES come from the stream schema", () => {
   });
 
   it("offers the labels", async () => {
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelName(c, "cpu_utilization_percent{");
     await c.getSuggestions();
     await flushPromises();
@@ -138,7 +151,7 @@ describe("label NAMES come from the stream schema", () => {
     // `value` is the sample, `_timestamp` is the clock, `__hash__` is internal
     // and `__name__` is the metric you already typed. None of them belong
     // inside `{`.
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelName(c, "cpu_utilization_percent{");
     await c.getSuggestions();
     await flushPromises();
@@ -154,7 +167,7 @@ describe("label NAMES come from the stream schema", () => {
   it("keeps inserting a label ready to be matched", async () => {
     // Existing behaviour worth not losing: the insertion leaves the cursor at
     // an `=`, because a bare label name is not a filter.
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelName(c, "cpu_utilization_percent{");
     await c.getSuggestions();
     await flushPromises();
@@ -168,7 +181,7 @@ describe("label NAMES come from the stream schema", () => {
     // parsePromQlQuery cannot read at all (it returns no labels), so the test
     // was demanding dedupe behaviour that has never existed and that this item
     // is not about. The shape matters more than the assertion here.
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     const query = 'cpu_utilization_percent{service="api",}';
     c.autoCompleteData.value.query = query;
     c.autoCompleteData.value.position.cursorIndex = query.length - 2;
@@ -180,7 +193,7 @@ describe("label NAMES come from the stream schema", () => {
   });
 
   it("asks the schema once per metric, not once per keystroke", async () => {
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     for (const q of [
       "cpu_utilization_percent{",
       "cpu_utilization_percent{s",
@@ -194,7 +207,7 @@ describe("label NAMES come from the stream schema", () => {
   });
 
   it("asks again for a different metric", async () => {
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelName(c, "cpu_utilization_percent{");
     await c.getSuggestions();
     await flushPromises();
@@ -208,7 +221,7 @@ describe("label NAMES come from the stream schema", () => {
     // A failed lookup must not empty the list; the language is still the
     // language.
     vi.mocked(streamService.schema).mockRejectedValue(new Error("500"));
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelName(c, "cpu_utilization_percent{");
     await c.getSuggestions();
     await flushPromises();
@@ -219,7 +232,7 @@ describe("label NAMES come from the stream schema", () => {
 describe("label VALUES come from the same place SQL gets them", () => {
   it("reads the cache under the metric's stream key", async () => {
     vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway", "chat-service"]);
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelValue(c, 'cpu_utilization_percent{service="');
     await c.getSuggestions();
     await flushPromises();
@@ -229,19 +242,59 @@ describe("label VALUES come from the same place SQL gets them", () => {
     );
   });
 
-  it("offers the cached values, quoted", async () => {
+  it("offers the cached values", async () => {
     vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway", "chat-service"]);
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelValue(c, 'cpu_utilization_percent{service="');
     await c.getSuggestions();
     await flushPromises();
-    const items = offered(c);
-    expect(items.map((k) => k.label)).toEqual(["api-gateway", "chat-service"]);
-    expect(items[0].insertText).toBe('"api-gateway"');
+    expect(offered(c).map((k) => k.label)).toEqual(["api-gateway", "chat-service"]);
+  });
+
+  // ── Quoting, against the model monaco actually holds ───────────────────────
+  // Typing `"` auto-closes, so the model is `service=""` with the cursor
+  // BETWEEN the quotes — not the unterminated `service="` a naive spec assumes.
+  // Inserting a fully quoted value there produces
+  //   cpu_utilization_percent{service=""analytics-service""}
+  // which is what this build does today; reproduced in a dashboard panel before
+  // these tests were written. An earlier draft asserted insertText was
+  // '"api-gateway"' and would have blessed it.
+  describe("inserting a value leaves exactly one pair of quotes", () => {
+    const valuesFor = async (query: string, cursorIndex: number) => {
+      vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway"]);
+      const c = await freshComposable();
+      c.autoCompleteData.value.query = query;
+      c.autoCompleteData.value.position.cursorIndex = cursorIndex;
+      await c.getSuggestions();
+      await flushPromises();
+      return offered(c);
+    };
+
+    it("inserts the bare value when both quotes are already there", async () => {
+      // `{service=""}` with the cursor between the quotes — the auto-closed
+      // shape, and the one a user is actually in.
+      const query = 'cpu_utilization_percent{service=""}';
+      const items = await valuesFor(query, query.indexOf('""'));
+      expect(items[0]?.insertText).toBe("api-gateway");
+    });
+
+    it("closes the quote when the user typed only the opening one", async () => {
+      // Auto-closing off, or the closer deleted: the value has to terminate
+      // itself or the query will not parse.
+      const query = 'cpu_utilization_percent{service="';
+      const items = await valuesFor(query, query.length - 1);
+      expect(items[0]?.insertText).toBe('api-gateway"');
+    });
+
+    it("supplies both quotes when none were typed", async () => {
+      const query = "cpu_utilization_percent{service=";
+      const items = await valuesFor(query, query.length - 1);
+      expect(items[0]?.insertText).toBe('"api-gateway"');
+    });
   });
 
   it("asks the server when the cache is cold", async () => {
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelValue(c, 'cpu_utilization_percent{service="');
     await c.getSuggestions();
     await flushPromises();
@@ -253,7 +306,7 @@ describe("label VALUES come from the same place SQL gets them", () => {
 
   it("does not ask the server when the cache answered", async () => {
     vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["api-gateway"]);
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelValue(c, 'cpu_utilization_percent{service="');
     await c.getSuggestions();
     await flushPromises();
@@ -263,7 +316,7 @@ describe("label VALUES come from the same place SQL gets them", () => {
   it("keeps an empty result empty rather than showing the language", async () => {
     // Same rule as the SQL side: a lookup that matched nothing is not an
     // invitation to offer 113 functions inside a label filter.
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelValue(c, 'cpu_utilization_percent{service="');
     await c.getSuggestions();
     await flushPromises();
@@ -276,7 +329,7 @@ describe("label VALUES come from the same place SQL gets them", () => {
 
 describe("what must not change", () => {
   it("still offers the catalog when the cursor is not in a label position", async () => {
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     c.autoCompleteData.value.query = "rate(";
     c.autoCompleteData.value.position.cursorIndex = 4;
     await c.getSuggestions();
@@ -287,7 +340,7 @@ describe("what must not change", () => {
 
   it("does nothing at all without a metric name to scope to", async () => {
     // `{service="` on its own names no stream, so there is nothing to read.
-    const c = usePromqlSuggestions();
+    const c = await freshComposable();
     atLabelValue(c, '{service="');
     await c.getSuggestions();
     await flushPromises();
