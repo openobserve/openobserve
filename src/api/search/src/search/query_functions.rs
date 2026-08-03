@@ -24,7 +24,7 @@ use axum::{Json, extract::Path, response::Response};
 use search::datafusion::exec::{CatalogFunction, catalog_functions};
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct QueryFunctionsResponse {
     pub list: Vec<CatalogFunction>,
 }
@@ -43,7 +43,8 @@ pub struct QueryFunctionsResponse {
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Success", content_type = "application/json"),
+        (status = 200, description = "Success", content_type = "application/json",
+         body = QueryFunctionsResponse),
     )
 )]
 pub async fn list(Path(org_id): Path<String>) -> Response {

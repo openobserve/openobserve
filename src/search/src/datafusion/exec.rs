@@ -363,7 +363,7 @@ pub fn registered_function_names() -> &'static [String] {
 }
 
 /// One entry of the SQL function catalog served to the query editor.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, utoipa::ToSchema)]
 pub struct CatalogFunction {
     pub name: String,
     /// Argument list, e.g. "(field, k)". Drives the editor's `detail` column.
