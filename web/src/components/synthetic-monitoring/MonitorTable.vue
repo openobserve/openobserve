@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[25rem] whitespace-normal break-words text-xs"
       >
         <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-          <span class="cursor-help truncate">{{ (row as any).name || "—" }}</span>
+          <span class="cursor-pointer truncate">{{ (row as any).name || "—" }}</span>
         </div>
       </OTooltip>
       <span v-else class="truncate">—</span>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="(row as any).url"
         content-class="max-w-[25rem] whitespace-normal break-words text-xs"
       >
-        <span class="cursor-help truncate">{{ (row as any).url }}</span>
+        <span class="cursor-pointer truncate">{{ (row as any).url }}</span>
       </OTooltip>
       <span v-else class="truncate">—</span>
     </template>
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
         :delay="0"
       >
-        <div class="flex cursor-help items-center gap-1">
+        <div class="flex cursor-pointer items-center gap-1">
           <span class="max-w-[4.375rem] truncate text-xs">{{
             locationLabel((row as any).locations[0])
           }}</span>
