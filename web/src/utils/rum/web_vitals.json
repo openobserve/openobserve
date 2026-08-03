@@ -307,6 +307,400 @@
         }
       ],
       "layout": { "x": 8, "y": 8, "w": 4, "h": 6, "i": 6 }
+    },
+    {
+      "id": "Panel_Section_MobileVitals",
+      "type": "html",
+      "title": "Mobile Vitals",
+      "description": "",
+      "htmlContent": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [],
+      "layout": { "x": 0, "y": 16, "w": 12, "h": 2, "i": 20 },
+      "o2Platform": "mobile",
+      "o2RequiresAnyField": [
+        "vital_duration",
+        "view_slow_frames_rate",
+        "view_freeze_rate",
+        "view_frozen_frame_count",
+        "view_refresh_rate_average",
+        "view_memory_average",
+        "view_cpu_ticks_per_second"
+      ]
+    },
+    {
+      "id": "Panel_ID_AppStartCold",
+      "type": "bar",
+      "title": "App Start — Cold ( p95 )",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": "seconds",
+        "unit_custom": "",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", approx_percentile_cont(vital_duration, 0.95) / 1000000000 as \"y_axis_1\"  FROM \"_rumdata\" where type='vital' and vital_app_launch_metric='ttid' and vital_startup_type='cold_start' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": { "promql_legend": "", "layer_type": "scatter", "weight_fixed": 1 }
+        }
+      ],
+      "layout": { "x": 0, "y": 18, "w": 4, "h": 6, "i": 21 },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_SlowFramesRate",
+      "type": "bar",
+      "title": "Slow Frames Rate",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": "custom",
+        "unit_custom": "/s",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_slow_frames_rate) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": { "promql_legend": "", "layer_type": "scatter", "weight_fixed": 1 }
+        }
+      ],
+      "layout": { "x": 4, "y": 18, "w": 4, "h": 6, "i": 22 },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_FreezeRate",
+      "type": "bar",
+      "title": "Freeze Rate",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_freeze_rate) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": { "promql_legend": "", "layer_type": "scatter", "weight_fixed": 1 }
+        }
+      ],
+      "layout": { "x": 8, "y": 18, "w": 4, "h": 6, "i": 23 },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_FrozenFrames",
+      "type": "bar",
+      "title": "Frozen Frames",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", sum(view_frozen_frame_count) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": { "promql_legend": "", "layer_type": "scatter", "weight_fixed": 1 }
+        }
+      ],
+      "layout": { "x": 0, "y": 24, "w": 4, "h": 6, "i": 24 },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_RefreshRate",
+      "type": "bar",
+      "title": "UI Refresh Rate",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": "custom",
+        "unit_custom": "Hz",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_refresh_rate_average) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": { "promql_legend": "", "layer_type": "scatter", "weight_fixed": 1 }
+        }
+      ],
+      "layout": { "x": 4, "y": 24, "w": 4, "h": 6, "i": 25 },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_MemoryUsage",
+      "type": "bar",
+      "title": "Memory Usage ( avg )",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": "custom",
+        "unit_custom": "MB",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_memory_average) / 1048576 as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": { "promql_legend": "", "layer_type": "scatter", "weight_fixed": 1 }
+        }
+      ],
+      "layout": { "x": 8, "y": 24, "w": 4, "h": 6, "i": 26 },
+      "o2Platform": "mobile"
+    },
+    {
+      "id": "Panel_ID_CpuTicks",
+      "type": "bar",
+      "title": "CPU Ticks / s",
+      "description": "",
+      "config": {
+        "show_legends": false,
+        "legends_position": null,
+        "unit": "custom",
+        "unit_custom": "/s",
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "error_config": {
+        "custom_error_handeling": true,
+        "custom_error_message": "No Data",
+        "default_data_on_error": "[[{\"y_axis_1\":0}]]"
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT histogram(_timestamp) as \"x_axis_1\", avg(view_cpu_ticks_per_second) as \"y_axis_1\"  FROM \"_rumdata\" where type='view' and source in ('android', 'ios', 'react-native', 'flutter') and service in ($service) and env in ($env) and version in ($version) GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null,
+                "aggregationFunction": "histogram"
+              }
+            ],
+            "y": [
+              {
+                "label": "",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": null,
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": { "promql_legend": "", "layer_type": "scatter", "weight_fixed": 1 }
+        }
+      ],
+      "layout": { "x": 0, "y": 30, "w": 4, "h": 6, "i": 27 },
+      "o2Platform": "mobile"
     }
   ],
   "variables": {
