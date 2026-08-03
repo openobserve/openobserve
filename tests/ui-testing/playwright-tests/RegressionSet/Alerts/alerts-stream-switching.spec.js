@@ -438,9 +438,11 @@ test.describe("Alerts Stream Switching Regression", () => {
     // === SAVE + VERIFY: Full alert creation flow ===
 
     // Capture the alert name that setupToQueryConfig filled.
-    // O2: OInput wraps the native <input>; use alertNameInputField to hit the real <input>.
-    const alertNameInput = page.locator(pm.alertsPage.alertNameInputField);
-    const alertName = await alertNameInput.inputValue();
+    // O2: the alert name is an OInlineEdit title — in display mode the committed
+    // value lives in the `-value` span; the `-input` only exists while editing.
+    // Reading inputValue() here times out because there is no input in the DOM,
+    // so read the display value instead.
+    const alertName = await pm.alertsPage.getAlertName();
     testLogger.info(`Saving alert: ${alertName}`);
 
     // Select destination using POM locator
