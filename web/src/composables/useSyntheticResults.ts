@@ -20,7 +20,7 @@ import {
   aggregateStepStats,
   bucketInterval,
   buildHistogramSql,
-  buildKpiSql,
+  buildP95Sql,
   buildRetryAttributionSql,
   foldRetryAttribution,
   buildLastRunSql,
@@ -31,7 +31,7 @@ import {
   buildRunDetailSql,
   buildProtocolRunDetailSql,
   mapHistogram,
-  mapKpi,
+  deriveKpiFromHistogram,
   mapProtocolRunDetail,
   mapRun,
   mapRunDetail,
@@ -307,20 +307,32 @@ export function useSyntheticResults() {
       const hasAttemptsField = schemaFields.has("attempts");
       const hasStatusReasonField = schemaFields.has("status_reason");
 
-      // Group 1: KPI + last-run — both feed KPI cards. Resolves
-      // independently so the KPI section renders as soon as these
-      // fast queries complete, without waiting for the runs list.
+      // The histogram now feeds BOTH the charts and the KPI tiles.
+      //
+      // The tiles used to have their own bare-aggregate query, which could never
+      // hit O2's result cache (that only engages for time-bucketed queries) and
+      // so rescanned on every page load: measured 276-658ms against 7ms for the
+      // cached histogram beside it. Every count tile is a plain sum over the
+      // buckets, so this is exact rather than an approximation — only p95 needs
+      // its own (small) query, because percentiles do not sum.
+      const histogramRowsP = executeQuery(
+        buildHistogramSql(monitorId, interval, hasAttemptsField, hasStatusReasonField),
+        startTime,
+        endTime,
+        "logs",
+      );
+
       const kpiPromise = Promise.all([
-        executeQuery(
-          buildKpiSql(monitorId, hasAttemptsField, hasStatusReasonField),
-          startTime,
-          endTime,
-          "logs",
-        ),
+        histogramRowsP,
+        executeQuery(buildP95Sql(monitorId), startTime, endTime, "logs"),
         executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
       ])
-        .then(([kpiRows, lastRunRows]) => {
-          kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
+        .then(([histogramRows, p95Rows, lastRunRows]) => {
+          kpi.value = deriveKpiFromHistogram(
+            histogramRows as Record<string, unknown>[],
+            p95Rows[0] ?? null,
+            lastRunRows[0] ?? null,
+          );
         })
         .catch((e: unknown) => {
           kpi.value = { ...EMPTY_KPI };
@@ -331,13 +343,8 @@ export function useSyntheticResults() {
           kpiHasLoadedOnce.value = true;
         });
 
-      // Group 2: Histogram — feeds response-time and errors charts.
-      const histogramPromise = executeQuery(
-        buildHistogramSql(monitorId, interval),
-        startTime,
-        endTime,
-        "logs",
-      )
+      // Group 2: the same histogram rows feed the response-time and errors charts.
+      const histogramPromise = histogramRowsP
         .then((histogramRows) => {
           buckets.value = mapHistogram(histogramRows, startTime, endTime);
         })

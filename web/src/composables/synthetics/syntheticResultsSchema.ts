@@ -955,82 +955,6 @@ function parseSteps(raw: unknown): StepResult[] {
   }));
 }
 
-export function bucketInterval(durationMicros: number): string {
-  const seconds = durationMicros / 1_000_000;
-  const target = seconds / 30;
-  if (target < 30) return "10 seconds";
-  if (target < 120) return "1 minute";
-  if (target < 600) return "5 minutes";
-  if (target < 1800) return "15 minutes";
-  if (target < 3600) return "30 minutes";
-  if (target < 21_600) return "1 hour";
-  if (target < 86_400) return "6 hours";
-  return "1 day";
-}
-
-function intervalSeconds(interval: string): number {
-  switch (interval) {
-    case "10 seconds":
-      return 10;
-    case "1 minute":
-      return 60;
-    case "5 minutes":
-      return 300;
-    case "15 minutes":
-      return 900;
-    case "30 minutes":
-      return 1800;
-    case "1 hour":
-      return 3600;
-    case "6 hours":
-      return 21_600;
-    case "1 day":
-      return 86_400;
-    default:
-      return 60;
-  }
-}
-
-// ── Query builders ────────────────────────────────────────────────────────
-
-const F = SYNTHETIC_FIELDS;
-const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
-
-export function buildKpiSql(
-  monitorId: string,
-  /** Whether the stream schema includes the `attempts` field. When false
-   * (e.g. on instances where the probe doesn't write this field), the
-   * retried_runs clause is omitted to avoid a schema-mismatch error. */
-  hasAttemptsField = false,
-  /** Whether the stream schema includes `status_reason`. Same gate: the search
-   * API rejects a query naming a field the schema doesn't have. */
-  hasStatusReasonField = false,
-): string {
-  const id = escapeSqlLiteral(monitorId);
-  const retriedClause = hasAttemptsField
-    ? `\n  COUNT(*) FILTER (WHERE attempts > 1) as retried_runs,`
-    : "";
-  // `warning` is produced by two unrelated layers: the retry loop (flaky) and a
-  // checker reporting a reachable-but-degrading target (cert_expiring,
-  // sftp_degraded). Counting them together reported a TLS check with a
-  // soon-expiring certificate as ~100% flaky forever. `status_reason` splits
-  // them, and these are two more FILTER clauses over the scan the query
-  // already does — no extra pass, no extra bytes.
-  const reasonClauses = hasStatusReasonField
-    ? `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason = '${STATUS_REASON.flaky}') as flaky_runs,` +
-      `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason != '' AND status_reason != '${STATUS_REASON.flaky}') as degraded_runs,`
-    : "";
-  return `SELECT
-  COUNT(*) as total_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}') as warning_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.failed}') as failed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.error}') as error_runs,${retriedClause}${reasonClauses}
-  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
-FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'`;
-}
-
 export function buildLastRunSql(monitorId: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT ${F.status} as status, ${F.timestamp} as ts
@@ -1040,12 +964,43 @@ ORDER BY ${F.timestamp} DESC
 LIMIT 1`;
 }
 
-export function buildHistogramSql(monitorId: string, interval: string): string {
+/**
+ * Per-bucket counts for the chart — and the source the KPI tiles are summed
+ * from.
+ *
+ * O2's result cache only engages for **time-bucketed** queries. Measured on a
+ * live instance, same query three times, hour-aligned window:
+ *
+ *     HISTOGRAM  233ms -> 9ms -> 7ms   result_cache_ratio=100  scan=0
+ *     KPI        658ms -> 340ms -> 276ms  result_cache_ratio=0  scan=265 (every time)
+ *
+ * The old `buildKpiSql` was a bare aggregate, so it could never hit that cache
+ * and rescanned on every page load — while returning counts this query already
+ * has per bucket. Carrying the same FILTER clauses here and summing them client
+ * side removes that second query entirely.
+ *
+ * `retried_runs` / `flaky_runs` / `degraded_runs` are gated on schema presence
+ * for the same reason the KPI query gated them: the search API rejects a query
+ * naming a field the stream does not have.
+ */
+export function buildHistogramSql(
+  monitorId: string,
+  interval: string,
+  hasAttemptsField = false,
+  hasStatusReasonField = false,
+): string {
   const id = escapeSqlLiteral(monitorId);
+  const retriedClause = hasAttemptsField
+    ? `\n  COUNT(*) FILTER (WHERE attempts > 1) as retried_runs,`
+    : "";
+  const reasonClauses = hasStatusReasonField
+    ? `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason = '${STATUS_REASON.flaky}') as flaky_runs,` +
+      `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason != '' AND status_reason != '${STATUS_REASON.flaky}') as degraded_runs,`
+    : "";
   return `SELECT
   histogram(${F.timestamp}, '${interval}') as ts,
   COALESCE(AVG(${F.duration}), 0) as avg_duration,
-  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,
+  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,${retriedClause}${reasonClauses}
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}') as warning_runs,
@@ -1056,6 +1011,24 @@ WHERE ${F.monitorId} = '${id}'
 GROUP BY ts
 ORDER BY ts`;
 }
+
+/**
+ * p95 only. Percentiles are the one KPI that cannot be summed from buckets —
+ * the 95th percentile of a set is not the mean of its buckets' 95th
+ * percentiles — so this stays a separate (small) query while every count comes
+ * from the cached histogram.
+ */
+export function buildP95Sql(monitorId: string): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
+FROM ${TABLE}
+WHERE ${F.monitorId} = '${id}'`;
+}
+
+// ── Query builders ────────────────────────────────────────────────────────
+
+const F = SYNTHETIC_FIELDS;
+const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
 
 /** Most-recent runs for the Runs table. */
 /** Columns the runs query selects, with a typed literal fallback for when the
@@ -1503,37 +1476,43 @@ WHERE ${F.monitorId} = '${id}'${runExecutionWhere(runId, executionId, schemaFiel
 LIMIT 1`;
 }
 
-// ── Adapters (raw hits → typed models) ────────────────────────────────────
-
-export function mapKpi(
-  rawKpiRow: Record<string, unknown> | null | undefined,
+/**
+ * Sums the histogram's per-bucket counts into the KPI tiles.
+ *
+ * Every count tile is a plain sum over buckets, so it is exact — not an
+ * approximation of what the deleted `buildKpiSql` returned. The one exception is
+ * p95, which cannot be summed and comes from [`buildP95Sql`].
+ *
+ * This exists because the histogram query hits O2's result cache (7ms warm) and
+ * a bare aggregate never can (276-658ms, rescanned every load). Deriving the
+ * tiles from a query the page already fetches removes the second query rather
+ * than caching it.
+ */
+export function deriveKpiFromHistogram(
+  buckets: Record<string, unknown>[],
+  p95Row: Record<string, unknown> | null | undefined,
   rawLastRun: Record<string, unknown> | null | undefined,
 ): SyntheticKpi {
-  const totalRuns = num(rawKpiRow?.total_runs);
-  const passedRuns = num(rawKpiRow?.passed_runs);
-  const warningRuns = num(rawKpiRow?.warning_runs);
-  const failedRuns = num(rawKpiRow?.failed_runs);
-  const errorRuns = num(rawKpiRow?.error_runs);
-  const retriedRuns = num(rawKpiRow?.retried_runs);
-  const flakyExecutions = num(rawKpiRow?.flaky_runs);
-  const degradedExecutions = num(rawKpiRow?.degraded_runs);
+  const sum = (k: string) => buckets.reduce((acc, b) => acc + num(b[k]), 0);
+  const totalRuns = sum("total_runs");
+  const passedRuns = sum("passed_runs");
+  const warningRuns = sum("warning_runs");
+  const errorRuns = sum("error_runs");
   const lastRunTsRaw = rawLastRun ? num(rawLastRun.ts) : 0;
   return {
-    // P6a — `error` is excluded from BOTH sides. It means "we could not look",
-    // not "the service was down"; leaving it in the denominator understates
-    // uptime by exactly our own dispatch-failure rate. `errorRuns` is reported
-    // separately so the omission is visible rather than silent.
+    // P6a — `error` is excluded from BOTH sides, same as before: it means "we
+    // could not look", not "the service was down".
     uptimePct:
       totalRuns - errorRuns > 0 ? ((passedRuns + warningRuns) / (totalRuns - errorRuns)) * 100 : 0,
-    p95Ms: num(rawKpiRow?.p95_duration),
+    p95Ms: num(p95Row?.p95_duration),
     passedRuns,
     warningRuns,
-    failedRuns,
+    failedRuns: sum("failed_runs"),
     errorRuns,
     totalRuns,
-    retriedRuns,
-    flakyExecutions,
-    degradedExecutions,
+    retriedRuns: sum("retried_runs"),
+    flakyExecutions: sum("flaky_runs"),
+    degradedExecutions: sum("degraded_runs"),
     lastRunStatus: rawLastRun ? toRunStatus(rawLastRun.status) : null,
     lastRunAt: lastRunTsRaw > 0 ? lastRunTsRaw / 1000 : null,
   };
@@ -1686,6 +1665,42 @@ function mapEvidence(raw: unknown): StepEvidence[] {
     worstResponses: Array.isArray(e?.worst_responses) ? e.worst_responses : [],
     firstConsoleErrors: Array.isArray(e?.first_console_errors) ? e.first_console_errors : [],
   }));
+}
+
+export function bucketInterval(durationMicros: number): string {
+  const seconds = durationMicros / 1_000_000;
+  const target = seconds / 30;
+  if (target < 30) return "10 seconds";
+  if (target < 120) return "1 minute";
+  if (target < 600) return "5 minutes";
+  if (target < 1800) return "15 minutes";
+  if (target < 3600) return "30 minutes";
+  if (target < 21_600) return "1 hour";
+  if (target < 86_400) return "6 hours";
+  return "1 day";
+}
+
+function intervalSeconds(interval: string): number {
+  switch (interval) {
+    case "10 seconds":
+      return 10;
+    case "1 minute":
+      return 60;
+    case "5 minutes":
+      return 300;
+    case "15 minutes":
+      return 900;
+    case "30 minutes":
+      return 1800;
+    case "1 hour":
+      return 3600;
+    case "6 hours":
+      return 21_600;
+    case "1 day":
+      return 86_400;
+    default:
+      return 60;
+  }
 }
 
 /**

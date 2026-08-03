@@ -22,7 +22,7 @@ import {
   aggregateStepStats,
   bucketInterval,
   buildHistogramSql,
-  buildKpiSql,
+  buildHistogramSql,
   buildLastRunSql,
   buildRunsSql,
   buildRunsWithStepsSql,
@@ -36,7 +36,7 @@ import {
   deviceIconName,
   deviceLabel,
   mapHistogram,
-  mapKpi,
+  deriveKpiFromHistogram,
   mapRun,
   evidenceSeverity,
   indexEvidenceByStep,
@@ -45,9 +45,17 @@ import {
   type EvidenceEvent,
 } from "./syntheticResultsSchema";
 
+/** Shim: the old mapKpi took one aggregate row; the tiles are now summed from
+ *  histogram buckets. One bucket carrying the same counts is the equivalent
+ *  input, and the same row still supplies p95. */
+const deriveKpiFromHistogramCompat = (
+  row: Record<string, unknown> | null | undefined,
+  lastRun: Record<string, unknown> | null | undefined,
+) => deriveKpiFromHistogram(row ? [row] : [], row, lastRun);
+
 describe("syntheticResultsSchema query builders", () => {
   it("should reference the configured stream and fields in the KPI SQL", () => {
-    const sql = buildKpiSql("mon-1");
+    const sql = buildHistogramSql("mon-1", "1 hour");
     expect(sql).toContain(`FROM "${SYNTHETIC_RESULTS_STREAM}"`);
     expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon-1'`);
     expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.passed}')`);
@@ -58,13 +66,13 @@ describe("syntheticResultsSchema query builders", () => {
   });
 
   it("should include retried_runs clause when attempts field exists in schema", () => {
-    const sql = buildKpiSql("mon-1", true);
+    const sql = buildHistogramSql("mon-1", "1 hour", true);
     expect(sql).toContain("WHERE attempts > 1");
     expect(sql).toContain("retried_runs");
   });
 
   it("should omit retried_runs clause when attempts field is absent from schema", () => {
-    const sql = buildKpiSql("mon-1", false);
+    const sql = buildHistogramSql("mon-1", "1 hour", false);
     expect(sql).not.toContain("attempts");
     expect(sql).not.toContain("retried_runs");
   });
@@ -119,7 +127,7 @@ describe("syntheticResultsSchema query builders", () => {
   });
 
   it("should escape single quotes in the monitor id to prevent injection", () => {
-    const sql = buildKpiSql("mon'1");
+    const sql = buildHistogramSql("mon'1", "1 hour");
     expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon''1'`);
   });
 });
@@ -134,7 +142,7 @@ describe("bucketInterval", () => {
 
 describe("mapKpi", () => {
   it("should compute uptime from passed/total and map the last run", () => {
-    const kpi = mapKpi(
+    const kpi = deriveKpiFromHistogramCompat(
       {
         total_runs: 288,
         passed_runs: 287,
@@ -152,7 +160,7 @@ describe("mapKpi", () => {
   });
 
   it("should yield a zeroed kpi with null last run when there is no data", () => {
-    const kpi = mapKpi(null, null);
+    const kpi = deriveKpiFromHistogram([], null, null);
     expect(kpi.uptimePct).toBe(0);
     expect(kpi.totalRuns).toBe(0);
     expect(kpi.lastRunStatus).toBe(null);
@@ -160,7 +168,7 @@ describe("mapKpi", () => {
   });
 
   it("should coerce string field values from the search response", () => {
-    const kpi = mapKpi(
+    const kpi = deriveKpiFromHistogramCompat(
       { total_runs: "10", passed_runs: "9", failed_runs: "1", p95_duration: "120" },
       null,
     );
@@ -661,7 +669,7 @@ describe("mapRunDetail — evidence the probe already writes (Phase 4)", () => {
 
 describe("KPI: warning is two unrelated things", () => {
   it("splits flaky from degraded when status_reason is in the schema", () => {
-    const sql = buildKpiSql("mon-1", true, true);
+    const sql = buildHistogramSql("mon-1", "1 hour", true, true);
     expect(sql).toContain("as flaky_runs");
     expect(sql).toContain("as degraded_runs");
     // Both clauses hang off the scan the query already performs.
@@ -671,12 +679,12 @@ describe("KPI: warning is two unrelated things", () => {
   it("omits both clauses when the field is absent from the schema", () => {
     // The search API rejects a query naming a field the stream doesn't have,
     // which would take the whole KPI panel down rather than one tile.
-    const sql = buildKpiSql("mon-1", true, false);
+    const sql = buildHistogramSql("mon-1", "1 hour", true, false);
     expect(sql).not.toContain("status_reason");
   });
 
   it("counts flaky and degraded separately, against the execution denominator", () => {
-    const kpi = mapKpi(
+    const kpi = deriveKpiFromHistogramCompat(
       {
         total_runs: 100,
         passed_runs: 80,
