@@ -18,6 +18,7 @@ import {
   applyMetricChart,
   buildMetricSparkline,
   extractSparklineValues,
+  fillSparklineRange,
   calculateMetricFontSize,
   METRIC_COPY_BTN_SLOT_PX,
   METRIC_MIN_FONT_PX,
@@ -372,6 +373,60 @@ describe("extractSparklineValues", () => {
         { zo_sql_key: 2, zo_sql_num: "n/a" },
       ]),
     ).toEqual([5]);
+  });
+});
+
+describe("fillSparklineRange", () => {
+  // Interval derives from the smallest gap (10). Range 0..30 → 4 fixed slots.
+  const hits = [
+    { zo_sql_key: 0, zo_sql_num: 1 },
+    { zo_sql_key: 10, zo_sql_num: 2 },
+    { zo_sql_key: 30, zo_sql_num: 4 },
+  ];
+
+  it("returns [] for empty / non-array input", () => {
+    expect(fillSparklineRange(undefined as any, 0, 30)).toEqual([]);
+    expect(fillSparklineRange([], 0, 30)).toEqual([]);
+  });
+
+  it("spans the full range with a fixed slot count, empties → 0", () => {
+    // The omitted bucket at 20 becomes 0; length is range/interval+1 = 4 regardless.
+    expect(fillSparklineRange(hits, 0, 30)).toEqual([1, 2, 0, 4]);
+  });
+
+  it("uses the provided no-value for empty buckets", () => {
+    expect(fillSparklineRange(hits, 0, 30, 99)).toEqual([1, 2, 99, 4]);
+  });
+
+  it("keeps the slot count fixed as a partial (streaming) chunk lands early", () => {
+    // Only the first two buckets have arrived, but the range is still 0..30, so
+    // the series is full width (4 slots) with the tail empty — no x-axis shrink.
+    expect(
+      fillSparklineRange(
+        [
+          { zo_sql_key: 0, zo_sql_num: 1 },
+          { zo_sql_key: 10, zo_sql_num: 2 },
+        ],
+        0,
+        30,
+      ),
+    ).toEqual([1, 2, 0, 0]);
+  });
+
+  it("falls back to internal-gap fill when the range is unusable", () => {
+    // No range → still dip through the omitted bucket, just not full-width.
+    expect(fillSparklineRange(hits, NaN, NaN)).toEqual([1, 2, 0, 4]);
+  });
+
+  it("parses ISO-string bucket keys against a microsecond range", () => {
+    const start = Date.UTC(2026, 0, 1, 0, 0, 0) * 1000;
+    const iso = [
+      { zo_sql_key: "2026-01-01T00:00:00", zo_sql_num: 5 },
+      { zo_sql_key: "2026-01-01T00:01:00", zo_sql_num: 7 },
+      { zo_sql_key: "2026-01-01T00:03:00", zo_sql_num: 9 },
+    ];
+    // 60s buckets across a 3-minute range → 4 slots; the 00:02 bucket is empty.
+    expect(fillSparklineRange(iso, start, start + 180 * 1e6)).toEqual([5, 7, 0, 9]);
   });
 });
 

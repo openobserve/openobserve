@@ -173,6 +173,94 @@ export const extractSparklineValues = (hits: any): number[] => {
     .filter((n) => !Number.isNaN(n));
 };
 
+/** Normalize a histogram bucket key (UTC string, or sec/ms/µs number) to microseconds. */
+const bucketMicros = (raw: any): number => {
+  if (raw == null) return NaN;
+  const num = Number(raw);
+  if (!Number.isNaN(num)) {
+    if (num >= 1e14) return num; // microseconds
+    if (num >= 1e11) return num * 1e3; // milliseconds
+    if (num >= 1e8) return num * 1e6; // seconds
+    return num; // already small (e.g. test indices) — use as-is
+  }
+  const s = String(raw);
+  const iso = /[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : `${s}Z`;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? NaN : ms * 1e3;
+};
+
+/**
+ * Full-range sparkline series: one slot per histogram bucket across the user's
+ * [start, end] range, so the x-axis width stays FIXED as streaming chunks arrive
+ * — a chunk fills its own slots and the rest stay `noValue`, instead of the axis
+ * rescaling to whatever data has landed so far. The bucket interval is derived
+ * from the data's smallest gap. Falls back to filling only the internal gaps
+ * (then to raw values) when the range or interval can't be determined.
+ */
+export const fillSparklineRange = (
+  hits: any,
+  startMicros: number,
+  endMicros: number,
+  noValue: number = 0,
+): number[] => {
+  if (!Array.isArray(hits) || hits.length === 0) return [];
+  const valOf = (h: any): number => {
+    if (h?.zo_sql_num != null) return Number(h.zo_sql_num);
+    for (const [k, v] of Object.entries(h ?? {})) {
+      if (k === "zo_sql_key" || k === "zo_sql_breakdown" || k.includes("timestamp")) continue;
+      const n = Number(v);
+      if (!Number.isNaN(n)) return n;
+    }
+    return NaN;
+  };
+  const points = [...hits]
+    .map((h) => ({ t: bucketMicros(h?.zo_sql_key ?? h?._timestamp), v: valOf(h) }))
+    .filter((p) => !Number.isNaN(p.v) && !Number.isNaN(p.t))
+    .sort((a, b) => a.t - b.t);
+  if (points.length < 2) return points.map((p) => p.v);
+
+  // Histogram buckets are regular, so the smallest gap is the bucket interval.
+  let interval = Infinity;
+  for (let i = 1; i < points.length; i++) {
+    const gap = points[i].t - points[i - 1].t;
+    if (gap > 0 && gap < interval) interval = gap;
+  }
+  if (!Number.isFinite(interval) || interval <= 0) return points.map((p) => p.v);
+
+  // Preferred: one slot for every bucket across the whole user range → fixed width.
+  const haveRange =
+    Number.isFinite(startMicros) && Number.isFinite(endMicros) && endMicros > startMicros;
+  if (haveRange) {
+    const n = Math.min(5000, Math.round((endMicros - startMicros) / interval) + 1);
+    if (n >= 2) {
+      const out = new Array(n).fill(noValue);
+      let placed = 0;
+      for (const p of points) {
+        const idx = Math.round((p.t - startMicros) / interval);
+        if (idx >= 0 && idx < n) {
+          out[idx] = p.v;
+          placed++;
+        }
+      }
+      // If nothing landed in range (bad parse/unit), don't blank the sparkline —
+      // fall through to the data-only path below.
+      if (placed > 0) return out;
+    }
+  }
+
+  // No usable range: fill only the internal gaps between real buckets so the
+  // trend still dips through omitted buckets.
+  const out: number[] = [points[0].v];
+  for (let i = 1; i < points.length; i++) {
+    const missing = Math.round((points[i].t - points[i - 1].t) / interval) - 1;
+    if (missing > 0 && missing <= 5000) {
+      for (let k = 0; k < missing; k++) out.push(noValue);
+    }
+    out.push(points[i].v);
+  }
+  return out;
+};
+
 /**
  * Applies chart-specific options for: metric
  *
@@ -188,6 +276,7 @@ export function applyMetricChart(ctx: SQLContext): void {
     getAxisDataFromKey,
     chartPanelRef,
     sparklineData,
+    metadata,
   } = ctx;
 
   const key1 = yAxisKeys?.[0];
@@ -214,7 +303,16 @@ export function applyMetricChart(ctx: SQLContext): void {
   };
   // --- Optional sparkline (metric value + line/area/bar trend) ---
   // Prefer the histogram (is_ui_histogram) series; fall back to the metric's own values.
-  const histogramSeries = extractSparklineValues(sparklineData);
+  // The trend spans the user's full [start, end] range (fixed x-axis width across
+  // streaming chunks); empty buckets fill with no_value_replacement (numeric), else 0.
+  const rawNoValue = Number(panelSchema?.config?.no_value_replacement);
+  const sparkNoValue = Number.isFinite(rawNoValue) ? rawNoValue : 0;
+  const histogramSeries = fillSparklineRange(
+    sparklineData,
+    Number(metadata?.queries?.[0]?.startTime),
+    Number(metadata?.queries?.[0]?.endTime),
+    sparkNoValue,
+  );
   const sparklineInput = histogramSeries.length >= 2 ? histogramSeries : yAxisValue;
   const sparkline = buildMetricSparkline(
     sparklineInput,

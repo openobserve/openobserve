@@ -745,6 +745,34 @@ describe("usePanelSQLExecutor", () => {
       expect(state.sparklineData[0]).toEqual(hits);
     });
 
+    it("streams hits: sparklineData updates on each chunk, not only on complete", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(0, 300_000_000, null);
+
+      const [payload, handlers] = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+
+      const chunk1 = [{ zo_sql_key: 1, zo_sql_num: 5 }];
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: chunk1 } },
+      });
+      // Committed on the chunk, before complete() runs.
+      expect(state.sparklineData[0]).toEqual(chunk1);
+
+      const chunk2 = [{ zo_sql_key: 2, zo_sql_num: 7 }];
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: chunk2 } },
+      });
+      expect(state.sparklineData[0]).toEqual([...chunk1, ...chunk2]);
+
+      handlers.complete();
+      expect(state.sparklineData[0]).toEqual([...chunk1, ...chunk2]);
+    });
+
     it("drops a stale sparkline stream that completes after a newer run reset the state", async () => {
       const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
       const { executeSQL } = usePanelSQLExecutor(ctx);

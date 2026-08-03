@@ -265,13 +265,26 @@ export const usePanelSQLExecutor = (ctx: {
           state.sparklineWarning = content?.error_detail || content?.message || "";
         }
       };
+      // Publish the hits accumulated so far. Called on every chunk so the trend
+      // streams in (the render watcher tracks sparklineData) instead of appearing
+      // once at the end. Dropped if a newer run already reset the state.
+      const commitHits = () => {
+        if (runToken !== sparklineRunToken) return;
+        // Reassign the whole array so the render watcher (shallow ref) fires.
+        const next = Array.isArray(state.sparklineData) ? state.sparklineData.slice() : [];
+        next[currentQueryIndex] = hits.slice();
+        state.sparklineData = next;
+      };
       // Same contract as handleSearchResponse: (requestPayload, streamResponse).
       // The response is the 2nd arg; the 1st is our own request (type "histogram").
       fetchQueryDataWithHttpStream(payload, {
         data: (_payload: any, response: any) => {
           if (response?.type === "search_response_hits") {
             const h = response?.content?.results?.hits;
-            if (Array.isArray(h)) hits.push(...h);
+            if (Array.isArray(h)) {
+              hits.push(...h);
+              commitHits();
+            }
           } else if (response?.type === "error") {
             captureSparklineError(response?.content);
           }
@@ -281,13 +294,7 @@ export const usePanelSQLExecutor = (ctx: {
           removeTraceId(traceId);
         },
         complete: () => {
-          // Drop the write if a newer run already reset the state.
-          if (runToken === sparklineRunToken) {
-            // Reassign the whole array so the render watcher (shallow ref) fires.
-            const next = Array.isArray(state.sparklineData) ? state.sparklineData.slice() : [];
-            next[currentQueryIndex] = hits.slice();
-            state.sparklineData = next;
-          }
+          commitHits();
           removeTraceId(traceId);
         },
         reset: () => {
