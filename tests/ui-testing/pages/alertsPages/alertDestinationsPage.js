@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { CommonActions } from '../commonActions';
+import { CommonActions, openNavFlyoutChild } from '../commonActions.js';
 import { AlertsPage } from './alertsPage.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
@@ -10,9 +10,9 @@ export class AlertDestinationsPage {
         this.commonActions = new CommonActions(page);
         this.alertsPage = new AlertsPage(page);
         
-        // Navigation locators
-        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
-        this.destinationsTab = '[data-test="alert-destinations-tab"]';
+        // Navigation locators. Destinations moved out of Settings into the
+        // Reliability nav group, so there is no settings tab to click — use
+        // openNavFlyoutChild(page, 'destinations').
         this.destinationsListTitle = '[data-test="alert-destinations-list-title"]';
         
         // Destination creation locators
@@ -150,7 +150,7 @@ export class AlertDestinationsPage {
             // Try URL-based navigation first (more reliable than menu clicking)
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
             const orgIdentifier = process.env.ORGNAME || 'default';
-            const destinationsUrl = `${baseUrl}/web/settings/alert_destinations?org_identifier=${orgIdentifier}`;
+            const destinationsUrl = `${baseUrl}/web/alert-destinations?org_identifier=${orgIdentifier}`;
 
             try {
                 await this.page.goto(destinationsUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -169,13 +169,8 @@ export class AlertDestinationsPage {
                 testLogger.warn('URL navigation to destinations failed, trying menu path', { error: navError.message });
             }
 
-            // Fallback: Navigate via Settings menu
-            await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 15000 });
-            await this.page.locator(this.settingsMenuItem).click();
-            await this.page.waitForTimeout(2000);
-
-            await this.page.locator(this.destinationsTab).waitFor({ state: 'visible', timeout: 15000 });
-            await this.page.locator(this.destinationsTab).click();
+            // Fallback: navigate via the Reliability nav group (it left Settings).
+            await openNavFlyoutChild(this.page, 'destinations');
             await this.page.waitForTimeout(2000);
 
             // Wait for destinations page to load
@@ -466,7 +461,7 @@ export class AlertDestinationsPage {
         // Navigate directly to the import destination page (bypasses import button click)
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const orgIdentifier = process.env.ORGNAME || 'default';
-        const importUrl = `${baseUrl}/web/settings/alert_destinations?org_identifier=${orgIdentifier}&action=import`;
+        const importUrl = `${baseUrl}/web/alert-destinations?org_identifier=${orgIdentifier}&action=import`;
 
         try {
             await this.page.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -505,7 +500,7 @@ export class AlertDestinationsPage {
         // Wait for the post-import navigation back to the destinations list (router.push fires
         // ~400ms after the success toast). This replaces a fixed waitForTimeout and ensures
         // the new destination row has actually been created before downstream verification.
-        await this.page.waitForURL(/\/alert_destinations(?!.*action=import)/, { timeout: 15000 }).catch(() => {});
+        await this.page.waitForURL(/\/alert-destinations(?!.*action=import)/, { timeout: 15000 }).catch(() => {});
     }
 
     /**

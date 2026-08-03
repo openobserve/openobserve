@@ -1,11 +1,8 @@
 {
   "totals": {
-    "rawVarInComponent": 103
+    "rawVarInComponent": 101
   },
   "files": {
-    "components/O2AIChat.vue": {
-      "rawVarInComponent": 1
-    },
     "components/alerts/AlertInsightsContextMenu.vue": {
       "rawVarInComponent": 2
     },
@@ -16,6 +13,9 @@
       "rawVarInComponent": 4
     },
     "components/ingestion/ai/content/AIIntegrationCard.vue": {
+      "rawVarInComponent": 1
+    },
+    "components/O2AIChat.vue": {
       "rawVarInComponent": 1
     },
     "components/rum/errorTracking/view/ErrorEvents.vue": {
@@ -50,9 +50,6 @@
     },
     "plugins/logs/SearchBar.vue": {
       "rawVarInComponent": 1
-    },
-    "plugins/logs/TenstackTable.vue": {
-      "rawVarInComponent": 2
     },
     "plugins/traces/ThreadToolCalls.vue": {
       "rawVarInComponent": 6

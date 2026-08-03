@@ -88,8 +88,8 @@ const ODialogStub = {
   `,
 };
 
-const QIconStub = {
-  name: "QIcon",
+const OIconStub = {
+  name: "OIcon",
   props: ["name", "size", "color"],
   template: `<i data-test="OIcon" :data-name="name" :class="$attrs.class" />`,
 };
@@ -139,7 +139,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         ODialog: ODialogStub,
         OButton: OButtonStub,
         OInput: OInputStub,
-        OIcon: QIconStub,
+        OIcon: OIconStub,
         OBadge: OBadgeStub,
       },
     },
@@ -229,7 +229,7 @@ describe("TestModelMatchDialog", () => {
             ODialog: ODialogStub,
             OButton: OButtonStub,
             OInput: OInputStub,
-            OIcon: QIconStub,
+            OIcon: OIconStub,
             OBadge: OBadgeStub,
           },
         },

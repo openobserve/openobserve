@@ -24,11 +24,11 @@ class UnflattenedPage {
         // Logs explorer
         this.dateTimeButton = page.locator('[data-test="date-time-btn"]');
         this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
-        this.logTableRowExpandMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.logTableRowExpandMenu = page.locator('[data-test="o2-table-expand-1"]');
         // FTS default-column feature: first cell may be the generic "source"
         // column OR an FTS column (body/message/log). Target whichever first-row
         // cell is rendered; a click bubbles to the row handler that opens detail.
-        this.logSourceColumn = page.locator('[data-test^="log-table-column-0-"]').first();
+        this.logSourceColumn = page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         this.o2IdText = page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id"]');
         this.unflattenedTab = page.locator('[data-test="log-detail-json-content"] [data-test="tab-unflattened"]');
         this.closeDialog = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
@@ -225,7 +225,7 @@ class UnflattenedPage {
      * Do NOT click the expand button first.  Clicking the expand button inserts
      * a new virtual row at rowIndex+1 in the TenstackTable, which shifts all
      * subsequent row indices by 1.  After row 0 is expanded,
-     * log-table-column-1-_timestamp no longer exists (index 1 is the inline
+     * the row-1 _timestamp cell no longer exists (index 1 is the inline
      * expanded-content row), so findRowWithO2Id breaks after the first row and
      * never scans the rest of the table.
      */
@@ -236,7 +236,7 @@ class UnflattenedPage {
         // default-column feature the first cell may be the generic "source"
         // column OR an FTS column (body/message/log), so target whichever
         // first cell of this row is rendered rather than "source" only.
-        const sourceCell = this.page.locator(`[data-test^="log-table-column-${rowIndex}-"]`).first();
+        const sourceCell = this.page.locator(`[data-test="o2-table-row-${rowIndex}"] [data-test^="o2-table-cell-"]`).first();
         await sourceCell.waitFor({ state: 'visible', timeout: 15000 });
         await sourceCell.click();
         // Wait for the detail drawer to be open — deterministic on drawer state.
@@ -317,7 +317,7 @@ class UnflattenedPage {
                 break;
             }
             const expandBtn = this.page.locator(
-                `[data-test="log-table-column-${rowIndex}-_timestamp"] [data-test="table-row-expand-menu"]`
+                `[data-test="o2-table-expand-${rowIndex}"]`
             );
             // Stop if the row doesn't exist (table shorter than maxRows).
             if (!(await expandBtn.isVisible().catch(() => false))) {

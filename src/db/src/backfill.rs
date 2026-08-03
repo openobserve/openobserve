@@ -179,6 +179,8 @@ pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()
                             period_end_time: None,
                             tolerance: 0,
                             last_satisfied_at: None,
+                            delivery_silenced_until: None,
+                            last_notified_level: None,
                             backfill_job: Some(config::meta::triggers::BackfillJob {
                                 current_position: backfill_job.start_time,
                                 deletion_status:

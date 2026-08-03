@@ -124,6 +124,10 @@ export const defaultAlertValue: any = () => {
         },
       },
       promql_condition: null,
+      // Per-SERIES alerting for PromQL (M-9). PromQL's counterpart to
+      // aggregation.multi_alert — a PromQL alert has no aggregation, so the
+      // flag cannot live there.
+      promql_multi_alert: false,
       vrl_function: null,
       multi_time_range: [],
     },
@@ -153,6 +157,11 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
+    // priority id, and the payload layer drops null so pre-Feature-2 alerts
+    // serialize unchanged.
+    priority: null,
+    tags: [],
   };
 };
 
@@ -184,6 +193,10 @@ export const defaultAnomalyConfig = () => ({
   last_error: undefined as string | undefined,
   last_detection_run: undefined as number | undefined,
   next_run_at: undefined as number | undefined,
+  // Feature 2: anomaly configs carry the same triage metadata as alerts.
+  // `null` (not 0) is unset — 0 is not a valid priority id.
+  priority: null as number | null,
+  tags: [] as string[],
 });
 
 // ─── Composable ─────────────────────────────────────────────────────────────
@@ -1132,8 +1145,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     for (const message of messages) {
       let node: HTMLElement | null = message.parentElement;
       while (node && node !== form) {
+        // [data-inline-edit-trigger] is OInlineEdit's display-mode button: an
+        // inline-edited field has NO input in the DOM until it is opened, so
+        // without this the header name field would never be reachable here.
         const control = node.querySelector<HTMLElement>(
-          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup]',
+          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup], [data-inline-edit-trigger]',
         );
         if (control) {
           control.focus();
@@ -1186,15 +1202,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
-  // Focus a topbar select/input by its Vue component ref
+  // Focus a topbar select/input by its Vue component ref. A component that
+  // exposes its own focus() owns the decision (OInlineEdit has no input in the
+  // DOM until it opens, so "focus me" means "open the editor"); everything else
+  // falls back to the first input inside its root.
   const focusTopbarField = (fieldRef: any) => {
     nextTick(() => {
       const el = fieldRef?.value?.$el as HTMLElement | null;
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        const input = el.querySelector("input") as HTMLElement | null;
-        input?.focus();
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (typeof fieldRef?.value?.focus === "function") {
+        fieldRef.value.focus();
+        return;
       }
+      const input = el?.querySelector("input") as HTMLElement | null;
+      input?.focus();
     });
   };
 
@@ -1215,7 +1236,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           variant: "error",
           message: t("alerts.messages.anomalyDetectionNameRequired"),
         });
-        focusTopbarField(anomalyNameRef);
+        // One inline-edit control now serves both alert and anomaly names, so
+        // step1Ref is the anomaly name field too.
+        focusTopbarField(step1Ref);
         return false;
       }
       return true;
@@ -1877,6 +1900,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         folder_id: (activeFolderId.value as string) || "default",
         alert_destinations:
           c.alert_enabled && c.alert_destination_ids?.length ? c.alert_destination_ids : [],
+        // Feature 2. Priority is sent as an integer (the storage id); omitted
+        // entirely when unset so the payload matches a pre-Feature-2 config.
+        // Tags are always sent so clearing them actually clears — the backend
+        // treats an explicit empty list as "remove all".
+        ...(c.priority === null || c.priority === undefined
+          ? {}
+          : { priority: Number(c.priority) }),
+        tags: Array.isArray(c.tags) ? c.tags : [],
         anomaly_config: {
           query_mode: c.query_mode,
           filters: c.query_mode === "filters" ? (c.filters ?? []) : null,

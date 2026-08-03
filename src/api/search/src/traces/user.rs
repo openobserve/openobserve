@@ -414,7 +414,6 @@ pub async fn get_latest_users(
                 gen_ai_usage_cost: json::get_float_value(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
-                ..Default::default()
             },
         );
     }
@@ -458,7 +457,13 @@ pub async fn get_latest_users(
     })
 }
 
-use super::TraceDetail;
+#[derive(Default, Clone, Debug)]
+struct TraceDetail {
+    start_time: i64,
+    end_time: i64,
+    gen_ai_usage_total_tokens: i64,
+    gen_ai_usage_cost: f64,
+}
 
 #[derive(Debug, Serialize)]
 struct UserResponseItem {

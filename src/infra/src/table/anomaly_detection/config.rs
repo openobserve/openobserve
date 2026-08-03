@@ -334,6 +334,8 @@ mod tests {
             alert_destinations: None,
             folder_id: "folder-1".to_string(),
             owner: None,
+            priority: None,
+            tags: None,
             status: 0,
             retries: 0,
             last_updated: 0,

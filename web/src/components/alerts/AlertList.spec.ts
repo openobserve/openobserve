@@ -190,8 +190,7 @@ async function mountAlertList() {
         },
         ImportAlert: true,
         AddAlert: true,
-        QTablePagination: true,
-        QDrawer: true,
+        Pagination: true,
         ODialog: ODialogStub,
         ODrawer: ODrawerStub,
         ConfirmDialog: {
@@ -446,44 +445,43 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
-  it("shows period & frequency columns for all/scheduled tabs and hides in realTime", async () => {
+  // period ("Look back window"), frequency ("Check every"), state, level and
+  // last_trained_at were removed from the list: they are configuration detail
+  // or duplicate a neighbouring column, and the row was too wide to scan.
+  // They remain on the alert detail/edit views.
+  it("no longer renders the removed configuration columns on any tab", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // Ensure we're in alerts view mode first
     wrapper.vm.viewMode = "alerts";
     await flushPromises();
 
-    // default tab: all
-    // OTableColumnDef uses `id` field (not `name`)
-    wrapper.vm.activeTab = "all";
-    await flushPromises();
-    let ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).toContain("period");
-    expect(ids).toContain("frequency");
-
-    // switch to realTime
-    wrapper.vm.activeTab = "realTime";
-    await flushPromises();
-    ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).not.toContain("period");
-    expect(ids).not.toContain("frequency");
-
-    // switch to scheduled
-    wrapper.vm.activeTab = "scheduled";
-    await flushPromises();
-    ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).toContain("period");
-    expect(ids).toContain("frequency");
+    for (const tab of ["all", "scheduled", "realTime", "anomalyDetection"]) {
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+      const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+      for (const removed of ["period", "frequency", "state", "level", "last_trained_at"]) {
+        expect(ids, `tab=${tab} must not show "${removed}"`).not.toContain(removed);
+      }
+    }
   });
 
-  it("renders the State column and the summary strip with operational counts", async () => {
+  // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
+  it("renders the priority and tags columns", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+    expect(ids).toContain("priority");
+    expect(ids).toContain("tags");
+  });
+
+  it("renders the summary strip with operational counts", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // State column is present on every tab (derived from `enabled`).
-    const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).toContain("state");
+    // NOTE: the State *column* was removed from the table, but the derived
+    // counts still drive the summary strip above it — that is the whole reason
+    // the column was redundant.
 
     // Drive the counts from an explicit set so the assertion is deterministic
     // regardless of cross-test store state.
@@ -1232,70 +1230,50 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it("AlertHistoryDrawer is rendered with v-model:open bound to showAlertDetailsDrawer", async () => {
+  // The alert details side panel was removed: a multi-alert's per-group table,
+  // its group history and the cap banner do not fit a drawer, and a routed
+  // page is linkable and back-navigable. Clicking a row now navigates.
+  it("row click routes to the alert detail page instead of opening a drawer", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.exists()).toBe(true);
-    expect(drawer.props("open")).toBe(false);
+    expect(wrapper.findComponent({ name: "AlertHistoryDrawer" }).exists()).toBe(false);
 
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-    expect(drawer.props("open")).toBe(true);
-  });
-
-  it("AlertHistoryDrawer receives alertId and alertType bound from selectedAlertDetails", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    wrapper.vm.selectedAlertDetails = {
-      alert_id: "alert-1",
-      alert_type: "Scheduled",
-    };
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.props("alertId")).toBe("alert-1");
-    expect(drawer.props("alertType")).toBe("Scheduled");
-  });
-
-  it("AlertHistoryDrawer renders empty alertId fallback when no selectedAlertDetails", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    wrapper.vm.selectedAlertDetails = null;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.props("alertId")).toBe("");
-  });
-
-  it("AlertHistoryDrawer 'edit' event invokes editAlertFromDrawer handler", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
     const row = wrapper.vm.filteredResults[0];
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    // ensure handler exists and does not throw
-    expect(typeof wrapper.vm.editAlertFromDrawer).toBe("function");
-    await drawer.vm.$emit("edit", row);
+    wrapper.vm.triggerExpand(row);
     await flushPromises();
-    // After firing edit the details drawer should close
-    expect(wrapper.vm.showAlertDetailsDrawer).toBe(false);
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertDetail",
+        params: { alert_id: row.alert_id },
+      }),
+    );
+    push.mockRestore();
   });
 
-  it("AlertHistoryDrawer update:open=false closes showAlertDetailsDrawer", async () => {
+  it("row click without an alert id does not navigate", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    await drawer.vm.$emit("update:open", false);
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
+    wrapper.vm.triggerExpand({});
     await flushPromises();
-    expect(wrapper.vm.showAlertDetailsDrawer).toBe(false);
+
+    expect(push).not.toHaveBeenCalled();
+    push.mockRestore();
+  });
+
+  it("formatGroupCount marks a lower-bound count with the >= it was persisted with", async () => {
+    // The marker is not decoration: past the M-6 cap the stored number is the
+    // most the evaluation could see, so printing it bare understates an
+    // incident.
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    expect(wrapper.vm.formatGroupCount(3, false)).toBe("3");
+    expect(wrapper.vm.formatGroupCount(3, true)).toBe("\u22653");
+    expect(wrapper.vm.formatGroupCount(0, undefined)).toBe("0");
   });
 });

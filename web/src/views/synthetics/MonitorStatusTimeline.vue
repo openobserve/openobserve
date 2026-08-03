@@ -77,6 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip side="top" :delay="0" :max-width="'auto'">
               <template #content>
                 <div class="min-w-50 py-0.5">
+                  <!-- Passed · Warning · Failed always sum to the execution
+                       count. `error` aggregates into failed rather than falling
+                       out of both buckets, which is what used to make a run of
+                       [pass, fail, error] read as "1 passed · 1 failed". -->
                   <div
                     class="text-text-secondary mb-1.5 flex flex-wrap items-center gap-1.5 border-b px-1 pb-1 text-xs font-semibold"
                   >
@@ -84,17 +88,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-success-solid-bg)]"
                     />
                     <span class="text-text-secondary">{{
-                      t("synthetics.timeline.tooltipPassed", {
-                        count: passCountLocal(seg.executions),
-                      })
+                      t("synthetics.timeline.tooltipPassed", { count: seg.tally.passed })
                     }}</span>
+                    <template v-if="seg.tally.warning > 0">
+                      <span
+                        class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-warning-solid-bg)]"
+                      />
+                      <span class="text-text-secondary">{{
+                        t("synthetics.timeline.tooltipWarning", { count: seg.tally.warning })
+                      }}</span>
+                    </template>
                     <span
                       class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-error-solid-bg)]"
                     />
                     <span class="text-text-secondary">{{
-                      t("synthetics.timeline.tooltipFailed", {
-                        count: failCountLocal(seg.executions),
-                      })
+                      t("synthetics.timeline.tooltipFailed", { count: seg.tally.failed })
                     }}</span>
                   </div>
                   <template v-for="(group, gIdx) in groupedByLocation(seg.executions)" :key="gIdx">
@@ -177,6 +185,12 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
+import {
+  rollUpStatus,
+  type AggregateStatus,
+  type ExecutionStatus,
+  type StatusTally,
+} from "@/utils/synthetics/rollUpStatus";
 
 defineOptions({ name: "MonitorStatusTimeline" });
 
@@ -195,18 +209,21 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "warning" | "fail" | "error";
+  status: ExecutionStatus;
   errorSnippet: string | null;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
+  status: AggregateStatus;
   color: string;
   title: string;
   /** Epoch ms of the first execution in this logical run. */
   timestampMs: number;
   executions: TimelineExecution[];
+  /** Bucket counts, computed by the parent alongside `title` so the tooltip
+   * header and the segment title cannot report the same run differently. */
+  tally: StatusTally;
 }
 
 interface Props {
@@ -217,9 +234,13 @@ interface Props {
   startLabel: string;
   endLabel: string;
   isBrowser?: boolean;
+  /** The runs query hit its row cap, so these segments are the most recent
+   * slice of the window rather than all of it. */
+  truncated?: boolean;
 }
 const props = withDefaults(defineProps<Props>(), {
   isBrowser: true,
+  truncated: false,
 });
 
 const browserIconUrl = (name: string): string => {
@@ -237,15 +258,8 @@ const browserIconUrl = (name: string): string => {
 
 interface ExecGroup {
   location: string;
-  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
+  status: AggregateStatus;
   executions: TimelineExecution[];
-}
-
-function passCountLocal(execs: TimelineExecution[]): number {
-  return execs.filter((e) => e.status === "pass" || e.status === "warning").length;
-}
-function failCountLocal(execs: TimelineExecution[]): number {
-  return execs.filter((e) => e.status === "fail").length;
 }
 
 function groupedByLocation(execs: TimelineExecution[]): ExecGroup[] {
@@ -255,19 +269,13 @@ function groupedByLocation(execs: TimelineExecution[]): ExecGroup[] {
     if (list) list.push(exec);
     else map.set(exec.location, [exec]);
   }
-  return Array.from(map, ([location, executions]) => {
-    const allPass = executions.every((e) => e.status === "pass" || e.status === "warning");
-    const allFail = executions.every((e) => e.status === "fail" || e.status === "error");
-    const allWarning = executions.every((e) => e.status === "warning");
-    const status = allPass
-      ? allWarning
-        ? "all-warning"
-        : "all-pass"
-      : allFail
-        ? "all-fail"
-        : "mixed";
-    return { location, status, executions };
-  });
+  return Array.from(map, ([location, executions]) => ({
+    location,
+    // Same roll-up as the segment above it. Inlining a second copy here is what
+    // let the location dot stay green on a location that warned.
+    status: rollUpStatus(executions.map((e) => e.status)),
+    executions,
+  }));
 }
 
 // ── Scroll state ────────────────────────────────────────────────────────
@@ -286,7 +294,11 @@ const rangeLabel = computed(() => {
   const page = Math.round(scrollLeft.value / (scrollRef.value?.clientWidth ?? 1));
   const start = page * MAX_VISIBLE + 1;
   const end = Math.min((page + 1) * MAX_VISIBLE, total);
-  return t("synthetics.timeline.rangeLabel", { start, end, total });
+  const range = t("synthetics.timeline.rangeLabel", { start, end, total });
+  // The KPI cards above aggregate the whole window; these segments come from a
+  // capped list query. Say so, rather than letting a truncated set read as the
+  // complete picture and leave the two silently disagreeing.
+  return props.truncated ? `${range} · ${t("synthetics.timeline.mostRecent")}` : range;
 });
 
 function scrollTimeline(direction: "left" | "right") {

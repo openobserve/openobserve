@@ -25,9 +25,16 @@ use axum::{
 };
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::cloud;
+#[cfg(feature = "profiling")]
+use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, authz, dashboards, folders, organization, users,
+    alerts, authz, dashboards, folders, kv, model_pricing, organization, service_accounts,
+    short_url, slos, sourcemaps, status, stream, users,
 };
+use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
 use openobserve_core::auth::AuthExtractor;
 use tower_http::{
@@ -46,9 +53,17 @@ use {
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::get_config as get_o2_config,
     },
+    openobserve_api_management::request::{
+        actions, ai, anomaly_detection, domain_management, eval_jobs, gen_ai, keys, license,
+        providers, score_configs, scorers, service_streams, synthetics, workflows,
+    },
+    openobserve_api_pipelines::request::re_pattern,
+    openobserve_api_search::search::patterns,
 };
 
-use super::request::*;
+use super::request::mcp;
+#[cfg(feature = "enterprise")]
+use super::request::ratelimit;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
@@ -64,7 +79,7 @@ pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
 
-pub use common::meta::http::ERROR_HEADER;
+use common::meta::http::ERROR_HEADER;
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -633,6 +648,23 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
+    // External alert source webhooks — token-authenticated inside the handler itself
+    // (never via auth_middleware), so these must stay in basic_routes rather than
+    // service_routes. See GHSA-wffq-g8qf-ccmv: do not widen the shared token
+    // classifier in validator.rs to cover this token type.
+    router = router
+        .route(
+            "/api/v2/{org_id}/incidents/events",
+            post(alerts::external_events::ingest_events),
+        )
+        .route(
+            "/api/v2/{org_id}/incidents/events/{token}",
+            post(alerts::external_events::ingest_events_url_token),
+        )
+        .route_layer(DefaultBodyLimit::max(
+            alerts::external_events::MAX_BODY_BYTES,
+        ));
+
     router
 }
 
@@ -829,6 +861,26 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
+        // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
+        // measurement is an enterprise capability, and the handlers already
+        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
+        // registered before the {slo_id} catch-all, per the router's ordering
+        // rule.
+        .route(
+            "/{org_id}/slos",
+            get(slos::list_slos).post(slos::create_slo),
+        )
+        // Before the {slo_id} catch-all, or "move" is parsed as an SLO id.
+        .route("/{org_id}/slos/move", post(slos::move_slos))
+        .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
+        .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
+        .route(
+            "/{org_id}/slos/{slo_id}",
+            get(slos::get_slo)
+                .put(slos::update_slo)
+                .delete(slos::delete_slo),
+        )
+
         // Folders (v2)
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
@@ -837,6 +889,8 @@ pub fn service_routes() -> Router {
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/groups", get(alerts::list_alert_groups))
+        .route("/v2/{org_id}/alerts/{alert_id}/groups/transitions", get(alerts::list_alert_group_transitions))
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
@@ -846,18 +900,25 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/clone", post(alerts::clone_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
+        .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/dedup/summary", get(alerts::dedup_stats::get_dedup_summary))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
         .route("/v2/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
+        .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/history", get(alerts::incidents::get_incident_rca_history))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
+        .route("/v2/{org_id}/incidents/integrations", get(alerts::incident_integrations::list_integrations).post(alerts::incident_integrations::create_integration))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}", delete(alerts::incident_integrations::delete_integration))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}/enable", patch(alerts::incident_integrations::set_integration_enabled))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}/rotate", post(alerts::incident_integrations::rotate_integration_token))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}/senders", get(alerts::incident_integrations::list_integration_senders))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))

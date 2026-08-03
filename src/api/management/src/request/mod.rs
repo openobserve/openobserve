@@ -49,6 +49,7 @@ pub mod scorers;
 pub mod service_accounts;
 pub mod service_streams;
 pub mod short_url;
+pub mod slos;
 pub mod sourcemaps;
 pub mod status;
 pub mod stream;

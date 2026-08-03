@@ -178,16 +178,21 @@ describe("SettingsIndex", () => {
       expect(items.some((i: any) => i.key === "organization")).toBe(true);
     });
 
-    it("should include alert-destinations item", () => {
+    // Notification Destinations and Templates moved to Reliability
+    // (/alerts/destinations, /alerts/templates) — they are alerting
+    // configuration, not deployment configuration. Settings keeps only
+    // Pipeline Destinations.
+    it("should not include alert-destinations or alert-templates items", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
-      expect(items.some((i: any) => i.dataTest === "alert-destinations-tab")).toBe(true);
+      expect(items.some((i: any) => i.dataTest === "alert-destinations-tab")).toBe(false);
+      expect(items.some((i: any) => i.dataTest === "alert-templates-tab")).toBe(false);
     });
 
-    it("should include alert-templates item", () => {
+    it("should still include pipeline-destinations item", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
-      expect(items.some((i: any) => i.dataTest === "alert-templates-tab")).toBe(true);
+      expect(items.some((i: any) => i.dataTest === "pipeline-destinations-tab")).toBe(true);
     });
 
     it("should include synthetics_locations item with correct properties", () => {
@@ -303,11 +308,12 @@ describe("SettingsIndex", () => {
       expect(generalGroup).toBeDefined();
     });
 
-    it("should contain DESTINATIONS & TEMPLATES group", () => {
+    it("should contain a Destinations group holding only Pipeline Destinations", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
-      const destGroup = groups.find((g: any) => g.label === "Destinations & Templates");
+      const destGroup = groups.find((g: any) => g.label === "Destinations");
       expect(destGroup).toBeDefined();
+      expect(destGroup.items.map((i: any) => i.key)).toEqual(["pipeline_destinations"]);
     });
 
     it("should contain a Synthetics group", () => {

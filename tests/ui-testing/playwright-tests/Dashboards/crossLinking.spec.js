@@ -449,7 +449,7 @@ test.describe("Cross-Linking testcases", () => {
         await page.waitForTimeout(2000);
 
         // Step 3: Expand a log row to reveal the inline JSON detail (JsonPreview)
-        const expandBtn = page.locator('[data-test="table-row-expand-menu"]').first();
+        const expandBtn = page.locator('[data-test^="o2-table-expand-"]').first();
         await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
         await expandBtn.click();
         await page.waitForTimeout(2000);
@@ -901,7 +901,7 @@ test.describe("Cross-Linking testcases", () => {
 
         // Expand the first log row inline (the new logs UI replaced the
         // side-panel `dashboard-confirm-dialog` with an inline JsonPreview
-        // toggled by `table-row-expand-menu`, the same path test 10 uses).
+        // toggled by `o2-table-expand-<index>`, the same path test 10 uses).
         await pm.crossLinkPage.expandFirstLogRow();
 
         // Check the configured field — cross-link SHOULD appear
@@ -1258,7 +1258,7 @@ test.describe("Cross-Linking testcases", () => {
         await page.waitForTimeout(2000);
 
         // Step 3: Expand a log row to reveal the inline JSON detail (JsonPreview)
-        const expandBtn = page.locator('[data-test="table-row-expand-menu"]').first();
+        const expandBtn = page.locator('[data-test^="o2-table-expand-"]').first();
         await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
         await expandBtn.click();
         await page.waitForTimeout(2000);

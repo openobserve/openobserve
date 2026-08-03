@@ -47,7 +47,7 @@ export class CrossLinkPage {
         // Logs result-table expand toggle — kept as a Locator class member so
         // callers don't reach into raw `page.locator(...)` from the spec.
         this.firstLogRowExpand = page
-            .locator('[data-test="table-row-expand-menu"]')
+            .locator('[data-test^="o2-table-expand-"]')
             .first();
     }
 
@@ -719,14 +719,14 @@ export class CrossLinkPage {
 
     /**
      * Click the first non-empty data cell in the rendered dashboard table panel.
-     * Uses the `dashboard-data-row-cell` data-test attribute emitted by
+     * Uses the `o2-table-cell-<columnId>` data-test attribute emitted by
      * TenstackTable so we never depend on raw <td> selectors.
      */
     async clickFirstDashboardTableCell() {
         testLogger.debug('Clicking first dashboard table cell to trigger drilldown');
         await this.page.evaluate(() => {
             const cells = document.querySelectorAll(
-                '[data-test="dashboard-panel-table"] [data-test="dashboard-data-row-cell"]'
+                '[data-test="dashboard-panel-table"] [data-test^="o2-table-cell-"]'
             );
             for (const cell of cells) {
                 if (cell.offsetParent !== null && cell.textContent && cell.textContent.trim()) {

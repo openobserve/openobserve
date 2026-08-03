@@ -73,13 +73,13 @@ export class LogsPage {
         this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
         this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
         this.exploreButton = '[data-test="logs-search-explore-btn"]';
-        this.timestampColumnMenu = '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]';
+        this.timestampColumnMenu = '[data-test="o2-table-expand-1"]';
         this.resultText = '[data-test="logs-search-search-result"]';
         this.logsSearchResultLogsTable = '[data-test="logs-search-result-logs-table"]';
         this.kubernetesFieldsSelector = '[data-test*="log-search-expand-kubernetes"]';
         this.allFieldsSelector = '[data-test*="log-search-expand-"]';
         this.matchingFieldsSelector = '[data-test*="log-search-expand-"]';
-        this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
+        this.logTableColumnSource = '[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.searchBarRefreshButton = '[data-test="logs-search-bar-refresh-btn"]';
         this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
@@ -167,7 +167,7 @@ export class LogsPage {
         // [data-test="log-search-expand-<field>-field-btn"]. Deterministic data-test for waits.
         this.expandCodeFieldBtn = '[data-test="log-search-expand-code-field-btn"]';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
-        this.logTableColumn3Source = '[data-test="log-table-column-3-source"]';
+        this.logTableColumn3Source = '[data-test="o2-table-row-3"] [data-test="o2-table-cell-source"]';
         this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
 
         // Additional locators
@@ -392,8 +392,8 @@ export class LogsPage {
 
         // Table and pagination CSS selectors
         this.tableBottom = '[data-test="logs-search-result-pagination"]';
-        this.tableBodyRow = 'tbody tr';
-        this.tableBodyRowWithIndex = 'tbody tr[data-index]';
+        this.tableBodyRow = 'tbody tr[data-test^="o2-table-row-"]';
+        this.tableBodyRowWithIndex = 'tbody tr[data-test^="o2-table-row-"]';
         this.tableHeaderCell = 'thead th';
         this.tableHeaders = 'thead th';
 
@@ -441,10 +441,10 @@ export class LogsPage {
         this.patternEmptyState = 'text=No patterns found';
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
-        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr';
-        this.tableRowExpandMenu = '[data-test="table-row-expand-menu"]';
+        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
+        this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
-        this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
+        this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
         this.searchResultText = '[data-test="logs-search-search-result"]';
         this.logDetailPanel = '[data-test="logs-search-result-detail-dialog"], [data-test*="log-detail"]';
         this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
@@ -1074,7 +1074,7 @@ export class LogsPage {
     }
 
     async expectTimestampColumnVisible() {
-        const timestampColumn = this.page.locator('[data-test="log-table-column-1-_timestamp"]');
+        const timestampColumn = this.page.locator('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]');
         await expect(timestampColumn, 'Timestamp column should be visible').toBeVisible({ timeout: 5000 });
         testLogger.info('Timestamp column visible in table');
     }
@@ -1502,7 +1502,7 @@ export class LogsPage {
     }
 
     async expectLogsTableRowCount(count) {
-        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr')).toHaveCount(count);
+        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]')).toHaveCount(count);
     }
 
     // Time and date methods
@@ -1856,7 +1856,7 @@ export class LogsPage {
     async openTimestampMenu() {
         try {
             await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { state: 'visible', timeout: 10000 });
-            await this.page.waitForSelector('[data-test="log-table-column-1-_timestamp"]', { state: 'visible', timeout: 10000 });
+            await this.page.waitForSelector('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]', { state: 'visible', timeout: 10000 });
             await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 10000 });
             await this.timestampColumnMenu.scrollIntoViewIfNeeded();
             
@@ -2285,11 +2285,11 @@ export class LogsPage {
             }
         }
 
-        const rows = await this.page.locator('[data-test^="logs-search-result-detail-"]').all();
+        const rows = await this.page.locator('[data-test^="o2-table-row-"]').all();
         let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
 
         for (const row of rows) {
-            const sourceCell = await row.locator('[data-test^="log-table-column-"][data-test$="-source"]').textContent();
+            const sourceCell = await row.locator('[data-test="o2-table-cell-source"]').textContent();
             try {
                 const logcountMatch = sourceCell.match(/logcount":(\d+)/);
                 const currentValue = logcountMatch ? parseInt(logcountMatch[1]) : 0;
@@ -2948,7 +2948,7 @@ export class LogsPage {
     async waitForTableHits(timeout = 15000) {
         try {
             await this.page.waitForFunction(
-                () => document.querySelector('[data-test^="log-table-column-0-"]') !== null,
+                () => document.querySelector('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]') !== null,
                 { timeout },
             );
             return true;
@@ -3344,7 +3344,7 @@ export class LogsPage {
         // Playwright's auto-retrying click is allowed to settle via a short
         // post-condition wait on the detail dialog by callers.
         const firstRowCell = this.page
-            .locator('[data-test^="log-table-column-0-"]')
+            .locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]')
             .first();
         await firstRowCell.waitFor({ state: 'visible', timeout: 30000 });
         return await firstRowCell.click();
@@ -3366,7 +3366,7 @@ export class LogsPage {
     /**
      * Opens the log detail sidebar by clicking the first result row.
      * Clicks whichever first-row cell is rendered (matched by the
-     * `log-table-column-0-` prefix) — the default column may be the generic
+     * first row) — the default column may be the generic
      * "source" column OR the FTS "body"/message column — then waits for the
      * detail dialog. Includes a force-click fallback for transient instability.
      * @returns {Promise<void>}
@@ -3377,7 +3377,7 @@ export class LogsPage {
         // the highlighting test stream). Waiting on the exact "...-source" cell timed out
         // whenever the body column was rendered instead, so target any first-row cell by
         // prefix — mirroring clickLogTableColumnSource / waitForSearchResults.
-        const sourceCell = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const sourceCell = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         // Under CI load the row can resolve in the DOM while the results table is still
         // streaming/re-rendering, so a plain click waits out its timeout on "element is not
         // stable". Wait for the cell to be visible, bring it into view, then click with a
@@ -3897,7 +3897,7 @@ export class LogsPage {
         // The default view may render the generic "source" column OR the FTS
         // "body" column, so wait for any first-row cell rather than "source"
         // specifically — both mean "results rendered".
-        const firstRow = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const firstRow = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
@@ -4755,7 +4755,7 @@ export class LogsPage {
     }
 
     async expectTableColumnHeaderVisible(columnName) {
-        const columnHeader = this.page.locator(`[data-test="log-search-result-table-th-${columnName}"]`);
+        const columnHeader = this.page.locator(`[data-test="o2-table-th-${columnName}"]`);
         await expect(columnHeader, `Column header ${columnName} should be visible`).toBeVisible({ timeout: 5000 });
         testLogger.info(`Column header ${columnName} is visible`);
     }
@@ -4825,7 +4825,7 @@ export class LogsPage {
      */
     async expectLogTableColumnSourceVisible() {
         const sourceCol = this.page.locator(this.logTableColumnSource);
-        const anyFirstRowCol = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const anyFirstRowCol = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         // Whichever appears first satisfies "results rendered".
         await Promise.race([
             sourceCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
@@ -4845,7 +4845,7 @@ export class LogsPage {
      * @param {number} rowIndex - Row index (default 0 = first row)
      */
     async expectLogTableColumnVisible(columnName, rowIndex = 0) {
-        const element = this.page.locator(`[data-test="log-table-column-${rowIndex}-${columnName}"]`);
+        const element = this.page.locator(`[data-test="o2-table-row-${rowIndex}"] [data-test="o2-table-cell-${columnName}"]`);
         await element.waitFor({ state: 'visible', timeout: 30000 });
         return await expect(element).toBeVisible();
     }
@@ -5438,7 +5438,7 @@ export class LogsPage {
         // logs table. Wait for either signal — both fire on success.
         await Promise.any([
             this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`).waitFor({ state: 'visible', timeout: 10000 }),
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`).waitFor({ state: 'visible', timeout: 10000 }),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`).waitFor({ state: 'visible', timeout: 10000 }),
         ]).catch(() => {});
     }
 
@@ -5450,12 +5450,12 @@ export class LogsPage {
         // reverts to an add button. Wait on either DOM convergence.
         await Promise.any([
             this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).waitFor({ state: 'visible', timeout: 10000 }),
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`).waitFor({ state: 'hidden', timeout: 10000 }),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`).waitFor({ state: 'hidden', timeout: 10000 }),
         ]).catch(() => {});
     }
 
     async expectFieldInTableHeader(fieldName, timeout = 10000) {
-        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible({ timeout });
+        return await expect(this.page.locator(`[data-test="o2-table-th-${fieldName}"]`)).toBeVisible({ timeout });
     }
 
     async expectFieldNotInTableHeader(fieldName) {
@@ -5463,7 +5463,7 @@ export class LogsPage {
         // (Asserting on the removed field is mode-agnostic: the default view may
         // fall back to the generic "source" column or the FTS "body" column.)
         return await expect(
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`),
         ).toHaveCount(0);
     }
 
@@ -5478,8 +5478,8 @@ export class LogsPage {
      * @returns {Promise<'message'|'log'>} The FTS field currently in the header.
      */
     async resolveFtsDefaultField(timeout = 15000) {
-        const message = this.page.locator('[data-test="log-search-result-table-th-message"]');
-        const log = this.page.locator('[data-test="log-search-result-table-th-log"]');
+        const message = this.page.locator('[data-test="o2-table-th-message"]');
+        const log = this.page.locator('[data-test="o2-table-th-log"]');
         await expect(message.or(log).first()).toBeVisible({ timeout });
         return (await message.isVisible().catch(() => false)) ? 'message' : 'log';
     }
@@ -5498,10 +5498,10 @@ export class LogsPage {
      */
     async clickCloseColumnButton(fieldName) {
         const header = this.page.locator(
-            `[data-test="log-search-result-table-th-${fieldName}"]`,
+            `[data-test="o2-table-th-${fieldName}"]`,
         );
         const closeBtn = this.page.locator(
-            `[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`,
+            `[data-test="o2-table-th-remove-${fieldName}-btn"]`,
         );
         // Hover the column header to reveal its hover-gated X, then click normally
         // so the actionability check still runs (no force).
@@ -5552,7 +5552,7 @@ export class LogsPage {
 
     async openFirstLogDetails() {
         // Click on the first log entry to open details (expand the first column)
-        await this.page.locator('[data-index="0"] [data-test="table-row-expand-menu"]').click();
+        await this.page.locator('[data-test="o2-table-expand-0"]').click();
         // Wait for the details drawer to open — keys off the actual reveal instead of a buffer.
         await this.page.locator('[data-test="logs-search-result-detail-dialog"], [data-test="log-details-include-exclude-field-btn"], [data-test="log-details-include-field-btn"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     }
@@ -6062,11 +6062,11 @@ export class LogsPage {
     }
 
     async clickTableExpandMenuFirst() {
-        return await this.page.locator('[data-test="table-row-expand-menu"]').first().click({ force: true });
+        return await this.page.locator('[data-test^="o2-table-expand-"]').first().click({ force: true });
     }
 
     async clickTimestampColumnMenu() {
-        return await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        return await this.page.locator('[data-test="o2-table-expand-0"]').click();
     }
 
     async clickDateTimeButton() {
@@ -6170,7 +6170,7 @@ export class LogsPage {
     }
 
     async getLogsTableRowCount() {
-        return await this.page.locator(`${this.logsTable} tbody tr`).count();
+        return await this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`).count();
     }
 
     /**
@@ -6179,7 +6179,7 @@ export class LogsPage {
      * @returns {Promise<string[]>} Array of row text content
      */
     async getLogsTableRowTexts(limit = 10) {
-        const rows = this.page.locator(`${this.logsTable} tbody tr`);
+        const rows = this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`);
         const count = Math.min(await rows.count(), limit);
         const texts = [];
         for (let i = 0; i < count; i++) {
@@ -6698,43 +6698,37 @@ export class LogsPage {
      */
     async countSeverityColorBars() {
         return await this.page
-            .locator('tbody tr[data-index] [data-test="log-table-row-status-color"]')
+            .locator('tbody tr[data-status-bar="true"]')
             .count();
     }
 
     async getSeverityColors() {
         return await this.page.evaluate(() => {
-            const rows = document.querySelectorAll('tbody tr[data-index]');
+            const rows = document.querySelectorAll('tbody tr[data-status-bar="true"]');
             const findings = [];
 
             for (const row of rows) {
                 const text = row.textContent;
-                // The status color bar carries data-test="log-table-row-status-color"
-                // and data-test-status-level="<level>". This makes the detected
-                // severity/level machine-readable regardless of which column is
-                // shown (the FTS "body" column hides the raw "source" JSON).
-                let colorDiv = row.querySelector('[data-test="log-table-row-status-color"]');
-
-                // Fallbacks for older renders: inline-style / absolute-positioned div.
-                if (!colorDiv) colorDiv = row.querySelector('div[style*="background"]');
-                if (!colorDiv) colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
-                if (!colorDiv) {
-                    const divs = row.querySelectorAll('div');
-                    for (const div of divs) {
-                        const style = window.getComputedStyle(div);
-                        if (style.position === 'absolute' && style.left === '0px' && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-                            colorDiv = div;
-                            break;
-                        }
-                    }
+                // OTable draws the spine as a ::before on the row's first cell, fed by
+                // the --row-status-color custom property set inline on the <tr>, and
+                // marks the row with data-status-bar. The level rides along on the row
+                // class (o2-log-level-<level>) so it stays machine-readable whichever
+                // column is shown.
+                const raw = row.style.getPropertyValue('--row-status-color').trim();
+                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
+                // The token resolves to a hex; callers normalise through rgbToHex,
+                // so hand back the rgb() form a computed style would have given.
+                let bgColor = raw;
+                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+                if (hex) {
+                    let h = hex[1];
+                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+                    const n = parseInt(h, 16);
+                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
                 }
 
-                if (!colorDiv) continue;
-
-                const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
-                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
-
-                const level = colorDiv.getAttribute('data-test-status-level') || null;
+                const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
+                const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;
 
                 // Best-effort: also recover the raw severity number when the JSON
                 // source column is visible (kept for backward compatibility).
@@ -7100,7 +7094,7 @@ export class LogsPage {
      * reactive store before callers check for the analyze button or row-dependent UI.
      */
     async waitForSearchResultRows(timeout = 20000) {
-        await this.page.locator(`${this.logsTable} tbody tr`).first()
+        await this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`).first()
             .waitFor({ state: 'visible', timeout });
         testLogger.info('waitForSearchResultRows: at least one result row is visible');
     }
@@ -10458,7 +10452,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getLogsTableRows() {
-        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
+        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]');
     }
 
     /**
@@ -10466,7 +10460,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getFirstRowExpandMenu() {
-        return this.page.locator('[data-test="table-row-expand-menu"]').first();
+        return this.page.locator('[data-test^="o2-table-expand-"]').first();
     }
 
     /**
@@ -10601,14 +10595,11 @@ export class LogsPage {
      * Shared by getScrollContainerPosition()/scrollToResultsBottom() so both
      * always act on the same element.
      *
-     * Since the histogram-pinning change in logs/SearchResult.vue the histogram
-     * strip no longer scrolls: the results table below it (`<TenstackTable>`,
-     * rendered as `[data-test="logs-search-result-logs-table"]`) owns the
-     * scrollbar. Its scroll parent is the `ref="parentRef"` div
-     * (`.o2-scroll-container`, `overflow: auto`) — the outer `scrollContainerRef`
-     * pane is now `overflow: hidden` in the logs view. So walk UP from the table
-     * to the nearest ancestor with a scrollable computed overflow-y (class
-     * renames don't break it).
+     * The results table (`[data-test="logs-search-result-logs-table"]`) does not
+     * own the scrollbar itself — it delegates scrolling to an ancestor pane that
+     * it shares with the pinned histogram. So walk UP from the table to the
+     * nearest ancestor with a scrollable computed overflow-y, matched by computed
+     * style so class renames (or another move of the scroller) don't break it.
      *
      * Falls back to the older pagination sibling-walk for the patterns view,
      * where the whole `scrollContainerRef` pane still scrolls as one.
@@ -10816,7 +10807,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getTimestampColumnHeader() {
-        return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+        return this.page.locator('[data-test="o2-table-th-timestamp"]');
     }
 
     /**
@@ -10824,7 +10815,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getSourceColumnHeader() {
-        return this.page.locator('[data-test="log-search-result-table-th-source"]');
+        return this.page.locator('[data-test="o2-table-th-source"]');
     }
 
     /**

@@ -178,16 +178,6 @@ describe("Header Component", () => {
       plugins: [i18n],
       stubs: {
         ThemeSwitcher: true,
-        QBtn: true,
-        QIcon: true,
-        QToolbarTitle: true,
-        QMenu: true,
-        QList: true,
-        QItem: true,
-        QItemSection: true,
-        QSeparator: true,
-        QTooltip: true,
-        QMarkupTable: true,
       },
     };
 
@@ -198,9 +188,7 @@ describe("Header Component", () => {
     it("should display OpenObserve logo by default", async () => {
       const logoWrapper = createWrapper({
         mountType: "mount",
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await logoWrapper.vm.$nextTick();
@@ -225,10 +213,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          // Don't stub QToolbar so content renders
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       // Wait for component to render
@@ -258,9 +243,7 @@ describe("Header Component", () => {
             theme: "dark",
           },
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await darkWrapper.vm.$nextTick();
@@ -290,9 +273,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await customWrapper.vm.$nextTick();
@@ -322,9 +303,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await customWrapper.vm.$nextTick();
@@ -352,9 +331,7 @@ describe("Header Component", () => {
             },
           },
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await quotaWrapper.vm.$nextTick();
@@ -385,9 +362,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await quotaWrapper.vm.$nextTick();
@@ -440,9 +415,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await quotaWrapper.vm.$nextTick();
@@ -469,9 +442,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -496,9 +467,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "false",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -523,9 +492,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -551,9 +518,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -580,9 +545,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -608,9 +571,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -641,9 +602,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -674,9 +633,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await aiWrapper.vm.$nextTick();
@@ -895,15 +852,11 @@ describe("Header Component", () => {
     });
 
     it("should attach an OTooltip to the profile button", () => {
-      // The QTooltip with class="header-user-tooltip" was replaced by OTooltip
       // (no class needed — OTooltip styles itself via Tailwind tokens).
       // The test now verifies the OTooltip is co-located with the profile btn.
       const tooltipWrapper = createWrapper({
         mountType: "mount",
-        stubsOverrides: {
-          QToolbar: false,
-          QBtn: false,
-        },
+        stubsOverrides: {},
       });
 
       const profileBtn = tooltipWrapper.find('[data-test="header-my-account-profile-icon"]');
@@ -1031,9 +984,7 @@ describe("Header Component", () => {
     it("should render with light theme logo", async () => {
       const lightWrapper = createWrapper({
         mountType: "mount",
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await lightWrapper.vm.$nextTick();
@@ -1056,9 +1007,7 @@ describe("Header Component", () => {
             theme: "dark",
           },
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await darkWrapper.vm.$nextTick();
@@ -1134,7 +1083,6 @@ describe("Header Component", () => {
           organizations: [],
         },
         stubsOverrides: {
-          // QSelect was replaced by OSelect during the OSelect migration; keep
           // the OSelect stub off so we can probe its options.
           OSelect: false,
         },
@@ -1159,10 +1107,7 @@ describe("Header Component", () => {
             },
           },
         },
-        stubsOverrides: {
-          QToolbar: false,
-          QToolbarTitle: false,
-        },
+        stubsOverrides: {},
       });
 
       const html = wrapper.html();
@@ -1227,9 +1172,7 @@ describe("Header Component", () => {
         configOverrides: {
           isEnterprise: "true",
         },
-        stubsOverrides: {
-          QToolbar: false,
-        },
+        stubsOverrides: {},
       });
 
       await customWrapper.vm.$nextTick();

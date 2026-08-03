@@ -39,7 +39,7 @@ export function useTableTree<TData extends Record<string, any>>(
     tree?: boolean;
     data: TData[];
     expandedIds?: string[];
-    rowKey?: string;
+    rowKey?: string | ((row: TData) => string);
     getChildren?: (row: TData) => TData[] | undefined;
     getRowWarning?: (row: TData) => boolean;
     treeColumnId?: string;
@@ -49,6 +49,12 @@ export function useTableTree<TData extends Record<string, any>>(
 ) {
   const enabled = computed(() => !!props.tree);
   const keyField = computed(() => props.rowKey ?? "id");
+
+  function resolveRowKey(row: TData): string {
+    const rk = keyField.value;
+    if (typeof rk === "function") return String(rk(row) ?? "");
+    return String((row as any)[rk] ?? "");
+  }
 
   const expandedIds = ref<Set<string>>(new Set(props.expandedIds ?? []));
 
@@ -81,7 +87,7 @@ export function useTableTree<TData extends Record<string, any>>(
   }
 
   function rowId(row: TData): string {
-    return String((row as any)[keyField.value] ?? "");
+    return resolveRowKey(row);
   }
 
   /** Metadata map (by row reference) + flattened row list */

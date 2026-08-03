@@ -157,6 +157,26 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(host.text()).toContain(DESTINATIONS_REQUIRED_MESSAGE);
   });
 
+  // Regression (#13156): AlertTargetsSelect replaced the name=-bound destinations
+  // select, so this error is hand-rendered — and it shipped WITHOUT role="alert".
+  // AddAlert's focusOnFirstError finds the tab that owns an invalid field by
+  // scanning [role="alert"] messages; without the marker, saving from the
+  // Advanced tab with no destination toasted "fix the highlighted fields" but
+  // never brought the Alert Rules tab forward. The cross-tab specs in
+  // AddAlert.spec.ts seed a synthetic message (steps are stubbed there), so the
+  // REAL markup's marker must be pinned here.
+  it("renders the destinations error as [role=alert] so focusOnFirstError can find its tab", async () => {
+    const host = mountDescendant("true");
+    await hostForm(host).handleSubmit();
+    await flushPromises();
+    await nextTick();
+
+    const error = host.find('[data-test="alert-settings-destinations-error"]');
+    expect(error.exists()).toBe(true);
+    expect(error.attributes("role")).toBe("alert");
+    expect(error.text()).toBe(DESTINATIONS_REQUIRED_MESSAGE);
+  });
+
   it("passes submit when valid — string number input coerces via the schema", async () => {
     // Rewritten from the old standalone "emits silence/period as NUMBERS" test:
     // the schema's z.coerce accepts the raw STRING the input holds; the payload
