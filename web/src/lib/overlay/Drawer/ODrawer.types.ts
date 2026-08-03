@@ -13,9 +13,9 @@ export type DrawerSide = "right" | "left";
 
 /**
  * Panel width presets.
- * sm=360px | md=480px (default) | lg=640px | xl=800px | full=100vw
+ * sm=360px | md=480px (default) | lg=640px | xl=800px | xxl=1000px | full=100vw
  */
-export type DrawerSize = "sm" | "md" | "lg" | "xl" | "full";
+export type DrawerSize = "sm" | "md" | "lg" | "xl" | "xxl" | "full";
 
 export interface DrawerProps {
   /** Controlled open state — use with v-model:open */

@@ -87,6 +87,12 @@ const props = withDefaults(
     ) => { passed: boolean; durationMs: number; error?: string; structuredError?: any } | undefined;
     /** Returns a CSS color for the 4px left status bar per row (e.g. validation errors). */
     getRowStatusColor?: (row: TData) => string | undefined;
+    /**
+     * Total run duration in ms — the scale every timeline bar is drawn against
+     * (results mode). Supplies the column header's window and the denominator
+     * for each bar, so the row data carries only its own offset and duration.
+     */
+    totalDurationMs?: number;
   }>(),
   {
     actionKey: "action",
@@ -98,6 +104,7 @@ const props = withDefaults(
     locked: false,
     readonly: false,
     selectionEnabled: false,
+    totalDurationMs: 0,
   },
 );
 
@@ -171,6 +178,29 @@ function getDotState(row: TData): StepDotState | undefined {
 // ── Column definitions ─────────────────────────────────────────────
 const isEditor = computed(() => props.mode === "editor");
 
+/**
+ * The scale every timeline bar shares, never zero.
+ *
+ * A run with no recorded duration would otherwise divide by zero and paint
+ * every bar full-width, which reads as "everything took the whole run".
+ */
+const timelineTotal = computed(() => Math.max(props.totalDurationMs || 0, 1));
+
+const fmtSeconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+
+/**
+ * "Timeline · 0 – 35.8s".
+ *
+ * The window belongs in the header rather than on each row: it is the one fact
+ * that makes a bar's position mean anything, and repeating it per row would say
+ * it once per step.
+ */
+const timelineHeader = computed(() =>
+  props.totalDurationMs
+    ? t("synthetics.journey.timelineHeaderWindow", { end: fmtSeconds(props.totalDurationMs) })
+    : t("synthetics.journey.timelineHeader"),
+);
+
 const columns = computed<OTableColumnDef<TData>[]>(() => {
   if (isEditor.value) {
     return [
@@ -183,18 +213,20 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
       { id: "actions", header: "", size: 128, isAction: true },
     ];
   }
-  // Results mode
+  // Results mode. Headers are named here because results mode renders them —
+  // the run's steps are a table an engineer reads down, and an unlabelled
+  // timeline column cannot say what its bars are drawn against.
   return [
     { id: "step", header: "", size: 44 },
-    { id: "screenshot", header: "", size: 90 },
+    { id: "screenshot", header: t("synthetics.journey.shotHeader"), size: 90 },
     {
       id: "details",
       header: t("synthetics.journey.stepHeader"),
       size: 200,
       meta: { autoWidth: true },
     },
-    { id: "progress", header: "", size: 100 },
-    { id: "duration", header: t("synthetics.journey.durationHeader"), size: 80 },
+    { id: "progress", header: timelineHeader.value, size: 260 },
+    { id: "duration", header: t("synthetics.journey.timeHeader"), size: 80 },
   ];
 });
 
@@ -222,7 +254,7 @@ function handleUpdateExpanded(ids: string[]) {
     :data="data"
     :columns="columns"
     row-key="id"
-    :show-header="false"
+    :show-header="mode === 'results'"
     :selection="selectionEnabled ? 'multiple' : 'none'"
     :selected-ids="selectedIds"
     :expansion="'multiple'"
@@ -317,13 +349,18 @@ function handleUpdateExpanded(ids: string[]) {
       </div>
     </template>
 
-    <!-- ── cell-progress: Progress bar (results mode) ──────────── -->
+    <!-- ── cell-progress: Timeline segment (results mode) ──────── -->
+    <!-- A segment, not a fill: the bar starts where the step started within the
+         run, so reading down the column shows where the time went rather than
+         six bars all anchored to the same left edge. -->
     <template v-if="mode === 'results'" #cell-progress="{ row }">
       <OProgressBar
-        :value="((row as any).duration ?? 0) / Math.max((row as any)._totalDuration ?? 1, 1)"
+        :start="((row as any).offsetMs ?? 0) / timelineTotal"
+        :value="(((row as any).offsetMs ?? 0) + ((row as any).duration ?? 0)) / timelineTotal"
         :variant="(row as any).status === 'fail' ? 'danger' : 'default'"
         size="xs"
-        class="h-2! w-20! shrink-0"
+        class="w-full"
+        data-test="synthetics-journey-step-timeline-bar"
       />
     </template>
 

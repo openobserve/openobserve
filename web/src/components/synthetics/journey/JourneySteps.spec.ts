@@ -64,7 +64,7 @@ const OSpinnerStub = {
 
 // OProgressBar stub
 const OProgressBarStub = {
-  props: ["value", "variant", "size"],
+  props: ["value", "start", "variant", "size"],
   template: '<div class="progress-bar-stub" />',
 };
 
@@ -423,6 +423,82 @@ describe("JourneySteps", () => {
         false,
       );
       expect(wrapper.find('[data-test="synthetics-journey-step-insert-btn"]').exists()).toBe(false);
+    });
+
+    // The timeline is a shared scale, so each bar is positioned by the step's
+    // offset into the run rather than anchored to the column's left edge.
+    it("draws each timeline bar as a segment at the step's offset", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          mode: "results",
+          totalDurationMs: 10000,
+          data: [
+            { id: 1, name: "a", offsetMs: 0, duration: 2000, status: "pass" },
+            { id: 2, name: "b", offsetMs: 2000, duration: 3000, status: "pass" },
+            { id: 3, name: "c", offsetMs: 5000, duration: 5000, status: "fail" },
+          ],
+        },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const bars = wrapper.findAllComponents(OProgressBarStub);
+      expect(bars.map((b) => [b.props("start"), b.props("value")])).toEqual([
+        [0, 0.2],
+        [0.2, 0.5],
+        [0.5, 1],
+      ]);
+      // The failed step keeps its own colour on the shared scale.
+      expect(bars[2].props("variant")).toBe("danger");
+    });
+
+    // Dividing by a zero-length run would paint every bar full width, which
+    // reads as "every step took the whole run".
+    it("survives a run with no recorded duration", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          mode: "results",
+          totalDurationMs: 0,
+          data: [{ id: 1, name: "a", offsetMs: 0, duration: 0, status: "pass" }],
+        },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(wrapper.findComponent(OProgressBarStub).props("value")).toBe(0);
+    });
+
+    // Editor mode is a form; results mode is a table an engineer reads down.
+    it("shows column headers in results mode but not in editor mode", async () => {
+      const data = makeSteps(1);
+      wrapper = mount(JourneySteps, {
+        props: { data, mode: "results", totalDurationMs: 35800 },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("showHeader")).toBe(true);
+      // The window is what makes a bar's position mean anything. Read from the
+      // column definition, not the rendered text: this suite's i18n catalogue is
+      // a stub, so `t()` echoes the key and never interpolates.
+      const cols = table.props("columns") as Array<{ id: string; header: string }>;
+      expect(cols.map((c) => c.id)).toEqual([
+        "step",
+        "screenshot",
+        "details",
+        "progress",
+        "duration",
+      ]);
+      expect(cols.find((c) => c.id === "progress")?.header).toContain(
+        "synthetics.journey.timelineHeaderWindow",
+      );
+
+      wrapper = mount(JourneySteps, {
+        props: { data, mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("showHeader")).toBe(false);
     });
   });
 
