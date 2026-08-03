@@ -1,7 +1,17 @@
-import searchService from "@/services/search";
+import streamService from "@/services/stream";
+import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import { nextTick, ref } from "vue";
 import { PROMQL_CATALOG } from "@/utils/query/promqlCompletion";
 import { SORT_LANE } from "@/utils/query/sqlCompletion";
+
+// Columns a metrics stream carries that are not labels. `value` is the sample,
+// `_timestamp` the clock, `__hash__` internal, and `__name__` the metric the
+// user has already typed — none of them belong inside `{`.
+const NON_LABEL_COLUMNS = new Set(["value", "_timestamp", "__hash__", "__name__"]);
+
+// One schema per metric per page, shared by every editor. A metrics stream is
+// named for its metric, so this is also the label list.
+const metricLabelCache = new Map<string, string[]>();
 import { useStore } from "vuex";
 
 const usePromqlSuggestions = () => {
@@ -173,12 +183,13 @@ const usePromqlSuggestions = () => {
       const metricName = parsedQuery?.metricName || "";
       const labels = parsedQuery?.label?.labels || {};
 
-      // NOT cleared here. Two of the branches below return without
-      // refilling it, and an empty list is never the better answer: the
-      // catalog is the floor.
-      const startISOTimestamp: any = autoCompleteData.value.dateTime.startTime;
-      const endISOTimestamp: any = autoCompleteData.value.dateTime.endTime;
-      // import search service and call search.get_promql_series
+      // The list is NOT cleared here. Two of the branches below return without
+      // refilling it, and an empty list is never the better answer: the catalog
+      // is the floor.
+      //
+      // The dateTime range went with the series call. The lookups that replaced
+      // it carry their own windows — the schema has none to carry, and the
+      // value fetch uses its own recent-values window.
       if (metricName) labels["__name__"] = metricName;
 
       const formattedLabels = Object.keys(labels).map((key) => {
@@ -197,14 +208,13 @@ const usePromqlSuggestions = () => {
       }
 
       if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label")) return;
+      // Both lookups are scoped to one metric; without a metric name there is
+      // no stream to read and nothing honest to offer.
+      if (!metricName) return;
 
-      let labelSuggestions: any;
+      const org = store.state.selectedOrganization.identifier;
+      const streamCtx = { org, streamType: "metrics", streamName: metricName };
 
-      // ASSIGNED, not pushed. The push relied on the list having just been
-      // cleared at the top of this function; once the catalog was seeded and
-      // that clear removed, it appended a loading row to 113 entries — and
-      // appended another on every keystroke until the response replaced the
-      // array. While this request is in flight the loading row IS the list.
       autoCompletePromqlKeywords.value = [
         {
           label: "...Loading",
@@ -212,36 +222,76 @@ const usePromqlSuggestions = () => {
           kind: "Text",
         },
       ];
-
       autoCompleteData.value.popup.open(autoCompleteData.value.text);
 
-      searchService
-        .get_promql_series({
-          org_identifier: store.state.selectedOrganization.identifier,
-          labels: `{${formattedLabels.join(",")}}`,
-          start_time: startISOTimestamp,
-          end_time: endISOTimestamp,
-        })
-        .then((response: any) => {
-          labelSuggestions = getLabelSuggestions(
-            response.data.data,
-            labelFocus,
-            formattedLabels.join(","),
-          );
-        })
-        .finally(() => {
-          if (labelSuggestions) {
-            updatePromqlKeywords(labelSuggestions, { contextual: true });
-            // Nothing matched: leave the position empty and take the widget
-            // away, rather than leaving an empty box open over the query.
-            if (!labelSuggestions.length) autoCompleteData.value.popup.close("");
-          } else {
-            // The request itself failed. The labels are unavailable; the
-            // language is not, so fall back to the catalog.
-            updatePromqlKeywords([]);
-            autoCompleteData.value.popup.close("");
+      if (labelFocus.focusOn === "label") {
+        // The SCHEMA, not the series. `/series` returns every matching series
+        // with all of its labels for the client to dedupe — 5903 bytes where
+        // the schema answers in 1699, and it is metadata, so no scan at all.
+        try {
+          let labels = metricLabelCache.get(metricName);
+          if (!labels) {
+            const response: any = await streamService.schema(org, metricName, "metrics");
+            const columns = response?.data?.schema ?? response?.data?.uds_schema ?? [];
+            labels = columns
+              .map((column: any) => column?.name)
+              .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name));
+            metricLabelCache.set(metricName, labels as string[]);
           }
-        });
+
+          const alreadyFiltered = formattedLabels.join(",");
+          updatePromqlKeywords(
+            (labels as string[])
+              .filter((name) => alreadyFiltered.indexOf(`${name}=`) === -1)
+              .map((name) => ({
+                label: name,
+                kind: "Variable",
+                // A bare label name is not a filter; leave the cursor at the
+                // operator.
+                insertText: `${name}=`,
+              })),
+            { contextual: true },
+          );
+        } catch {
+          // The labels are unavailable; the language is not.
+          updatePromqlKeywords([]);
+          autoCompleteData.value.popup.close("");
+        }
+        return;
+      }
+
+      // Label VALUES are field values of the metric's stream — the same cache,
+      // the same key, the same on-demand fetch the SQL editors use.
+      const labelName = labelFocus.meta.label;
+      let values: string[] = [];
+      try {
+        values = await getFieldValuesForSuggestion(streamCtx, labelName);
+        if (!values.length) values = await requestFieldValues(streamCtx, labelName);
+      } catch {
+        values = [];
+      }
+
+      // Quoting, decided from what is actually around the cursor. Monaco
+      // auto-closes `"`, so the model is `service=""` with the cursor between
+      // them; inserting a fully quoted value there produced
+      // `service=""api-gateway""`.
+      const textBeforeCursor = autoCompleteData.value.query.slice(0, cursorIndex + 1);
+      const textAfterCursor = autoCompleteData.value.query.slice(cursorIndex + 1);
+      const hasOpeningQuote = /"[^"]*$/.test(textBeforeCursor);
+      const hasClosingQuote = textAfterCursor.startsWith('"');
+
+      updatePromqlKeywords(
+        values.map((value) => ({
+          label: value,
+          kind: "Variable",
+          insertText: hasOpeningQuote ? (hasClosingQuote ? value : `${value}"`) : `"${value}"`,
+        })),
+        { contextual: true },
+      );
+      // Nothing matched: take the widget away rather than leaving an empty box
+      // hanging over the query.
+      if (!values.length) autoCompleteData.value.popup.close("");
+      return;
     } catch (e) {
       console.log(e);
     }

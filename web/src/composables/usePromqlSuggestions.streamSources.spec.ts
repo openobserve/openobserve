@@ -327,6 +327,28 @@ describe("label VALUES come from the same place SQL gets them", () => {
   });
 });
 
+describe("while a lookup is in flight", () => {
+  it("shows one loading row, not one per keystroke", async () => {
+    // Moved here from the main spec, which used to hold the SERIES call open to
+    // observe this. The row is set before either lookup starts, and it is
+    // ASSIGNED rather than pushed — appending it to the catalog once per
+    // keystroke is a bug this project has already shipped once.
+    // The lookup is held open, and getSuggestions is NOT awaited: this path
+    // awaits its lookups, so awaiting the call would wait for the very thing
+    // being kept pending. The loading row is observed while it is still true.
+    vi.mocked(getFieldValuesForSuggestion).mockReturnValue(new Promise(() => {}) as any);
+    const c = await freshComposable();
+    const query = 'cpu_utilization_percent{service="';
+    c.autoCompleteData.value.query = query;
+    c.autoCompleteData.value.position.cursorIndex = query.length - 1;
+    for (let i = 0; i < 3; i++) void c.getSuggestions();
+    await flushPromises();
+    const rows = offered(c);
+    expect(rows.filter((k: any) => k.label === "...Loading")).toHaveLength(1);
+    expect(rows).toHaveLength(1);
+  });
+});
+
 describe("what must not change", () => {
   it("still offers the catalog when the cursor is not in a label position", async () => {
     const c = await freshComposable();

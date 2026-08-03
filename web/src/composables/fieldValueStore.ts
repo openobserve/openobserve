@@ -37,6 +37,7 @@
  */
 
 import * as fieldValueDB from "@/composables/fieldValueDB";
+import streamService from "@/services/stream";
 import { extractValuesFromHits } from "@/utils/fieldValueUtils";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
@@ -47,6 +48,20 @@ const MAX_VALUES_PER_FIELD = Number((import.meta as any).env?.VITE_MAX_FIELD_VAL
 // Total IDB record cap across all orgs/streams/fields combined. Prevents the
 // browser's IndexedDB storage from growing forever. Overridable via .env.
 const MAX_FIELDS_STORED = Number((import.meta as any).env?.VITE_MAX_FIELDS_STORED ?? 5000);
+
+// How far back to look when asking the server for values a cold cache has never
+// seen. Recent values are the useful ones for completion, and a narrow window
+// keeps the scan small.
+const VALUES_LOOKBACK_MS = 15 * 60 * 1000;
+
+// How many values one request asks for. A dropdown shows a handful; the
+// endpoint charges for the rest.
+const VALUES_REQUEST_SIZE = 10;
+
+// How long to wait before asking again about a field that answered with nothing
+// — or whose request failed. NOT permanent: a transient 500, or one quiet
+// fifteen-minute window, must not disable a field's values for the session.
+const VALUES_RETRY_COOLDOWN_MS = 60_000;
 
 // How long a field's values stay valid in IDB after the last write.
 // Sliding window — every new write resets the clock. Overridable via .env (unit: days).
@@ -225,4 +240,80 @@ export const getFieldValuesForSuggestion = async (
   } catch {
     return [];
   }
+};
+
+// ─── On-demand fetch ─────────────────────────────────────────────────────────
+
+// Shared at module scope on purpose: every editor on the page asks the same
+// questions, and the point of both maps is that the second asker pays nothing.
+const inFlightRequests = new Map<string, Promise<string[]>>();
+const suppressedUntil = new Map<string, number>();
+
+/**
+ * Ask the server for a field's recent values, and leave them in the cache.
+ *
+ * Both capture paths are byproducts of something the user already did — a Run
+ * Query, or expanding a field in the sidebar — so a stream nobody has touched
+ * has no values at all and the editor quietly offers the field list instead.
+ * This is the path for that case.
+ *
+ * Writes through captureFromValuesApi rather than to IndexedDB directly,
+ * because that is what invalidates the read cache: the caller has just read
+ * this key and primed it with an EMPTY list, and without invalidation the next
+ * keystroke would still see nothing for a minute.
+ *
+ * Never throws, and never blocks anything that matters — see the callers, which
+ * do not await it.
+ */
+export const requestFieldValues = async (
+  ctx: StreamContext,
+  fieldName: string,
+): Promise<string[]> => {
+  if (!fieldName || !ctx.org || !ctx.streamType || !ctx.streamName) return [];
+
+  const key = makeKey(ctx, fieldName);
+
+  const until = suppressedUntil.get(key);
+  if (until !== undefined && Date.now() < until) return [];
+
+  const existing = inFlightRequests.get(key);
+  if (existing) return existing;
+
+  const endMicros = Date.now() * 1000;
+  const request = streamService
+    .fieldValues({
+      org_identifier: ctx.org,
+      stream_name: ctx.streamName,
+      fields: [fieldName],
+      size: VALUES_REQUEST_SIZE,
+      start_time: endMicros - VALUES_LOOKBACK_MS * 1000,
+      end_time: endMicros,
+      // Without this a metrics or traces stream is read as logs, and answers
+      // with nothing.
+      type: ctx.streamType,
+      no_count: true,
+    })
+    .then((res: any) => {
+      const values: string[] = (res?.data?.hits?.[0]?.values ?? [])
+        .map((entry: any) => String(entry?.zo_sql_key ?? ""))
+        .filter((value: string) => value.length > 0);
+
+      if (values.length)
+        captureFromValuesApi(
+          ctx,
+          fieldName,
+          values.map((key) => ({ key })),
+        );
+      else suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
+
+      return values;
+    })
+    .catch(() => {
+      suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
+      return [] as string[];
+    })
+    .finally(() => inFlightRequests.delete(key));
+
+  inFlightRequests.set(key, request);
+  return request;
 };

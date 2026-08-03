@@ -320,43 +320,6 @@ describe("usePromqlSuggestions Composable - Comprehensive Coverage", () => {
 
     expect(searchService.get_promql_series).not.toHaveBeenCalled();
   });
-
-  // Test 29: getSuggestions with successful API call
-  it("should handle successful API call in getSuggestions", async () => {
-    (searchService.get_promql_series as any).mockResolvedValue({
-      data: {
-        data: [
-          { instance: "server1", job: "node" },
-          { instance: "server2", job: "node" },
-        ],
-      },
-    });
-
-    // Test the structure and behavior when suggestions is called
-    composable.autoCompleteData.value.query = 'cpu_usage{instance="';
-    composable.autoCompleteData.value.position.cursorIndex = 19;
-    composable.autoCompleteData.value.popup.open = vi.fn();
-    composable.autoCompleteData.value.popup.close = vi.fn();
-
-    // Test the label focus first to see if it would call API
-    const labelFocus = composable.analyzeLabelFocus(
-      composable.autoCompleteData.value.query,
-      composable.autoCompleteData.value.position.cursorIndex,
-    );
-
-    await composable.getSuggestions();
-
-    // Test based on actual focus behavior
-    if (
-      labelFocus.isFocused &&
-      (labelFocus.focusOn === "value" || labelFocus.focusOn === "label")
-    ) {
-      expect(searchService.get_promql_series).toHaveBeenCalled();
-    } else {
-      expect(searchService.get_promql_series).not.toHaveBeenCalled();
-    }
-  });
-
   // Test 30: getSuggestions with API error
   it("should handle API error in getSuggestions", async () => {
     (searchService.get_promql_series as any).mockRejectedValue(new Error("API Error"));
@@ -406,44 +369,6 @@ describe("usePromqlSuggestions Composable - Comprehensive Coverage", () => {
     result = composable.analyzeLabelFocus(query, 0);
     expect(result.isFocused).toBe(false);
   });
-
-  // Test 35: getSuggestions with metric name in labels
-  it("should include metric name in API call when conditions are met", async () => {
-    (searchService.get_promql_series as any).mockResolvedValue({
-      data: { data: [] },
-    });
-
-    // Set up a query with proper cursor position
-    composable.autoCompleteData.value.query = 'cpu_usage{instance="';
-    composable.autoCompleteData.value.position.cursorIndex = 19;
-    composable.autoCompleteData.value.popup.open = vi.fn();
-    composable.autoCompleteData.value.popup.close = vi.fn();
-
-    // Test the label focus behavior
-    const labelFocus = composable.analyzeLabelFocus(
-      composable.autoCompleteData.value.query,
-      composable.autoCompleteData.value.position.cursorIndex,
-    );
-
-    await composable.getSuggestions();
-
-    // Only expect API call if conditions are met
-    if (
-      labelFocus.isFocused &&
-      (labelFocus.focusOn === "value" || labelFocus.focusOn === "label")
-    ) {
-      expect(searchService.get_promql_series).toHaveBeenCalledWith(
-        expect.objectContaining({
-          labels: expect.stringContaining('__name__="cpu_usage"'),
-        }),
-      );
-    } else {
-      // Test that the function correctly parses the query
-      const parsed = composable.parsePromQlQuery('cpu_usage{instance="');
-      expect(parsed.metricName).toBe("cpu_usage");
-    }
-  });
-
   // Test 36: Function return types validation
   it("should return correct types from all functions", () => {
     expect(typeof composable.parsePromQlQuery).toBe("function");
@@ -635,32 +560,6 @@ describe("PromQL catalog reaches the editor", () => {
 
   // Caller-supplied lists replacing the catalog outright is already covered by
   // "should update keywords with provided data" above; not duplicated here.
-
-  it("shows a lone loading row while the label series is in flight", async () => {
-    // The loading row used to be the ONLY entry, because getSuggestions cleared
-    // the list first. Seeding the catalog and dropping that clear turned the
-    // push into an append: the row lands at the end of 113 entries, and every
-    // further keystroke appends ANOTHER one until the response replaces the
-    // array. Bounded only by how slow the request is.
-    // The request must stay in flight for the loading state to be observable
-    // at all — with a promise that settles, .finally() replaces the list before
-    // any assertion can see it, and the test reports 0 rows whether or not the
-    // bug is there.
-    vi.mocked(searchService.get_promql_series).mockReturnValue(new Promise(() => {}) as any);
-
-    const fresh = usePromqlSuggestions();
-    fresh.autoCompleteData.value.query = 'up{instance="';
-    fresh.autoCompleteData.value.position.cursorIndex = 12;
-    await fresh.getSuggestions();
-    await fresh.getSuggestions();
-    await fresh.getSuggestions();
-
-    const rows = fresh.autoCompletePromqlKeywords.value as any[];
-    const loading = rows.filter((k: any) => k.label === "...Loading");
-    expect(loading.length, `${loading.length} loading rows`).toBe(1);
-    expect(rows.length, "the catalog is still in the list behind the loading row").toBe(1);
-  });
-
   it("never leaves the editor with an empty list", async () => {
     // getSuggestions clears the list before deciding what to show, and two of
     // its branches return without refilling it — an untracked cursor is one.
@@ -717,23 +616,6 @@ describe("PromQL catalog reaches the editor", () => {
     const rows = fresh.autoCompletePromqlKeywords.value as any[];
     expect(rows.filter((k: any) => k.kind === "Function")).toEqual([]);
   });
-
-  it("still shows the label suggestions when the lookup finds some", async () => {
-    vi.mocked(searchService.get_promql_series).mockResolvedValue({
-      data: { data: [{ instance: "server-1", job: "api" }] },
-    } as any);
-    const fresh = usePromqlSuggestions();
-    fresh.autoCompleteData.value.query = "up{";
-    fresh.autoCompleteData.value.position.cursorIndex = 2;
-
-    await fresh.getSuggestions();
-    await flushPromises();
-
-    const labels = (fresh.autoCompletePromqlKeywords.value as any[]).map((k: any) => k.label);
-    expect(labels).toContain("instance");
-    expect(labels).not.toContain("rate");
-  });
-
   it("has the catalog ready before the first keystroke", async () => {
     // getSuggestions is what fills this list today, and getSuggestions only
     // runs on a query update — so a freshly opened PromQL editor has an EMPTY
@@ -745,3 +627,14 @@ describe("PromQL catalog reaches the editor", () => {
     expect((fresh.autoCompletePromqlKeywords.value as any[]).length).toBeGreaterThan(90);
   });
 });
+
+// ─── Removed with the series endpoint (tmp/code.md D11) ──────────────────────
+// Four tests lived here that drove getSuggestions through
+// /prometheus/api/v1/series: two asserted the call was made, one asserted the
+// label suggestions it produced, and one held its promise open to observe the
+// loading row. Item 21 replaced that source with the stream schema and the
+// field-value cache, so asserting the series call is now asserting the bug.
+//
+// Their subjects did not disappear with them: label names, label values and the
+// loading row are all covered in usePromqlSuggestions.streamSources.spec.ts,
+// against the sources that actually serve them.

@@ -100,7 +100,6 @@ import {
   resolveKeywords,
   resolveSuggestions,
   buildCompletionItems,
-  hasDynamicEntries,
 } from "@/utils/query/sqlCompletion";
 import {
   parseCallContext,
@@ -843,6 +842,7 @@ export default defineComponent({
                   insertTextRules: rules(),
                   tags: monaco.languages.CompletionItemTag,
                 }),
+                incomplete: true,
               };
             }
           }
@@ -869,9 +869,14 @@ export default defineComponent({
               insertTextRules: rules(),
               tags: monaco.languages.CompletionItemTag,
             }),
-            // Only a list whose content depends on the typed word needs
-            // re-querying; the shared catalog is static.
-            incomplete: hasDynamicEntries(suggestionList) || hasDynamicEntries(keywordList),
+            // ALWAYS incomplete, which is not about the content: `severity = `
+            // turns this same static catalog into a value list, and monaco
+            // re-filters what it has unless the previous answer said otherwise
+            // (suggestModel.js). So the values waited for a trigger character,
+            // and a value fetched from the server after this call could never
+            // arrive at all. Costs one provider call per keystroke over a local
+            // catalog and a cached lookup.
+            incomplete: true,
           };
         },
       });

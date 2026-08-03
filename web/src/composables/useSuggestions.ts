@@ -1,6 +1,6 @@
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
-import { getFieldValuesForSuggestion } from "@/composables/fieldValueStore";
+import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import {
   SQL_KEYWORDS,
   SQL_CLAUSE_KEYWORDS,
@@ -159,7 +159,22 @@ const useSqlSuggestions = () => {
         stored = [];
       }
     }
-    return [...new Set([...inSession, ...stored])];
+
+    const merged = [...new Set([...inSession, ...stored])];
+
+    // Nothing cached: ask the server, and do NOT wait for the answer. The
+    // completion provider awaits this function, so awaiting here would put a
+    // network round trip between the user and their dropdown on every value
+    // position. The fetch writes to the cache; the provider is invoked again on
+    // the next keystroke (its results are marked incomplete for exactly this
+    // reason), and that call reads the values locally.
+    if (!merged.length && org && streamType && streamName) {
+      void Promise.resolve(requestFieldValues({ org, streamType, streamName }, fieldName)).catch(
+        () => {},
+      );
+    }
+
+    return merged;
   };
 
   /**
