@@ -244,6 +244,50 @@ describe("requestFieldValues — not asking twice", () => {
   });
 });
 
+describe("requestFieldValues — a request that never answers", () => {
+  // services/http.ts has its axios timeout COMMENTED OUT, so nothing upstream
+  // ends a stalled request. Without a bound here the in-flight entry is never
+  // cleared, every later call joins the same dead promise, and the PromQL path
+  // — which awaits this — shows "...Loading" for the rest of the session with
+  // no keystroke able to recover it.
+  it("gives up rather than hanging its caller", { timeout: 5000 }, async () => {
+    vi.mocked(streamService.fieldValues).mockReturnValue(new Promise(() => {}) as any);
+    const store = await freshStore();
+    vi.useFakeTimers();
+    try {
+      const pending = store.requestFieldValues(ctx, "environment");
+      await vi.advanceTimersByTimeAsync(30_000);
+      await expect(pending).resolves.toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("is not wedged by it — a later request still goes out", { timeout: 5000 }, async () => {
+    vi.mocked(streamService.fieldValues).mockReturnValue(new Promise(() => {}) as any);
+    const store = await freshStore();
+    vi.useFakeTimers();
+    try {
+      const pending = store.requestFieldValues(ctx, "environment");
+      await vi.advanceTimersByTimeAsync(30_000);
+      await pending;
+
+      // Past the cooldown, with the endpoint healthy again.
+      vi.mocked(streamService.fieldValues).mockResolvedValue(
+        apiResponse(["development", "staging"]) as any,
+      );
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      await expect(store.requestFieldValues(ctx, "environment")).resolves.toEqual([
+        "development",
+        "staging",
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
+  });
+});
+
 describe("requestFieldValues — refusing to ask", () => {
   it("does not call the endpoint without a complete stream context", async () => {
     const store = await freshStore();

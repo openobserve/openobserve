@@ -58,6 +58,10 @@ const VALUES_LOOKBACK_MS = 15 * 60 * 1000;
 // endpoint charges for the rest.
 const VALUES_REQUEST_SIZE = 10;
 
+// How long to wait for the endpoint before giving up. services/http.ts has its
+// axios timeout commented out, so nothing upstream ends a stalled request.
+const VALUES_REQUEST_TIMEOUT_MS = 10_000;
+
 // How long to wait before asking again about a field that answered with nothing
 // — or whose request failed. NOT permanent: a transient 500, or one quiet
 // fifteen-minute window, must not disable a field's values for the session.
@@ -280,21 +284,35 @@ export const requestFieldValues = async (
   if (existing) return existing;
 
   const endMicros = Date.now() * 1000;
-  const request = streamService
-    .fieldValues({
-      org_identifier: ctx.org,
-      stream_name: ctx.streamName,
-      fields: [fieldName],
-      size: VALUES_REQUEST_SIZE,
-      start_time: endMicros - VALUES_LOOKBACK_MS * 1000,
-      end_time: endMicros,
-      // Without this a metrics or traces stream is read as logs, and answers
-      // with nothing.
-      type: ctx.streamType,
-      no_count: true,
-    })
-    .then((res: any) => {
-      const values: string[] = (res?.data?.hits?.[0]?.values ?? [])
+
+  // The timeout races the request, and the cleanup hangs off the RACE rather
+  // than off the request: a promise that never settles would never run its own
+  // finally, which is precisely the state being guarded against.
+  const request = (async (): Promise<string[]> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const response: any = await Promise.race([
+        streamService.fieldValues({
+          org_identifier: ctx.org,
+          stream_name: ctx.streamName,
+          fields: [fieldName],
+          size: VALUES_REQUEST_SIZE,
+          start_time: endMicros - VALUES_LOOKBACK_MS * 1000,
+          end_time: endMicros,
+          // Without this a metrics or traces stream is read as logs, and
+          // answers with nothing.
+          type: ctx.streamType,
+          no_count: true,
+        }),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("field values request timed out")),
+            VALUES_REQUEST_TIMEOUT_MS,
+          );
+        }),
+      ]);
+
+      const values: string[] = (response?.data?.hits?.[0]?.values ?? [])
         .map((entry: any) => String(entry?.zo_sql_key ?? ""))
         .filter((value: string) => value.length > 0);
 
@@ -302,17 +320,20 @@ export const requestFieldValues = async (
         captureFromValuesApi(
           ctx,
           fieldName,
-          values.map((key) => ({ key })),
+          values.map((value) => ({ key: value })),
         );
       else suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
 
       return values;
-    })
-    .catch(() => {
+    } catch {
+      // Failed, or took too long to matter. Either way, wait before asking again.
       suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
-      return [] as string[];
-    })
-    .finally(() => inFlightRequests.delete(key));
+      return [];
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+      inFlightRequests.delete(key);
+    }
+  })();
 
   inFlightRequests.set(key, request);
   return request;
