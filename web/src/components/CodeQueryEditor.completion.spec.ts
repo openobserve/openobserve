@@ -384,10 +384,18 @@ describe("Phase 1 — the registered completion provider", () => {
     expect((await invokeSug("SELECT a", "a")).incomplete).toBe(true);
   });
 
-  it("A2 — a purely static list is NOT reported as incomplete", async () => {
-    // Re-querying every keystroke for content that cannot change is wasted work.
-    expect((await invokeKw("SELECT a", "a")).incomplete).toBeFalsy();
-    expect((await invokeFallback("SELECT a", "a")).incomplete).toBeFalsy();
+  it("A2/D10 — even a static list is reported as incomplete", async () => {
+    // This asserted the OPPOSITE, on the reasoning that re-querying content
+    // which cannot change is wasted work. The content cannot change; the
+    // CONTEXT can. `severity = ` turns the same static catalog into a value
+    // list, and monaco will not ask again unless the previous answer said
+    // incomplete — so the values waited for a trigger character, and any value
+    // fetched from the server after the first call could never arrive at all.
+    //
+    // The wasted work is real and small: a local catalog and a cached lookup,
+    // rebuilt per keystroke. See tmp/code.md D10.
+    expect((await invokeKw("SELECT a", "a")).incomplete).toBe(true);
+    expect((await invokeFallback("SELECT a", "a")).incomplete).toBe(true);
   });
 
   it("B3 — deprecated aliases carry monaco's Deprecated tag (strikethrough)", async () => {
@@ -993,5 +1001,92 @@ describe("double-quote warnings reach the model", () => {
     const markers = await markersFor(`-- level = "error"\nSELECT * FROM t`, "dq-comment");
     expect(markers, "the validation never ran at all").not.toBeNull();
     expect(markers).toEqual([]);
+  });
+});
+
+
+// ─── Phase 5 (tmp/code.md D10) — the list must be re-queried, not re-filtered ─
+// Monaco only calls a provider again mid-word when the previous result said
+// `incomplete` (suggestModel.js). Ours says complete, so while the widget is
+// open monaco re-filters the list it already has — and the switch from fields
+// to VALUES waits for a trigger character. Reproduced live: at `severity = `
+// the widget still showed availability_zone/AWS/body; one quote later it showed
+// INFO/ERROR/WARN, and a fresh provider call at either position returned
+// values. The provider was right; the invalidation was wrong.
+//
+// It is also the mechanism D9 needs: values fetched from the server after the
+// first call can only reach the list if there IS a next call.
+describe("completion results invite monaco to ask again", () => {
+  const store9 = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  const providerFor = async (props: any) => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+    const before = createFn.mock.calls.length;
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
+    mount(CodeQueryEditor, {
+      props: { language: "sql", query: "", ...props },
+      global: { plugins: [store9] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+    return {
+      provide: registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1].provideCompletionItems,
+      model: createdEditors.at(-1)!.getModel(),
+    };
+  };
+
+  const ask = async (provide: any, model: any, textUntilCursor: string) => {
+    model.getValueInRange.mockReturnValue(textUntilCursor);
+    model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
+    return await provide(model, { lineNumber: 1, column: 1 }, {}, {});
+  };
+
+  const FIELDS = [
+    { name: "level", label: "level", kind: "Field", insertText: "level", detail: "Utf8" },
+  ];
+
+  it("marks the ordinary list incomplete", { timeout: 30000 }, async () => {
+    const { provide, model } = await providerFor({
+      editorId: "incomplete-normal",
+      keywords: FIELDS,
+      fieldValueResolver: async () => [],
+    });
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE ");
+    expect(result.incomplete, "monaco will re-filter this list instead of asking again").toBe(true);
+  });
+
+  it("marks the VALUE list incomplete too", { timeout: 30000 }, async () => {
+    // The values on screen may be a cold-cache partial answer, with the real
+    // ones still in flight; the next keystroke has to come back here.
+    const { provide, model } = await providerFor({
+      editorId: "incomplete-values",
+      keywords: FIELDS,
+      fieldValueResolver: async () => ["error"],
+    });
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    expect(result.suggestions.map((s: any) => s.label)).toEqual(["error"]);
+    expect(result.incomplete).toBe(true);
+  });
+
+  it("switches to values as soon as the operator is typed", { timeout: 30000 }, async () => {
+    // The user-visible half: no quote needed, no second trigger character.
+    const { provide, model } = await providerFor({
+      editorId: "incomplete-switch",
+      keywords: FIELDS,
+      fieldValueResolver: async (f: string) => (f === "level" ? ["error", "warn"] : []),
+    });
+    const before = await ask(provide, model, "SELECT * FROM logs WHERE lev");
+    expect(before.suggestions.map((s: any) => s.label)).toContain("level");
+
+    const after = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    expect(after.suggestions.map((s: any) => s.label)).toEqual(["error", "warn"]);
   });
 });
