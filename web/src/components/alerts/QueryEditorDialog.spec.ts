@@ -541,20 +541,27 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
   });
 });
 
-// ─── Phase 1 (tmp/code.md N1) ─────────────────────────────────────────────────
-// QueryEditorDialog wires the whole autocomplete pipeline in handleQueryUpdate
-// (query, cursorIndex, org/stream context, popup.open, getSuggestions) but binds
-// :keywords="autoCompleteKeywords" — the BASE list — instead of effectiveKeywords.
+// ─── Phase 1 (N1) / Phase 3 (C4) — autocomplete reaches the editor ───────────
+// These two tests used to drive a VALUE context and assert that values arrived
+// through `keywords` while `suggestions` went blank. That was the only way to
+// tell effectiveKeywords from autoCompleteKeywords, which are identical unless
+// a context is active — and it was a fair test until the value round trip was
+// removed: the completion PROVIDER now resolves values itself, so nothing
+// pushes them through the props any more.
 //
-// Comparing the bound prop against vm.effectiveKeywords would pass even with the
-// bug, because effectiveKeywords returns autoCompleteKeywords verbatim when no
-// context is active. Drive a real VALUE context instead.
+// What replaces each half:
+//   - the N1 invariant (bind the context-aware list, never the base one) is now
+//     enforced for EVERY editor host in utils/query/editorWiring.spec.ts, which
+//     needs no context to make the distinction visible;
+//   - what this file can still prove is its own wiring — that the resolver the
+//     provider awaits arrives, and resolves against the stream context the
+//     dialog sets.
 
-describe("QueryEditorDialog - N1 context keywords reach the editor", () => {
+describe("QueryEditorDialog - autocomplete wiring reaches the editor", () => {
   const editorStubDef = {
     name: "UnifiedQueryEditor",
     template: '<div class="stub-kw-editor" />',
-    props: ["query", "keywords", "suggestions"],
+    props: ["query", "keywords", "suggestions", "fieldValueResolver"],
     emits: ["update:query", "blur", "focus", "language-change", "ask-ai", "run-query"],
     methods: {
       // handleQueryUpdate reads these off queryEditorRef.
@@ -594,8 +601,7 @@ describe("QueryEditorDialog - N1 context keywords reach the editor", () => {
             name: "ODrawer",
             props: ["open", "size", "showClose", "bleed", "persistent", "title", "width"],
             emits: ["update:open"],
-            template:
-              "<div><slot name='header-left' /><slot name='header-right' /><slot /></div>",
+            template: "<div><slot name='header-left' /><slot name='header-right' /><slot /></div>",
           },
           FullViewContainer: {
             template: "<div><slot /><slot name='right' /></div>",
@@ -612,27 +618,35 @@ describe("QueryEditorDialog - N1 context keywords reach the editor", () => {
     expect(wrapper.findComponent({ name: "UnifiedQueryEditor" }).exists()).toBe(true);
   });
 
-  it("delivers field VALUES to the editor once the cursor is after an operator", async () => {
+  it("hands the editor a resolver that produces the stored values", async () => {
     const wrapper = mountWithStub();
     const editor = wrapper.findComponent({ name: "UnifiedQueryEditor" });
+    // Drives handleQueryUpdate, which is where the dialog sets the org/stream
+    // context the lookup is keyed on. Without that the resolver returns [] and
+    // this fails — which is the wiring worth guarding.
     await editor.vm.$emit("update:query", "level = ");
     await flushPromises();
 
-    const delivered = (editor.props("keywords") ?? []) as any[];
-    expect(delivered.some((k) => k.kind === "Value")).toBe(true);
+    const resolve = editor.props("fieldValueResolver") as (f: string) => Promise<string[]>;
+    expect(typeof resolve, "no resolver reached the editor").toBe("function");
+    await expect(resolve("level")).resolves.toEqual(expect.arrayContaining(["error", "warn"]));
   });
 
-  it("blanks the function suggestions while in value context", async () => {
+  it("leaves the catalog suggestions alone in a value position", async () => {
+    // The provider swaps the whole list out for values itself. The parent
+    // blanking the catalog was part of the removed round trip, and doing it
+    // here would now take the functions away for no one's benefit.
     const wrapper = mountWithStub();
     const editor = wrapper.findComponent({ name: "UnifiedQueryEditor" });
     await editor.vm.$emit("update:query", "level = ");
     await flushPromises();
 
-    expect(editor.props("suggestions")).toEqual([]);
+    const suggestions = (editor.props("suggestions") ?? []) as any[];
+    expect(suggestions.some((s: any) => s.name === "match_all")).toBe(true);
   });
 });
 
-// Stored field values for the N1 value-context probe above. Only useSuggestions
+// Stored field values for the resolver test above. Only useSuggestions
 // consumes this module, so mocking it does not affect the rest of the suite.
 vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue(["error", "warn"]),

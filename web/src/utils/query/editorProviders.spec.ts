@@ -528,7 +528,7 @@ describe("rankNumericFieldsFirst", () => {
     },
     { label: "value", kind: "Field", detail: "Float64", sortText: `${FIELD_LANE}value` },
     { label: "duration_ms", kind: "Field", detail: "Int64", sortText: `${FIELD_LANE}duration_ms` },
-    { label: "avg", kind: "Function", detail: "(field)", sortText: "avg" },
+    { label: "avg", kind: "Function", detail: "(field)", sortText: "\u0001avg" },
   ] as any[];
 
   // localeCompare ignores the control characters the lanes are built from, so

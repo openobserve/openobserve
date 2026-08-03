@@ -331,7 +331,7 @@ describe("N7 — optional metadata is forwarded to monaco", () => {
     documentation: "Approximate top-k aggregation.",
     insertText: "approx_topk(${1:field}, ${2:10})",
     insertTextRules: "InsertAsSnippet",
-    sortText: "approx_topk",
+    sortText: "\u0002approx_topk",
   };
 
   it("forwards detail", () => {
@@ -347,7 +347,7 @@ describe("N7 — optional metadata is forwarded to monaco", () => {
   });
 
   it("forwards sortText", () => {
-    expect(build({ suggestions: [rich] })[0].sortText).toBe("approx_topk");
+    expect(build({ suggestions: [rich] })[0].sortText).toBe("\u0002approx_topk");
   });
 
   it("attaches the supplied range to every item", () => {
