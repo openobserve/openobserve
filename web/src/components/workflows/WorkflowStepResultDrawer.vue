@@ -202,16 +202,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("workflow.test.stepResult.forwardedHeading") }}
                 </div>
                 <div
-                  v-for="(m, i) in outputBranchMeta"
+                  v-for="(label, i) in showBranchLabels ? outputBranchLabels : []"
                   :key="i"
                   data-test="workflow-step-result-output-branch-label"
                   class="text-text-secondary flex shrink-0 items-center gap-1 px-2.5 pt-2 text-xs font-medium"
                 >
                   <OIcon name="arrow-right" size="xs" />
-                  <span class="min-w-0 truncate">{{ m.label }}</span>
-                  <span class="shrink-0">·
-                    {{ t("workflow.test.stepResult.recordCount", { count: m.count }) }}</span
-                  >
+                  <span class="min-w-0 truncate">{{ label }}</span>
                 </div>
                 <div class="min-h-0 flex-1" data-test="workflow-step-result-output-records">
                   <CodeQueryEditor
@@ -438,21 +435,23 @@ const outputRecordsText = computed<string | null>(() => {
 
 // Caption line(s) shown above the output editor — where the records went and how
 // many. One entry per downstream target (terminal → the external send).
-const outputBranchMeta = computed<{ label: string; count: number }[]>(() => {
+const outputBranchLabels = computed<string[]>(() => {
   if (isTerminal.value) {
     const recs = nodeTestInput(nodeId.value);
-    return recs && recs.length
-      ? [{ label: t("workflow.test.stepResult.sentExternally"), count: recs.length }]
-      : [];
+    return recs && recs.length ? [t("workflow.test.stepResult.sentExternally")] : [];
   }
   return nodeTestOutputBranches(nodeId.value)
     .filter((b) => Array.isArray(b.records) && b.records.length)
     .map((b) => {
       const typeName = nodeMeta(b.nodeType) ? t(nodeMeta(b.nodeType)!.titleKey) : b.nodeType;
-      const label = b.detail ? `${typeName} · ${b.detail}` : typeName;
-      return { label, count: (b.records as any[]).length };
+      return b.detail ? `${typeName} · ${b.detail}` : typeName;
     });
 });
+// A caption above the output editor is shown ONLY when it adds information: a
+// terminal (names the external send) or a fan-out (distinguishes branches). For a
+// single downstream the target is obvious from the canvas, so we show no caption at
+// all — a "→ to node X" line there just reads as noise.
+const showBranchLabels = computed(() => isTerminal.value || outputBranchLabels.value.length > 1);
 
 // When nothing was emitted, explain WHY in the node's own terms: a condition
 // matched nothing (the common, actionable case) vs. a generic drop.

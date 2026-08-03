@@ -2222,7 +2222,6 @@
         "useAsTestInput": "Use these records as the test input",
         "useAsTestInputNoInput": "No input records to use as the test input.",
         "useAsTestInputNoOutput": "This step produced no output to use as the test input.",
-        "recordCount": "{count} record(s)",
         "copyInput": "Copy Input",
         "copyOutput": "Copy Output",
         "copiedInput": "Input copied to clipboard",

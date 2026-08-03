@@ -260,11 +260,14 @@ describe("WorkflowStepResultDrawer", () => {
       expect(JSON.parse(editor.props("query"))).toEqual([rec(3)]); // f1's output == d1's input
     });
 
-    it("shows a branch caption with the record count", () => {
+    it("single downstream: NO caption (the target is obvious from the canvas)", () => {
+      // f1 -> d1 (single). No "→ Destination · sink-a" line, no record count — just
+      // the records in the editor.
       const wrapper = mountDrawer();
-      const label = wrapper.find('[data-test="workflow-step-result-output-branch-label"]');
-      expect(label.exists()).toBe(true);
-      expect(label.text()).toContain(t("workflow.test.stepResult.recordCount", { count: 1 }));
+      expect(wrapper.find('[data-test="workflow-step-result-output-branch-label"]').exists()).toBe(
+        false,
+      );
+      expect(outputEditor(wrapper)).toBeTruthy();
     });
 
     it("terminal (destination): shows the records it sent, with the 'sent externally' caption", () => {
@@ -284,10 +287,15 @@ describe("WorkflowStepResultDrawer", () => {
         ],
         result: { errors: {}, inputs: { t1: [rec(1)], f1: [rec(2)], d1: [rec(3)] }, ranNodeIds: ["t1", "f1", "d1"], blockedNodeIds: [] },
       });
-      const out = JSON.parse(outputEditor(mountDrawer()).props("query"));
+      const wrapper = mountDrawer();
+      const out = JSON.parse(outputEditor(wrapper).props("query"));
       const keys = Object.keys(out);
       expect(keys).toHaveLength(2);
       expect(keys.every((k) => k.startsWith("→ "))).toBe(true);
+      // fan-out DOES keep a caption per branch (to tell them apart)
+      expect(wrapper.findAll('[data-test="workflow-step-result-output-branch-label"]')).toHaveLength(
+        2,
+      );
     });
 
     it("errored node: shows the error message(s) AND the records it forwarded", () => {
