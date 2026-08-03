@@ -167,76 +167,37 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  generate_matrix:
+    timeout-minutes: 5
+    name: generate_matrix
+    needs: [check_main_changed]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: gen
+        run: |
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix_regression.json)
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
+
   ui_integration_tests:
     timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary]
+    needs: [build_binary, generate_matrix]
     runs-on:
       labels: eks-openobserve-standard-8
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - testfolder: "Logs-Regression"
-            run_files:
-              [
-                "logs-regression.spec.js",
-                "logs-bugs.spec.js",
-                "logs-9754.spec.js",
-                "logs-9044-7354.spec.js",
-              ]
-          - testfolder: "Alerts-Regression"
-            run_files:
-              [
-                "alerts-regression.spec.js",
-                "alerts-stream-switching.spec.js",
-                "alerts-bugs.spec.js",
-              ]
-          - testfolder: "Dashboard-Regression"
-            run_files:
-              [
-                "dashboard-regression.spec.js",
-              ]
-          - testfolder: "Streams-Regression"
-            run_files:
-              [
-                "streams-regression.spec.js",
-              ]
-          - testfolder: "Pipelines-Regression"
-            run_files:
-              [
-                "enrichment-regression.spec.js",
-                "pipeline-regression.spec.js",
-              ]
-          - testfolder: "Traces-Regression"
-            run_files:
-              [
-                "traces-regression.spec.js",
-                "traces-bugs.spec.js",
-              ]
-          - testfolder: "Metrics-Regression"
-            run_files:
-              [
-                "metrics-regression.spec.js",
-              ]
-          - testfolder: "GeneralTests-Regression"
-            run_files:
-              [
-                "ui-regression.spec.js",
-                "landing-regression.spec.js",
-              ]
-          - testfolder: "DataSources-Regression"
-            run_files:
-              [
-                "datasources-regression.spec.js",
-              ]
-          - testfolder: "Reports-Regression"
-            run_files:
-              [
-                "reports-regression-bugs.spec.js",
-              ]
+      # Matrix from tests/ui-testing/ci-matrix/ci_matrix_regression.json (single source of
+      # truth, shared with ENT via build-ci-matrix.js). Edit that JSON, not this file.
+      matrix: ${{ fromJSON(needs.generate_matrix.outputs.matrix) }}
 
     steps:
       - name: Kill background apt processes
@@ -326,23 +287,10 @@ jobs:
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
 
           if [ -n "$FILE_LIST" ]; then
-            # Derive feature subfolder from testfolder (maps testfolder name → directory under RegressionSet/)
-            case "${{ matrix.testfolder }}" in
-              "Dashboard-Regression")   FEATURE="Dashboards" ;;
-              "Pipelines-Regression")   FEATURE="Pipelines" ;;
-              "Alerts-Regression")      FEATURE="Alerts" ;;
-              "Logs-Regression")        FEATURE="Logs" ;;
-              "Traces-Regression")      FEATURE="Traces" ;;
-              "Metrics-Regression")     FEATURE="Metrics" ;;
-              "Streams-Regression")     FEATURE="Streams" ;;
-              "Reports-Regression")     FEATURE="Reports" ;;
-              "DataSources-Regression") FEATURE="DataSources" ;;
-              "GeneralTests-Regression") FEATURE="General" ;;
-              *)                        FEATURE="RegressionSet" ;;
-            esac
-            ACTUAL_FOLDER="RegressionSet/$FEATURE"
+            # actual_folder (e.g. RegressionSet/Logs) comes from the matrix now —
+            # the testfolder->directory mapping lives in ci_matrix_regression.json.
+            ACTUAL_FOLDER="${{ matrix.actual_folder }}"
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
-            echo "DEBUG: FEATURE = $FEATURE"
 
             FILE_PATHS=""
             for file in $FILE_LIST; do

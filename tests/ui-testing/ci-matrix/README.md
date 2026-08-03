@@ -1,19 +1,42 @@
-# Playwright CI shard matrix — single source of truth
+# Playwright CI shard matrices — single source of truth
 
-`ci-matrix.json` (this directory) is the **only** place the Playwright UI shard list
+## Manifest index
+
+Each Playwright workflow builds its matrix from one of these JSON files (via a
+`generate_matrix` job). Shared workflows use an OSS **base** + an ENT **overlay**
+(`*.ent.json`, in the enterprise repo); ENT-only workflows use a standalone manifest.
+
+| Manifest | Drives workflow | Kind |
+|---|---|---|
+| `ci_matrix.json` (+ ENT `ci_matrix.ent.json`) | `playwright.yml` (PR gate) | shared base + overlay |
+| `ci_matrix_regression.json` (+ ENT `ci_matrix_regression.ent.json`) | `playwright_regression.yml` | shared base + overlay |
+| `ci_matrix_cloud.json` *(ENT repo)* | `playwright_alpha1.yml` | ENT-only standalone |
+| `ci_matrix_env.json` *(ENT repo)* | `playwright_env.yml` | ENT-only standalone |
+| `ci_matrix_env_scheduled.json` *(ENT repo)* | `playwright_env_scheduled.yml` | ENT-only standalone |
+| `ci_matrix_firefox.json` *(ENT repo)* | `playwright-firefox-ondemand.yml` | ENT-only standalone |
+
+Base manifests + `build-ci-matrix.js` live in OSS; overlays and ENT-only manifests live
+in `o2-enterprise/tests/ui-testing/ci-matrix/`. The merge script is shared (ENT reuses it
+from its OSS checkout).
+
+---
+
+## The shared PR-gate matrix (below refers to `ci_matrix.json`)
+
+`ci_matrix.json` (this directory) is the **only** place the Playwright UI shard list
 lives. Both the OSS and Enterprise `playwright.yml` workflows build their test matrix
 from it at run time via `.github/scripts/build-ci-matrix.js`, so a spec added here runs
 in **both** repos automatically — no more hand-syncing two workflow files.
 
 ## Adding / moving a spec
 
-- **A spec both OSS and ENT run:** edit `ci-matrix.json` only. Add the filename to the
+- **A spec both OSS and ENT run:** edit `ci_matrix.json` only. Add the filename to the
   `run_files` of the right shard (`testfolder`). Done — ENT picks it up on its next run.
-- **An enterprise-only spec:** edit `o2-enterprise/tests/ui-testing/ci-matrix.ent.json`
+- **An enterprise-only spec:** edit `o2-enterprise/tests/ui-testing/ci-matrix/ci_matrix.ent.json`
   (the overlay), never this file. Two shapes:
   - add it to an existing shared shard → `"append": { "<testfolder>": ["my.spec.js"] }`
   - a whole new ENT-only shard → add an object to `"shards": [ … ]`.
-- **A new shard:** add a new object to `ci-matrix.json` with `testfolder`,
+- **A new shard:** add a new object to `ci_matrix.json` with `testfolder`,
   `actual_folder`, `browser`, `run_files`.
 
 ## Fields
@@ -50,4 +73,4 @@ A spec cannot be in both `run_files` and `disabled` — the build fails if it is
 `"disabled": { "Alerts": [ { "file": "…", "reason": "…" } ] }`.
 
 The ENT overlay only ever carries the **delta** from OSS. It must not re-list any spec
-already in `ci-matrix.json`; `build-ci-matrix.js` fails the run if it does.
+already in `ci_matrix.json`; `build-ci-matrix.js` fails the run if it does.

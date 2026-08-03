@@ -176,7 +176,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # Build the shard matrix from tests/ui-testing/ci-matrix.json (single source of truth,
+  # Build the shard matrix from tests/ui-testing/ci-matrix/ci_matrix.json (single source of truth,
   # shared with ENT via build-ci-matrix.js). Runs under the same gate as build_binary so
   # ui_integration_tests always has a matrix whenever it is allowed to run.
   generate_matrix:
@@ -197,7 +197,7 @@ jobs:
       - uses: actions/checkout@v5
       - id: gen
         run: |
-          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix.json)
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json)
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
 
@@ -216,7 +216,7 @@ jobs:
     #   options: --user root
     strategy:
       fail-fast: false
-      # Matrix is generated from tests/ui-testing/ci-matrix.json by the
+      # Matrix is generated from tests/ui-testing/ci-matrix/ci_matrix.json by the
       # generate_matrix job (the single source of truth shared with ENT). To add
       # or move a spec, edit that JSON file — do NOT hand-edit a matrix here.
       matrix: ${{ fromJSON(needs.generate_matrix.outputs.matrix) }}
@@ -337,7 +337,7 @@ jobs:
 
           if [ -n "$FILE_LIST" ]; then
             # actual_folder (the real directory under playwright-tests/) comes straight
-            # from the matrix now — the logical->directory mapping lives in ci-matrix.json.
+            # from the matrix now — the logical->directory mapping lives in ci-matrix/ci_matrix.json.
             ACTUAL_FOLDER="${{ matrix.actual_folder }}"
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
 

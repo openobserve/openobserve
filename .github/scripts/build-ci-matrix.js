@@ -9,8 +9,8 @@
  *   node build-ci-matrix.js <base.json>                 # OSS: base manifest verbatim
  *   node build-ci-matrix.js <base.json> <overlay.json>  # ENT: base + enterprise overlay
  *
- * The base (OSS tests/ui-testing/ci-matrix.json) is the ONLY place shared shards are
- * listed. ENT never re-lists shared specs — its overlay (ci-matrix.ent.json) carries
+ * The base (OSS tests/ui-testing/ci-matrix/ci_matrix.json) is the ONLY place shared shards are
+ * listed. ENT never re-lists shared specs — its overlay (ci_matrix.ent.json) carries
  * only the delta, so a spec added to OSS flows into ENT automatically:
  *   { "append": { "<testfolder>": ["extra.spec.js", ...] },   // add ENT-only specs to a shared shard
  *     "shards": [ {testfolder,actual_folder,browser,run_files} ], // whole ENT-only shards (Workflows, SDR…)
