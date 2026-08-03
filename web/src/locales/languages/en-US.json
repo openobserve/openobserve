@@ -240,6 +240,12 @@
       "import": "Import pipeline",
       "importDesc": "Upload a pipeline definition"
     },
+    "noDatasets": {
+      "title": "Create your first dataset",
+      "description": "Golden datasets collect annotated traces and reviews into versioned evaluation sets. Create one to start curating.",
+      "action": "New dataset",
+      "actionDesc": "Start an empty dataset"
+    },
     "noFunctions": {
       "title": "Create your first function",
       "description": "Functions enrich and reshape your data at ingest or query time. Add one to get started.",
@@ -8787,6 +8793,7 @@
     },
     "sections": {
       "monitor": "Monitor",
+      "annotate": "Annotate",
       "evaluate": "Evaluate"
     },
     "nav": {
@@ -8794,6 +8801,7 @@
       "sessions": "Sessions",
       "agentGraph": "Agent Graph",
       "agentBehavior": "Agent Behavior",
+      "datasets": "Datasets",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
@@ -8804,10 +8812,42 @@
       "sessions": "Browse and inspect agent sessions turn by turn",
       "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
       "agentBehavior": "Spot agents stuck in loops and the errors making them fail",
+      "datasets": "Curate golden datasets from annotated traces and reviews",
       "quality": "Track score quality across span, trace, and session evaluations",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
+    },
+    "datasets": {
+      "listTitle": "Datasets",
+      "searchPlaceholder": "Search Datasets...",
+      "newButton": "New Dataset",
+      "loadError": "Failed to load datasets",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "tags": "Tags",
+        "sources": "Sources",
+        "items": "Items",
+        "version": "Version",
+        "updated": "Updated"
+      },
+      "source": {
+        "trace": "trace",
+        "annotation": "annotation",
+        "manual": "manual"
+      },
+      "create": {
+        "title": "New Dataset",
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. Support Reply Quality",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "What this dataset is for (optional)",
+        "tagsLabel": "Tags",
+        "tagsPlaceholder": "Type a tag, press Enter...",
+        "success": "Dataset created",
+        "error": "Failed to create dataset"
+      }
     },
     "scope": {
       "env": "Env",
