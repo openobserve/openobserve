@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-pub mod cipher_key;
-pub mod column;
-pub mod group_by;
-pub mod histogram_interval;
-pub mod match_all;
-pub mod partition_column;
-pub mod pickup_where;
-pub mod streaming_aggregate;
-pub mod utils;
+pub mod streaming_agg;

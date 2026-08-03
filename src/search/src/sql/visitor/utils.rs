@@ -16,7 +16,15 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use datafusion::sql::TableReference;
-use sqlparser::ast::{Expr, Ident, VisitorMut};
+use sqlparser::ast::{Expr, Ident, ObjectNamePart, VisitorMut};
+
+/// Extract the identifier value from a SQL object-name component.
+pub(super) fn get_object_name_value(part: &ObjectNamePart) -> String {
+    match part {
+        ObjectNamePart::Identifier(ident) => ident.value.clone(),
+        ObjectNamePart::Function(_) => "__UNKNOWN_FUNCTION__".to_string(),
+    }
+}
 
 pub struct FieldNameVisitor {
     pub field_names: HashSet<String>,

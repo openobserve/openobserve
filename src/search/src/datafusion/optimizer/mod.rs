@@ -40,19 +40,16 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use infra::schema::get_stream_setting_index_fields;
-#[cfg(feature = "enterprise")]
-use {
-    crate::datafusion::optimizer::context::generate_streaming_agg_rules,
-    crate::datafusion::optimizer::logical_optimizer::cipher::{
-        RewriteCipherCall, RewriteCipherKey,
-    },
-    o2_enterprise::enterprise::search::datafusion::optimizer::eliminate_aggregate::EliminateAggregateRule,
-};
 
+#[cfg(feature = "enterprise")]
+use crate::datafusion::optimizer::logical_optimizer::cipher::{
+    RewriteCipherCall, RewriteCipherKey,
+};
 use crate::{
     datafusion::optimizer::{
         analyze::remove_index_fields::RemoveIndexFieldsRule,
-        context::PhysicalOptimizerContext,
+        context::{PhysicalOptimizerContext, generate_streaming_agg_rules},
+        eliminate_aggregate::EliminateAggregateRule,
         logical_optimizer::{
             add_sort_and_limit::AddSortAndLimitRule, limit_join_right_side::LimitJoinRightSide,
             rewrite_histogram::RewriteHistogram,
@@ -68,8 +65,10 @@ use crate::{
 
 pub mod analyze;
 pub mod context;
+pub mod eliminate_aggregate;
 pub mod logical_optimizer;
 pub mod physical_optimizer;
+pub mod stream_aggregate;
 pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
@@ -180,13 +179,9 @@ pub fn generate_physical_optimizer_rules(
                 rules.push(Arc::new(AggregateTopkRule::new(sql.limit)));
             }
             PhysicalOptimizerContext::StreamingAggregation(context) => {
-                if let Some(_context) = context {
-                    #[cfg(feature = "enterprise")]
-                    rules.push(generate_streaming_agg_rules(_context));
-                    #[cfg(feature = "enterprise")]
+                if let Some(context) = context {
+                    rules.push(generate_streaming_agg_rules(context));
                     rules.push(Arc::new(EliminateAggregateRule::new()) as _);
-                    #[cfg(not(feature = "enterprise"))]
-                    continue;
                 }
             }
         }

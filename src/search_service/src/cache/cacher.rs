@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ::search::{CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy};
+use ::search::{
+    CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
+    cache::streaming_agg::STREAMING_AGGS_CACHE_DIR,
+};
 use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME,
@@ -24,8 +27,6 @@ use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
     meta::ResultCacheMeta,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::cache::streaming_agg::STREAMING_AGGS_CACHE_DIR;
 
 use crate::{
     cache::{
@@ -867,21 +868,18 @@ pub async fn delete_cache(
     }
 
     // Part 2: delete the aggregation cache
-    #[cfg(feature = "enterprise")]
-    {
-        let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
-        let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
+    let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
+    let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
 
-        for file in aggs_files {
-            if !should_delete_cache_file(&file, &criteria) {
-                continue;
-            }
-            match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
-                Ok(_) => remove_files.push(file),
-                Err(e) => {
-                    log::error!("Error deleting cache: {:?}", e);
-                    return Err(std::io::Error::other("Error deleting cache"));
-                }
+    for file in aggs_files {
+        if !should_delete_cache_file(&file, &criteria) {
+            continue;
+        }
+        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+            Ok(_) => remove_files.push(file),
+            Err(e) => {
+                log::error!("Error deleting cache: {:?}", e);
+                return Err(std::io::Error::other("Error deleting cache"));
             }
         }
     }
