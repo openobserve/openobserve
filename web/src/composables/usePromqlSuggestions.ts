@@ -11,7 +11,12 @@ const NON_LABEL_COLUMNS = new Set(["value", "_timestamp", "__hash__", "__name__"
 
 // One schema per metric per page, shared by every editor. A metrics stream is
 // named for its metric, so this is also the label list.
+//
+// Keyed by ORGANISATION and metric, because organisations are switched in place
+// in this SPA and metric names are not unique across them — the field-value
+// cache is scoped the same way, for the same reason.
 const metricLabelCache = new Map<string, string[]>();
+const metricLabelCacheKey = (org: string, metric: string) => `${org}|${metric}`;
 import { useStore } from "vuex";
 
 const usePromqlSuggestions = () => {
@@ -177,7 +182,15 @@ const usePromqlSuggestions = () => {
     return labelMeta;
   }
 
+  // Bumped by every suggestion pass. A lookup that finishes after a newer one
+  // started has been overtaken and must not publish: values are a network call
+  // with a ten-second ceiling, so `{service="` can easily answer after the user
+  // has moved on to `{region="`.
+  let suggestionGeneration = 0;
+
   const getSuggestions = async () => {
+    const generation = ++suggestionGeneration;
+    const isCurrent = () => generation === suggestionGeneration;
     try {
       const parsedQuery: any = parsePromQlQuery(autoCompleteData.value.query);
       const metricName = parsedQuery?.metricName || "";
@@ -229,15 +242,18 @@ const usePromqlSuggestions = () => {
         // with all of its labels for the client to dedupe — 5903 bytes where
         // the schema answers in 1699, and it is metadata, so no scan at all.
         try {
-          let labels = metricLabelCache.get(metricName);
+          const cacheKey = metricLabelCacheKey(org, metricName);
+          let labels = metricLabelCache.get(cacheKey);
           if (!labels) {
             const response: any = await streamService.schema(org, metricName, "metrics");
             const columns = response?.data?.schema ?? response?.data?.uds_schema ?? [];
             labels = columns
               .map((column: any) => column?.name)
               .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name));
-            metricLabelCache.set(metricName, labels as string[]);
+            metricLabelCache.set(cacheKey, labels as string[]);
           }
+
+          if (!isCurrent()) return;
 
           const alreadyFiltered = formattedLabels.join(",");
           updatePromqlKeywords(
@@ -254,6 +270,7 @@ const usePromqlSuggestions = () => {
           );
         } catch {
           // The labels are unavailable; the language is not.
+          if (!isCurrent()) return;
           updatePromqlKeywords([]);
           autoCompleteData.value.popup.close("");
         }
@@ -270,6 +287,8 @@ const usePromqlSuggestions = () => {
       } catch {
         values = [];
       }
+
+      if (!isCurrent()) return;
 
       // Quoting, decided from what is actually around the cursor. Monaco
       // auto-closes `"`, so the model is `service=""` with the cursor between

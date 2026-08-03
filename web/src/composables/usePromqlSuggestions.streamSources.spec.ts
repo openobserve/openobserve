@@ -43,12 +43,14 @@ vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
   requestFieldValues: vi.fn().mockResolvedValue([]),
 }));
+// A SINGLE mutable store, so a test can switch organisation the way the app
+// does — in place, without a page reload.
+const mockStore = vi.hoisted(() => ({
+  state: { selectedOrganization: { identifier: "myorg" } },
+}));
 vi.mock("vuex", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vuex")>();
-  return {
-    ...actual,
-    useStore: vi.fn(() => ({ state: { selectedOrganization: { identifier: "myorg" } } })),
-  };
+  return { ...actual, useStore: vi.fn(() => mockStore) };
 });
 
 import searchService from "@/services/search";
@@ -100,6 +102,7 @@ const offered = (c: any) => c.autoCompletePromqlKeywords.value as any[];
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockStore.state.selectedOrganization.identifier = "myorg";
   vi.mocked(streamService.schema).mockResolvedValue(METRIC_SCHEMA as any);
   vi.mocked(getFieldValuesForSuggestion).mockResolvedValue([]);
   vi.mocked(requestFieldValues).mockResolvedValue([]);
@@ -346,6 +349,72 @@ describe("while a lookup is in flight", () => {
     const rows = offered(c);
     expect(rows.filter((k: any) => k.label === "...Loading")).toHaveLength(1);
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("caches and races", () => {
+  it("does not serve one organisation's labels to another", async () => {
+    // The same class of bug as the cross-tenant transform leak fixed earlier in
+    // this workstream: a cache keyed on the metric alone. Organisations are
+    // switched IN PLACE in this SPA, metric names are not unique across them,
+    // and label names are that tenant's schema.
+    const c = await freshComposable();
+    const query = "cpu_utilization_percent{";
+    const ask = async () => {
+      c.autoCompleteData.value.query = query;
+      c.autoCompleteData.value.position.cursorIndex = query.length - 1;
+      await c.getSuggestions();
+      await flushPromises();
+      return offered(c).map((k: any) => k.label);
+    };
+
+    vi.mocked(streamService.schema).mockResolvedValue({
+      data: { schema: [{ name: "tenant_a_only", type: "Utf8" }] },
+    } as any);
+    expect(await ask()).toContain("tenant_a_only");
+
+    mockStore.state.selectedOrganization.identifier = "otherorg";
+    vi.mocked(streamService.schema).mockResolvedValue({
+      data: { schema: [{ name: "tenant_b_only", type: "Utf8" }] },
+    } as any);
+
+    const afterSwitch = await ask();
+    expect(afterSwitch, "served the previous tenant's labels").not.toContain("tenant_a_only");
+    expect(afterSwitch).toContain("tenant_b_only");
+    expect(vi.mocked(streamService.schema).mock.calls.at(-1)?.[0]).toBe("otherorg");
+  });
+
+  it("ignores a slow lookup that lands after a newer one", async () => {
+    // Values are a network call with a ten-second ceiling. Type `{service="`,
+    // change your mind to `{region="`, and the first answer can arrive last and
+    // overwrite the second — offering service names for a region filter.
+    const c = await freshComposable();
+    let resolveSlow: (v: string[]) => void = () => {};
+    vi.mocked(getFieldValuesForSuggestion)
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveSlow = resolve)) as any)
+      .mockResolvedValue(["us-east-1"]);
+
+    const first = 'cpu_utilization_percent{service="';
+    c.autoCompleteData.value.query = first;
+    c.autoCompleteData.value.position.cursorIndex = first.length - 1;
+    void c.getSuggestions();
+    await flushPromises();
+
+    const second = 'cpu_utilization_percent{region="';
+    c.autoCompleteData.value.query = second;
+    c.autoCompleteData.value.position.cursorIndex = second.length - 1;
+    await c.getSuggestions();
+    await flushPromises();
+    expect(offered(c).map((k: any) => k.label)).toEqual(["us-east-1"]);
+
+    // The abandoned request finally answers.
+    resolveSlow(["api-gateway", "chat-service"]);
+    await flushPromises();
+
+    expect(
+      offered(c).map((k: any) => k.label),
+      "a stale lookup overwrote the current one",
+    ).toEqual(["us-east-1"]);
   });
 });
 
