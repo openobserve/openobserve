@@ -4657,7 +4657,7 @@
     "summaryActive": "Active",
     "summaryPaused": "Paused",
     "summaryFailed": "Failed",
-    "summaryRecent": "Fired < 15m",
+    "summaryRecent": "Triggered < 15m",
     "summaryTotal": "Total",
     "numOfEvents": "Number of Events",
     "view": "View",

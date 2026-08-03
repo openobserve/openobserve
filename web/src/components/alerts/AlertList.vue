@@ -1021,6 +1021,9 @@ export default defineComponent({
       let failed = 0;
       let recent = 0;
       for (const r of rows) {
+        // active = unpaused (enabled); paused = disabled. These two partition the
+        // rows. `failed` is an orthogonal health overlay (a failed anomaly is still
+        // active), so it is counted separately and may overlap with active/paused.
         if (r.enabled) active += 1;
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
@@ -1105,7 +1108,14 @@ export default defineComponent({
       if (!f) return rows;
       if (f === "recent")
         return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
-      return rows.filter((r: any) => alertState(r) === f);
+      if (f === "failed")
+        return rows.filter(
+          (r: any) =>
+            r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
+        );
+      // active = unpaused (enabled); paused = disabled — matching the summary
+      // counts. A failed anomaly is still active here (failed is an overlay).
+      return rows.filter((r: any) => (f === "active" ? r.enabled : !r.enabled));
     });
     const onStatSelect = (key: string) => {
       if (key === "total") {
