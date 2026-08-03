@@ -33,9 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :empty-message="emptyMessage"
     :data-test="dataTest"
     :horizontal-scroll="true"
+    :row-class="monitorRowClass"
+    :get-row-style="monitorRowStyle"
     show-index
     @row-click="(row: any) => emit('row-click', row)"
   >
+    <!-- Summary strip supplied by the parent (it owns the status facet). -->
+    <template v-if="$slots.subheader" #subheader>
+      <slot name="subheader" />
+    </template>
+
     <!-- Toolbar slots (passthrough to parent) -->
     <template #toolbar>
       <slot name="toolbar" />
@@ -63,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[25rem] whitespace-normal break-words text-xs"
       >
         <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-          <span class="cursor-help truncate">{{ (row as any).name || "—" }}</span>
+          <span class="cursor-pointer truncate">{{ (row as any).name || "—" }}</span>
         </div>
       </OTooltip>
       <span v-else class="truncate">—</span>
@@ -76,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="(row as any).url"
         content-class="max-w-[25rem] whitespace-normal break-words text-xs"
       >
-        <span class="cursor-help truncate">{{ (row as any).url }}</span>
+        <span class="cursor-pointer truncate">{{ (row as any).url }}</span>
       </OTooltip>
       <span v-else class="truncate">—</span>
     </template>
@@ -120,17 +127,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- History sparkbars -->
     <template #cell-history="{ row }">
-      <div class="spark">
+      <div class="flex h-5 items-end gap-px">
         <span
           v-for="(tick, i) in (row as any).history"
           :key="i"
-          class="spark-bar"
+          class="rounded-default h-full w-1 shrink-0 cursor-pointer"
           :class="
             tick.status === 'up'
-              ? 'bg-[var(--color-success-500)]'
+              ? 'bg-success-500'
               : tick.status === 'down'
-                ? 'bg-[var(--color-error-500)]'
-                : 'bg-[var(--color-warning-500)]'
+                ? 'bg-error-500'
+                : 'bg-warning-500'
           "
           @mouseenter="showSparkTip($event, tick)"
           @mouseleave="hideSparkTip"
@@ -145,10 +152,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="font-mono text-sm font-semibold"
         :class="
           parseFloat((row as any).responseTime) < 300
-            ? 'text-[var(--color-success-600)]'
+            ? 'text-status-success-text'
             : parseFloat((row as any).responseTime) < 1000
-              ? 'text-[var(--color-warning-600)]'
-              : 'text-[var(--color-error-600)]'
+              ? 'text-status-warning-text'
+              : 'text-status-error-text'
         "
         >{{ (row as any).responseTime }}</span
       >
@@ -175,10 +182,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               'min-w-11 text-right font-mono text-sm text-xs font-semibold ' +
               ((row as any).uptime >= 99
-                ? 'text-[var(--color-success-600)]'
+                ? 'text-status-success-text'
                 : (row as any).uptime >= 95
-                  ? 'text-[var(--color-warning-600)]'
-                  : 'text-[var(--color-error-600)]')
+                  ? 'text-status-warning-text'
+                  : 'text-status-error-text')
             "
             >{{ (row as any).uptime }}%</span
           >
@@ -195,13 +202,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
         :delay="0"
       >
-        <div class="flex cursor-help items-center gap-1">
+        <div class="flex cursor-pointer items-center gap-1">
           <span class="max-w-[4.375rem] truncate text-xs">{{
             locationLabel((row as any).locations[0])
           }}</span>
           <span
             v-if="(row as any).locations.length > 1"
-            class="rounded-default shrink-0 bg-[var(--color-surface-subtle)] px-1 py-0.5 text-xs font-bold whitespace-nowrap"
+            class="rounded-default bg-surface-subtle shrink-0 px-1 py-0.5 text-xs font-bold whitespace-nowrap"
             >+{{ (row as any).locations.length - 1 }}</span
           >
         </div>
@@ -215,8 +222,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Last check -->
+    <!-- Relative age from the RAW microsecond timestamp — the same renderer every
+         other table uses, so "3m ago" reads identically across the app. -->
     <template #cell-lastCheck="{ row }">
-      <span class="truncate">{{ (row as any).lastCheck || "—" }}</span>
+      <OTimeCell :value="(row as any).lastCheckAt" unit="us" mode="relative" :timezone="timezone" />
     </template>
 
     <!-- Row actions -->
@@ -419,14 +428,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <Teleport to="body">
     <div
       v-if="sparkTip.show && sparkTip.tick"
-      class="spark-tooltip"
+      class="rounded-surface bg-surface-overlay border-border-default text-text-body pointer-events-auto fixed z-50 flex w-56 flex-col gap-2 border p-3 text-xs shadow-lg"
       :style="{ left: sparkTip.x + 'px', top: sparkTip.y + 'px' }"
       @mouseenter="keepSparkTip"
       @mouseleave="hideSparkTip"
     >
-      <div class="stt-header">
-        <span class="stt-time">{{ sparkTip.tick.hour }} – {{ sparkTip.tick.nextHour }}</span>
-        <span class="stt-badge" :class="'stt-badge--' + sparkTip.tick.status">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-text-secondary"
+          >{{ sparkTip.tick.hour }} – {{ sparkTip.tick.nextHour }}</span
+        >
+        <OBadge
+          size="sm"
+          :variant="
+            sparkTip.tick.status === 'up'
+              ? 'success-soft'
+              : sparkTip.tick.status === 'down'
+                ? 'error-soft'
+                : 'warning-soft'
+          "
+        >
           {{
             sparkTip.tick.status === "up"
               ? t("synthetics.table.statusUp")
@@ -434,22 +454,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t("synthetics.table.statusDown")
                 : t("synthetics.table.statusDegraded")
           }}
-        </span>
+        </OBadge>
       </div>
-      <div class="stt-divider" />
-      <div class="stt-checks">
-        <div v-for="c in sparkTip.tick.checks" :key="c.loc" class="stt-check">
-          <span class="stt-dot" :class="c.ok ? 'stt-dot--up' : 'stt-dot--down'" />
-          <span class="stt-loc">{{ c.loc }}</span>
-          <span class="stt-ms">{{
+      <div class="border-border-default border-t" />
+      <div class="flex flex-col gap-1">
+        <div v-for="c in sparkTip.tick.checks" :key="c.loc" class="flex items-center gap-1.5">
+          <span
+            class="h-1.5 w-1.5 shrink-0 rounded-full"
+            :class="c.ok ? 'bg-success-500' : 'bg-error-500'"
+          />
+          <span class="min-w-0 flex-1 truncate">{{ c.loc }}</span>
+          <span class="text-text-secondary shrink-0 tabular-nums">{{
             c.ms !== null ? c.ms + t("synthetics.table.ms") : t("synthetics.table.timeout")
           }}</span>
         </div>
       </div>
-      <div v-if="sparkTip.tick.avgMs !== null" class="stt-avg">
+      <div v-if="sparkTip.tick.avgMs !== null" class="text-text-secondary tabular-nums">
         {{ t("synthetics.table.avg") }} · {{ sparkTip.tick.avgMs }}{{ t("synthetics.table.ms") }}
       </div>
-      <div class="stt-arrow" />
     </div>
   </Teleport>
 </template>
@@ -471,14 +493,47 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 
 type Mode = "all" | "browser";
+
+// Extreme-left health rail — inset box-shadow so it paints regardless of
+// border-collapse; rem width + token colour keep it theme-aware. Same vocabulary
+// as Alerts and Pipelines: red = failing, amber = degrading, green = passing,
+// grey = never reported.
+// Full-row wash for the two rows that are not "just not green":
+//   failing  → light red, because a failing check is the reason this page exists
+//              and it is rare in a healthy estate;
+//   paused   → muted grey, de-emphasis rather than alarm.
+// A DEGRADED monitor keeps a clean row and reads from the amber rail: it is worth
+// noticing, not worth acting on this second, and washing it too would put most of
+// a wobbly estate in colour.
+const monitorRowClass = (row: any): string => {
+  if (String(row?.status ?? "").toLowerCase() === "failed") return "!bg-status-error-bg";
+  return row?.enabled === false ? "!bg-surface-panel" : "";
+};
+
+const monitorRowStyle = (row: any): Record<string, string> => {
+  const status = String(row?.status ?? "").toLowerCase();
+  const color =
+    status === "failed"
+      ? "var(--color-error-500)"
+      : status === "warning"
+        ? "var(--color-warning-500)"
+        : status === "passed"
+          ? "var(--color-success-500)"
+          : "var(--color-grey-400)";
+  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+};
 
 const props = withDefaults(
   defineProps<{
     mode: Mode;
     data: any[];
     loading?: boolean;
+    /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
+     *  component and must not reach into the store for it. */
+    timezone?: string;
     footerTitle?: string;
     emptyMessage?: string;
     dataTest?: string;

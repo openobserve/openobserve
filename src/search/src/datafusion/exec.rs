@@ -321,6 +321,12 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::summary_percentile::SummaryPercentile::new(),
     ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::approx_topk::ApproxTopK::new(),
+    ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
+    ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
 
     #[cfg(feature = "enterprise")]
@@ -328,12 +334,6 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
         ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
-        ctx.register_udaf(AggregateUDF::from(
-            o2_enterprise::enterprise::search::datafusion::udaf::approx_topk::ApproxTopK::new(),
-        ));
-        ctx.register_udaf(AggregateUDF::from(
-            o2_enterprise::enterprise::search::datafusion::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
-        ));
         ctx.register_udaf(AggregateUDF::from(
             o2_enterprise::enterprise::search::datafusion::udaf::ddsketch::DDSketchAgg::new(),
         ));

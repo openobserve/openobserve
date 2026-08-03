@@ -1619,8 +1619,11 @@ export default defineComponent({
       scheduledReports.value = [];
       isLoadingReports.value = true;
 
+      // folder_id is intentionally omitted here: it filters by the REPORT's own
+      // folder, not the dashboard's folder, so passing the dashboard folder id
+      // would incorrectly exclude reports saved to a different report folder.
       reports
-        .list(store.state.selectedOrganization.identifier, folderId.value, dashboardId.value)
+        .list(store.state.selectedOrganization.identifier, "", dashboardId.value)
         .then((response) => {
           scheduledReports.value = response.data;
         })

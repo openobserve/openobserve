@@ -25,9 +25,9 @@ pub struct Model {
     pub dispatch_attempts: i32,
     /// KSUID of the parent run (all jobs for one scheduled slot share this).
     pub run_id: String,
-    /// JSON array of BrowserDevice {execution_id, engine, device} — browser monitors only.
+    /// JSON array of BrowserDevice {execution_id, engine, device} — browser checks only.
     pub browser_devices: Option<String>,
-    /// JSON blob of monitor metadata copied at enqueue time e.g. {"tags": ["prod"]}.
+    /// JSON blob of check metadata copied at enqueue time e.g. {"tags": ["prod"]}.
     pub metadata: String,
     /// JSON execution summaries written at ack time (no full step data — that's in the stream).
     pub result: Option<String>,

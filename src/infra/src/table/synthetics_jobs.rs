@@ -42,14 +42,14 @@ pub struct EnqueueParams<'a> {
     pub valid_until: i64,
     /// KSUID of the parent `synthetics_runs` row.
     pub run_id: &'a str,
-    /// JSON array of `{execution_id, engine, device}` — browser monitors only. `None` for
-    /// protocol monitors.
+    /// JSON array of `{execution_id, engine, device}` — browser checks only. `None` for
+    /// protocol checks.
     pub browser_devices: Option<&'a str>,
-    /// Serialized `JobMetadata` — monitor-level context copied at enqueue time.
+    /// Serialized `JobMetadata` — check-level context copied at enqueue time.
     pub metadata: &'a str,
 }
 
-/// Monitor-level metadata copied into the job row at enqueue time.
+/// Check-level metadata copied into the job row at enqueue time.
 /// Stored as a JSON blob so new fields can be added without schema migrations.
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct JobMetadata {
@@ -57,7 +57,7 @@ pub struct JobMetadata {
     pub tags: Vec<String>,
     /// The synthetic's check type ("http", "tcp", "browser", …) — copied at
     /// enqueue time so stream records (including dispatcher error records)
-    /// can carry `type` without a monitor lookup.
+    /// can carry `type` without a check lookup.
     #[serde(default)]
     pub synthetic_type: String,
 }
@@ -216,8 +216,8 @@ pub async fn get_by_id<C: ConnectionTrait>(
         .map_err(errors::Error::from)
 }
 
-/// Deletes all pending checks for a synthetic (called on monitor delete).
-pub async fn drain_monitor<C: ConnectionTrait>(
+/// Deletes all pending checks for a synthetic (called on check delete).
+pub async fn drain_check<C: ConnectionTrait>(
     conn: &C,
     synthetics_id: &str,
 ) -> Result<u64, errors::Error> {
@@ -249,7 +249,7 @@ const MAX_LEASE_BATCH: i64 = 100;
 ///
 /// `lease_secs` is a floor request, not the decision. Both probes hardcode 300s
 /// client-side while a check's retry sequence — which runs *inside* the leased
-/// job — is bounded only by `JOB_LEASE_SECS`, so an under-lease means the lease
+/// job — is bounded only by the configured job lease, so an under-lease means the lease
 /// expires while the probe is still working: the reaper terminates the job,
 /// completes the run as an error, and the probe's real result is then rejected as
 /// a stale ack. A client cannot be trusted to know how long its job may take, so
@@ -264,7 +264,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
     lease_secs: i64,
     browser: Option<bool>,
 ) -> Result<Vec<LeasedRow>, errors::Error> {
-    let lease_secs = lease_secs.max(config::meta::synthetics::JOB_LEASE_SECS);
+    let lease_secs = lease_secs.max(config::meta::synthetics::limits().job_lease_secs);
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
     // `limit` arrives from a client and is cast to u64 below, where a negative
@@ -596,7 +596,7 @@ pub enum DispatchFailureOutcome {
     /// Reset to Pending; a future lease will retry it.
     Requeued,
     /// Budget exhausted. Pure decision — no DB write here. The caller already
-    /// owns terminating the job (status + run counter + monitor status, e.g.
+    /// owns terminating the job (status + run counter + check status, e.g.
     /// via the dispatcher's existing `mark_failure`), so writing an
     /// intermediate status here would just be overwritten and wastes a query.
     DeadLettered,
@@ -691,26 +691,67 @@ pub async fn failing_locations<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
 ) -> Result<Vec<String>, errors::Error> {
-    let rows = Entity::find()
+    Ok(run_location_outcomes(conn, run_id).await?.failing)
+}
+
+/// Every location of a run, split by whether it passed.
+///
+/// `failing_locations` alone could not describe a recovery: on a recovered run
+/// nothing is failing **by definition**, so the list came back empty and the
+/// message degraded to a bare count ("Locations: 2"). The reader was told a
+/// check recovered without being told where.
+///
+/// It also could not describe a *partial* recovery — "2 of 3 recovered,
+/// aws-eu-central-1 still down" — because only one side of the split was ever
+/// carried.
+///
+/// One query for both sides rather than two: the rows are already being read,
+/// and the passing/failing split is a partition of the same result set.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct RunLocationOutcomes {
+    /// Locations that did not pass, worst first (Error > Warning > Failed).
+    pub failing: Vec<String>,
+    /// Locations that passed, alphabetical.
+    pub passing: Vec<String>,
+}
+
+pub async fn run_location_outcomes<C: ConnectionTrait>(
+    conn: &C,
+    run_id: &str,
+) -> Result<RunLocationOutcomes, errors::Error> {
+    const STATUS_PASSED: i32 = 3;
+
+    let mut rows = Entity::find()
         .select_only()
         .column(Column::Location)
         .column(Column::Status)
         .filter(Column::RunId.eq(run_id))
-        .filter(Column::Status.ne(3))
         .into_tuple::<(String, i32)>()
         .all(conn)
         .await?;
-    let mut rows = rows;
+
     // Worst first: Error(6) > Warning(5) > Failed(4). A reader scanning the first
     // line of a message should see the most severe location, not the
-    // alphabetically first.
+    // alphabetically first. Passing rows sort last and are split out below.
     rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    let mut out: Vec<String> = Vec::with_capacity(rows.len());
-    for (loc, _) in rows {
-        if !out.contains(&loc) {
-            out.push(loc);
+
+    let mut out = RunLocationOutcomes::default();
+    for (loc, status) in rows {
+        // A location runs once per run, but dedupe anyway: a requeued job can
+        // leave two rows for one location, and naming it twice in a message
+        // reads as two separate outages.
+        let bucket = if status == STATUS_PASSED {
+            &mut out.passing
+        } else {
+            &mut out.failing
+        };
+        if !bucket.contains(&loc) {
+            bucket.push(loc);
         }
     }
+    // Failing is severity-ordered; passing has no severity, so alphabetical is
+    // the only stable order a reader can predict.
+    out.passing.sort();
     Ok(out)
 }
 

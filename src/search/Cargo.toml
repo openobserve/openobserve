@@ -29,6 +29,7 @@ flight.workspace = true
 futures.workspace = true
 futures-util.workspace = true
 hashbrown.workspace = true
+hashlink.workspace = true
 infra.workspace = true
 itertools.workspace = true
 log.workspace = true
