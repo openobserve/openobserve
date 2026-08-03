@@ -498,6 +498,49 @@ pub struct DueCheck {
 ///
 /// NOTE: Does not use FOR UPDATE SKIP LOCKED — the scheduler is single-node on alert_manager.
 /// If multi-node scheduling is needed, convert to a raw SQL query with SKIP LOCKED.
+impl TryFrom<synthetics_checks::Model> for DueCheck {
+    type Error = errors::Error;
+
+    fn try_from(m: synthetics_checks::Model) -> Result<Self, Self::Error> {
+        let check_type: SyntheticType = serde_json::from_value(serde_json::Value::String(
+            m.synthetics_type.clone(),
+        ))
+        .map_err(|e| {
+            errors::Error::Message(format!(
+                "invalid synthetics_type '{}' for {}: {e}",
+                m.synthetics_type, m.id
+            ))
+        })?;
+
+        let locations: Vec<String> = serde_json::from_value(m.locations)
+            .map_err(|e| errors::Error::Message(format!("invalid locations for {}: {e}", m.id)))?;
+
+        let frequency: SyntheticFrequency = serde_json::from_value(m.frequency).unwrap_or_default();
+
+        let browser_devices = if check_type == SyntheticType::Browser {
+            let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
+            cfg.browser_devices
+        } else {
+            vec![]
+        };
+
+        let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
+
+        Ok(DueCheck {
+            id: m.id,
+            name: m.name,
+            org_id: m.org_id,
+            check_type,
+            locations,
+            frequency,
+            tz_offset: m.tz_offset,
+            next_run_at: m.next_run_at,
+            browser_devices,
+            tags,
+        })
+    }
+}
+
 pub async fn fetch_due<C: ConnectionTrait>(
     conn: &C,
     now_us: i64,
@@ -512,51 +555,81 @@ pub async fn fetch_due<C: ConnectionTrait>(
         .all(conn)
         .await?;
 
-    models
-        .into_iter()
-        .map(|m| {
-            let check_type: SyntheticType =
-                serde_json::from_value(serde_json::Value::String(m.synthetics_type.clone()))
-                    .map_err(|e| {
-                        errors::Error::Message(format!(
-                            "invalid synthetics_type '{}' for {}: {e}",
-                            m.synthetics_type, m.id
-                        ))
-                    })?;
-
-            let locations: Vec<String> = serde_json::from_value(m.locations).map_err(|e| {
-                errors::Error::Message(format!("invalid locations for {}: {e}", m.id))
-            })?;
-
-            let frequency: SyntheticFrequency =
-                serde_json::from_value(m.frequency).unwrap_or_default();
-
-            let browser_devices = if check_type == SyntheticType::Browser {
-                let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
-                cfg.browser_devices
-            } else {
-                vec![]
-            };
-
-            let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
-
-            Ok(DueCheck {
-                id: m.id,
-                name: m.name,
-                org_id: m.org_id,
-                check_type,
-                locations,
-                frequency,
-                tz_offset: m.tz_offset,
-                next_run_at: m.next_run_at,
-                browser_devices,
-                tags,
-            })
-        })
-        .collect()
+    models.into_iter().map(DueCheck::try_from).collect()
 }
 
 /// Updates `last_triggered_at` and `next_run_at` after the scheduler fans out a check.
+/// Claims every due check in one pass, returning only the ones THIS node won.
+///
+/// This is the design's scheduler claim (`designs/synthetics/01-server-architecture.md`
+/// §4.2): "Run 2+ replicas; they self-shard via `SELECT … FOR UPDATE SKIP
+/// LOCKED` — no leader election."
+///
+/// Why locking beats the per-row compare-and-swap it replaces, at scale:
+///
+/// * **The nodes self-shard.** A locker skips rows another node already holds and takes *different*
+///   due checks instead, so N schedulers split the backlog. Under a CAS every node reads the same
+///   candidate list, one wins them all, and the losers issue one doomed UPDATE per check —
+///   `FETCH_LIMIT` wasted writes per node per tick.
+/// * **Losers do no writes at all.** The skip happens in the SELECT, so a node that loses a row
+///   never issues its UPDATE.
+///
+/// The advance happens **inside** the same transaction, because the row locks
+/// only exist until COMMIT — claiming and advancing separately would reopen the
+/// race this closes. `next_run_for` computes each check's next slot; it is a
+/// callback because that calculation (interval vs cron, tz, skip-missed) lives
+/// with the scheduler, while the lock has to be held here.
+///
+/// Fan-out is deliberately left to the caller, *after* the commit: holding row
+/// locks on user-facing config rows across N job inserts would stall any
+/// concurrent edit of those checks for the duration.
+///
+/// SQLite has no `FOR UPDATE`, and needs none — it is single-node by
+/// construction (`config.rs:3182` restricts cluster mode to Postgres), so no
+/// second scheduler can exist to race with.
+pub async fn claim_due<C>(
+    conn: &C,
+    now_us: i64,
+    limit: u64,
+    next_run_for: impl Fn(&DueCheck) -> i64,
+) -> Result<Vec<DueCheck>, errors::Error>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+
+    let mut query = Entity::find()
+        .filter(Column::Enabled.eq(true))
+        .filter(Column::NextRunAt.lte(now_us))
+        .order_by_asc(Column::NextRunAt)
+        .limit(limit);
+    if txn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+        query = query.lock_with_behavior(
+            sea_orm::sea_query::LockType::Update,
+            sea_orm::sea_query::LockBehavior::SkipLocked,
+        );
+    }
+    let models = query.all(&txn).await?;
+
+    let due: Vec<DueCheck> = models
+        .into_iter()
+        .map(DueCheck::try_from)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    for check in &due {
+        Entity::update_many()
+            .col_expr(Column::LastTriggeredAt, Expr::value(now_us))
+            .col_expr(Column::NextRunAt, Expr::value(next_run_for(check)))
+            .filter(Column::Id.eq(check.id.as_str()))
+            .exec(&txn)
+            .await?;
+    }
+
+    txn.commit().await?;
+    Ok(due)
+}
+
 /// Unconditionally sets a check's schedule. For user-initiated changes (edit,
 /// disable, run-now), where the user's action must always win.
 ///
@@ -574,62 +647,6 @@ pub async fn advance_schedule<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(())
-}
-
-/// Claims a check's due slot by advancing its schedule, returning whether THIS
-/// caller won it.
-///
-/// `expected_next_run_at` is the `next_run_at` the caller read in `fetch_due`.
-/// The UPDATE only matches while the row still holds that value, so of N
-/// schedulers racing the same slot exactly one gets `rows_affected == 1` and the
-/// rest get 0. This is a compare-and-swap, the same shape as
-/// `synthetics_jobs::lease_batch`'s `status = 0` guard.
-///
-/// Without it, `fetch_due` is a plain SELECT and every alert_manager node fired
-/// every due check: each inserted its own `synthetics_runs` row under a fresh
-/// KSUID, so the rows were genuinely distinct and no unique constraint
-/// downstream could collapse them. Two nodes meant every check ran twice —
-/// double probe cost, double records, double alert evaluation. Latent only
-/// because every environment happens to run `alertmanager 1/1`; scaling for HA
-/// would have silently doubled the fleet.
-///
-/// Callers MUST treat `false` as "another node owns this slot" and do nothing
-/// further — no run row, no jobs.
-///
-/// A CAS rather than the `SELECT … FOR UPDATE SKIP LOCKED` the design proposed
-/// (`designs/synthetics/01-server-architecture.md` §4.2). Both are correct and
-/// give the same exactly-once-per-slot guarantee; this is not a portability
-/// workaround — cluster mode is always Postgres (`config.rs:3182`), SQLite is
-/// single-node and cannot race, and SeaORM does expose `lock_with_behavior`.
-///
-/// The reason is that SKIP LOCKED would buy nothing here. Its advantage is
-/// claiming N rows in one statement, but `next_run_at` is computed *per check*
-/// from that check's own frequency, anchor and tz — so the advance is N separate
-/// UPDATEs either way, and the locking SELECT is added on top. This adds no
-/// query at all: the scheduler already issued exactly one advance per due check,
-/// and this only adds a WHERE clause to it and moves it earlier. It also holds
-/// no transaction open across the fan-out.
-///
-/// Revisit if the per-check advance ever needs to become a single bulk UPDATE;
-/// SKIP LOCKED is the right tool for that shape.
-///
-/// Synthetic checks are order-independent, so the advisory lock the OSS alert
-/// scheduler adds for strict FIFO (`scheduler/postgres.rs:672`) is not needed.
-pub async fn try_claim_slot<C: ConnectionTrait>(
-    conn: &C,
-    id: &str,
-    last_triggered_at: i64,
-    next_run_at: i64,
-    expected_next_run_at: i64,
-) -> Result<bool, errors::Error> {
-    let res = Entity::update_many()
-        .col_expr(Column::LastTriggeredAt, Expr::value(last_triggered_at))
-        .col_expr(Column::NextRunAt, Expr::value(next_run_at))
-        .filter(Column::Id.eq(id))
-        .filter(Column::NextRunAt.eq(expected_next_run_at))
-        .exec(conn)
-        .await?;
-    Ok(res.rows_affected > 0)
 }
 
 /// Updates `last_check_status` after a probe acks a job.
@@ -967,57 +984,60 @@ mod tests {
         assert_eq!(check.last_check_status, SyntheticStatus::Passed);
     }
 
-    /// The CAS guard is the whole HA fix: without `next_run_at = <expected>` in
-    /// the WHERE clause, every alert_manager node wins every slot and each check
-    /// runs once per node.
+    /// The lock clause is the whole HA fix: without FOR UPDATE SKIP LOCKED the
+    /// SELECT is plain and every alert_manager node claims every due check.
     #[tokio::test]
-    async fn test_try_claim_slot_emits_the_next_run_at_guard() {
+    async fn test_claim_due_locks_with_skip_locked_on_postgres() {
         use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
 
         let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
             .append_exec_results(vec![MockExecResult {
                 last_insert_id: 0,
                 rows_affected: 1,
             }])
             .into_connection();
 
-        let won = try_claim_slot(&db, "mon-1", 200, 300, 100).await.unwrap();
-        assert!(
-            won,
-            "rows_affected = 1 must mean this caller claimed the slot"
+        let claimed = claim_due(&db, 500, 10, |_| 900).await.unwrap();
+        assert_eq!(
+            claimed.len(),
+            1,
+            "the due check should be returned as claimed"
         );
 
-        let log = db.into_transaction_log();
-        let sql = format!("{:?}", log[0]);
+        let sql = format!("{:?}", db.into_transaction_log());
         assert!(
-            sql.contains("next_run_at"),
-            "the UPDATE must filter on next_run_at — without it the claim is not a claim: {sql}"
+            sql.contains("FOR UPDATE SKIP LOCKED"),
+            "the claiming SELECT must lock and skip, else replicas do not self-shard: {sql}"
         );
-        // The expected value must reach the WHERE clause, not just the SET list.
         assert!(
-            sql.contains("100"),
-            "expected_next_run_at (100) must be bound into the guard: {sql}"
+            sql.contains("UPDATE"),
+            "the advance must happen in the same transaction as the lock: {sql}"
         );
     }
 
-    /// The loser of a race must be told it lost, so it produces no run and no
-    /// jobs. Reporting success here is what produced duplicate executions.
+    /// SQLite has no FOR UPDATE and needs none — it is single-node, so no second
+    /// scheduler can exist to race with. Emitting the clause there is a syntax
+    /// error, so the backend branch is load-bearing.
     #[tokio::test]
-    async fn test_try_claim_slot_reports_false_when_another_node_won() {
+    async fn test_claim_due_omits_lock_clause_on_sqlite() {
         use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
 
-        let db = MockDatabase::new(DatabaseBackend::Postgres)
+        let db = MockDatabase::new(DatabaseBackend::Sqlite)
+            .append_query_results(vec![vec![make_model()]])
             .append_exec_results(vec![MockExecResult {
                 last_insert_id: 0,
-                rows_affected: 0,
+                rows_affected: 1,
             }])
             .into_connection();
 
-        let won = try_claim_slot(&db, "mon-1", 200, 300, 100).await.unwrap();
+        let claimed = claim_due(&db, 500, 10, |_| 900).await.unwrap();
+        assert_eq!(claimed.len(), 1);
+
+        let sql = format!("{:?}", db.into_transaction_log());
         assert!(
-            !won,
-            "rows_affected = 0 means the row no longer held the expected next_run_at, \
-             i.e. another scheduler advanced it first"
+            !sql.contains("FOR UPDATE"),
+            "SQLite cannot parse FOR UPDATE: {sql}"
         );
     }
 }
