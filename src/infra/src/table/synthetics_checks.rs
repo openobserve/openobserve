@@ -596,12 +596,25 @@ pub async fn advance_schedule<C: ConnectionTrait>(
 /// Callers MUST treat `false` as "another node owns this slot" and do nothing
 /// further — no run row, no jobs.
 ///
-/// Deliberately a CAS rather than `SELECT … FOR UPDATE SKIP LOCKED` (which the
-/// design proposed): SKIP LOCKED is Postgres-only and this table is also served
-/// by SQLite and MySQL. A CAS is portable, holds no lock across the fan-out, and
-/// gives the same exactly-once-per-slot guarantee. Synthetic checks are
-/// order-independent, so the advisory lock the OSS alert scheduler adds for
-/// strict FIFO (`scheduler/postgres.rs:672`) is not needed here.
+/// A CAS rather than the `SELECT … FOR UPDATE SKIP LOCKED` the design proposed
+/// (`designs/synthetics/01-server-architecture.md` §4.2). Both are correct and
+/// give the same exactly-once-per-slot guarantee; this is not a portability
+/// workaround — cluster mode is always Postgres (`config.rs:3182`), SQLite is
+/// single-node and cannot race, and SeaORM does expose `lock_with_behavior`.
+///
+/// The reason is that SKIP LOCKED would buy nothing here. Its advantage is
+/// claiming N rows in one statement, but `next_run_at` is computed *per check*
+/// from that check's own frequency, anchor and tz — so the advance is N separate
+/// UPDATEs either way, and the locking SELECT is added on top. This adds no
+/// query at all: the scheduler already issued exactly one advance per due check,
+/// and this only adds a WHERE clause to it and moves it earlier. It also holds
+/// no transaction open across the fan-out.
+///
+/// Revisit if the per-check advance ever needs to become a single bulk UPDATE;
+/// SKIP LOCKED is the right tool for that shape.
+///
+/// Synthetic checks are order-independent, so the advisory lock the OSS alert
+/// scheduler adds for strict FIFO (`scheduler/postgres.rs:672`) is not needed.
 pub async fn try_claim_slot<C: ConnectionTrait>(
     conn: &C,
     id: &str,
