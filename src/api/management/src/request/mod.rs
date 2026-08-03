@@ -22,6 +22,8 @@ pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;
 #[cfg(feature = "enterprise")]
+pub mod annotations;
+#[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod authz;
 #[cfg(feature = "cloud")]

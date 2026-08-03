@@ -135,6 +135,7 @@ mod tests {
         assert!(obj.contains_key("target_id"));
         assert!(obj.contains_key("evaluation_key"));
         assert!(obj.contains_key("score_version"));
+        assert!(obj.contains_key("ref_timestamp"));
         assert!(obj.contains_key("job_version"));
         assert!(obj.contains_key("span_id"));
         assert!(obj.contains_key("trace_id"));
@@ -170,6 +171,7 @@ mod tests {
         assert!(schema.field_with_name("value_numeric").is_ok());
         assert!(schema.field_with_name("value_categorical").is_ok());
         assert!(schema.field_with_name("value_boolean").is_ok());
+        assert!(schema.field_with_name("ref_timestamp").is_ok());
         assert!(schema.field_with_name("score_config_row_id").is_ok());
         assert!(schema.field_with_name("review_submission_id").is_ok());
         assert!(schema.field_with_name("queue_id").is_ok());
