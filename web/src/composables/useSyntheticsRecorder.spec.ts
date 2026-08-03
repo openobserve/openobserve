@@ -70,6 +70,9 @@ function emitStreamEvent(payload: Record<string, unknown>) {
 /** Mirrors REPLAY_TIMEOUT_MS in the composable — the replay watchdog window. */
 const REPLAY_TIMEOUT_MS = 15 * 60 * 1000;
 
+/** Mirrors COMMAND_TIMEOUT_MS — the one-shot ack window that bounds `stopping`. */
+const COMMAND_TIMEOUT_MS = 4000;
+
 /** Let the 500 ms probe delay + any pending microtasks settle. */
 async function settleProbeDelay() {
   await vi.advanceTimersByTimeAsync(500);
@@ -374,14 +377,186 @@ describe("useSyntheticsRecorder", () => {
       expect(r.error.value).toContain("No replayable steps");
     });
 
+    // ── Stop ────────────────────────────────────────────────────────────
+    //
+    // The extension cannot stop instantly, so the phase machine has to say so.
+    // Before this, Stop flipped straight to "stopped" while the run was still
+    // winding down, and the step it was interrupted on kept its spinner forever
+    // because nothing ever cleared activeStepId.
+
+    /**
+     * Start a replay and settle into the `running` phase, mid-journey. The replay
+     * promise is deliberately left floating — these tests are about what Stop does
+     * while it is still in flight, and the extension never answers it.
+     */
+    async function startRunningReplay(r: ReturnType<typeof useSyntheticsRecorder>) {
+      void r.replay(steps);
+      await settleProbeDelay();
+    }
+
     it("stopReplay should send a stopReplay command", async () => {
       const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+
       const promise = r.stopReplay();
       respondToLastCommand({ success: true });
       await promise;
 
-      const sentCmd = getLastCommand();
-      expect(sentCmd).toMatchObject({ action: "stopReplay" });
+      expect(getLastCommand()).toMatchObject({ action: "stopReplay" });
+    });
+
+    it("should hold the stopping phase until the extension confirms", async () => {
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+      emitStreamEvent({ method: "stepReplayStarted", stepId: "s1" });
+
+      const promise = r.stopReplay();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(r.replayPhase.value).toBe("stopping");
+
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(r.replayPhase.value).toBe("stopped");
+      expect(r.isReplaying.value).toBe(false);
+    });
+
+    it("should clear the active step so no step is left in progress after a stop", async () => {
+      // Regression: the step the replay was interrupted on never reports a result,
+      // so a non-null activeStepId rendered as a permanently spinning status dot.
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+      emitStreamEvent({ method: "stepReplayStarted", stepId: "s1" });
+      expect(r.activeStepId.value).toBe("s1");
+
+      const promise = r.stopReplay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(r.activeStepId.value).toBeNull();
+    });
+
+    it("should reach stopped even when the extension never acknowledges the stop", async () => {
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+
+      const promise = r.stopReplay();
+      // No response — only the one-shot command timeout releases it.
+      await vi.advanceTimersByTimeAsync(COMMAND_TIMEOUT_MS);
+      await promise;
+
+      expect(r.replayPhase.value).toBe("stopped");
+      expect(r.isReplaying.value).toBe(false);
+    });
+
+    it("should ignore a stepReplayStarted that arrives after the stop", async () => {
+      // The player can announce a step in the instant before the abort lands.
+      // Honouring it would re-arm the spinner on a step that never ran.
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+
+      const promise = r.stopReplay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      emitStreamEvent({ method: "stepReplayStarted", stepId: "s2" });
+      expect(r.activeStepId.value).toBeNull();
+    });
+
+    it("should still record a step result that was already in flight when stopping", async () => {
+      // That step genuinely ran, so it must keep counting toward "completed X of N".
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+
+      const promise = r.stopReplay();
+      await vi.advanceTimersByTimeAsync(0);
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s1", passed: true, duration_ms: 12 });
+
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(r.stepResults.size).toBe(1);
+    });
+
+    it("should not let a stopped replay's response clobber a newer run", async () => {
+      // Regression: Stop returns as soon as the extension acknowledges, but the
+      // original `replay` promise resolves later. Without a generation guard it
+      // landed on the run started in between and knocked "running" back to "stopped".
+      const r = useSyntheticsRecorder();
+      const firstReplay = r.replay(steps);
+      await settleProbeDelay();
+      const firstNonce = getLastCommandNonce()!;
+
+      const stopPromise = r.stopReplay();
+      respondToLastCommand({ success: true });
+      await stopPromise;
+      expect(r.replayPhase.value).toBe("stopped");
+
+      // User immediately hits Re-run.
+      const secondReplay = r.replay(steps);
+      await settleProbeDelay();
+      expect(r.replayPhase.value).toBe("running");
+
+      // Only now does the abandoned first replay answer.
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          source: window,
+          data: {
+            ch: "oo-bridge",
+            dir: "to-page",
+            nonce: firstNonce,
+            msg: { success: true, passed: false, stopped: true },
+          },
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(r.replayPhase.value).toBe("running");
+      expect(r.isReplaying.value).toBe(true);
+
+      respondToLastCommand({ success: true, passed: true });
+      await secondReplay;
+      expect(r.replayPhase.value).toBe("passed");
+      void firstReplay;
+    });
+
+    it("should not resurrect the stopped banner after the results are dismissed", async () => {
+      // Regression: the abandoned replay answers long after Stop. If it is still
+      // allowed to report, dismissing the stopped banner only hides it until that
+      // response lands and puts the journey back into "stopped".
+      const r = useSyntheticsRecorder();
+      await startRunningReplay(r);
+      const replayNonce = getLastCommandNonce()!;
+
+      const stopPromise = r.stopReplay();
+      respondToLastCommand({ success: true });
+      await stopPromise;
+
+      // User dismisses the banner (CreateBrowserTest's onClearResults).
+      r.replayPhase.value = "idle";
+
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          source: window,
+          data: {
+            ch: "oo-bridge",
+            dir: "to-page",
+            nonce: replayNonce,
+            msg: { success: true, passed: false, stopped: true },
+          },
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(r.replayPhase.value).toBe("idle");
+    });
+
+    it("should be a no-op when no replay is running", async () => {
+      const r = useSyntheticsRecorder();
+      await r.stopReplay();
+
+      expect(r.replayPhase.value).toBe("idle");
+      expect(getLastCommand()).toBeNull();
     });
 
     it("should stay running past the one-shot command timeout while steps stream in", async () => {

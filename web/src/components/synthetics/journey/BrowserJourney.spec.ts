@@ -65,6 +65,22 @@ const JourneyStepsStubWithExpansion = {
     </div>`,
 };
 
+// Stub that surfaces each row's status-dot state in the DOM, so the dot logic can be
+// asserted without pulling in the real OTable.
+const JourneyStepsStubWithDots = {
+  props: ["data", "mode", "selectedIds", "expandedIds", "dotStateFn"],
+  template: `
+    <div class="journey-steps-stub">
+      <div
+        v-for="item in data"
+        :key="item.id"
+        class="step-row"
+        :data-step-id="item.id"
+        :data-dot-state="dotStateFn ? dotStateFn(item) : ''"
+      >{{ item.name }}</div>
+    </div>`,
+};
+
 const ConfirmDialogStub = {
   template: '<div class="confirm-dialog-stub" />',
 };
@@ -677,5 +693,95 @@ describe("BrowserJourney per-step failure evidence", () => {
     const emitted = wrapper.emitted("replay-up-to")!;
     expect(emitted.length).toBeGreaterThan(0);
     for (const call of emitted) expect(call).toEqual([2]);
+  });
+});
+
+// ── Stopping a replay ───────────────────────────────────────────────────────
+describe("BrowserJourney — stopping a replay", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test" },
+    {
+      id: "s2",
+      action: "click",
+      name: "Sign in",
+      locator: { candidates: [{ kind: "css", value: "#go" }] },
+    },
+  ];
+
+  function mountWithDots(props: Record<string, unknown>) {
+    return mount(BrowserJourney, {
+      props: { modelValue: journey, ...props },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithDots } },
+    }) as VueWrapper;
+  }
+
+  function dotStateOf(w: VueWrapper, stepId: string) {
+    return w.find(`[data-step-id="${stepId}"]`).attributes("data-dot-state");
+  }
+
+  it("should show the running step as active while the replay is running", () => {
+    wrapper = mountWithDots({ replayPhase: "running", activeStepId: "s2" });
+    expect(dotStateOf(wrapper, "s2")).toBe("active");
+  });
+
+  // Regression: the step a replay was interrupted on never reports a result, so
+  // activeStepId stays pointing at it. Rendering that as "active" left the journey
+  // with a step spinning forever after Stop.
+  it("should not leave a step in progress once the replay has stopped", () => {
+    wrapper = mountWithDots({ replayPhase: "stopped", activeStepId: "s2" });
+    expect(dotStateOf(wrapper, "s2")).toBe("pending");
+  });
+
+  it("should not show a step as active while the stop is being confirmed", () => {
+    wrapper = mountWithDots({ replayPhase: "stopping", activeStepId: "s2" });
+    expect(dotStateOf(wrapper, "s2")).toBe("pending");
+  });
+
+  it("should keep results already reported before the stop", () => {
+    const stepResults = new Map([
+      ["s1", { stepId: "s1", stepName: "Open app", passed: true, durationMs: 900 }],
+    ]);
+    wrapper = mountWithDots({ replayPhase: "stopped", activeStepId: "s2", stepResults });
+    expect(dotStateOf(wrapper, "s1")).toBe("pass");
+    expect(dotStateOf(wrapper, "s2")).toBe("pending");
+  });
+
+  it("should replace Stop with a disabled, loading button while stopping", () => {
+    wrapper = mountWithDots({ replayPhase: "stopping" });
+
+    // The live Stop is gone, so a second press cannot queue another stopReplay…
+    expect(wrapper.find('[data-test="synthetics-journey-stop-replay-btn"]').exists()).toBe(false);
+    const stopping = wrapper.find('[data-test="synthetics-journey-stopping-replay-btn"]');
+    expect(stopping.exists()).toBe(true);
+    // …and Re-run must not appear until the replay has actually stopped.
+    expect(wrapper.find('[data-test="synthetics-journey-replay-btn"]').exists()).toBe(false);
+  });
+
+  it("should announce that it is stopping rather than claiming the replay stopped", () => {
+    wrapper = mountWithDots({ replayPhase: "stopping" });
+    expect(wrapper.find('[data-test="synthetics-journey-stopping-banner"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-journey-stopped-banner"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="synthetics-journey-replay-banner"]').exists()).toBe(false);
+  });
+
+  it("should offer Re-run once the replay has stopped", () => {
+    wrapper = mountWithDots({ replayPhase: "stopped" });
+    expect(wrapper.find('[data-test="synthetics-journey-stopping-replay-btn"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="synthetics-journey-stopped-banner"]').exists()).toBe(true);
+  });
+
+  it("should keep the journey locked against edits while stopping", () => {
+    // The player may still be unwinding, so editing a step would race it.
+    wrapper = mountWithDots({ replayPhase: "stopping" });
+    expect(wrapper.find('[data-test="synthetics-journey-add-step-btn"]').exists()).toBe(false);
   });
 });

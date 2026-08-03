@@ -120,6 +120,8 @@ const showDragColumn = computed(
 
 // ── Replay helpers ──────────────────────────────────────────────────────────
 const isReplayRunning = computed(() => props.replayPhase === "running");
+/** Stop pressed, extension not yet confirmed — still live, but no longer advancing. */
+const isReplayStopping = computed(() => props.replayPhase === "stopping");
 const isReplayActive = computed(() => props.replayPhase && props.replayPhase !== "idle");
 const isReplayTerminal = computed(
   () =>
@@ -127,7 +129,9 @@ const isReplayTerminal = computed(
     props.replayPhase === "failed" ||
     props.replayPhase === "stopped",
 );
-const isReplayLocked = computed(() => isReplayRunning.value); // editing suppressed during running
+// Editing stays suppressed until the stop is confirmed — the journey can still be
+// executing while `stopping`, so letting a step be edited would race the player.
+const isReplayLocked = computed(() => isReplayRunning.value || isReplayStopping.value);
 
 /** Index of the first failing step in journey order, or -1 when none failed. */
 const firstFailedIndex = computed(() =>
@@ -184,8 +188,11 @@ function stepDotState(stepId: string): StepDotState | undefined {
   if (result) {
     return result.passed ? "pass" : "fail";
   }
-  // Currently executing step
-  if (props.activeStepId === stepId) return "active";
+  // Currently executing step. Gated on `running` deliberately: a stopped replay leaves
+  // the step it was interrupted on with no result, and rendering that as "active" is what
+  // left the journey showing a step spinning forever. Outside `running` it falls through
+  // to "pending" — an empty circle, which is the truth: that step never completed.
+  if (isReplayRunning.value && props.activeStepId === stepId) return "active";
   const stepIndex = props.modelValue.findIndex((s) => s.id === stepId);
   if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return "skip";
   if (props.replayPhase === "running") return "pending";
@@ -244,7 +251,7 @@ watch(
 );
 
 const multiSelectEnabled = computed(
-  () => !isRecording.value && !props.readonly && !isReplayRunning.value,
+  () => !isRecording.value && !props.readonly && !isReplayLocked.value,
 );
 
 // ── Recording state ────────────────────────────────────────────────────────
@@ -414,7 +421,9 @@ function stopActiveRecording(): boolean {
 
 /** Sync stop for replay — called by parent's route guard. */
 function stopActiveReplay(): boolean {
-  if (!isReplayRunning.value) return false;
+  // `stopping` included: the extension has been asked to stop but has not confirmed, so
+  // the replay is still live and leaving without the sync stop can orphan it.
+  if (!isReplayLocked.value) return false;
   recorder.stopReplayAndForget();
   return true;
 }
@@ -422,7 +431,7 @@ function stopActiveReplay(): boolean {
 /** Sync fire-and-forget on tab close — prevents orphaned extension tabs. */
 function handleBeforeUnload() {
   if (recorder.isRecording.value) recorder.stopAndForget();
-  else if (isReplayRunning.value) recorder.stopReplayAndForget();
+  else if (isReplayLocked.value) recorder.stopReplayAndForget();
 }
 
 onMounted(() => {
@@ -671,7 +680,7 @@ function openChromeExtensions() {
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
       <div class="flex w-100 items-center justify-end gap-2">
         <OButton
-          v-if="!isRecording && !isReplayRunning"
+          v-if="!isRecording && !isReplayLocked"
           variant="outline"
           size="sm"
           :disabled="readonly || isRecording"
@@ -704,6 +713,19 @@ function openChromeExtensions() {
             icon-left="stop"
           >
             {{ t("synthetics.journey.stop") }}
+          </OButton>
+          <!-- Stop acknowledged, extension not yet confirmed. Same slot, so no layout
+               shift; disabled so a second click cannot queue another stopReplay. -->
+          <OButton
+            v-else-if="isReplayStopping"
+            variant="destructive"
+            size="sm"
+            loading
+            disabled
+            data-test="synthetics-journey-stopping-replay-btn"
+            icon-left="stop"
+          >
+            {{ t("synthetics.journey.stopping") }}
           </OButton>
           <OButton
             v-else-if="isReplayTerminal"
@@ -742,7 +764,7 @@ function openChromeExtensions() {
           v-else
           variant="primary"
           size="sm"
-          :disabled="readonly || isRecording || isReplayRunning"
+          :disabled="readonly || isRecording || isReplayLocked"
           data-test="synthetics-journey-record-btn"
           @click="onRecordButtonClick"
           icon-left="smart-display"
@@ -902,6 +924,19 @@ function openChromeExtensions() {
             total: modelValue.length,
           })
         }}
+      </span>
+    </div>
+
+    <!-- Replay stopping banner — the wait between Stop and the extension confirming -->
+    <div
+      v-else-if="replayPhase === 'stopping'"
+      class="rounded-default border-border-default bg-surface-subtle mx-2 mb-3 flex items-center gap-2 border px-3 py-2"
+      role="status"
+      data-test="synthetics-journey-stopping-banner"
+    >
+      <OIcon name="sync" size="sm" class="text-text-secondary animate-spin" aria-hidden="true" />
+      <span class="text-text-body text-sm" data-test="synthetics-journey-stopping-banner-text">
+        {{ t("synthetics.journey.replayStopping") }}
       </span>
     </div>
 
