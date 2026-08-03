@@ -221,20 +221,53 @@ pub async fn get_run<C: ConnectionTrait>(
         .map_err(errors::Error::from)
 }
 
-/// Atomically increments `jobs_done` and updates `run_result` to worst-case severity.
-/// Sets `completed_at` when `jobs_done + 1 >= job_count`.
+/// Records one job's outcome against its run, and returns `Some((run_result,
+/// job_count))` **only to the caller that actually completed the run** — `None`
+/// to everyone else.
 ///
 /// `job_result` uses SyntheticStatus DB integers: 1=Passed, 2=Warning, 3=Failed, 4=Error.
-/// Higher integer = higher severity, so `CASE WHEN ... > run_result` naturally picks worst.
+/// Higher integer = higher severity, so the `CASE` naturally keeps the worst.
 ///
-/// Returns `Some((run_result, job_count))` when the run is now complete (all jobs have acked),
-/// or `None` if jobs are still in progress.
+/// # Why completion is claimed rather than observed
+///
+/// The increment was always atomic (`jobs_done = jobs_done + 1` is computed by
+/// the database). **The completion decision was not:** it re-read the row in a
+/// second statement and returned `Some` whenever `jobs_done >= job_count`. Two
+/// jobs of the same run acking concurrently both saw the final count:
+///
+/// ```text
+/// ack A: UPDATE -> jobs_done = 1
+/// ack B: UPDATE -> jobs_done = 2
+/// ack A: SELECT -> 2 >= 2 -> Some   "I completed the run"
+/// ack B: SELECT -> 2 >= 2 -> Some   "I completed the run"   <-- twice
+/// ```
+///
+/// Everything the caller does on completion then happened twice: the run
+/// rollup, the check status write, and the alert dispatch — a duplicate
+/// customer-facing notification. This needed no multiple alert managers to
+/// reach: acks are served on ingesters (2 replicas in every environment) and the
+/// probes of one run finish independently.
+///
+/// Now `completed_at` is the guard. Exactly one caller flips it from NULL, and
+/// only that caller is told the run is complete. `completed_at IS NULL` is a
+/// compare-and-swap in the same shape as `synthetics_jobs::lease_batch`'s
+/// `status = 0`.
+///
+/// Deliberately not `RETURNING` (which would fold this into one statement):
+/// SQLite only gained it in 3.35 and the bundled version is not pinned here,
+/// whereas a guarded UPDATE plus `rows_affected` behaves identically on every
+/// backend.
 pub async fn increment_jobs_done<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
     job_result: i32,
     now_us: i64,
 ) -> Result<Option<(i32, i32)>, errors::Error> {
+    // Step 1: count this job and fold its severity in.
+    //
+    // `jobs_done < job_count` stops a duplicate or replayed ack from pushing the
+    // counter past the total, which would leave the run permanently "over
+    // complete" and, before the guard below existed, complete it twice.
     let update_sql = r#"
         UPDATE synthetics_runs
         SET
@@ -242,26 +275,43 @@ pub async fn increment_jobs_done<C: ConnectionTrait>(
             run_result = CASE
                 WHEN COALESCE(run_result, 0) >= $1 THEN run_result
                 ELSE $1
-            END,
-            completed_at = CASE
-                WHEN jobs_done + 1 >= job_count THEN $2
-                ELSE completed_at
             END
-        WHERE id = $3
+        WHERE id = $2 AND jobs_done < job_count
     "#;
     conn.execute(Statement::from_sql_and_values(
         conn.get_database_backend(),
         update_sql,
-        [
-            Value::from(job_result),
-            Value::from(now_us),
-            Value::from(run_id.to_owned()),
-        ],
+        [Value::from(job_result), Value::from(run_id.to_owned())],
     ))
     .await?;
 
+    // Step 2: claim completion. Only the caller whose increment brought
+    // `jobs_done` up to `job_count` finds `completed_at` still NULL.
+    let complete_sql = r#"
+        UPDATE synthetics_runs
+        SET completed_at = $1
+        WHERE id = $2 AND jobs_done >= job_count AND completed_at IS NULL
+    "#;
+    let claimed = conn
+        .execute(Statement::from_sql_and_values(
+            conn.get_database_backend(),
+            complete_sql,
+            [Value::from(now_us), Value::from(run_id.to_owned())],
+        ))
+        .await?
+        .rows_affected();
+
+    if claimed == 0 {
+        // Either jobs are still outstanding, or another ack already completed
+        // this run. Both mean: not ours to report.
+        return Ok(None);
+    }
+
+    // Step 3: we own the completion, so read back what the caller needs to
+    // report. Safe to read outside a transaction — nothing rewrites these two
+    // once `completed_at` is set.
     let check_sql = r#"
-        SELECT jobs_done, job_count, run_result FROM synthetics_runs WHERE id = $1
+        SELECT job_count, run_result FROM synthetics_runs WHERE id = $1
     "#;
     let rows = conn
         .query_all(Statement::from_sql_and_values(
@@ -271,17 +321,13 @@ pub async fn increment_jobs_done<C: ConnectionTrait>(
         ))
         .await?;
 
-    if let Some(row) = rows.into_iter().next() {
-        let done: i32 = row.try_get("", "jobs_done").unwrap_or(0);
-        let count: i32 = row.try_get("", "job_count").unwrap_or(1);
-        if done >= count {
+    match rows.into_iter().next() {
+        Some(row) => {
+            let count: i32 = row.try_get("", "job_count").unwrap_or(1);
             let result: Option<i32> = row.try_get("", "run_result").unwrap_or(None);
             Ok(Some((result.unwrap_or(job_result), count)))
-        } else {
-            Ok(None)
         }
-    } else {
-        Ok(None)
+        None => Ok(None),
     }
 }
 
@@ -322,5 +368,118 @@ mod tests {
         assert_eq!(r.job_count, 2);
         assert_eq!(r.jobs_done, 1);
         assert_eq!(r.run_result, Some(1));
+    }
+
+    /// One raw row as `query_all` sees it — the completion read-back selects
+    /// only these two columns.
+    fn run_row(
+        job_count: i32,
+        run_result: i32,
+    ) -> std::collections::BTreeMap<String, sea_orm::Value> {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("job_count".to_owned(), sea_orm::Value::from(job_count));
+        m.insert("run_result".to_owned(), sea_orm::Value::from(run_result));
+        m
+    }
+
+    /// Two acks of the same run must not both be told they completed it.
+    /// Before `completed_at` became the guard, both re-read `jobs_done >=
+    /// job_count` and both returned Some — so the run rollup, the check status
+    /// write and the ALERT all fired twice.
+    #[tokio::test]
+    async fn test_only_one_ack_is_told_it_completed_the_run() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        // Ack A: increment succeeds, and it wins the completed_at claim.
+        let winner = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                }, // increment
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                }, // claimed completion
+            ])
+            .append_query_results(vec![vec![run_row(2, 3)]])
+            .into_connection();
+        let a = increment_jobs_done(&winner, "run-1", 3, 100).await.unwrap();
+        assert_eq!(a, Some((3, 2)), "the ack that completed the run reports it");
+
+        // Ack B: increment is a no-op (already at job_count) and the
+        // completed_at claim matches nothing, because A already set it.
+        let loser = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 0,
+                }, // increment guarded out
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 0,
+                }, // completion already claimed
+            ])
+            .into_connection();
+        let b = increment_jobs_done(&loser, "run-1", 3, 100).await.unwrap();
+        assert_eq!(
+            b, None,
+            "a second ack must NOT be told it completed the run — that is the duplicate alert"
+        );
+    }
+
+    /// A run with jobs still outstanding reports nothing: the completion claim
+    /// matches no row because `jobs_done < job_count`.
+    #[tokio::test]
+    async fn test_incomplete_run_reports_none() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                }, // counted
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 0,
+                }, // not complete yet
+            ])
+            .into_connection();
+        assert_eq!(
+            increment_jobs_done(&db, "run-1", 1, 100).await.unwrap(),
+            None
+        );
+    }
+
+    /// The completion claim must guard on `completed_at IS NULL` — that clause
+    /// is the entire fix.
+    #[tokio::test]
+    async fn test_completion_claim_guards_on_completed_at() {
+        use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                },
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 0,
+                },
+            ])
+            .into_connection();
+        let _ = increment_jobs_done(&db, "run-1", 1, 100).await.unwrap();
+
+        let sql = format!("{:?}", db.into_transaction_log());
+        assert!(
+            sql.contains("completed_at IS NULL"),
+            "without this guard both acks complete the run: {sql}"
+        );
+        assert!(
+            sql.contains("jobs_done < job_count"),
+            "the increment must be guarded so a replayed ack cannot overshoot: {sql}"
+        );
     }
 }
