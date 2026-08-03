@@ -1485,8 +1485,17 @@ export function foldStepStream(
       // Guarded because a step present in the dimension query but absent here
       // would otherwise divide by zero; also keeps a 0-execution step at 0%
       // rather than NaN, which renders as an empty cell.
+      // These two are on DIFFERENT scales, which is not a typo. `StepGroup` was
+      // defined by the client-side tally, where `failRate` is a fraction and
+      // `flakyRate` is already a percentage to one decimal — and the Steps tab
+      // renders them accordingly (`failRate * 100` vs `flakyRate * 10 / 10`).
+      // Emitting a fraction here rendered a 25%-flaky step as "0.3%".
+      //
+      // Matched rather than normalised on purpose: both paths feed the same
+      // component while the fallback exists, so changing the scale would have to
+      // change the tally and the component in the same commit.
       failRate: executions > 0 ? failures / executions : 0,
-      flakyRate: executions > 0 ? flaky / executions : 0,
+      flakyRate: executions > 0 ? Math.round((flaky / executions) * 1000) / 10 : 0,
       flakyCount: flaky,
       failCount: failures,
       totalExecutions: executions,

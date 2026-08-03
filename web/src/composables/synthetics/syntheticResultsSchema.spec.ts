@@ -1331,6 +1331,25 @@ describe("foldStepStream coverage", () => {
     expect(r.coverage.toMs).toBe(9_000);
   });
 
+  it("puts failRate and flakyRate on the SAME scales the client-side tally uses", () => {
+    // `StepGroup` is consumed by one component that renders `failRate * 100` and
+    // `flakyRate * 10 / 10` — so failRate is a fraction and flakyRate is already
+    // a percentage. The asymmetry is inherited, not chosen, and it is invisible
+    // to the type checker because both are `number`.
+    //
+    // Emitting flakyRate as a fraction rendered a 25%-flaky step as "0.3%". Both
+    // paths feed the same component while the fallback exists, so they have to
+    // agree; this test is what notices when they stop.
+    const r = foldStepStream(
+      [{ ...agg("s1", 0, 200, 1_000, 2_000), failures: 50, flaky: 50 }],
+      [],
+      [],
+    );
+    const g = r.stepGroups[0];
+    expect(g.failRate).toBe(0.25); // fraction — component multiplies by 100
+    expect(g.flakyRate).toBe(25); // already a percentage — component does not
+  });
+
   it("orders steps by step_index", () => {
     const r = foldStepStream(
       [agg("late", 5, 1, 1, 2), agg("early", 0, 1, 1, 2)],
