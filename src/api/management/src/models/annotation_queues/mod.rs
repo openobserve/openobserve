@@ -5,13 +5,19 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+use config::meta::self_reporting::llm_scores::{
+    LlmScoreDataSourceType, LlmScoreDataType, LlmScoreRecord,
+};
 use infra::table::score_configs::ScoreConfigDataType;
 use openobserve_core::llm_evaluations::annotation_queues::{
-    AnnotationQueue, AnnotationQueueItem, AnnotationQueueItemSelection, CreateAnnotationQueue,
-    EnqueueAnnotationQueueItem, PinnedScoreConfig, UpdateAnnotationQueue,
+    AnnotationQueue, AnnotationQueueItem, AnnotationQueueItemContent, AnnotationQueueItemDetail,
+    AnnotationQueueItemSelection, CreateAnnotationQueue, CreateQueueReview,
+    EnqueueAnnotationQueueItem, PinnedScoreConfig, QueueReviewSubmission, UpdateAnnotationQueue,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
+
+use super::annotations::{AnnotationScoreRequestBody, AnnotationTargetMetadataRequestBody};
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -71,6 +77,8 @@ pub struct ListAnnotationQueuesResponseBody {
 #[into_params(parameter_in = Query)]
 #[serde(deny_unknown_fields)]
 pub struct ListAnnotationQueueItemsQuery {
+    /// Return memberships from one Annotation Queue only.
+    pub queue_id: Option<String>,
     /// Queue workflow status. Supported values are `pending` and `reviewed`.
     pub queue_status: Option<String>,
     /// Item scope. Supported values are `span`, `trace`, and `session`.
@@ -96,6 +104,28 @@ pub struct EnqueueAnnotationQueueItemRequestBody {
 pub struct AnnotationQueueItemSelectionRequestBody {
     /// Queue Item IDs selected for this bulk action.
     pub item_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReviewAnnotationQueueItemRequestBody {
+    /// Client-generated idempotency key shared by all N Score events. Reuse it
+    /// only when retrying the identical logical submission.
+    pub submission_id: String,
+    pub source_stream: String,
+    pub scores: Vec<AnnotationScoreRequestBody>,
+    #[serde(default)]
+    pub comments: Option<String>,
+    #[serde(default)]
+    pub target_metadata: Option<AnnotationTargetMetadataRequestBody>,
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListQueueReviewsResponseBody {
+    pub list: Vec<QueueReviewSubmission>,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -132,6 +162,42 @@ pub struct AnnotationQueueItemResponseBody {
 #[serde(rename_all = "camelCase")]
 pub struct ListAnnotationQueueItemsResponseBody {
     pub list: Vec<AnnotationQueueItemResponseBody>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationQueueItemContentResponseBody {
+    pub input: Option<serde_json::Value>,
+    pub output: Option<serde_json::Value>,
+    pub trace: Vec<serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationQueueMachineScoreResponseBody {
+    pub id: String,
+    pub name: String,
+    pub value_numeric: Option<f64>,
+    pub value_categorical: Option<String>,
+    pub value_boolean: Option<bool>,
+    pub data_type: String,
+    pub source_type: String,
+    pub source_stream: Option<String>,
+    pub scorer_id: Option<String>,
+    pub scorer_version: Option<String>,
+    pub score_config_id: Option<String>,
+    pub score_config_version: Option<String>,
+    pub reasoning: Option<String>,
+    pub timestamp: i64,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationQueueItemDetailResponseBody {
+    pub item: AnnotationQueueItemResponseBody,
+    pub source_stream: String,
+    pub content: AnnotationQueueItemContentResponseBody,
+    pub machine_scores: Vec<AnnotationQueueMachineScoreResponseBody>,
 }
 
 impl From<CreateAnnotationQueueRequestBody> for CreateAnnotationQueue {
@@ -172,6 +238,19 @@ impl From<AnnotationQueueItemSelectionRequestBody> for AnnotationQueueItemSelect
     fn from(value: AnnotationQueueItemSelectionRequestBody) -> Self {
         Self {
             item_ids: value.item_ids,
+        }
+    }
+}
+
+impl From<ReviewAnnotationQueueItemRequestBody> for CreateQueueReview {
+    fn from(value: ReviewAnnotationQueueItemRequestBody) -> Self {
+        Self {
+            submission_id: value.submission_id,
+            source_stream: value.source_stream,
+            scores: value.scores.into_iter().map(Into::into).collect(),
+            comments: value.comments,
+            target_metadata: value.target_metadata.unwrap_or_default().into(),
+            metadata: value.metadata,
         }
     }
 }
@@ -237,6 +316,61 @@ impl From<AnnotationQueueItem> for AnnotationQueueItemResponseBody {
             archived_at: value.archived_at,
             created_at: value.created_at,
             updated_at: value.updated_at,
+        }
+    }
+}
+
+impl From<AnnotationQueueItemContent> for AnnotationQueueItemContentResponseBody {
+    fn from(value: AnnotationQueueItemContent) -> Self {
+        Self {
+            input: value.input,
+            output: value.output,
+            trace: value.trace,
+        }
+    }
+}
+
+impl From<LlmScoreRecord> for AnnotationQueueMachineScoreResponseBody {
+    fn from(value: LlmScoreRecord) -> Self {
+        let data_type = match value.data_type {
+            LlmScoreDataType::Numeric => "numeric",
+            LlmScoreDataType::Categorical => "categorical",
+            LlmScoreDataType::Boolean => "boolean",
+        };
+        let source_type = match value.source_type {
+            LlmScoreDataSourceType::LlmJudge => "llm_judge",
+            LlmScoreDataSourceType::Code => "code",
+            LlmScoreDataSourceType::Remote => "remote",
+            LlmScoreDataSourceType::Annotation => "annotation",
+            LlmScoreDataSourceType::Feedback => "feedback",
+            LlmScoreDataSourceType::Experiment => "experiment",
+        };
+        Self {
+            id: value.id,
+            name: value.name,
+            value_numeric: value.value_numeric,
+            value_categorical: value.value_categorical,
+            value_boolean: value.value_boolean,
+            data_type: data_type.to_string(),
+            source_type: source_type.to_string(),
+            source_stream: value.source_stream,
+            scorer_id: value.scorer_id,
+            scorer_version: value.scorer_version,
+            score_config_id: value.score_config_id,
+            score_config_version: value.score_config_version,
+            reasoning: value.reasoning,
+            timestamp: value._timestamp,
+        }
+    }
+}
+
+impl From<AnnotationQueueItemDetail> for AnnotationQueueItemDetailResponseBody {
+    fn from(value: AnnotationQueueItemDetail) -> Self {
+        Self {
+            item: value.item.into(),
+            source_stream: value.source_stream,
+            content: value.content.into(),
+            machine_scores: value.machine_scores.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -308,6 +442,50 @@ mod tests {
         assert_eq!(response.list[0].ref_id, response.list[1].ref_id);
         assert_ne!(response.list[0].queue_id, response.list[1].queue_id);
         assert_ne!(response.list[0].status, response.list[1].status);
+    }
+
+    #[test]
+    fn queue_item_detail_serializes_content_and_machine_scores() {
+        let detail = AnnotationQueueItemDetail {
+            item: AnnotationQueueItem {
+                id: "item-1".to_string(),
+                org_id: "org-1".to_string(),
+                queue_id: "queue-1".to_string(),
+                queue_name: Some("Review".to_string()),
+                ref_type: "trace".to_string(),
+                ref_id: "trace-1".to_string(),
+                ref_trace_id: None,
+                ref_trace_start_time: 100,
+                status: "pending".to_string(),
+                reviewed_at: None,
+                archived_at: None,
+                created_at: 1,
+                updated_at: 2,
+            },
+            source_stream: "traces".to_string(),
+            content: AnnotationQueueItemContent {
+                input: Some(serde_json::json!({"question": "hello"})),
+                output: Some(serde_json::json!({"answer": "hi"})),
+                trace: vec![serde_json::json!({"trace_id": "trace-1"})],
+            },
+            machine_scores: vec![LlmScoreRecord {
+                id: "score-1".to_string(),
+                name: "faithfulness".to_string(),
+                value_numeric: Some(0.9),
+                data_type: LlmScoreDataType::Numeric,
+                source_type: LlmScoreDataSourceType::LlmJudge,
+                source_stream: Some("traces".to_string()),
+                _timestamp: 200,
+                ..LlmScoreRecord::default()
+            }],
+        };
+        let value =
+            serde_json::to_value(AnnotationQueueItemDetailResponseBody::from(detail)).unwrap();
+        assert_eq!(value["item"]["refTraceStartTime"], 100);
+        assert_eq!(value["sourceStream"], "traces");
+        assert_eq!(value["content"]["input"]["question"], "hello");
+        assert_eq!(value["machineScores"][0]["sourceType"], "llm_judge");
+        assert_eq!(value["machineScores"][0]["valueNumeric"], 0.9);
     }
 
     #[test]
