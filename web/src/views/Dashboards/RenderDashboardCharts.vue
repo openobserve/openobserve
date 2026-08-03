@@ -149,10 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    border to match. -->
               <h2
                 v-if="isSectionHeader(item)"
-                class="flex h-full items-end truncate"
+                class="flex h-full items-end"
+                :title="item.title"
                 :data-test="`dashboard-section-header-${item.id}`"
               >
-                {{ item.title }}
+                <!-- truncate has to sit on an inline child: on the flex parent the text
+                     is an anonymous flex item and never picks up the ellipsis. -->
+                <span class="truncate">{{ item.title }}</span>
               </h2>
               <!-- Panel with Panel-Level Variables -->
               <div v-else class="panel-with-variables flex h-full flex-col">
