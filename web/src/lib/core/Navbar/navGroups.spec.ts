@@ -158,6 +158,7 @@ describe("groupNavLinks", () => {
       "incidentList",
       "alertDestinations",
       "alertTemplates",
+      "alertSources",
     ]);
   });
 
@@ -190,15 +191,21 @@ describe("groupNavLinks", () => {
     ]);
   });
 
-  it("takes Destinations/Templates away with Alerts when alertList is hidden", () => {
-    // They carry `requires: "alertList"`, so hiding Alerts via custom_hide_menus
-    // must not leave its plumbing behind in the flyout.
+  it("takes Destinations/Templates away with Alerts when alertList is hidden, but keeps Alert Sources (requires incidentList)", () => {
+    // Destinations/Templates carry `requires: "alertList"`, so hiding Alerts via
+    // custom_hide_menus must not leave their plumbing behind in the flyout.
+    // Alert Sources requires `incidentList` instead — it rides on Incidents,
+    // not Alerts, so it survives here.
     const entries = groupNavLinks([link("home"), link("sloList"), link("incidentList")]);
     const reliability = entries.find(
       (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
         e.type === "linkGroup" && e.item.name === "reliability",
     );
-    expect(reliability?.children.map((c) => c.name)).toEqual(["sloList", "incidentList"]);
+    expect(reliability?.children.map((c) => c.name)).toEqual([
+      "sloList",
+      "incidentList",
+      "alertSources",
+    ]);
   });
 
   it("keeps SLOs a plain link when Alerts and Incidents are hidden", () => {
@@ -208,11 +215,17 @@ describe("groupNavLinks", () => {
     ]);
   });
 
-  it("keeps Incidents a plain link when it is the only reliability item", () => {
-    expect(keysOf(groupNavLinks([link("home"), link("incidentList")]))).toEqual([
-      "link:home",
-      "link:incidentList",
-    ]);
+  it("groups Incidents with Alert Sources when Incidents is the only other reliability item present", () => {
+    // Alert Sources requires incidentList, so Incidents is never really
+    // "alone" once Incidents is enabled — it always has Alert Sources riding
+    // alongside it, and 2 children is enough to collapse into a group.
+    const entries = groupNavLinks([link("home"), link("incidentList")]);
+    expect(keysOf(entries)).toEqual(["link:home", "linkGroup:reliability"]);
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    expect(reliability?.children.map((c) => c.name)).toEqual(["incidentList", "alertSources"]);
   });
 
   it("moves Reports under the Dashboards group", () => {
@@ -305,6 +318,10 @@ describe("groupNavLinks", () => {
   });
 
   it("does not lose any non-absorbed item", () => {
+    // incidentList collapses into linkGroup:reliability here (Alert Sources
+    // rides alongside it, requires: incidentList, ≥2 children collapses) — it
+    // surfaces as a linkGroup child, not a top-level link, so it's excluded
+    // from the top-level "surfaced" set the same way absorbed items are.
     const input = [
       link("home"),
       link("logs"),
@@ -316,8 +333,17 @@ describe("groupNavLinks", () => {
       link("settings"),
     ];
     const entries = groupNavLinks(input);
-    const surfaced = entries.flatMap((e) => (e.type === "group" ? [] : [e.item.name]));
-    expect(surfaced.sort()).toEqual(input.map((i) => i.name).sort());
+    const surfaced = entries.flatMap((e) =>
+      e.type === "group" || e.type === "linkGroup" ? [] : [e.item.name],
+    );
+    const expectedNonCollapsed = input.map((i) => i.name).filter((n) => n !== "incidentList");
+    expect(surfaced.sort()).toEqual(expectedNonCollapsed.sort());
+
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    expect(reliability?.children.map((c) => c.name)).toContain("incidentList");
   });
 
   it("every group's absorbs/members are internally consistent", () => {
