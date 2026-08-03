@@ -23,24 +23,41 @@
  *      cached fetch — so a tab is correct regardless of parent load timing);
  *   2. drops any panel whose columns are absent from the schema, reflowing the survivors
  *      (via `filterDashboardBySchema`), so no persona ever hits a "column not found" error;
- *   3. reports when every panel was dropped, so the tab can show a friendly empty state.
+ *   3. when the tab passes its `dateTime`, additionally drops panels tagged for a platform
+ *      with no data in that range (via `useRumPlatforms`) — this is what keeps a mobile
+ *      section from lingering, empty, over a stream that merely *once* carried mobile data;
+ *   4. reports when every panel was dropped, so the tab can show a friendly empty state.
  *
  * When the schema is unknown, filtering is a no-op — the full dashboard renders, exactly
  * as the browser-only experience did before. See
  * docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
  */
 
-import { computed, ref, type ComputedRef, type Ref } from "vue";
+import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
 import usePerformance from "@/composables/rum/usePerformance";
+import useRumPlatforms from "@/composables/rum/useRumPlatforms";
 import useStreams from "@/composables/useStreams";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import {
   filterDashboardBySchema,
   presentFieldsFromSchemaMap,
+  type PlatformAvailability,
   type RumDashboard,
 } from "@/utils/rum/dashboardCapability";
 
 const RUM_STREAM = "_rumdata";
+
+/** The `dateTime` object the Performance tabs receive from their parent page. */
+export interface RumTabDateTime {
+  start_time?: Date | number | null;
+  end_time?: Date | number | null;
+}
+
+/** Search APIs take microseconds; the tabs carry `Date`s (or raw ms). */
+const toMicros = (value: Date | number | null | undefined): number => {
+  if (value instanceof Date) return value.getTime() * 1000;
+  return typeof value === "number" && Number.isFinite(value) ? value * 1000 : 0;
+};
 
 export interface RumPerformanceTab {
   /** The schema-migrated, capability-filtered dashboard to hand to RenderDashboardCharts. */
@@ -51,13 +68,30 @@ export interface RumPerformanceTab {
   showEmptyState: ComputedRef<boolean>;
   /** True when at least one panel was dropped — e.g. to hide browser-oriented section labels. */
   wasFiltered: ComputedRef<boolean>;
+  /** Platform availability in the selected range, or null while unresolved. */
+  platforms: ComputedRef<PlatformAvailability | null>;
   /** Kick off schema resolution — call from the tab's onMounted. */
   ensureRumSchema: () => Promise<void>;
 }
 
-const useRumPerformanceTab = (rawDashboard: unknown): RumPerformanceTab => {
+/**
+ * @param rawDashboard The tab's static dashboard JSON.
+ * @param dateTime     Optional. When supplied, the tab additionally gates panels tagged
+ *                     `o2Platform` on which platforms actually have data in that range
+ *                     (`useRumPlatforms`). Tabs that omit it keep pure field gating.
+ */
+const useRumPerformanceTab = (
+  rawDashboard: unknown,
+  dateTime?: Ref<RumTabDateTime | undefined>,
+): RumPerformanceTab => {
   const { performanceState } = usePerformance();
   const { getStream } = useStreams();
+  const {
+    hasBrowser,
+    hasMobile,
+    resolvedKey,
+    detectPlatforms,
+  } = useRumPlatforms();
 
   // Schema migration runs once; the raw JSON is a module-level import.
   const baseDashboard = convertDashboardSchemaVersion(rawDashboard) as RumDashboard;
@@ -69,18 +103,48 @@ const useRumPerformanceTab = (rawDashboard: unknown): RumPerformanceTab => {
   );
   const presentFields = computed(() => presentFieldsFromSchemaMap(rumSchemaMap.value));
 
-  const filtered = computed(() => filterDashboardBySchema(baseDashboard, presentFields.value));
+  // Null until this tab has opted in (by passing a range) AND the probe has answered.
+  // `useRumPlatforms` holds module-level state shared by every tab, so gating on
+  // `resolvedKey` alone would silently platform-gate the tabs that never asked for it the
+  // moment another tab resolved. Platform hints are also ignored while detection is in
+  // flight, so a tab never hides mobile panels just because the probe hasn't landed.
+  const platforms = computed<PlatformAvailability | null>(() =>
+    !dateTime || resolvedKey.value === null
+      ? null
+      : { hasBrowser: hasBrowser.value, hasMobile: hasMobile.value },
+  );
+
+  // A watcher, not a computed: probing is an imperative side effect (a search request) that
+  // has to re-run when the page's time range changes, and there is no event to hang it off —
+  // the range arrives as a prop from the parent page.
+  if (dateTime) {
+    watch(
+      dateTime,
+      (value) => {
+        const startTime = toMicros(value?.start_time);
+        const endTime = toMicros(value?.end_time);
+        if (!startTime || !endTime) return;
+        // Cached per range and self-recovering (schema fallback), so fire-and-forget.
+        detectPlatforms({ startTime, endTime });
+      },
+      { immediate: true, deep: true },
+    );
+  }
+
+  const filtered = computed(() =>
+    filterDashboardBySchema(baseDashboard, presentFields.value, { platforms: platforms.value }),
+  );
 
   const dashboardData = computed(() => filtered.value.dashboard);
 
   const wasFiltered = computed(() => filtered.value.droppedCount > 0);
 
-  // Empty only when the schema is genuinely known and nothing survived filtering — never
-  // on an unresolved/inconclusive schema (that path renders the full dashboard).
+  // Empty only when something was genuinely resolved (schema or platforms) and nothing
+  // survived filtering — never on an unresolved/inconclusive gate, which renders in full.
   const showEmptyState = computed(
     () =>
       schemaResolved.value &&
-      presentFields.value != null &&
+      (presentFields.value != null || platforms.value != null) &&
       filtered.value.keptCount === 0,
   );
 
@@ -102,7 +166,14 @@ const useRumPerformanceTab = (rawDashboard: unknown): RumPerformanceTab => {
     }
   };
 
-  return { dashboardData, schemaResolved, showEmptyState, wasFiltered, ensureRumSchema };
+  return {
+    dashboardData,
+    schemaResolved,
+    showEmptyState,
+    wasFiltered,
+    platforms,
+    ensureRumSchema,
+  };
 };
 
 export default useRumPerformanceTab;

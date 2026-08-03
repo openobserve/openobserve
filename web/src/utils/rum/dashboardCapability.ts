@@ -84,7 +84,11 @@ export const CAPABILITY_GATED_FIELDS: string[] = [
   "view_cpu_ticks_per_second",
   "error_is_crash",
   "error_category",
-  "freeze_duration",
+  // Flattened from `error.freeze.duration` — the ANR / app-hang duration. NOT `freeze_duration`:
+  // `_` is a word character, so a `\bfreeze_duration\b` matcher never fires inside
+  // `error_freeze_duration` and the panel would sail through the gate and error.
+  "error_freeze_duration",
+  "error_time_since_app_start",
   "vital_app_launch_metric",
   "vital_startup_type",
   "vital_duration",
@@ -128,6 +132,46 @@ export interface FilterResult {
   keptCount: number;
 }
 
+/**
+ * Panel-level capability hints, authored directly in the RUM dashboard JSON.
+ *
+ * Field gating alone can't answer two questions:
+ *   1. A section-header panel carries no SQL, so nothing ties it to a platform — without a
+ *      hint, a "Mobile app health" heading would survive on a browser-only stream.
+ *   2. Schema presence is forever: an org that ingested mobile for one afternoon in March
+ *      keeps those columns, so field gating would still show empty mobile tiles in July.
+ *      `o2Platform` is resolved against what actually has data in the selected range
+ *      (`useRumPlatforms`), which is the whole point of the source probe.
+ */
+export const PANEL_PLATFORM_KEY = "o2Platform";
+
+/**
+ * Keep the panel only if at least ONE of these columns is in the schema. Lets a header
+ * disappear together with the section it labels — a mobile stream from an app that has
+ * never crashed has no `error_is_crash` column, so its stability tiles are gated out and
+ * the heading must go with them.
+ */
+export const PANEL_REQUIRES_ANY_FIELD_KEY = "o2RequiresAnyField";
+
+export type RumPlatformKind = "browser" | "mobile";
+
+/** Which platforms actually have data — the shape `useRumPlatforms` resolves. */
+export interface PlatformAvailability {
+  hasBrowser: boolean;
+  hasMobile: boolean;
+}
+
+export interface FilterOptions {
+  /** Column count of the grid to repack into. Defaults to `DASHBOARD_GRID_COLUMNS`. */
+  gridWidth?: number;
+  /**
+   * Platform availability for the selected time range. When null/undefined, platform
+   * hints are ignored entirely and only field gating applies — which is what the tabs
+   * that don't probe (Vitals, Errors, API) get, unchanged.
+   */
+  platforms?: PlatformAvailability | null;
+}
+
 /** The concatenated SQL of every query on a panel. */
 const panelSql = (panel: DashboardPanel): string =>
   (panel?.queries ?? []).map((q) => q?.query ?? "").join("\n");
@@ -140,6 +184,34 @@ const panelReferencesAbsentField = (panel: DashboardPanel, presentFields: Set<st
   const sql = panelSql(panel);
   if (!sql) return false;
   return fieldMatchers.some(([field, matcher]) => !presentFields.has(field) && matcher.test(sql));
+};
+
+/** The panel's declared platform, or null when it is platform-agnostic. */
+const panelPlatform = (panel: DashboardPanel): RumPlatformKind | null => {
+  const value = panel?.[PANEL_PLATFORM_KEY];
+  return value === "browser" || value === "mobile" ? value : null;
+};
+
+/** True when the panel is tagged for a platform that has no data in range. */
+const panelPlatformUnavailable = (
+  panel: DashboardPanel,
+  platforms: PlatformAvailability | null | undefined,
+): boolean => {
+  if (!platforms) return false;
+  const platform = panelPlatform(panel);
+  if (!platform) return false;
+  return platform === "mobile" ? !platforms.hasMobile : !platforms.hasBrowser;
+};
+
+/** True when the panel declares required columns and the schema has none of them. */
+const panelRequiredFieldsMissing = (
+  panel: DashboardPanel,
+  presentFields: Set<string> | null | undefined,
+): boolean => {
+  if (!presentFields) return false;
+  const required = panel?.[PANEL_REQUIRES_ANY_FIELD_KEY];
+  if (!Array.isArray(required) || required.length === 0) return false;
+  return !required.some((field) => typeof field === "string" && presentFields.has(field));
 };
 
 /**
@@ -199,24 +271,37 @@ const totalPanelCount = (dashboard: RumDashboard): number => {
  *     silently saw ZERO panels for a converted dashboard, so `keptCount` was always 0 and
  *     the tab showed its empty state for every persona once the schema resolved.
  *
+ * A panel is dropped when ANY of these hold:
+ *   - its SQL references a capability-gated column absent from the schema;
+ *   - it declares `o2Platform` for a platform with no data in range (needs `options.platforms`);
+ *   - it declares `o2RequiresAnyField` and the schema has none of those columns.
+ *
  * @param dashboard      A RUM dashboard in either shape.
  * @param presentFields  The set of column names in the `_rumdata` schema. When null or
- *                       empty (schema not yet known) the dashboard is returned UNCHANGED,
- *                       so a browser user is never degraded by an unresolved schema.
+ *                       empty (schema not yet known) field gating is skipped, so a browser
+ *                       user is never degraded by an unresolved schema.
+ * @param options        Grid width to repack into, and platform availability for the range.
  * @returns The (possibly filtered) dashboard plus counts. When nothing is dropped, the
  *          SAME dashboard reference is returned so rendering is identical.
  */
 export const filterDashboardBySchema = (
   dashboard: RumDashboard,
   presentFields: Set<string> | null | undefined,
-  gridWidth: number = DASHBOARD_GRID_COLUMNS,
+  options: FilterOptions = {},
 ): FilterResult => {
-  // Unknown schema → don't touch anything (non-regression for the common browser path).
-  if (!presentFields || presentFields.size === 0) {
+  const { gridWidth = DASHBOARD_GRID_COLUMNS, platforms = null } = options;
+  const fields = presentFields && presentFields.size > 0 ? presentFields : null;
+
+  // Nothing to gate on at all → don't touch anything (non-regression for the common
+  // browser path, where an unresolved schema must still render the full dashboard).
+  if (!fields && !platforms) {
     return { dashboard, droppedCount: 0, keptCount: totalPanelCount(dashboard) };
   }
 
-  const keep = (panel: DashboardPanel) => !panelReferencesAbsentField(panel, presentFields);
+  const keep = (panel: DashboardPanel) =>
+    !panelPlatformUnavailable(panel, platforms) &&
+    !panelRequiredFieldsMissing(panel, fields) &&
+    !(fields && panelReferencesAbsentField(panel, fields));
 
   // v8+ shape: filter each tab's panels in place, aggregate counts across tabs.
   const usesTabs = Array.isArray(dashboard?.tabs) && !(dashboard.panels?.length);

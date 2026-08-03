@@ -34,6 +34,8 @@ export interface RumPerformanceTabMockOverrides {
   schemaResolved?: boolean;
   showEmptyState?: boolean;
   wasFiltered?: boolean;
+  /** Platform availability in range; null means detection hasn't resolved. */
+  platforms?: { hasBrowser: boolean; hasMobile: boolean } | null;
   ensureRumSchema?: ReturnType<typeof vi.fn>;
 }
 
@@ -47,6 +49,7 @@ export function createRumPerformanceTabMock(overrides: RumPerformanceTabMockOver
     schemaResolved = true,
     showEmptyState = false,
     wasFiltered = false,
+    platforms = { hasBrowser: true, hasMobile: false },
     ensureRumSchema = vi.fn().mockResolvedValue(undefined),
   } = overrides;
 
@@ -55,6 +58,7 @@ export function createRumPerformanceTabMock(overrides: RumPerformanceTabMockOver
     schemaResolved: ref(schemaResolved),
     showEmptyState: computed(() => showEmptyState),
     wasFiltered: computed(() => wasFiltered),
+    platforms: computed(() => platforms),
     ensureRumSchema,
   };
 }
