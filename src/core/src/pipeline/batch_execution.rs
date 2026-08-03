@@ -1184,14 +1184,14 @@ impl ProcessChannels {
     // a common place for error logging and handling, instead of repeating the same code
     // in each of the node processing fns
     async fn send_input(&mut self, metadata: &ProcessMetadata, id: &str, value: &Value) {
-        if let Some(ref mut channel) = self.inputs_sender {
-            if let Err(e) = channel.send((id.to_string(), value.clone())).await {
-                log::error!(
-                    "[Pipeline] {} [inv={}] error sending input via input channel for node {id} : {e}",
-                    metadata.pipeline_name,
-                    metadata.inv_id
-                );
-            }
+        if let Some(ref mut channel) = self.inputs_sender
+            && let Err(e) = channel.send((id.to_string(), value.clone())).await
+        {
+            log::error!(
+                "[Pipeline] {} [inv={}] error sending input via input channel for node {id} : {e}",
+                metadata.pipeline_name,
+                metadata.inv_id
+            );
         }
     }
 }
