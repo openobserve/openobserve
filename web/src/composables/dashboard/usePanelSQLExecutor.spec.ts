@@ -780,6 +780,64 @@ describe("usePanelSQLExecutor", () => {
       expect(state.sparklineData[0]).toEqual(freshHits);
     });
 
+    it("fires a per-query is_ui_histogram fetch for a multi-query metric grid", async () => {
+      const panelSchema = ref({
+        id: "panel-metric-multi",
+        title: "Multi Metric",
+        type: "metric",
+        queryType: "sql",
+        config: { sparkline: { enabled: true } },
+        queries: [
+          {
+            query: "SELECT count(*) as y FROM a",
+            vrlFunctionQuery: "",
+            fields: { stream: "a", stream_type: "logs", x: [{ alias: "ts" }] },
+            config: { time_shift: [] },
+          },
+          {
+            query: "SELECT count(*) as y FROM b",
+            vrlFunctionQuery: "",
+            fields: { stream: "b", stream_type: "logs", x: [{ alias: "ts" }] },
+            config: { time_shift: [] },
+          },
+        ],
+      });
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+      const { executeMultiSQL } = usePanelSQLExecutor(ctx);
+      await executeMultiSQL(0, 300_000_000, null, "logs");
+
+      // One isolated histogram fetch per query, each targeting its own grid cell.
+      const histCalls = fetchQueryDataWithHttpStream.mock.calls.filter(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      expect(histCalls).toHaveLength(2);
+      expect(histCalls[0][0].meta.currentQueryIndex).toBe(0);
+      expect(histCalls[1][0].meta.currentQueryIndex).toBe(1);
+
+      // Completing each stream writes to the matching sparklineData slot.
+      const hitsA = [
+        { zo_sql_key: "1", zo_sql_num: 1 },
+        { zo_sql_key: "2", zo_sql_num: 2 },
+      ];
+      const hitsB = [
+        { zo_sql_key: "1", zo_sql_num: 3 },
+        { zo_sql_key: "2", zo_sql_num: 4 },
+      ];
+      histCalls[0][1].data(histCalls[0][0], {
+        type: "search_response_hits",
+        content: { results: { hits: hitsA } },
+      });
+      histCalls[0][1].complete();
+      histCalls[1][1].data(histCalls[1][0], {
+        type: "search_response_hits",
+        content: { results: { hits: hitsB } },
+      });
+      histCalls[1][1].complete();
+
+      expect(state.sparklineData[0]).toEqual(hitsA);
+      expect(state.sparklineData[1]).toEqual(hitsB);
+    });
+
     const HISTOGRAM_UNAVAILABLE = {
       code: 20013,
       message: "Search histogram not available",

@@ -842,6 +842,10 @@ export const usePanelSQLExecutor = (ctx: {
       queries: [],
     };
     state.resultMetaData = [];
+    // Invalidate any in-flight sparkline stream from a previous run before reset.
+    sparklineRunToken++;
+    state.sparklineData = [];
+    state.sparklineWarning = "";
     state.annotations = [];
     state.isOperationCancelled = false;
 
@@ -975,6 +979,22 @@ export const usePanelSQLExecutor = (ctx: {
       state.data.push([]);
       state.metadata.queries.push(allMetadata[i]);
       state.resultMetaData.push([]);
+    }
+
+    if (panelSchema.value.type === "metric" && panelSchema.value.config?.sparkline?.enabled) {
+      for (let i = 0; i < allSearchRequests.length; i++) {
+        const it = panelSchema.value.queries[allMetadata[i]?.panelQueryIndex];
+        if (!it) continue;
+        fetchSparklineHistogram(
+          allSearchRequests[i].sql,
+          it,
+          allSearchRequests[i].start_time,
+          allSearchRequests[i].end_time,
+          pageType,
+          i,
+          abortControllerRef,
+        );
+      }
     }
 
     // Phase 3: Send single multi-stream call
