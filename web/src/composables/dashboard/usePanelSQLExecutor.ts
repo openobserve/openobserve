@@ -206,6 +206,11 @@ export const usePanelSQLExecutor = (ctx: {
     }
   };
 
+  // Bumped by executeSQL on every run. A fire-and-forget sparkline stream captures
+  // the token at fire time and only writes if it still matches — so a slow stream
+  // from a previous range/variable can't overwrite the freshly-reset state.
+  let sparklineRunToken = 0;
+
   // Isolated 2nd fetch: a UI histogram (is_ui_histogram=true) of the SAME query,
   // used ONLY to draw the metric sparkline. Fully guarded and fire-and-forget —
   // any failure leaves state.sparklineData empty and the metric shows value-only.
@@ -220,6 +225,8 @@ export const usePanelSQLExecutor = (ctx: {
   ) => {
     try {
       if (abortControllerRef?.signal?.aborted) return;
+      // Snapshot the current run; a later run bumps this and invalidates our writes.
+      const runToken = sparklineRunToken;
       const { traceId } = generateTraceContext();
       const hits: any[] = [];
       const payload: any = {
@@ -253,6 +260,7 @@ export const usePanelSQLExecutor = (ctx: {
       // renders. Other transient errors stay silent. The API delivers this either
       // as a `data` event of type "error" or via the stream `error` callback.
       const captureSparklineError = (content: any) => {
+        if (runToken !== sparklineRunToken) return;
         if (content?.code === 20013) {
           state.sparklineWarning = content?.error_detail || content?.message || "";
         }
@@ -273,10 +281,13 @@ export const usePanelSQLExecutor = (ctx: {
           removeTraceId(traceId);
         },
         complete: () => {
-          // Reassign the whole array so the render watcher (shallow ref) fires.
-          const next = Array.isArray(state.sparklineData) ? state.sparklineData.slice() : [];
-          next[currentQueryIndex] = hits.slice();
-          state.sparklineData = next;
+          // Drop the write if a newer run already reset the state.
+          if (runToken === sparklineRunToken) {
+            // Reassign the whole array so the render watcher (shallow ref) fires.
+            const next = Array.isArray(state.sparklineData) ? state.sparklineData.slice() : [];
+            next[currentQueryIndex] = hits.slice();
+            state.sparklineData = next;
+          }
           removeTraceId(traceId);
         },
         reset: () => {
@@ -301,6 +312,8 @@ export const usePanelSQLExecutor = (ctx: {
         queries: [],
       };
       state.resultMetaData = [];
+      // Invalidate any in-flight sparkline stream from a previous run before reset.
+      sparklineRunToken++;
       state.sparklineData = [];
       state.sparklineWarning = "";
       state.annotations = [];

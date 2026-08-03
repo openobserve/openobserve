@@ -745,6 +745,41 @@ describe("usePanelSQLExecutor", () => {
       expect(state.sparklineData[0]).toEqual(hits);
     });
 
+    it("drops a stale sparkline stream that completes after a newer run reset the state", async () => {
+      const { ctx, state, fetchQueryDataWithHttpStream } = makeMetricCtx(true);
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+
+      // Run 1 fires the sparkline stream, but it hasn't completed yet.
+      await executeSQL(0, 300_000_000, null);
+      const [stalePayload, staleHandlers] = fetchQueryDataWithHttpStream.mock.calls.find(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+
+      // Run 2 (e.g. a new time range) resets state and bumps the run token.
+      await executeSQL(0, 600_000_000, null);
+
+      // The OLD stream now completes with stale hits — must be ignored.
+      staleHandlers.data(stalePayload, {
+        type: "search_response_hits",
+        content: { results: { hits: [{ zo_sql_key: "old", zo_sql_num: 1 }] } },
+      });
+      staleHandlers.complete();
+      expect(state.sparklineData[0]).toBeUndefined();
+
+      // The current run's stream still writes normally.
+      const histCalls = fetchQueryDataWithHttpStream.mock.calls.filter(
+        ([p]: any) => p?.meta?.is_ui_histogram === true,
+      );
+      const [freshPayload, freshHandlers] = histCalls[histCalls.length - 1];
+      const freshHits = [{ zo_sql_key: "new", zo_sql_num: 9 }];
+      freshHandlers.data(freshPayload, {
+        type: "search_response_hits",
+        content: { results: { hits: freshHits } },
+      });
+      freshHandlers.complete();
+      expect(state.sparklineData[0]).toEqual(freshHits);
+    });
+
     const HISTOGRAM_UNAVAILABLE = {
       code: 20013,
       message: "Search histogram not available",
