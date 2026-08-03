@@ -51,13 +51,18 @@ describe("useSyntheticResults", () => {
   });
 
   it("should map raw search responses into typed state via the adapters", async () => {
-    // Order of Promise.all: kpi, lastRun, histogram, runs.
+    // Query order: histogram, p95, lastRun, runs.
+    //
+    // The count tiles are summed from the histogram buckets rather than fetched
+    // by their own aggregate, because a bare aggregate can never hit o2's result
+    // cache (it only engages for time-bucketed queries) and so rescanned on every
+    // load. p95 stays a separate call: percentiles do not sum across buckets.
     executeQuery
       .mockResolvedValueOnce([
-        { total_runs: 100, passed_runs: 99, failed_runs: 1, p95_duration: 2940 },
+        { total_runs: 100, passed_runs: 99, failed_runs: 1 },
       ])
+      .mockResolvedValueOnce([{ p95_duration: 2940 }])
       .mockResolvedValueOnce([{ status: "passed", ts: 1_700_000_000_000_000 }])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           ts: 1_700_000_000_000_000,
