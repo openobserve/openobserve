@@ -919,6 +919,8 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/incidents/integrations/{integration_id}", delete(alerts::incident_integrations::delete_integration))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/enable", patch(alerts::incident_integrations::set_integration_enabled))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/rotate", post(alerts::incident_integrations::rotate_integration_token))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}/destinations", patch(alerts::incident_integrations::set_integration_destinations))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}/name", patch(alerts::incident_integrations::set_integration_name))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/senders", get(alerts::incident_integrations::list_integration_senders))
 
         // Alert templates

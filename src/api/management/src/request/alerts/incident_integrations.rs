@@ -36,12 +36,30 @@ pub struct CreateIntegrationPayload {
     pub name: String,
     pub source_type: Option<String>,
     pub config: Option<serde_json::Value>,
+    /// Where notifications go when this source's alerts create or join an
+    /// incident. Omitted or empty means "use the org default" — see
+    /// `IncidentIntegrationRecord::destinations`.
+    #[serde(default)]
+    pub destinations: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub struct SetEnabledPayload {
     pub enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+pub struct SetDestinationsPayload {
+    #[serde(default)]
+    pub destinations: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+pub struct SetNamePayload {
+    pub name: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,6 +72,7 @@ pub struct IntegrationResponse {
     pub token: String,
     pub enabled: bool,
     pub config: serde_json::Value,
+    pub destinations: Vec<String>,
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
@@ -75,6 +94,7 @@ impl IntegrationResponse {
             token: record.token,
             enabled: record.enabled,
             config: record.config,
+            destinations: record.destinations,
             created_by: record.created_by,
             created_at: record.created_at,
             updated_at: record.updated_at,
@@ -129,12 +149,7 @@ impl From<infra::table::incident_integrations::SenderRecord> for SenderResponse 
 /// an allowed `source_type` (defaulting to "auto" when absent).
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub(crate) fn validate_create(payload: &CreateIntegrationPayload) -> Result<(), String> {
-    if payload.name.trim().is_empty() {
-        return Err("name cannot be empty".to_string());
-    }
-    if payload.name.len() > 100 {
-        return Err("name cannot exceed 100 characters".to_string());
-    }
+    validate_name(&payload.name)?;
     if let Some(st) = payload.source_type.as_deref()
         && !ALLOWED_SOURCE_TYPES.contains(&st)
     {
@@ -142,6 +157,17 @@ pub(crate) fn validate_create(payload: &CreateIntegrationPayload) -> Result<(), 
             "source_type must be one of: {}",
             ALLOWED_SOURCE_TYPES.join(", ")
         ));
+    }
+    Ok(())
+}
+
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+pub(crate) fn validate_name(name: &str) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("name cannot be empty".to_string());
+    }
+    if name.len() > 100 {
+        return Err("name cannot exceed 100 characters".to_string());
     }
     Ok(())
 }
@@ -206,6 +232,7 @@ pub async fn create_integration(
         token: infra::table::incident_integrations::generate_token(),
         enabled: true,
         config: payload.config.unwrap_or_else(|| serde_json::json!({})),
+        destinations: payload.destinations,
         created_by: user_email.user_id,
         created_at: now,
         updated_at: now,
@@ -232,6 +259,47 @@ pub async fn set_integration_enabled(
         payload.enabled,
     )
     .await
+    {
+        Ok(()) => MetaHttpResponse::ok("updated"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn set_integration_destinations(
+    Path((org_id, integration_id)): Path<(String, String)>,
+    Json(payload): Json<SetDestinationsPayload>,
+) -> Response {
+    if let Some(resp) = gate_enabled() {
+        return resp;
+    }
+
+    match infra::table::incident_integrations::set_destinations(
+        &org_id,
+        &integration_id,
+        &payload.destinations,
+    )
+    .await
+    {
+        Ok(()) => MetaHttpResponse::ok("updated"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn set_integration_name(
+    Path((org_id, integration_id)): Path<(String, String)>,
+    Json(payload): Json<SetNamePayload>,
+) -> Response {
+    if let Some(resp) = gate_enabled() {
+        return resp;
+    }
+    if let Err(e) = validate_name(&payload.name) {
+        return MetaHttpResponse::bad_request(e);
+    }
+
+    match infra::table::incident_integrations::set_name(&org_id, &integration_id, &payload.name)
+        .await
     {
         Ok(()) => MetaHttpResponse::ok("updated"),
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -334,6 +402,22 @@ pub async fn rotate_integration_token(_path: Path<(String, String)>) -> Response
 }
 
 #[cfg(not(feature = "enterprise"))]
+pub async fn set_integration_name(
+    _path: Path<(String, String)>,
+    _body: Json<SetNamePayload>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn set_integration_destinations(
+    _path: Path<(String, String)>,
+    _body: Json<SetDestinationsPayload>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
 pub async fn list_integration_senders(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -352,6 +436,7 @@ mod tests {
             name: name.to_string(),
             source_type: source_type.map(String::from),
             config: None,
+            destinations: Vec::new(),
         }
     }
 
@@ -408,6 +493,14 @@ mod tests {
         assert_eq!(p.name, "minimal");
         assert!(p.source_type.is_none());
         assert!(p.config.is_none());
+        assert!(p.destinations.is_empty());
+    }
+
+    #[test]
+    fn test_create_payload_deserializes_destinations() {
+        let json = r#"{"name":"grafana-prod","destinations":["sre-pages","email-oncall"]}"#;
+        let p: CreateIntegrationPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(p.destinations, vec!["sre-pages", "email-oncall"]);
     }
 
     #[test]
@@ -415,6 +508,20 @@ mod tests {
         let json = r#"{"enabled":false}"#;
         let p: SetEnabledPayload = serde_json::from_str(json).unwrap();
         assert!(!p.enabled);
+    }
+
+    #[test]
+    fn test_set_destinations_payload_round_trip() {
+        let json = r#"{"destinations":["sre-pages"]}"#;
+        let p: SetDestinationsPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(p.destinations, vec!["sre-pages"]);
+    }
+
+    #[test]
+    fn test_set_destinations_payload_defaults_empty() {
+        let json = r#"{}"#;
+        let p: SetDestinationsPayload = serde_json::from_str(json).unwrap();
+        assert!(p.destinations.is_empty());
     }
 
     #[test]

@@ -31,6 +31,18 @@ const alertSources = {
   rotate: (org_identifier: string, integration_id: string) => {
     return http().post(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}/rotate`);
   },
+  setDestinations: (org_identifier: string, integration_id: string, destinations: string[]) => {
+    return http().patch(
+      `/api/v2/${org_identifier}/incidents/integrations/${integration_id}/destinations`,
+      { destinations },
+    );
+  },
+  setName: (org_identifier: string, integration_id: string, name: string) => {
+    return http().patch(
+      `/api/v2/${org_identifier}/incidents/integrations/${integration_id}/name`,
+      { name },
+    );
+  },
   listSenders: (org_identifier: string, integration_id: string) => {
     return http().get(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}/senders`);
   },
