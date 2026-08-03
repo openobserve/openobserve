@@ -1586,7 +1586,9 @@ const getSynthetics = async (resource: Entity | Resource) => {
     resource.name,
   );
 
-  updateEntityEntities(resource, ["id"], [...(res.data?.monitors ?? [])], false, "name");
+  // `monitors` was renamed `checks` in the synthetics list response.
+  const syntheticRows = res.data?.checks ?? res.data?.monitors ?? [];
+  updateEntityEntities(resource, ["id"], [...syntheticRows], false, "name");
 
   return new Promise((resolve) => {
     resolve(true);

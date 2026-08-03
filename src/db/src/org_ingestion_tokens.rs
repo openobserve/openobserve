@@ -158,6 +158,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let parts: Vec<&str> = item_key.splitn(2, '/').collect();
                 if parts.len() == 2 {
+                    // Also drop the org -> default-token pick, which synthetics
+                    // reads once per job. Reusing this existing watch means a
+                    // rotate or disable on another node lands here without a
+                    // second event stream.
+                    org_ingestion_tokens::invalidate_default_cache(parts[0]);
                     // find_enabled_token only returns enabled tokens.
                     // If found → token is enabled → cache it.
                     // If not found → token is disabled/missing → remove from cache.
@@ -172,6 +177,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
+                if let Some((org_id, _)) = item_key.split_once('/') {
+                    org_ingestion_tokens::invalidate_default_cache(org_id);
+                }
                 ORG_INGESTION_TOKENS.remove(item_key);
             }
             db::Event::Empty => {}

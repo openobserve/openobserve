@@ -571,7 +571,10 @@ export interface SyntheticLocation {
   /** Name of the most recently seen agent, live or stale. */
   last_agent_name?: string;
   last_seen_at?: number;
-  monitors_count: number;
+  /** Renamed from `monitors_count`; the optional alias keeps a UI bundle
+   *  working against a server on either side of that rename. */
+  checks_count: number;
+  monitors_count?: number;
   checks_per_min: number;
 }
 

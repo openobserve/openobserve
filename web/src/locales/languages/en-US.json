@@ -10513,6 +10513,8 @@
       "retries": "Retries",
       "retriesOnFailure": "Retries on failure",
       "retriesOnFailureSuffix": "times.",
+      "retriesMaxHint": "Maximum {max}. Retries run inside the same job, so the whole sequence must fit the check budget.",
+      "retriesMaxBrowserHint": "Maximum {max} for browser checks. Each attempt reruns the journey on every device, so more would outrun the probe timeout and report a failure your site never had.",
       "retryDelay": "Wait for",
       "retryDelaySuffix": "ms in between retries.",
       "schedule": "Schedule",
