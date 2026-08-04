@@ -1529,6 +1529,11 @@ export class LogsPage {
         await this.page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     }
 
+    async setDateTimeToPast1Hour() {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.locator(this.relative1HourButton).click();
+    }
+
     async setAbsoluteDate(year, month, day, currentMonth, currentYear) {
         await this.page.locator(this.dateTimeButton).click();
         await this.page.locator(this.absoluteTab).click();
