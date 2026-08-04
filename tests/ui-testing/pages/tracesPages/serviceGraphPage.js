@@ -78,7 +78,7 @@ export class ServiceGraphPage {
    * Sets the stream filter in localStorage before navigating to ensure the correct stream is shown.
    * @param {string} streamName - Stream to filter by (default: 'default')
    */
-  async navigateToServiceGraphUrl(streamName = 'default') {
+  async navigateToServiceGraphUrl(streamName = 'default', period = '6h') {
     // Set stream filter in localStorage before navigation — the Vue component reads from here
     await this.page.evaluate((stream) => {
       localStorage.setItem('serviceGraph_streamFilter', stream);
@@ -86,9 +86,40 @@ export class ServiceGraphPage {
 
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    const url = `${baseUrl}/web/traces?tab=service-graph&org_identifier=${org}`;
+    // Query a WIDE window (default 6h), not the page default of "Past 15 Minutes". The service
+    // graph is derived by a backend daemon that runs on a delay after trace ingestion, so with
+    // the 15m default the just-ingested topology often falls outside the window and the chart
+    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The tab
+    // honours the `period` URL param (verified: label shows "Past 6 Hours").
+    const url = `${baseUrl}/web/traces?tab=service-graph&period=${period}&org_identifier=${org}`;
     await this.page.goto(url);
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  /**
+   * Navigate to the service graph and wait until the chart actually renders, tolerating
+   * service-graph-daemon lag: if the page shows the empty "No service graph data" state,
+   * refresh and retry within the budget. Returns once the chart is visible; if it never
+   * renders the caller's own assertion still fails (non-masking).
+   * @param {string} streamName
+   * @param {object} [opts] { period, timeout }
+   */
+  async navigateToServiceGraphAndWaitForChart(streamName = 'default', opts = {}) {
+    const period = opts.period || '6h';
+    const timeout = opts.timeout || 90000;
+    await this.navigateToServiceGraphUrl(streamName, period);
+
+    const chart = this.page.locator(this.chartContainer);
+    const deadline = Date.now() + timeout;
+    // Date.now() is allowed here (test/page-object runtime, not a workflow script).
+    while (Date.now() < deadline) {
+      if (await chart.isVisible().catch(() => false)) return true;
+      // Empty-state → nudge the daemon result by refreshing, then wait a cycle.
+      await this.page.locator(this.refreshButton).click({ timeout: 5000 }).catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await chart.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    }
+    return await chart.isVisible().catch(() => false);
   }
 
   async expectServiceGraphPageVisible() {
