@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              that read as padding and only fade in on tab hover — at rest every
              tab is clean text. The name and the input carry the same box
              (px-0.5), the pencil is absolutely positioned (out of flow) in the
-             pr-3 reserve, and both gutters exist in display AND edit mode, so
+             pr-2.5 reserve, and both gutters exist in display AND edit mode, so
              entering/leaving edit never changes the tab's width. -->
         <div class="flex w-full flex-nowrap items-center" :class="canManage ? 'pr-2.5' : ''">
           <!-- Auto-size the input to its text via an invisible sizer sharing the
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span
               aria-hidden="true"
-              class="col-start-1 row-start-1 invisible whitespace-pre px-0.5 text-sm"
+              class="invisible col-start-1 row-start-1 px-0.5 text-sm whitespace-pre"
               >{{ editingName || " " }}</span
             >
             <input
