@@ -118,14 +118,14 @@ const getFormattedDate = (timestamp: number) =>
 /* eslint-disable local/no-hardcoded-px -- style block below: the 1px timeline rail and 1px dot border are hairlines that must not scale with text or they smear at fractional zoom */
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): the timeline rail is a ::before pseudo-element on
    .event-timeline (and the dots are absolutely positioned against it), so there
    is no element for a utility class to land on. */
 .event-timeline {
   position: relative;
 
-  // Vertical rail connecting the dots.
+  /* Vertical rail connecting the dots. */
   &::before {
     content: "";
     position: absolute;
@@ -145,15 +145,15 @@ const getFormattedDate = (timestamp: number) =>
   height: 0.5625rem;
   border-radius: var(--radius-full);
   border: 1px solid var(--color-card-glass-border);
+}
 
-  &--default {
-    background: var(--color-card-glass-bg, var(--color-card-glass-border));
-  }
+.event-timeline__dot--default {
+  background: var(--color-card-glass-bg, var(--color-card-glass-border));
+}
 
-  &--error {
-    background: var(--color-severity-error-color);
-    border-color: var(--color-severity-error-color);
-  }
+.event-timeline__dot--error {
+  background: var(--color-severity-error-color);
+  border-color: var(--color-severity-error-color);
 }
 
 .event-timeline__item--error {

@@ -893,7 +893,7 @@ function fireConfetti() {
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(complex-state): the statusbar/fixbox state machine (idle→checking→
    connected/stalled) plus its radar keyframes and OStepper/OCollapsible :deep()
    content styling — not expressible as template utilities. */

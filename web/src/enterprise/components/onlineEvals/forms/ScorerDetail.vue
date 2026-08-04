@@ -718,14 +718,14 @@ function relativeTime(timestampMs: number): string {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): The <dl>/<dt>/<dd> element-selector grid, the used-by list's hover/:deep(button)
    overrides, and the status-cell dot variants — descendant and pseudo-class
    selectors with no element of their own to carry a utility. */
-// Page layout, spacing, colors, and text styling are Tailwind utilities in the
-// template (matching SessionDetails.vue). Only cohesive blocks that rely on
-// descendant/element selectors or hover state remain here. Font-family is never
-// set per component — it inherits the global --font-sans.
+/* Page layout, spacing, colors, and text styling are Tailwind utilities in the
+   template (matching SessionDetails.vue). Only cohesive blocks that rely on
+   descendant/element selectors or hover state remain here. Font-family is never
+   set per component — it inherits the global --font-sans. */
 
 .sd__tab-intro {
   margin: 0;
@@ -734,9 +734,9 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
-// Versions / Used By tab content sits directly in the body (not in a
-// .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
-// full-bleed table and is not wrapped here.
+/* Versions / Used By tab content sits directly in the body (not in a
+   .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
+   full-bleed table and is not wrapped here. */
 .sd__tab-pad {
   display: flex;
   flex-direction: column;

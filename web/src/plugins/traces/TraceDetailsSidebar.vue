@@ -2012,7 +2012,7 @@ export default defineComponent({
 /* eslint-disable local/no-hardcoded-px -- covers the style block below: the px there are 1px table cell dividers — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): Deliberate CSS — generated content the template can't class up,
    child-component internals reached with :deep(), :fullscreen chains, and
    scrollbar rails. */

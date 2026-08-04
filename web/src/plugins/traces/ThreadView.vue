@@ -552,7 +552,7 @@ function formatTime(ns: number): string {
 /* eslint-disable local/no-hardcoded-px -- the style block below uses 1px borders: hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): element styling for the sanitized markdown HTML that
    renderMarkdown() produces and the assistant bubble injects with v-html. Those
    nodes carry neither a scope attribute nor classes of their own, so :deep()

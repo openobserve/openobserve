@@ -1738,7 +1738,7 @@ onMounted(load);
 /* eslint-disable local/no-hardcoded-px -- covers the style block below (a comment inside style is not honoured): its 1px values are hairlines — a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): markdown styling for the assistant message injected
    with v-html. Those nodes carry no scope attribute and no classes of their own,
    so :deep() element selectors are the only expressible form — a Tailwind

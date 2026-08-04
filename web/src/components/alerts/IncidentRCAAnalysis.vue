@@ -386,7 +386,7 @@ export default defineComponent({
 /* eslint-disable local/no-hardcoded-px -- covers the style block below: every px there is a 1px table/thead border — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(generated-content): the RCA report is markdown rendered through
    `v-html="sanitize(formattedRcaContent)"` above — the .rca-report-content wrapper
    and all of its children are built as an HTML string in IncidentDetailDrawer.vue

@@ -126,7 +126,7 @@ const renderedSections = computed(() =>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): .o2-card-md wraps markdown rendered at runtime — the
    :deep(:not(pre) > code)::before/::after backtick strip and :deep(table) rules
    target nodes this template never writes, so they cannot be utilities. */
