@@ -10,7 +10,7 @@ import * as path from 'path';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment, authedRequest } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 export class LogsPage {
@@ -844,7 +844,9 @@ export class LogsPage {
             await expect.poll(async () => {
                 pollCount++;
                 try {
-                    const response = await this.page.request.get(url, { headers: getAuthHeaders() });
+                    // authedRequest self-heals on 401/403 (refresh passcode / re-auth) so a
+                    // rotated-credential 401 from a concurrent shard doesn't stall the poll.
+                    const response = await authedRequest(this.page, 'get', url);
                     const status = response.status();
                     if (response.ok()) {
                         const data = await response.json();
