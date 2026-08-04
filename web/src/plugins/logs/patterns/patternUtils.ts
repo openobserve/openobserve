@@ -243,19 +243,90 @@ export const escapeForMatchAll = (str: string): string => {
     .replace(/\t/g, "\\t");
 };
 
+/** Maximum patterns one alert may be built from — keeps the SQL comprehensible. */
+export const MAX_PATTERNS_PER_ALERT = 10;
+
 /**
- * Build a SQL query for a pattern against a given stream.
- * Returns a SELECT * with match_all() WHERE clauses for each constant segment.
+ * One pattern's clause: every invariant constant must be present, so the
+ * constants are ANDed. A pattern with no constants has nothing that identifies
+ * it (its wildcards are per-log samples, not invariants) and yields null.
  */
-export const buildPatternSqlQuery = (template: string, streamName: string): string => {
+const patternClause = (template: string): string | null => {
   const constants = extractConstantsFromPattern(template);
-  let sql = `SELECT * FROM '${streamName}'`;
-  if (constants.length > 0) {
-    const conditions = constants.map((c) => `match_all('${escapeForMatchAll(c)}')`);
-    sql += ` WHERE ${conditions.join(" AND ")}`;
+  if (!constants.length) return null;
+
+  return constants.map((c) => `match_all('${escapeForMatchAll(c)}')`).join(" AND ");
+};
+
+/**
+ * Parenthesise only where precedence demands it. A lone pattern sits among ANDs,
+ * which are associative, so wrapping it would just add noise to a query the user
+ * reads in the confirm dialog. Once patterns are ORed together, each needs its
+ * own group or the AND inside one would bind across the OR.
+ */
+const joinAlternatives = (clauses: string[]): string =>
+  clauses.length > 1 ? clauses.map((c) => `(${c})`).join(" OR ") : clauses[0];
+
+export interface PatternSetSqlOptions {
+  streamName: string;
+  /** Templates the alert should match. */
+  includes?: string[];
+  /** Templates the alert should ignore. */
+  excludes?: string[];
+  /** The current search's WHERE fragment, ANDed in front of the pattern terms. */
+  baseFilter?: string;
+  /** "count" emits `count(*) AS cnt` for threshold-on-number alerts. */
+  select?: "rows" | "count";
+}
+
+/**
+ * Build the alert query for a SET of patterns, with include/exclude semantics.
+ *
+ *   SELECT … FROM '<stream>'
+ *   WHERE  <base filter>              -- the user's current search
+ *     AND  ( P1 OR P2 )               -- any of the included patterns
+ *     AND  NOT ( Q1 OR Q2 )           -- none of the excluded ones
+ *
+ * The operators follow what the UI says: constants within a pattern are ANDed
+ * (all must appear), includes are ORed ("any of these"), and excludes are
+ * negated as a group ("none of these" — NOT(A OR B) ≡ NOT A AND NOT B, written
+ * in the OR form because it mirrors the selection).
+ */
+export const buildPatternSetSqlQuery = (options: PatternSetSqlOptions): string => {
+  const { streamName, includes = [], excludes = [], baseFilter, select = "rows" } = options;
+
+  const projection = select === "count" ? "count(*) AS cnt" : "*";
+  const includeClauses = includes.map(patternClause).filter(Boolean) as string[];
+  const excludeClauses = excludes.map(patternClause).filter(Boolean) as string[];
+
+  const terms: string[] = [];
+
+  const trimmedBase = baseFilter?.trim();
+  if (trimmedBase) terms.push(`(${trimmedBase})`);
+
+  if (includeClauses.length) {
+    const joined = joinAlternatives(includeClauses);
+    // The OR group must be bracketed against the surrounding ANDs; a single
+    // include is already safe among them.
+    terms.push(includeClauses.length > 1 ? `(${joined})` : joined);
   }
+
+  if (excludeClauses.length) {
+    terms.push(`NOT (${joinAlternatives(excludeClauses)})`);
+  }
+
+  let sql = `SELECT ${projection} FROM '${streamName}'`;
+  if (terms.length) sql += ` WHERE ${terms.join(" AND ")}`;
   return sql;
 };
+
+/**
+ * Single-pattern query — the one-include case of buildPatternSetSqlQuery.
+ * Kept as its own name because that is how the rest of the pattern UI refers to
+ * it, but there is only one code path underneath.
+ */
+export const buildPatternSqlQuery = (template: string, streamName: string): string =>
+  buildPatternSetSqlQuery({ streamName, includes: [template] });
 
 /**
  * Derive a human-readable alert name from a pattern template and stream name.

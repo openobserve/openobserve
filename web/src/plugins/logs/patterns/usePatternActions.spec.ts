@@ -90,19 +90,21 @@ vi.mock("@/composables/useLogs/usePatterns", () => ({
 }));
 
 // patternUtils mock
-vi.mock("./patternUtils", () => ({
-  extractConstantsFromPattern: vi.fn(),
-  escapeForMatchAll: vi.fn((s: string) => s),
-  buildPatternAlertData: vi.fn(() => ({
-    streamName: "test-stream",
-    sqlQuery: "SELECT *",
-    alertName: "Alert_test-stream_User",
-  })),
-}));
+// Partial mock: only the constant extraction is stubbed (tests drive it to
+// simulate usable / unusable patterns). The SQL builder and the pattern cap stay
+// real, so these tests exercise the query the user would actually get.
+vi.mock("./patternUtils", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    extractConstantsFromPattern: vi.fn(),
+    escapeForMatchAll: vi.fn((s: string) => s),
+  };
+});
 
 // -- Import after mocks --
 import { usePatternActions } from "./usePatternActions";
-import { extractConstantsFromPattern, buildPatternAlertData } from "./patternUtils";
+import { extractConstantsFromPattern } from "./patternUtils";
 
 describe("usePatternActions", () => {
   beforeEach(() => {
@@ -110,9 +112,12 @@ describe("usePatternActions", () => {
     // Reset shared state between tests
     mockSearchObj.data.stream.addToFilter = "";
     mockSearchObj.meta.logsVisualizeToggle = "patterns";
-    const { selectedPattern, showPatternDetails } = usePatternActions();
+    const { selectedPattern, showPatternDetails, clearSelection } = usePatternActions();
     selectedPattern.value = null;
     showPatternDetails.value = false;
+    // Selection is module-scoped (shared across call sites), so it must be
+    // reset between tests like any other singleton.
+    clearSelection();
   });
 
   describe("openPatternDetails", () => {
@@ -260,68 +265,141 @@ describe("usePatternActions", () => {
     });
   });
 
-  describe("createAlertFromPattern", () => {
+  describe("alert selection (include / exclude)", () => {
     beforeEach(() => {
-      // Provide constants so alert creation proceeds
       vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
-      // Re-set buildPatternAlertData return value (cleared by outer beforeEach vi.clearAllMocks)
-      vi.mocked(buildPatternAlertData).mockReturnValue({
-        streamName: "test-stream",
-        sqlQuery: "SELECT *",
-        alertName: "Alert_test-stream_User",
-      });
-      // Ensure stream is selected (previous tests may have cleared it)
       mockSearchObj.data.stream.selectedStream = ["test-stream"];
     });
 
-    it("should navigate to addAlert with pattern data", () => {
-      const { createAlertFromPattern } = usePatternActions();
+    const p1 = { pattern_id: "p1", template: "User <*> logged in" };
+    const p2 = { pattern_id: "p2", template: "Probe <*> succeeded" };
 
-      createAlertFromPattern({
-        template: "User <*> logged in",
-        pattern_id: "p1",
-        frequency: 100,
-        percentage: 50,
-      });
+    it("cycles a pattern unselected → include → exclude → unselected", () => {
+      const api = usePatternActions();
 
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "addAlert",
-          query: expect.objectContaining({ fromPattern: "true" }),
-        }),
+      api.cycleSelection(p1);
+      expect(api.selectionOf(p1)).toBe("include");
+
+      api.cycleSelection(p1);
+      expect(api.selectionOf(p1)).toBe("exclude");
+
+      api.cycleSelection(p1);
+      expect(api.selectionOf(p1)).toBeNull();
+    });
+
+    it("tracks include and exclude counts separately", () => {
+      const api = usePatternActions();
+
+      api.cycleSelection(p1);
+      api.cycleSelection(p2);
+      api.cycleSelection(p2);
+
+      expect(api.includedCount.value).toBe(1);
+      expect(api.excludedCount.value).toBe(1);
+      expect(api.hasSelection.value).toBe(true);
+    });
+
+    it("refuses a pattern with no distinctive constants", () => {
+      vi.mocked(extractConstantsFromPattern).mockReturnValue([]);
+      const api = usePatternActions();
+
+      api.cycleSelection({ pattern_id: "p3", template: "<*> <*>" });
+
+      expect(api.selectionOf({ pattern_id: "p3" })).toBeNull();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "warning" }),
       );
     });
 
-    it("should warn when no stream is selected", () => {
-      mockSearchObj.data.stream.selectedStream = [];
-      const { createAlertFromPattern } = usePatternActions();
+    it("marks an all-wildcard pattern unselectable", () => {
+      const api = usePatternActions();
+      expect(api.isPatternSelectable(p1)).toBe(true);
 
-      createAlertFromPattern({ template: "User <*> logged in" });
-
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-
-    it("should warn when pattern has no long constants", () => {
       vi.mocked(extractConstantsFromPattern).mockReturnValue([]);
-      const { createAlertFromPattern } = usePatternActions();
-
-      createAlertFromPattern({ template: "<*>" });
-
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
-      expect(mockRouterPush).not.toHaveBeenCalled();
+      expect(api.isPatternSelectable({ template: "<*>" })).toBe(false);
     });
 
-    it("should store patternData in sessionStorage", () => {
-      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
-      const { createAlertFromPattern } = usePatternActions();
+    it("clears the whole selection", () => {
+      const api = usePatternActions();
+      api.cycleSelection(p1);
+      api.clearSelection();
 
-      createAlertFromPattern({
-        template: "User <*> logged in",
+      expect(api.hasSelection.value).toBe(false);
+    });
+
+    it("disables alert creation until something is selected", () => {
+      const api = usePatternActions();
+      expect(api.alertDisabledReason.value).toBeTruthy();
+
+      api.cycleSelection(p1);
+      expect(api.alertDisabledReason.value).toBeNull();
+    });
+
+    it("disables alert creation when no stream is selected", () => {
+      mockSearchObj.data.stream.selectedStream = [];
+      const api = usePatternActions();
+      api.cycleSelection(p1);
+
+      expect(api.alertDisabledReason.value).toBeTruthy();
+    });
+  });
+
+  describe("buildPatternsAlertPrefill", () => {
+    // These templates carry constants long enough to survive the real
+    // extractConstantsFromPattern, which the SQL builder calls internally.
+    const REAL_TEMPLATE = "Connection refused to upstream <*>";
+
+    beforeEach(() => {
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
+      mockSearchObj.data.stream.selectedStream = ["test-stream"];
+      mockSearchObj.meta.sqlMode = false;
+      mockSearchObj.data.query = "";
+    });
+
+    it("builds a prefill from the current selection", () => {
+      mockPatternsState.value.patterns.patterns[0].template = REAL_TEMPLATE;
+      const api = usePatternActions();
+      api.cycleSelection({ pattern_id: "p1", template: REAL_TEMPLATE });
+
+      const prefill = api.buildPatternsAlertPrefill();
+
+      expect(prefill.source).toBe("patterns");
+      expect(prefill.streamName).toBe("test-stream");
+      expect(prefill.sql).toContain("match_all('Connection refused to upstream')");
+    });
+
+    it("ANDs the current search filter in front of the pattern terms", () => {
+      mockSearchObj.data.query = "code = 500";
+      mockPatternsState.value.patterns.patterns[0].template = REAL_TEMPLATE;
+      const api = usePatternActions();
+      api.cycleSelection({ pattern_id: "p1", template: REAL_TEMPLATE });
+
+      expect(api.buildPatternsAlertPrefill().sql).toContain("(code = 500)");
+    });
+
+    it("says so when a SQL-mode query cannot be spliced in", () => {
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.query = 'SELECT * FROM "test-stream"';
+      mockPatternsState.value.patterns.patterns[0].template = REAL_TEMPLATE;
+      const api = usePatternActions();
+      api.cycleSelection({ pattern_id: "p1", template: REAL_TEMPLATE });
+
+      const prefill = api.buildPatternsAlertPrefill();
+      expect(prefill.warnings.map((w: any) => w.key)).toContain("sqlModeFilterDropped");
+      expect(prefill.sql).not.toContain("SELECT * FROM \"test-stream\")");
+    });
+
+    it("builds a single-pattern prefill for the detail drawer", () => {
+      const api = usePatternActions();
+
+      const prefill = api.buildSinglePatternAlertPrefill({
+        template: REAL_TEMPLATE,
         pattern_id: "p1",
       });
 
-      expect(setItemSpy).toHaveBeenCalledWith("patternData", expect.any(String));
+      expect(prefill.source).toBe("patterns");
+      expect(prefill.meta?.includedPatterns).toEqual([REAL_TEMPLATE]);
+      expect(prefill.sql).toContain("match_all('Connection refused to upstream')");
     });
   });
 });

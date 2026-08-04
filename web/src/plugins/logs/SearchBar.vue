@@ -766,6 +766,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator v-if="config.isEnterprise == 'true'" />
 
+          <!-- Alert creation is shared platform machinery: this page contributes
+               its search state through a pure adapter and CreateAlertAction owns
+               the label, confirm dialog, and hand-off. Not enterprise-gated —
+               alerts exist in OSS, unlike scheduled search above. -->
+          <ODropdownGroup :label="t('search.menuGroupAlerts')">
+            <CreateAlertAction
+              variant="menu-item"
+              source="logs"
+              :build="buildLogsAlertPrefill"
+              :disabled-reason="createAlertDisabledReason"
+              data-test="logs-create-alert-btn"
+            />
+          </ODropdownGroup>
+
+          <ODropdownSeparator />
+
           <ODropdownGroup
             v-if="
               config.isEnterprise == 'true' &&
@@ -1979,6 +1995,8 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildPrefillFromLogs, logsAlertSnapshot } from "@/utils/alerts/prefill/fromLogs";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
@@ -2041,6 +2059,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    CreateAlertAction,
     OSeparator,
     OSplitter,
     OButtonGroup,
@@ -4747,6 +4766,32 @@ export default defineComponent({
       searchObj.meta.jobRecords = 100;
     };
 
+    // ── Create alert from this search ────────────────────────────────────
+    // Stated up front rather than as a toast after the click: a control that
+    // explains why it is unavailable beats a dead-end action.
+    const createAlertDisabledReason = computed(() => {
+      if (!searchObj.data.stream.selectedStream?.length) {
+        return t("logs.searchBar.selectStreamBeforeSchedule");
+      }
+      return null;
+    });
+
+    /**
+     * This page's contribution to alert creation: a plain snapshot of searchObj
+     * in, an AlertPrefill out. The resolved SQL comes from buildSearch's
+     * read-only mode — the same query the backend runs, so the alert cannot
+     * drift from what the user is looking at. ignoreQuickMode is on because
+     * quick mode narrows the SELECT list for display, which is meaningless when
+     * only the row count matters.
+     */
+    const buildLogsAlertPrefill = () => {
+      const payload = buildSearch(true, true);
+
+      return buildPrefillFromLogs(
+        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone),
+      );
+    };
+
     const openSearchInspectDialog = () => {
       searchInspectTraceId.value = "";
       searchInspectDialog.value = true;
@@ -5031,6 +5076,8 @@ export default defineComponent({
       addJobScheduler,
       routeToSearchSchedule,
       createScheduleJob,
+      buildLogsAlertPrefill,
+      createAlertDisabledReason,
       searchInspectDialog,
       searchInspectTraceId,
       openSearchInspectDialog,

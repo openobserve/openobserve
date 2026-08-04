@@ -24,6 +24,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Status level left border (colored via currentColor from the severity class) -->
     <div class="absolute inset-y-0 left-0 z-10 w-1 bg-current" :class="severityClass" />
 
+    <!-- Alert selection. Deliberately worded "Alert on" / "Ignore in alert"
+         rather than include/exclude: the hover actions elsewhere on this row
+         filter the SEARCH, and reusing those words for a different effect is
+         how users end up building the wrong alert. -->
+    <div v-if="selectable !== undefined" class="flex-shrink-0 pl-3" @click.stop>
+      <OButton
+        :variant="selectionVariant"
+        size="xs"
+        :disabled="!selectable"
+        :aria-label="selectionLabel"
+        :data-test="`pattern-card-${index}-alert-selection`"
+        @click="$emit('toggle-selection', pattern)"
+      >
+        <OIcon :name="selectionIcon" size="xs" />
+        <OTooltip :content="selectionLabel" side="right" />
+      </OButton>
+    </div>
+
     <!-- Count + share bar -->
     <div class="w-28 flex-shrink-0 pr-1 pl-3">
       <div
@@ -151,6 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import PatternVolumeCell from "./PatternVolumeCell.vue";
 import {
   tokenizeTemplate,
@@ -175,10 +195,18 @@ const props = defineProps<{
   wrap?: boolean;
   /** Highest display count across the (filtered) pattern set — scales the share bar. */
   maxFrequency?: number;
+  /**
+   * Alert selection state. Leave undefined to hide the control entirely, so
+   * surfaces that only browse patterns are unaffected.
+   */
+  selection?: "include" | "exclude" | null;
+  /** False for all-wildcard patterns, which have no text to match on. */
+  selectable?: boolean;
 }>();
 
 defineEmits<{
   (e: "click", pattern: any, index: number): void;
+  (e: "toggle-selection", pattern: any): void;
 }>();
 
 const { t } = useI18n();
@@ -189,6 +217,26 @@ const templateTokens = computed(() =>
 );
 
 const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
+
+// Tri-state: unselected → alert on → ignore → unselected.
+const selectionIcon = computed(() => {
+  if (props.selection === "include") return "add";
+  if (props.selection === "exclude") return "remove";
+  return "add";
+});
+
+const selectionVariant = computed(() => {
+  if (props.selection === "include") return "primary";
+  if (props.selection === "exclude") return "outline-destructive";
+  return "ghost";
+});
+
+const selectionLabel = computed(() => {
+  if (!props.selectable) return t("logs.patternList.noMatchTerms");
+  if (props.selection === "include") return t("logs.patternList.alertOn");
+  if (props.selection === "exclude") return t("logs.patternList.ignoreInAlert");
+  return t("logs.patternList.alertOn");
+});
 
 // Window-wide occurrences for this pattern, reported by the volume cell once
 // its lazy query resolves. Until then we show the extraction sample's count.

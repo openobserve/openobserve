@@ -1,0 +1,126 @@
+// Copyright 2026 OpenObserve Inc.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * The contract between ANY surface in the app ("create an alert from what I'm
+ * looking at") and the alert form. A surface contributes one pure adapter that
+ * returns an AlertPrefill; nothing else in the alerts module changes.
+ *
+ * Adapters must satisfy the invariants enforced by `normalizePrefill`
+ * (utils/alerts/alertPrefill.ts):
+ *
+ *  1. Resolved query, not source syntax — `sql` is what the backend would run:
+ *     no `[WHERE_CLAUSE]` templates, no unsubstituted dashboard variables.
+ *  2. Exactly one stream. Surfaces with several supply `streamCandidates` and
+ *     let the confirm dialog resolve it — never silently take `[0]`.
+ *  3. `periodMinutes` is minutes, already clamped. Never raw timestamps.
+ *  4. Warn, don't mutate silently: every lossy transform emits a warning.
+ *  5. Pure and synchronous — a plain snapshot in, a plain object out. No store,
+ *     no router, no await. This is what makes adapters trivially testable.
+ *  6. Never throw: an adapter that cannot build a usable prefill returns one
+ *     carrying a `blocking` warning.
+ */
+
+/**
+ * Open by design: a new surface registers an id in ALERT_SOURCES
+ * (utils/alerts/alertSourceRegistry.ts), it does not edit a union here. An
+ * unregistered id still works, on defaults.
+ */
+export type AlertPrefillSource = string;
+
+/**
+ * `blocking` prevents the user continuing to the form — reserved for prefills
+ * that could not be built into anything usable.
+ */
+export type AlertPrefillWarningLevel = "info" | "warning" | "blocking";
+
+export interface AlertPrefillWarning {
+  /** i18n key, relative to `alerts.prefill.warnings`. */
+  key: string;
+  params?: Record<string, string | number>;
+  level: AlertPrefillWarningLevel;
+}
+
+export interface AlertPrefillStreamCandidate {
+  name: string;
+  type: string;
+}
+
+/** The alert conditions-builder group shape (mirrors defaultAlertValue()). */
+export interface AlertPrefillConditionGroup {
+  filterType: "group";
+  logicalOperator: string;
+  groupId: string;
+  conditions: any[];
+}
+
+export interface AlertPrefillAggregation {
+  group_by: string[];
+  function: string;
+  having: {
+    column: string;
+    operator: string;
+    value: number;
+  };
+}
+
+export interface AlertPrefillThresholdCondition {
+  column: string;
+  operator: string;
+  value: number;
+}
+
+/**
+ * How the alert counts what the query returns. Sourced from the registry's
+ * `defaultThreshold`, overridable by the user in the confirm dialog.
+ */
+export type AlertPrefillThresholdShape = "matching-rows" | "count";
+
+/** Bumped whenever the persisted shape changes; a stale blob is ignored. */
+export const ALERT_PREFILL_VERSION = 1;
+
+export interface AlertPrefill {
+  version: typeof ALERT_PREFILL_VERSION;
+  source: AlertPrefillSource;
+  /** Human label for where this came from — used in the toast and the name. */
+  sourceLabel: string;
+
+  name?: string;
+  streamType: string;
+  streamName: string;
+
+  queryType: "sql" | "promql" | "custom";
+  sql?: string;
+  promql?: string;
+  conditions?: AlertPrefillConditionGroup;
+  vrlFunction?: string | null;
+
+  aggregation?: AlertPrefillAggregation | null;
+  promqlCondition?: AlertPrefillThresholdCondition | null;
+  thresholdShape?: AlertPrefillThresholdShape;
+
+  /** Rolling evaluation window in minutes, already clamped. */
+  periodMinutes?: number;
+  frequencyMinutes?: number;
+  timezone?: string;
+
+  /** Populated when the surface had more than one stream to choose from. */
+  streamCandidates?: AlertPrefillStreamCandidate[];
+
+  warnings: AlertPrefillWarning[];
+
+  /** Source-specific; never read by the form. Summary / telemetry only. */
+  meta?: Record<string, unknown>;
+}

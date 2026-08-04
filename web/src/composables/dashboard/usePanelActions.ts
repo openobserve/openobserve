@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Helper function to properly wrap CSV values
 export const wrapCsvValue = (val: any): string => {
@@ -157,29 +160,35 @@ export function usePanelAlertCreation({
       }
     }
 
-    const panelDataToPass = {
-      panelTitle: panelSchema.value.title || "Unnamed Panel",
-      panelId: panelSchema.value.id,
-      queries: panelSchema.value.queries,
-      queryType: queryType,
-      timeRange: selectedTimeObj.value,
-      threshold: selection.threshold,
-      condition: selection.condition,
-      // Pass the Y-axis column name for threshold comparison
-      yAxisColumn: yAxisColumn,
-      // Pass the executed query with variables already replaced
-      executedQuery: executedQuery,
-    };
+    // The panel's y-axis extraction above is this surface's own knowledge; from
+    // here on it is the shared path — the same adapter, launcher, and form that
+    // every other surface uses. No confirm dialog here: the user already chose
+    // the threshold and condition in the context menu itself.
+    const { openAlertCreation } = useAlertCreation({ router, store });
 
-    // Navigate to alert creation page
-    router.push({
-      name: "addAlert",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-        fromPanel: "true",
-        panelData: encodeURIComponent(JSON.stringify(panelDataToPass)),
-      },
-    });
+    const launched = openAlertCreation(
+      buildPrefillFromPanel({
+        panelTitle: panelSchema.value.title || "Unnamed Panel",
+        panelId: panelSchema.value.id,
+        queries: panelSchema.value.queries,
+        queryType,
+        timeRange: selectedTimeObj.value,
+        threshold: selection.threshold,
+        condition: selection.condition as "above" | "below",
+        yAxisColumn,
+        executedQuery,
+      }),
+    );
+
+    // There is no confirm dialog on this path, so a refusal would otherwise be
+    // an unexplained no-op — the user right-clicks, picks a threshold, and
+    // nothing happens. Say why instead.
+    if (!launched) {
+      toast({
+        variant: "error",
+        message: "This panel's query has no stream to alert on.",
+      });
+    }
   };
 
   return {

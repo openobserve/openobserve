@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="h-full max-h-full overflow-hidden">
     <AddAlert
-      v-if="destinations.length > 0"
+      v-if="destinations.length > 0 || hasPrefill"
       :isUpdated="isUpdated"
       :destinations="destinations"
       @update:list="handleUpdateList"
@@ -28,12 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { computed, defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -46,6 +47,12 @@ export default defineComponent({
     const route = useRoute();
     const destinations = ref([]);
     const isUpdated = ref(false);
+
+    // A prefill means the user arrived from another surface carrying work with
+    // them (a logs search, a panel, a pattern set). That changes two behaviours
+    // below: we must not bounce them off this page, and we own clearing the
+    // stashed payload once they leave.
+    const hasPrefill = computed(() => !!route.query.prefill);
 
     const getDestinations = async () => {
       try {
@@ -64,6 +71,10 @@ export default defineComponent({
 
     const handleUpdateList = (folderId?: string) => {
       const resolvedFolder = folderId || (route.query.folder as string) || "default";
+
+      // The prefill has been consumed into a saved alert — retiring it here
+      // stops a later visit to this page inheriting a stale query.
+      clearAlertPrefill();
 
       // Invalidate cached alerts for this folder so the AlertList
       // component fetches fresh data when it mounts.
@@ -91,23 +102,41 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await getDestinations();
-      if (!destinations.value.length) {
+      if (destinations.value.length) return;
+
+      // Bouncing a prefilled form would throw away work the user did on another
+      // page — they arrived here with a query in hand. Warn and let them
+      // continue; the destinations step offers creating one inline.
+      if (hasPrefill.value) {
         toast({
           variant: "warning",
-          message: "No destinations found. Please create a destination first.",
+          message: "No destinations found. Create one before saving this alert.",
         });
-        router.push({
-          name: "alertList",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
+        return;
       }
+
+      toast({
+        variant: "warning",
+        message: "No destinations found. Please create a destination first.",
+      });
+      router.push({
+        name: "alertList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    });
+
+    // Leaving without saving retires the prefill too — otherwise re-opening the
+    // form later would silently inherit the abandoned query.
+    onBeforeUnmount(() => {
+      clearAlertPrefill();
     });
 
     return {
       destinations,
       isUpdated,
+      hasPrefill,
       getDestinations,
       handleUpdateList,
       handleCancel,
