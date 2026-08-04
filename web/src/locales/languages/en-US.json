@@ -5288,7 +5288,7 @@
     "summaryActive": "Active",
     "summaryPaused": "Paused",
     "summaryFailed": "Failed",
-    "summaryRecent": "Fired < 15m",
+    "summaryRecent": "Triggered < 15m",
     "summaryTotal": "Total",
     "webhook": "Web Hook",
     "email": "Email",
@@ -5887,6 +5887,7 @@
       "priorityP5": "P5 (Informational)"
     },
     "lastRun": "Last run: {time}",
+    "retryTraining": "Retrain the model and re-run detection",
     "queryEditor": {
       "sqlVrlBadge": "SQL + VRL",
       "noStream": "none",

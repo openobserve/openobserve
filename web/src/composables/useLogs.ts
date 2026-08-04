@@ -174,12 +174,10 @@ const useLogs = (t: TranslateFn) => {
   };
 
   const routeToSearchSchedule = () => {
+    // Search Scheduler is now its own route (was an `action=search_scheduler` overlay).
     router.push({
-      query: {
-        action: "search_scheduler",
-        org_identifier: searchObj.organizationIdentifier,
-        type: "search_scheduler_list",
-      },
+      name: "searchScheduler",
+      query: { org_identifier: searchObj.organizationIdentifier },
     });
   };
 

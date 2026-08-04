@@ -123,7 +123,10 @@
     </template>
 
     <template #cell-error="{ row }">
-      <span class="text-compact">{{ row.error || "—" }}</span>
+      <OTooltip v-if="row.error" :content="row.error">
+        <span class="text-compact">{{ row.error }}</span>
+      </OTooltip>
+      <span v-else class="text-compact">—</span>
     </template>
 
     <template #empty>
