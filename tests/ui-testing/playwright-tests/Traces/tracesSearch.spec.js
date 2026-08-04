@@ -226,13 +226,17 @@ test.describe("Traces Search testcases", () => {
       // Verify the search bar is still functional
       await pm.tracesPage.expectSearchBarVisible();
 
-      // Verify we can see either results or a proper message
-      const hasResults = await pm.tracesPage.hasTraceResults();
-      const hasNoResults = await pm.tracesPage.isNoResultsVisible();
-
-      // At least one state should be present
-      const validState = hasResults || hasNoResults;
-      expect(validState).toBeTruthy();
+      // Verify we can see either results or a proper message. The trace search settles
+      // asynchronously, so a single read of both checks can catch the in-between state
+      // where neither has rendered yet (both false) — the CI failure here. Poll until one
+      // terminal state appears; if neither ever does, the poll still times out and fails.
+      let hasResults = false, hasNoResults = false;
+      await expect.poll(async () => {
+        hasResults = await pm.tracesPage.hasTraceResults();
+        if (hasResults) return true;
+        hasNoResults = await pm.tracesPage.isNoResultsVisible();
+        return hasResults || hasNoResults;
+      }, { timeout: 20000, intervals: [500, 1000, 1500, 2000] }).toBe(true);
       testLogger.info(`Stream selected state verified: hasResults=${hasResults}, hasNoResults=${hasNoResults}`);
     } else {
       // Neither state is visible - this might be a different UI state or error
