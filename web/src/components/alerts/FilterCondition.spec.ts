@@ -177,10 +177,13 @@ describe("FilterCondition.vue Branch Coverage", () => {
       expect((wrapper.vm as any).condition.value).toBe("test_value");
     });
 
-    it("should not show tooltips when AI chat is disabled", async () => {
+    // Reveal-on-hover tooltips are no longer gated on AI-chat mode: the filter
+    // controls truncate long values in every mode, so a filled column /
+    // operator / value each get a hover tooltip regardless of isAiChatEnabled.
+    it("shows a reveal-on-hover tooltip per filled field even when AI chat is disabled", async () => {
       const aiDisabledStore = createStore({
         state: {
-          isAiChatEnabled: false, // Branch condition: false
+          isAiChatEnabled: false,
         },
       });
 
@@ -201,9 +204,24 @@ describe("FilterCondition.vue Branch Coverage", () => {
         },
       });
 
-      // Branch: condition.column && store.state.isAiChatEnabled = false (line 33)
-      // Branch: condition.operator && store.state.isAiChatEnabled = false (line 57)
-      // Branch: condition.value && store.state.isAiChatEnabled = false (line 83)
+      // column + operator + value are all filled → three tooltips (the toggle
+      // button's tooltip is absent because this is the first condition → "if").
+      const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
+      expect(tooltips.length).toBe(3);
+    });
+
+    it("shows no field tooltips when the condition is empty", async () => {
+      const wrapper = mount(FilterCondition, {
+        props: {
+          ...defaultProps,
+          condition: { column: "", operator: "", value: "", logicalOperator: "AND" },
+        },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+        },
+      });
+
       const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBe(0);
     });

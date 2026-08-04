@@ -187,11 +187,7 @@
                 />
               </div>
 
-              <div class="flex flex-col gap-3.5">
-                <!-- Above the prompt: the reader needs to know which variables
-                 exist BEFORE writing the template. The chip row below the
-                 textarea is different — it reflects what they actually used. -->
-                <ScorerPromptVariableGuide />
+              <div>
                 <OFormTextarea
                   name="template"
                   :label="t('onlineEvals.scorer.promptLabel')"
@@ -696,7 +692,6 @@ import onlineEvalsService, {
 import { dataTypeOf, defaultModelOf, entityId, valueOf } from "../utils/evalEntity";
 import { extractTemplateVariables, formatTemplateVariable, showError } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
-import ScorerPromptVariableGuide from "./scorer/ScorerPromptVariableGuide.vue";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
 import { makeScorerFormSchema, type ScorerForm } from "./ScorerFormPage.schema";
 

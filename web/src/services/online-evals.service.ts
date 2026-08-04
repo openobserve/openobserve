@@ -233,6 +233,8 @@ export interface CompletionWindowConfig {
 
 export interface ManualEvalJobPayload {
   targetId: string;
+  startTime: number;
+  endTime: number;
   spanId?: string | null;
   traceId?: string | null;
   sessionId?: string | null;

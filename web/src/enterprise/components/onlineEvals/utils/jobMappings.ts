@@ -1,7 +1,7 @@
 import type { EvalTargetScope, Scorer } from "@/services/online-evals.service";
 import { entityId } from "./evalEntity";
 import { extractTemplateVariables } from "./evalFormat";
-import { isSystemProvidedVariable } from "./systemProvidedVariables";
+import { systemProvidedVariablesForScope } from "./systemProvidedVariables";
 
 export function scorerTemplateVariables(scorer: Scorer) {
   return [
@@ -12,7 +12,11 @@ export function scorerTemplateVariables(scorer: Scorer) {
   ];
 }
 
-export function defaultJobMappingValue(variable: string) {
+export function defaultJobMappingValue(variable: string, targetScope: EvalTargetScope = "span") {
+  if (systemProvidedVariablesForScope(targetScope).some(({ name }) => name === variable.trim())) {
+    return `{{${variable.trim()}}}`;
+  }
+
   const defaults: Record<string, string> = {
     input: "{{gen_ai_input_messages}}",
     output: "{{gen_ai_output_messages}}",
@@ -35,10 +39,20 @@ export function jobMappingVariablesForScorer(
   return [...new Set([...scorerTemplateVariables(scorer), ...Object.keys(existingMapping || {})])];
 }
 
+export function scorerUsesSpans(
+  scorer: Scorer,
+  existingMapping: Record<string, string> | undefined,
+) {
+  if (scorerTemplateVariables(scorer).includes("spans")) return true;
+
+  return Object.values(existingMapping || {}).some(
+    (value) => value.trim().replace(/\s+/g, "") === "{{spans}}",
+  );
+}
+
 export function buildJobInputMappingPayload(
   scorerIds: string[],
   inputMappings: Record<string, Record<string, string>>,
-  targetScope: EvalTargetScope = "span",
 ) {
   const payload: Record<string, Record<string, string>> = {};
 
@@ -46,7 +60,7 @@ export function buildJobInputMappingPayload(
     const cleanMapping = Object.fromEntries(
       Object.entries(inputMappings[scorerId] || {})
         .map(([key, value]) => [key.trim(), value.trim()])
-        .filter(([key, value]) => key && value && !isSystemProvidedVariable(targetScope, key)),
+        .filter(([key, value]) => key && value),
     );
 
     if (Object.keys(cleanMapping).length) payload[scorerId] = cleanMapping;
@@ -88,6 +102,7 @@ export function syncJobInputMappings(
   scorers: Scorer[],
   inputMappings: Record<string, Record<string, string>>,
   scorerVersions: Record<string, number | null>,
+  targetScope: EvalTargetScope = "span",
 ) {
   const selected = new Set(scorerIds);
   const nextMappings: Record<string, Record<string, string>> = {};
@@ -99,7 +114,9 @@ export function syncJobInputMappings(
 
     if (scorer) {
       scorerTemplateVariables(scorer).forEach((variable) => {
-        if (mapping[variable] === undefined) mapping[variable] = defaultJobMappingValue(variable);
+        if (mapping[variable] === undefined) {
+          mapping[variable] = defaultJobMappingValue(variable, targetScope);
+        }
       });
     }
 

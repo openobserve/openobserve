@@ -48,7 +48,24 @@ const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },
 });
 
-const scorers = [{ id: "s1", entityId: "s1", name: "Scorer 1" }];
+const scorers = [
+  {
+    id: "s1",
+    entityId: "s1",
+    name: "Scorer 1",
+    template: "Judge {{ input }}",
+    variables: ["input"],
+  },
+];
+const spansScorers = [
+  {
+    id: "s1",
+    entityId: "s1",
+    name: "Trace evidence scorer",
+    template: "Judge {{ input }} using {{ spans }}",
+    variables: ["input", "spans"],
+  },
+];
 
 const endSignal = {
   version: 2,
@@ -330,7 +347,9 @@ describe("JobFormPage", () => {
     expect(payload.samplingValue).toBe(0.1);
     expect(typeof payload.samplingValue).toBe("number");
     expect(payload.filterCondition).toEqual({ type: "all" }); // empty filter
-    expect(payload.inputMapping).toBeNull(); // no template vars → no mapping
+    expect(payload.inputMapping).toEqual({
+      s1: { input: "{{gen_ai_input_messages}}" },
+    });
     // draft path → no activation
     expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
     expect(wrapper.emitted("saved")).toBeTruthy();
@@ -371,8 +390,23 @@ describe("JobFormPage", () => {
     expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
   });
 
-  it("blocks trace activation until every scorer has a selector binding", async () => {
+  it("activates a trace job without selectors when its scorers do not use spans", async () => {
     wrapper = createWrapper();
+    setField(wrapper, "name", "trace-active");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+    await wrapper.find('[data-test="job-form-save-activate-btn"]').trigger("click");
+
+    await submit(wrapper);
+
+    expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
+    expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith("test-org", "job-1");
+  });
+
+  it("blocks trace activation when a scorer using spans has no selector", async () => {
+    wrapper = createWrapper({ scorers: spansScorers });
     setField(wrapper, "name", "trace-active");
     setField(wrapper, "stream", "default");
     setField(wrapper, "targetScope", "trace");
@@ -387,7 +421,7 @@ describe("JobFormPage", () => {
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({
         variant: "error",
-        message: "Select a Span Selector for every scorer.",
+        message: "Select a Span Selector for each scorer that uses trace spans.",
       }),
     );
   });
@@ -429,6 +463,66 @@ describe("JobFormPage", () => {
       expect(payload.samplingValue).toBeNull(); // mode 'all' → no sampling value
       expect(payload.scorers).toEqual([{ id: "s1", version: null }]);
       expect(wrapper.emitted("saved")).toBeTruthy();
+    });
+
+    // A draft has never run, so editing one offers the same explicit choice as
+    // create: keep it a draft, or promote it. `editRow` has no status → draft.
+    it("offers the Save & Activate choice (both buttons) when editing a draft", () => {
+      wrapper = createWrapper({ mode: "edit", row: editRow });
+      expect(wrapper.find('[data-test="job-form-save-draft-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="job-form-save-activate-btn"]').exists()).toBe(true);
+      // The plain single Save is NOT shown for a draft.
+      expect(wrapper.find('[data-test="job-form-save-btn"]').exists()).toBe(false);
+    });
+
+    it("promotes a draft to active via Save & Activate (update THEN activate)", async () => {
+      wrapper = createWrapper({ mode: "edit", row: editRow });
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+
+      // The activate button's @click sets the flag; the form drives the submit.
+      await wrapper.find('[data-test="job-form-save-activate-btn"]').trigger("click");
+      await submit(wrapper);
+
+      expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledWith(
+        "test-org",
+        "job-9",
+        expect.any(Object),
+      );
+      // Promotion happens as a second explicit call, on the same job id.
+      expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith("test-org", "job-9");
+      expect(wrapper.emitted("saved")).toBeTruthy();
+    });
+
+    it("keeps a draft a draft via Save as Draft (update only, never activates)", async () => {
+      wrapper = createWrapper({ mode: "edit", row: editRow });
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+
+      await wrapper.find('[data-test="job-form-save-draft-btn"]').trigger("click");
+      await submit(wrapper);
+
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
+      expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
+    });
+
+    // A config edit must never silently flip enablement: an active/paused job
+    // shows a single Save that preserves its run state.
+    it("shows a single Save and never activates when editing a non-draft (active) job", async () => {
+      wrapper = createWrapper({ mode: "edit", row: { ...editRow, status: "active" } });
+
+      expect(wrapper.find('[data-test="job-form-save-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="job-form-save-activate-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="job-form-save-draft-btn"]').exists()).toBe(false);
+
+      setField(wrapper, "scorerIds", ["s1"]);
+      setField(wrapper, "samplingMode", "all");
+      await submit(wrapper);
+
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
+      expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
     });
 
     it("shows and preserves an existing trace End Signal when saving", async () => {
