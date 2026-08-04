@@ -3401,7 +3401,7 @@
     "sparklineLayout": "Расположение",
     "sparklineLayoutBackground": "Фон",
     "sparklineColor": "Цвет",
-    "sparklineFillOpacity": "Непрозрачность заливки",
+    "sparklineFillOpacity": "Непрозрачность заливки области",
     "sparklineLineWidth": "Толщина линии",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "Допускается не более {count} поля в {axis}.",

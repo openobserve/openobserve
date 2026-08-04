@@ -3401,7 +3401,7 @@
     "sparklineLayout": "レイアウト",
     "sparklineLayoutBackground": "背景",
     "sparklineColor": "色",
-    "sparklineFillOpacity": "塗りつぶしの不透明度",
+    "sparklineFillOpacity": "エリアの塗りつぶしの不透明度",
     "sparklineLineWidth": "線の幅",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "{axis} 軸で最大 {count} フィールドまで許可されています。",

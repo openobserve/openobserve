@@ -52,28 +52,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="(v) => patch({ color: v })"
         />
       </div>
-      <div v-if="effectiveType !== 'bar'" class="flex gap-2.5">
-        <div class="min-w-0 flex-1">
-          <OInput
-            :model-value="String(model.lineWidth ?? METRIC_SPARKLINE.lineWidth)"
-            type="number"
-            :label="t('dashboard.sparklineLineWidth')"
-            data-test="dashboard-config-sparkline-line-width"
-            @update:model-value="onLineWidthInput"
-            @blur="normalizeLineWidth"
-          />
-        </div>
-        <div v-if="effectiveType === 'area'" class="min-w-0 flex-1">
-          <OInput
-            :model-value="String(model.fillOpacity ?? METRIC_SPARKLINE.fillOpacity)"
-            type="number"
-            :label="t('dashboard.sparklineFillOpacity')"
-            data-test="dashboard-config-sparkline-fill-opacity"
-            @update:model-value="onFillOpacityInput"
-            @blur="normalizeFillOpacity"
-          />
-        </div>
-      </div>
+      <OInput
+        v-if="effectiveType !== 'bar'"
+        :model-value="String(model.lineWidth ?? METRIC_SPARKLINE.lineWidth)"
+        type="number"
+        :label="t('dashboard.sparklineLineWidth')"
+        data-test="dashboard-config-sparkline-line-width"
+        @update:model-value="onLineWidthInput"
+        @blur="normalizeLineWidth"
+      />
+      <OSlider
+        v-if="effectiveType === 'area'"
+        :model-value="
+          typeof model.fillOpacity === 'number' ? model.fillOpacity : METRIC_SPARKLINE.fillOpacity
+        "
+        :min="0"
+        :max="1"
+        :step="0.05"
+        :label="t('dashboard.sparklineFillOpacity')"
+        show-value
+        :format-value="formatOpacity"
+        data-test="dashboard-config-sparkline-fill-opacity"
+        class="gap-2!"
+        @update:model-value="(v) => patch({ fillOpacity: v })"
+      />
     </template>
   </div>
 </template>
@@ -85,6 +87,7 @@ import { useI18n } from "vue-i18n";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSlider from "@/lib/forms/Slider/OSlider.vue";
 import SparklineLayoutIcon from "./SparklineLayoutIcon.vue";
 import SparklineTypeIcon from "./SparklineTypeIcon.vue";
 import ColorSwatchPicker from "../ColorSwatchPicker.vue";
@@ -103,7 +106,7 @@ const DEFAULTS = {
 
 export default defineComponent({
   name: "SparklineConfig",
-  components: { OSwitch, OSelect, OInput, ColorSwatchPicker },
+  components: { OSwitch, OSelect, OInput, OSlider, ColorSwatchPicker },
   setup() {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
@@ -144,26 +147,14 @@ export default defineComponent({
       },
     ];
 
-    const clamp01 = (v: unknown) => Math.max(0, Math.min(1, Number(v) || 0));
+    // Opacity slider value shown as a percentage (0.15 → "15%").
+    const formatOpacity = (v: number) => `${Math.round(v * 100)}%`;
 
-    // Live-apply while typing: a valid number is stored (and re-rendered)
-    // immediately; an empty field is stored as "" so it shows blank while
-    // editing (the renderer falls back to the default for a non-number).
-    const onFillOpacityInput = (v: unknown) => {
-      const s = String(v ?? "").trim();
-      patch({ fillOpacity: s === "" ? "" : clamp01(s) });
-    };
+    // Line width live-apply: a valid number is stored immediately; an empty field
+    // is stored as "" (blank while editing) and reset to the default on blur.
     const onLineWidthInput = (v: unknown) => {
       const s = String(v ?? "").trim();
       patch({ lineWidth: s === "" ? "" : Number(s) || DEFAULTS.lineWidth });
-    };
-
-    // Empty/invalid field → reset to the default on blur (mirrors the decimals
-    // config), so the input shows AND stores the default instead of blank.
-    const normalizeFillOpacity = () => {
-      if (String(model.value.fillOpacity ?? "").trim() === "") {
-        patch({ fillOpacity: DEFAULTS.fillOpacity });
-      }
     };
     const normalizeLineWidth = () => {
       if (String(model.value.lineWidth ?? "").trim() === "") {
@@ -180,9 +171,8 @@ export default defineComponent({
       layoutOptions,
       METRIC_SPARKLINE,
       TEXT_SWATCHES,
-      onFillOpacityInput,
+      formatOpacity,
       onLineWidthInput,
-      normalizeFillOpacity,
       normalizeLineWidth,
     };
   },

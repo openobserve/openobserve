@@ -3401,7 +3401,7 @@
     "sparklineLayout": "Układ",
     "sparklineLayoutBackground": "Tło",
     "sparklineColor": "Kolor",
-    "sparklineFillOpacity": "Krycie wypełnienia",
+    "sparklineFillOpacity": "Krycie wypełnienia obszaru",
     "sparklineLineWidth": "Szerokość linii",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "Maksymalnie {count} pole w osi {axis} jest dozwolone.",

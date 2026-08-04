@@ -3401,7 +3401,7 @@
     "sparklineLayout": "布局",
     "sparklineLayoutBackground": "背景",
     "sparklineColor": "颜色",
-    "sparklineFillOpacity": "填充不透明度",
+    "sparklineFillOpacity": "面积填充不透明度",
     "sparklineLineWidth": "线宽",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "在{axis}中最多允许{count}个字段。",

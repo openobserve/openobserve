@@ -3401,7 +3401,7 @@
     "sparklineLayout": "Bố cục",
     "sparklineLayoutBackground": "Nền",
     "sparklineColor": "Màu",
-    "sparklineFillOpacity": "Độ mờ tô",
+    "sparklineFillOpacity": "Độ mờ tô vùng",
     "sparklineLineWidth": "Độ rộng đường",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "Tối đa {count} trường trong {axis} được cho phép.",

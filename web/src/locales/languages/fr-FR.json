@@ -3401,7 +3401,7 @@
     "sparklineLayout": "Disposition",
     "sparklineLayoutBackground": "Arrière-plan",
     "sparklineColor": "Couleur",
-    "sparklineFillOpacity": "Opacité du remplissage",
+    "sparklineFillOpacity": "Opacité du remplissage de l'aire",
     "sparklineLineWidth": "Épaisseur de ligne",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "Maximum {count} champ dans l'axe {axis} autorisé.",

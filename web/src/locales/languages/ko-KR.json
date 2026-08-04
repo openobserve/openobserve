@@ -3401,7 +3401,7 @@
     "sparklineLayout": "레이아웃",
     "sparklineLayoutBackground": "배경",
     "sparklineColor": "색상",
-    "sparklineFillOpacity": "채우기 불투명도",
+    "sparklineFillOpacity": "영역 채우기 불투명도",
     "sparklineLineWidth": "선 너비",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "{axis}에서 최대 {count}개 필드가 허용됩니다.",

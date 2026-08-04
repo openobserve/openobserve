@@ -3401,7 +3401,7 @@
     "sparklineLayout": "Lay-out",
     "sparklineLayoutBackground": "Achtergrond",
     "sparklineColor": "Kleur",
-    "sparklineFillOpacity": "Vuldekking",
+    "sparklineFillOpacity": "Vlakvuldekking",
     "sparklineLineWidth": "Lijndikte",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "Maximaal {count} veld in {axis} is toegestaan.",

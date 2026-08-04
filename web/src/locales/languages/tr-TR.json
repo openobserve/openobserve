@@ -3401,7 +3401,7 @@
     "sparklineLayout": "Düzen",
     "sparklineLayoutBackground": "Arka plan",
     "sparklineColor": "Renk",
-    "sparklineFillOpacity": "Dolgu opaklığı",
+    "sparklineFillOpacity": "Alan dolgu opaklığı",
     "sparklineLineWidth": "Çizgi genişliği",
     "dashboardMapsQueryBuilder": {
       "maxFieldAllowed": "{axis} ekseninde en fazla {count} alan izin verilir.",
