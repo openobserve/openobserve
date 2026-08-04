@@ -71,4 +71,69 @@ function getOrgIdentifier() {
     return process.env['ORGNAME'];
 }
 
-module.exports = { getAuthHeaders, isCloudEnvironment, getCloudConfig, getOrgIdentifier };
+/**
+ * Drop the in-memory cloud-config cache so the next getCloudConfig()/getAuthHeaders()
+ * re-reads cloud-config.json from disk. Call after the file has been rewritten with a
+ * fresh passcode (refreshCloudConfig / re-auth).
+ */
+function resetCloudConfigCache() {
+    _cloudConfig = null;
+}
+
+/**
+ * Re-fetch this org's passcode using the page's LIVE browser session (cookie auth) and
+ * rewrite cloud-config.json. Cheap and non-disruptive (a background fetch — no navigation),
+ * so it's safe to call mid-test. Recovers the common cloud failure where the per-org passcode
+ * was rotated/invalidated by another shard sharing the org while the UI session is still alive.
+ * Returns true if a fresh passcode was obtained.
+ * @param {import('@playwright/test').Page} page
+ */
+async function refreshCloudConfig(page) {
+    if (!isCloudEnvironment()) return false;
+    try {
+        const orgId = getOrgIdentifier();
+        const pc = await page.evaluate(async (org) => {
+            const r = await fetch('/api/' + org + '/passcode');
+            return r.ok ? await r.json() : null;
+        }, orgId);
+        if (pc && pc.data && pc.data.passcode) {
+            const next = { ...(getCloudConfig() || {}), orgIdentifier: orgId, userEmail: pc.data.user, passcode: pc.data.passcode };
+            const configFile = path.join(__dirname, 'auth', 'cloud-config.json');
+            try { fs.writeFileSync(configFile, JSON.stringify(next, null, 2)); } catch (e) { /* fall through with in-memory value */ }
+            _cloudConfig = next;
+            const testLogger = require('./test-logger.js');
+            testLogger.info('[auth] Refreshed cloud passcode after 401');
+            return true;
+        }
+    } catch (e) {
+        // session may itself be dead — caller escalates to full re-auth
+    }
+    return false;
+}
+
+/**
+ * page.request wrapper that self-heals on 401/403: refreshes the passcode (and, if the
+ * session itself is dead, escalates to a full Dex re-login) then retries. Use for
+ * authenticated API calls so a transient/rotated-credential 401 doesn't fail the test.
+ * @param {import('@playwright/test').Page} page
+ * @param {'get'|'post'|'put'|'delete'|'patch'} method
+ * @param {string} url
+ * @param {object} [options] extra page.request options (data, params, ...)
+ * @param {number} [retries] max recovery attempts on 401/403
+ */
+async function authedRequest(page, method, url, options = {}, retries = 1) {
+    let resp = await page.request[method](url, { headers: getAuthHeaders(), ...options });
+    for (let i = 0; i < retries && (resp.status() === 401 || resp.status() === 403); i++) {
+        let recovered = await refreshCloudConfig(page);
+        if (!recovered) {
+            // Session itself is likely dead — lazy-require to avoid a circular import.
+            try { recovered = await require('./reauth-alpha1.js').reauthenticateAlpha1(page); }
+            catch (e) { recovered = false; }
+        }
+        if (!recovered) break;
+        resp = await page.request[method](url, { headers: getAuthHeaders(), ...options });
+    }
+    return resp;
+}
+
+module.exports = { getAuthHeaders, isCloudEnvironment, getCloudConfig, getOrgIdentifier, resetCloudConfigCache, refreshCloudConfig, authedRequest };
