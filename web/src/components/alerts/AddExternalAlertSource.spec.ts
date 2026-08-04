@@ -15,22 +15,12 @@ vi.mock("@/services/alert_destination", () => ({
   default: { list: vi.fn() },
 }));
 
-// ODrawer renders its body via <Teleport>, which JSDOM/VTU's wrapper.find()
-// and wrapper.html() cannot traverse from the mounted component's own root
-// (they only serialize its own subtree, not other document.body content the
-// teleport lands in) — matches the codebase's own AddRegexPattern.spec.ts
-// pattern for the same underlying component.
+// ODrawer teleports its body, which wrapper.find()/html() can't traverse.
+// Same stub the codebase uses in AddRegexPattern.spec.ts.
 const ODrawerStub = {
   name: "ODrawer",
   inheritAttrs: false,
-  props: [
-    "open",
-    "title",
-    "size",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "primaryButtonDisabled",
-  ],
+  props: ["open", "title", "size", "formId", "primaryButtonLabel", "secondaryButtonLabel"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div data-test="o-drawer-stub" :data-open="String(open)"><slot /></div>`,
 };
@@ -41,8 +31,7 @@ function buildWrapper(open = true, editingIntegration: any = undefined) {
   const store = createStore({
     state: {
       selectedOrganization: { identifier: "myorg" },
-      // CopyContent (rendered once a source is created) reads these directly
-      // in setup() — omitting them throws and silently aborts that subtree.
+      // CopyContent reads these in setup(); omitting them aborts that subtree.
       userInfo: { email: "admin@example.com" },
       organizationData: { organizationPasscode: "passcode" },
       zoConfig: {},
@@ -76,21 +65,15 @@ describe("AddExternalAlertSource", () => {
   });
 
   afterEach(() => {
-    // Each mounted component leaves a running setInterval (startPolling) or a
-    // pending mounted()-hook promise (fetchDestinationOptions) behind if not
-    // explicitly unmounted — under fake timers those linger into the next
-    // test's scheduler flush and produce stale-DOM failures unrelated to that
-    // test's own logic.
+    // Unmount explicitly: a leaked poll timer or pending fetch leaks into the
+    // next test's flush under fake timers.
     mountedWrappers.forEach((w) => w.unmount());
     mountedWrappers = [];
     vi.useRealTimers();
   });
 
   it("fetches destination options for the alert module when opened", async () => {
-    // Mounted with open=false first, matching how the parent list actually
-    // instantiates the drawer — fetchDestinationOptions only fires off the
-    // `open` watcher, not mounted(), so it must be exercised via a real
-    // false→true transition rather than always-open.
+    // Opens false→true: the fetch fires off the `open` watcher, not mounted().
     const wrapper = buildWrapper(false);
     expect(destinationService.list).not.toHaveBeenCalled();
     await wrapper.setProps({ open: true });
@@ -107,9 +90,7 @@ describe("AddExternalAlertSource", () => {
       data: { id: "int-1", token: "o2iat_abc", name: "grafana-staging" },
     });
     const wrapper = buildWrapper();
-    (wrapper.vm as any).form.name = "grafana-staging";
-    (wrapper.vm as any).form.destinations = ["sre-pages"];
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: ["sre-pages"] });
     expect(alertSources.create).toHaveBeenCalledWith("myorg", {
       name: "grafana-staging",
       source_type: "auto",
@@ -120,8 +101,7 @@ describe("AddExternalAlertSource", () => {
 
   it("does not call create when name is empty", async () => {
     const wrapper = buildWrapper();
-    (wrapper.vm as any).form.name = "";
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "   ", destinations: [] });
     expect(alertSources.create).not.toHaveBeenCalled();
   });
 
@@ -137,13 +117,16 @@ describe("AddExternalAlertSource", () => {
       data: { id: "int-1", token: "o2iat_abc", name: "grafana-staging" },
     });
     const wrapper = buildWrapper();
-    (wrapper.vm as any).form.name = "grafana-staging";
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: [] });
     expect((wrapper.vm as any).created).toBe(true);
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ open: true });
     expect((wrapper.vm as any).created).toBe(false);
-    expect((wrapper.vm as any).form.name).toBe("");
+    expect((wrapper.vm as any).defaultValues).toEqual({ name: "", destinations: [] });
+    expect(
+      (wrapper.find('[data-test="add-alert-source-name-input"] input').element as HTMLInputElement)
+        .value,
+    ).toBe("");
   });
 
   it("renders a usable name input and destinations select in the DOM", async () => {
@@ -151,8 +134,35 @@ describe("AddExternalAlertSource", () => {
     const nameInput = wrapper.find('[data-test="add-alert-source-name-input"] input');
     expect(nameInput.exists()).toBe(true);
     await nameInput.setValue("my-source");
-    expect((wrapper.vm as any).form.name).toBe("my-source");
+    expect((nameInput.element as HTMLInputElement).value).toBe("my-source");
     expect(wrapper.find('[data-test="add-alert-source-destinations-select"]').exists()).toBe(true);
+  });
+
+  it("creates the source when the drawer's form is submitted, without a manual click handler", async () => {
+    (alertSources.create as any).mockResolvedValue({
+      data: { id: "int-1", token: "o2iat_abc", name: "grafana-staging" },
+    });
+    const wrapper = buildWrapper();
+    await flushPromises();
+    await wrapper
+      .find('[data-test="add-alert-source-name-input"] input')
+      .setValue("grafana-staging");
+    await wrapper.find("form#add-alert-source-form").trigger("submit");
+    await vi.waitFor(() =>
+      expect(alertSources.create).toHaveBeenCalledWith("myorg", {
+        name: "grafana-staging",
+        source_type: "auto",
+        destinations: [],
+      }),
+    );
+  });
+
+  it("does not submit an empty name — the schema blocks the create call", async () => {
+    const wrapper = buildWrapper();
+    await flushPromises();
+    await wrapper.find("form#add-alert-source-form").trigger("submit");
+    await flushPromises();
+    expect(alertSources.create).not.toHaveBeenCalled();
   });
 
   it("shows all 3 setup steps together before the source is created, not just step 1", async () => {
@@ -161,8 +171,7 @@ describe("AddExternalAlertSource", () => {
     expect(html).toContain("alert_sources.setupStep1Title");
     expect(html).toContain("alert_sources.setupStep2Title");
     expect(html).toContain("alert_sources.setupStep3Title");
-    // Step 2/3 show a placeholder instead of the real snippet/status pill
-    // until the source is actually created.
+    // Steps 2/3 show a placeholder until the source is created.
     expect(wrapper.find('[data-test="add-alert-source-step2-placeholder"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="add-alert-source-created-snippet"]').exists()).toBe(false);
   });
@@ -185,23 +194,15 @@ describe("AddExternalAlertSource", () => {
     });
     (alertSources.listSenders as any).mockResolvedValue({ data: { senders: [] } });
     const wrapper = buildWrapper();
-    // setValue() dispatches a real input event — direct `wrapper.vm.form.name =
-    // ...` mutation doesn't reliably resync the rendered tree with fake timers
-    // active, leaving `wrapper.find()`/`wrapper.html()` reading a stale
-    // snapshot even though component state is already correct.
     await wrapper
       .find('[data-test="add-alert-source-name-input"] input')
       .setValue("grafana-staging");
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: [] });
     await flushPromises();
     await vi.runOnlyPendingTimersAsync();
     await flushPromises();
-    // Under the global ODrawerStub + fake timers combination, the rendered
-    // tree has repeatedly proven stale relative to already-correct reactive
-    // state (created/waitingForEvent) even after $nextTick/$forceUpdate — a
-    // VTU/stub-slot quirk, not app logic. Assert on state directly, which is
-    // the actual behavior under test; DOM branch selection is covered by the
-    // "renders a usable name input" test exercising the same v-if unaffected.
+    // The stub's slot tree renders stale under fake timers (a VTU quirk), so
+    // assert on state; the DOM branch is covered by the name-input test.
     expect((wrapper.vm as any).created).toBe(true);
     expect((wrapper.vm as any).waitingForEvent).toBe(true);
     expect((wrapper.vm as any).createdIntegration?.id).toBe("int-1");
@@ -212,8 +213,7 @@ describe("AddExternalAlertSource", () => {
       data: { id: "int-1", token: "o2iat_abc", name: "grafana-staging" },
     });
     const wrapper = buildWrapper();
-    (wrapper.vm as any).form.name = "grafana-staging";
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: [] });
     const snippet = (wrapper.vm as any).createdCurlSnippet as string;
     expect(snippet.startsWith("curl ")).toBe(true);
     expect(snippet).not.toContain("#");
@@ -224,8 +224,7 @@ describe("AddExternalAlertSource", () => {
       data: { id: "int-1", token: "o2iat_abc", name: "grafana-staging" },
     });
     const wrapper = buildWrapper();
-    (wrapper.vm as any).form.name = "grafana-staging";
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: [] });
     const snippet = (wrapper.vm as any).createdCurlSnippet as string;
     const bodyMatch = snippet.match(/-d '(.+)'$/);
     expect(bodyMatch).not.toBeNull();
@@ -244,8 +243,7 @@ describe("AddExternalAlertSource", () => {
       .mockResolvedValueOnce({ data: { senders: [] } })
       .mockResolvedValue({ data: { senders: [{ detected_source: "grafana" }] } });
     const wrapper = buildWrapper();
-    (wrapper.vm as any).form.name = "grafana-staging";
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: [] });
     await vi.advanceTimersByTimeAsync(3000);
     await wrapper.vm.$nextTick();
     expect((wrapper.vm as any).waitingForEvent).toBe(false);
@@ -263,7 +261,7 @@ describe("AddExternalAlertSource", () => {
     await wrapper
       .find('[data-test="add-alert-source-name-input"] input')
       .setValue("grafana-staging");
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: [] });
     await flushPromises();
     await vi.runOnlyPendingTimersAsync();
     await flushPromises();
@@ -276,8 +274,7 @@ describe("AddExternalAlertSource", () => {
       data: { id: "int-1", token: "o2iat_abc", name: "grafana-staging" },
     });
     const wrapper = buildWrapper();
-    (wrapper.vm as any).form.name = "grafana-staging";
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: [] });
     expect((wrapper.vm as any).pollTimer).toBeDefined();
     wrapper.unmount();
     expect((wrapper.vm as any).pollTimer).toBeUndefined();
@@ -288,8 +285,7 @@ describe("AddExternalAlertSource", () => {
       data: { id: "int-1", token: "o2iat_abc", name: "grafana-staging" },
     });
     const wrapper = buildWrapper();
-    (wrapper.vm as any).form.name = "grafana-staging";
-    await (wrapper.vm as any).submit();
+    await (wrapper.vm as any).submit({ name: "grafana-staging", destinations: [] });
     expect((wrapper.vm as any).pollTimer).toBeDefined();
     await wrapper.setProps({ open: false });
     expect((wrapper.vm as any).pollTimer).toBeUndefined();
@@ -315,16 +311,23 @@ describe("AddExternalAlertSource", () => {
       const wrapper = buildWrapper(false, EXISTING_INTEGRATION);
       await wrapper.setProps({ open: true });
       expect((wrapper.vm as any).isEditMode).toBe(true);
-      expect((wrapper.vm as any).form.name).toBe("default");
-      expect((wrapper.vm as any).form.destinations).toEqual(["sre-pages"]);
+      expect((wrapper.vm as any).defaultValues).toEqual({
+        name: "default",
+        destinations: ["sre-pages"],
+      });
+      expect(
+        (
+          wrapper.find('[data-test="add-alert-source-name-input"] input')
+            .element as HTMLInputElement
+        ).value,
+      ).toBe("default");
     });
 
     it("submitEdit calls update with only the changed fields, then emits updated and closes", async () => {
       (alertSources.update as any).mockResolvedValue({ data: {} });
       const wrapper = buildWrapper(false, EXISTING_INTEGRATION);
       await wrapper.setProps({ open: true });
-      (wrapper.vm as any).form.name = "renamed";
-      await (wrapper.vm as any).submitEdit();
+      await (wrapper.vm as any).submitEdit({ name: "renamed", destinations: ["sre-pages"] });
       expect(alertSources.update).toHaveBeenCalledWith("myorg", "int-1", { name: "renamed" });
       expect(wrapper.emitted("updated")).toBeTruthy();
       expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
@@ -334,8 +337,10 @@ describe("AddExternalAlertSource", () => {
       (alertSources.update as any).mockResolvedValue({ data: {} });
       const wrapper = buildWrapper(false, EXISTING_INTEGRATION);
       await wrapper.setProps({ open: true });
-      (wrapper.vm as any).form.destinations = ["sre-pages", "email-oncall"];
-      await (wrapper.vm as any).submitEdit();
+      await (wrapper.vm as any).submitEdit({
+        name: "default",
+        destinations: ["sre-pages", "email-oncall"],
+      });
       expect(alertSources.update).toHaveBeenCalledWith("myorg", "int-1", {
         destinations: ["sre-pages", "email-oncall"],
       });
@@ -344,17 +349,15 @@ describe("AddExternalAlertSource", () => {
     it("submitEdit does nothing when the name is blank", async () => {
       const wrapper = buildWrapper(false, EXISTING_INTEGRATION);
       await wrapper.setProps({ open: true });
-      (wrapper.vm as any).form.name = "   ";
-      await (wrapper.vm as any).submitEdit();
+      await (wrapper.vm as any).submitEdit({ name: "   ", destinations: ["sre-pages"] });
       expect(alertSources.update).not.toHaveBeenCalled();
     });
 
-    it("onPrimaryClick routes to submitEdit instead of create when in edit mode", async () => {
+    it("onSubmit routes to update instead of create when in edit mode", async () => {
       (alertSources.update as any).mockResolvedValue({ data: {} });
       const wrapper = buildWrapper(false, EXISTING_INTEGRATION);
       await wrapper.setProps({ open: true });
-      (wrapper.vm as any).form.name = "renamed";
-      await (wrapper.vm as any).onPrimaryClick();
+      await (wrapper.vm as any).onSubmit({ name: "renamed", destinations: ["sre-pages"] });
       expect(alertSources.create).not.toHaveBeenCalled();
       expect(alertSources.update).toHaveBeenCalledWith("myorg", "int-1", { name: "renamed" });
     });
