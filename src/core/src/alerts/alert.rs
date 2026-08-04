@@ -1702,7 +1702,13 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         req = req.header("Content-type", "application/json");
     }
 
-    let resp = req.body(msg.clone()).send().await?;
+    let resp = match req.body(msg.clone()).send().await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error sending request to {} with error {e:?}", endpoint.url);
+            return Err(anyhow::anyhow!("error sending request : {e:?}"));
+        }
+    };
     let resp_status = resp.status();
     let resp_body = resp.text().await?;
 
