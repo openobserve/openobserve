@@ -102,15 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <span>
                         {{ t("pipeline.emptyValueGuideline") }}
-                        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code literal representing an empty string value, must stay identical in every language -->
-                        <span class="highlight text-text-link font-bold">""</span
+                        <span class="highlight text-text-link font-bold">{{ raw('""') }}</span
                         >{{ t("pipeline.exampleColon") }}
-                        <!-- eslint-disable vue/no-bare-strings-in-template -- SQL condition example, code must stay identical in every language -->
                         <span
                           class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                          >app_name != ""</span
+                          >{{ raw('app_name != ""') }}</span
                         >
-                        <!-- eslint-enable vue/no-bare-strings-in-template -->
                       </span>
                     </div>
                     <div class="flex items-start gap-2">
@@ -121,15 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <span>
                         {{ t("pipeline.nullValueGuideline") }}
-                        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code literal representing the null keyword, must stay identical in every language -->
-                        <span class="highlight text-text-link font-bold">null</span
+                        <span class="highlight text-text-link font-bold">{{ raw("null") }}</span
                         >{{ t("pipeline.exampleColon") }}
-                        <!-- eslint-disable vue/no-bare-strings-in-template -- SQL condition example, code must stay identical in every language -->
                         <span
                           class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                          >app_name != null</span
+                          >{{ raw("app_name != null") }}</span
                         >
-                        <!-- eslint-enable vue/no-bare-strings-in-template -->
                       </span>
                     </div>
                     <div class="flex items-start gap-2">
@@ -181,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
 import { getUUID } from "@/utils/zincutils";

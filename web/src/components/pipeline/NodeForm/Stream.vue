@@ -112,12 +112,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >{}</span
                       >
                       {{ t("alerts.configureStreamNameDynamicNote") }}
-                      <!-- eslint-disable vue/no-bare-strings-in-template -- example stream-name pattern with placeholder syntax, must stay literal across locales -->
                       <span
                         class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                        >static_text_{fieldname}_postfix</span
+                        >{{ raw("static_text_{fieldname}_postfix") }}</span
                       >{{ t("alerts.staticTextBeforeAfterNote") }}
-                      <!-- eslint-enable vue/no-bare-strings-in-template -->
                       <span
                         class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                         >{}</span

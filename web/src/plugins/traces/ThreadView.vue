@@ -140,12 +140,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            whitespace between them, dropping the space after "with". The space is
            concatenated into the interpolation so no template-whitespace
            collapsing (or formatter re-wrap) can drop it. -->
-      <!-- eslint-disable vue/no-bare-strings-in-template -- code sample: GenAI semantic-convention attribute name/value, must not be translated -->
+      <!-- The <code> token is a GenAI semantic-convention attribute name/value —
+           a code sample, identical in every locale, hence raw(). -->
       <span>
         {{ t("traces.threadView.noLlmTurns") + " " }}
-        <code class="text-text-body font-mono">gen_ai.operation.name = chat</code>.
+        <code class="text-text-body font-mono">{{ raw("gen_ai.operation.name = chat") }}</code
+        >.
       </span>
-      <!-- eslint-enable vue/no-bare-strings-in-template -->
     </div>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
       <!-- System prompt (global — identical across traces in a session). -->

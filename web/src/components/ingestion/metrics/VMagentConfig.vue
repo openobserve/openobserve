@@ -26,8 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <CopyContent :content="raw(fanoutContent)" />
       <div class="italic">
         {{ t("ingestion.vmagent.tipPrefix") }}
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- CLI flag name must stay identical in every language -->
-        <code>-remoteWrite.url</code> {{ t("ingestion.vmagent.tipSuffix") }}
+        <code>{{ raw("-remoteWrite.url") }}</code> {{ t("ingestion.vmagent.tipSuffix") }}
       </div>
     </div>
 

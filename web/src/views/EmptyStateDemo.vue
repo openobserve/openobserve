@@ -14,8 +14,7 @@
           </h1>
           <p class="text-text-secondary mt-1 max-w-2xl text-sm">
             {{ t("emptyState.demo.introText") }}
-            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- component name shown as code, not translatable -->
-            <code class="text-text-body">&lt;OEmptyState&gt;</code>
+            <code class="text-text-body">{{ emptyStateTag }}</code>
             {{ t("emptyState.demo.introTextSuffix") }}
           </p>
         </div>
@@ -49,8 +48,9 @@
             <span class="text-text-secondary text-xs font-semibold tracking-wider uppercase">
               {{ p.label }}
             </span>
-            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code example showing preset prop syntax, not translatable -->
-            <code class="text-2xs text-text-disabled">preset="{{ p.preset }}"</code>
+            <code class="text-2xs text-text-disabled"
+              >{{ raw('preset="') }}{{ p.preset }}{{ raw('"') }}</code
+            >
           </div>
           <div class="rounded-default border-border-default h-110 overflow-hidden border">
             <OEmptyState
@@ -70,8 +70,8 @@
         </h2>
         <p class="text-text-secondary mb-3 max-w-2xl text-sm">
           {{ t("emptyState.demo.characterSectionDesc") }}
-          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code example of the illustration prop, not translatable -->
-          <code class="text-text-body">illustration="explorer"</code>.
+          <code class="text-text-body">{{ raw('illustration="explorer"') }}</code
+          >.
         </p>
         <div class="rounded-default border-border-default h-110 overflow-hidden border">
           <OEmptyState
@@ -119,9 +119,15 @@ import { ref } from "vue";
 
 import { OEmptyState, type EmptyStatePresetName } from "@/lib/core/EmptyState";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
 const { t } = useI18nTyped();
+
+// The component name, shown as code — not prose, so it stays literal in every
+// locale. It lives here rather than inline as `{{ raw("<OEmptyState>") }}`
+// because Prettier's HTML parser reads the `<` inside an interpolation as a tag
+// open and fails to parse the file.
+const emptyStateTag = raw("<OEmptyState>");
 
 // local dark-mode preview wrapper so reviewers can flip themes without changing
 // their global setting (mirrors the app's `.dark` class on a scoped root).

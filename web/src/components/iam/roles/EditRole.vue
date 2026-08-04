@@ -200,18 +200,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>
                     {{ t("iam.editRole.jsonConfigHelp") }}
                   </div>
-                  <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal JSON code sample, not translatable text -->
-                  <pre style="font-size: var(--text-xs)">
-{
-  "object": "MainResource:ChildResource",
-  "permission": "AccessType"
-}</pre
-                  >
+                  <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
                   <div>
                     <span class="font-bold">{{ t("iam.editRole.childResource") }}</span> <br />
                     {{ t("iam.editRole.specificInstanceOr") }}
-                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal field identifier from the JSON example above, not translatable text -->
-                    <span class="font-bold">organizationID</span>
+                    <span class="font-bold">{{ raw("organizationID") }}</span>
                     {{ t("iam.editRole.forAllInstances") }}
                   </div>
                 </div>
@@ -316,6 +309,13 @@ const router = useRouter();
 const store = useStore();
 
 const isHelpOpen = ref(false);
+
+// Literal JSON code sample shown in the quick-reference help panel. Rendered
+// verbatim through raw() — it is code, identical in every locale.
+const jsonPermissionSample = `{
+  "object": "MainResource:ChildResource",
+  "permission": "AccessType"
+}`;
 
 const permissionJsonEditorRef: any = ref(null);
 

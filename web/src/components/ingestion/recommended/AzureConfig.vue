@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </li>
               <li>
                 {{ t("ingestion.azureSetup.selectEventHubPrefix") }}
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal Azure resource-name prefix, must stay identical across locales -->
-                <code>o2-activity</code>)
+                <code>{{ raw("o2-activity") }}</code
+                >)
               </li>
               <li>
                 {{ t("ingestion.azureSetup.clickPrefix") }} <strong>{{ t("common.save") }}</strong>
@@ -163,27 +163,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-heading mb-1 text-xs">
                   {{ t("ingestion.azureSetup.resourceGroupLabel") }}
                 </div>
-                <!-- eslint-disable vue/no-bare-strings-in-template -- example Azure resource-group name format, not translatable content -->
                 <OInput
                   :placeholder="raw('rg-openobserve-activity-logs')"
                   v-model="resourceGroup"
                   autocomplete="off"
                   data-test="azure-resource-group-input"
                 />
-                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </div>
               <div>
                 <div class="text-text-heading mb-1 text-xs">
                   {{ t("ingestion.azureSetup.deploymentNameLabel") }}
                 </div>
-                <!-- eslint-disable vue/no-bare-strings-in-template -- example Azure deployment-name format, not translatable content -->
                 <OInput
                   :placeholder="raw('o2-activity-20260420')"
                   v-model="deploymentName"
                   autocomplete="off"
                   data-test="azure-deployment-name-input"
                 />
-                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </div>
             </div>
 

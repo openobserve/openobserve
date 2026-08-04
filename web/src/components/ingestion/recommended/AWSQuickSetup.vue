@@ -199,11 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mt-2 text-xs" :class="hintTextClass">
             <span v-if="stackSetModel === 'self'">
               {{ t("ingestion.requires") }}
-              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- AWS IAM role name, must stay identical in every locale -->
-              <code>AWSCloudFormationStackSetAdministrationRole</code>
+              <code>{{ raw("AWSCloudFormationStackSetAdministrationRole") }}</code>
               {{ t("ingestion.and") }}
-              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- AWS IAM role name, must stay identical in every locale -->
-              <code>AWSCloudFormationStackSetExecutionRole</code>
+              <code>{{ raw("AWSCloudFormationStackSetExecutionRole") }}</code>
               {{ t("ingestion.iamRolesInYourAccount") }}
             </span>
             <span v-else>
@@ -247,7 +245,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("ingestion.service", { count: enabledServices.length }, enabledServices.length) }}
           {{ t("ingestion.selected") }}
           <template v-if="deploymentMode === 'stackset'">
-            · {{ t("ingestion.region", { count: targetRegions.length }, targetRegions.length) }}</template
+            ·
+            {{
+              t("ingestion.region", { count: targetRegions.length }, targetRegions.length)
+            }}</template
           >
         </span>
       </div>

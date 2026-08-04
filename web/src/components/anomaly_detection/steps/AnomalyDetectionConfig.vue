@@ -142,16 +142,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #column>
                   <code>{{ store.state.zoConfig.timestamp_column || raw("_timestamp") }}</code>
                 </template>
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "time_bucket" is a literal SQL column alias name, not translatable UI copy -->
-                <template #timeBucket><code>time_bucket</code></template>
+                <template #timeBucket
+                  ><code>{{ raw("time_bucket") }}</code></template
+                >
               </i18n-t>
             </div>
             <div class="mt-1 text-xs" :class="'text-text-secondary'">
               <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "time_bucket" is a literal SQL column alias name, not translatable UI copy -->
-                <template #timeBucket><code>time_bucket</code></template>
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "value" is a literal SQL column alias name, not translatable UI copy -->
-                <template #valueColumn><code>value</code></template>
+                <template #timeBucket
+                  ><code>{{ raw("time_bucket") }}</code></template
+                >
+                <template #valueColumn
+                  ><code>{{ raw("value") }}</code></template
+                >
               </i18n-t>
             </div>
           </div>

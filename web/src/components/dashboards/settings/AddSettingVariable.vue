@@ -186,8 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <template #content>
                       {{ t("dashboard.filterInfoTooltip") }}
-                      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal variable-name syntax token, must not be translated -->
-                      <span class="bg-highlight-bg px-1.25">$variableName</span>.
+                      <span class="bg-highlight-bg px-1.25">{{ raw("$variableName") }}</span
+                      >.
                     </template>
                   </OTooltip>
                 </div>
