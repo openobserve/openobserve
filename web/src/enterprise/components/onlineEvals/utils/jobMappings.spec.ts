@@ -11,6 +11,7 @@ import {
   defaultJobMappingValue,
   jobMappingVariablesForScorer,
   normalizeJobInputMappings,
+  scorerUsesSpans,
   scorerTemplateVariables,
   syncJobInputMappings,
 } from "./jobMappings";
@@ -78,6 +79,14 @@ describe("defaultJobMappingValue", () => {
     expect(defaultJobMappingValue("custom.field")).toBe("{{custom_field}}");
     expect(defaultJobMappingValue("plain")).toBe("{{plain}}");
   });
+
+  it("uses trace and session view values when the scope provides them", () => {
+    expect(defaultJobMappingValue("input", "trace")).toBe("{{input}}");
+    expect(defaultJobMappingValue("spans", "trace")).toBe("{{spans}}");
+    expect(defaultJobMappingValue("statistics", "session")).toBe("{{statistics}}");
+    expect(defaultJobMappingValue("steps", "session")).toBe("{{steps}}");
+    expect(defaultJobMappingValue("input", "session")).toBe("{{gen_ai_input_messages}}");
+  });
 });
 
 describe("jobMappingVariablesForScorer", () => {
@@ -96,6 +105,37 @@ describe("jobMappingVariablesForScorer", () => {
   it("tolerates a missing existing mapping (undefined)", () => {
     const s = scorer({ variables: ["input", "output"] });
     expect(jobMappingVariablesForScorer(s, undefined)).toEqual(["input", "output"]);
+  });
+});
+
+describe("scorerUsesSpans", () => {
+  it("detects the spans prompt variable", () => {
+    expect(
+      scorerUsesSpans(
+        scorer({
+          variables: ["question", "spans"],
+          template: "Judge {{ question }} using {{ spans }}",
+        }),
+        {},
+      ),
+    ).toBe(true);
+  });
+
+  it("detects a custom prompt variable mapped to the spans view", () => {
+    expect(
+      scorerUsesSpans(scorer({ variables: ["evidence"] }), {
+        evidence: "{{ spans }}",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not require spans for unrelated prompt variables", () => {
+    expect(
+      scorerUsesSpans(scorer({ variables: ["input", "output"] }), {
+        input: "{{ input }}",
+        output: "{{ output }}",
+      }),
+    ).toBe(false);
   });
 });
 
@@ -132,51 +172,55 @@ describe("buildJobInputMappingPayload", () => {
     expect(buildJobInputMappingPayload([], {})).toBeNull();
   });
 
-  it("omits the complete system-provided view for trace jobs", () => {
+  it("preserves mappings to system-provided trace values", () => {
     expect(
-      buildJobInputMappingPayload(
-        ["s1"],
-        {
-          s1: {
-            input: "{{custom_input}}",
-            output: "{{custom_output}}",
-            statistics: "{{custom_stats}}",
-            spans: "{{custom_spans}}",
-            steps: "{{custom_steps}}",
-            custom: "{{custom_field}}",
-          },
+      buildJobInputMappingPayload(["s1"], {
+        s1: {
+          input: "{{custom_input}}",
+          output: "{{custom_output}}",
+          statistics: "{{custom_stats}}",
+          spans: "{{custom_spans}}",
+          steps: "{{custom_steps}}",
+          custom: "{{custom_field}}",
         },
-        "trace",
-      ),
-    ).toEqual({ s1: { custom: "{{custom_field}}" } });
-  });
-
-  it("only omits statistics and steps for session jobs", () => {
-    expect(
-      buildJobInputMappingPayload(
-        ["s1"],
-        {
-          s1: {
-            input: "{{custom_input}}",
-            statistics: "{{custom_stats}}",
-            spans: "{{custom_spans}}",
-            steps: "{{custom_steps}}",
-          },
-        },
-        "session",
-      ),
+      }),
     ).toEqual({
-      s1: { input: "{{custom_input}}", spans: "{{custom_spans}}" },
+      s1: {
+        input: "{{custom_input}}",
+        output: "{{custom_output}}",
+        statistics: "{{custom_stats}}",
+        spans: "{{custom_spans}}",
+        steps: "{{custom_steps}}",
+        custom: "{{custom_field}}",
+      },
     });
   });
 
-  it("keeps statistics and steps freely mappable for span jobs", () => {
+  it("preserves mappings to system-provided session values", () => {
     expect(
-      buildJobInputMappingPayload(
-        ["s1"],
-        { s1: { statistics: "{{span_stats}}", steps: "{{span_steps}}" } },
-        "span",
-      ),
+      buildJobInputMappingPayload(["s1"], {
+        s1: {
+          input: "{{custom_input}}",
+          statistics: "{{custom_stats}}",
+          spans: "{{custom_spans}}",
+          steps: "{{custom_steps}}",
+        },
+      }),
+    ).toEqual({
+      s1: {
+        input: "{{custom_input}}",
+        statistics: "{{custom_stats}}",
+        spans: "{{custom_spans}}",
+        steps: "{{custom_steps}}",
+      },
+    });
+  });
+
+  it("keeps statistics and steps freely mappable", () => {
+    expect(
+      buildJobInputMappingPayload(["s1"], {
+        s1: { statistics: "{{span_stats}}", steps: "{{span_steps}}" },
+      }),
     ).toEqual({
       s1: { statistics: "{{span_stats}}", steps: "{{span_steps}}" },
     });
@@ -263,6 +307,29 @@ describe("syncJobInputMappings", () => {
     );
     expect(nextMappings.s1.input).toBe("{{user_typed_this}}");
     expect(nextMappings.s1.output).toBe("{{gen_ai_output_messages}}");
+  });
+
+  it("seeds system-provided values as sources for trace jobs", () => {
+    const { nextMappings } = syncJobInputMappings(
+      ["s1"],
+      [
+        scorer({
+          id: "s1",
+          entity_id: "s1",
+          variables: ["input", "statistics", "spans", "custom"],
+        }),
+      ],
+      {},
+      {},
+      "trace",
+    );
+
+    expect(nextMappings.s1).toEqual({
+      input: "{{input}}",
+      statistics: "{{statistics}}",
+      spans: "{{spans}}",
+      custom: "{{custom}}",
+    });
   });
 
   it("carries scorer versions through to the next state", () => {

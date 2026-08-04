@@ -298,8 +298,11 @@ const columns = computed(() =>
       header: t("onlineEvals.job.columns.actions"),
       sortable: false,
       isAction: true,
-      size: 100,
-      meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+      size: 120,
+      // Three buttons are always visible: (activate XOR pause) + edit + delete.
+      // actionCount drives the computed column width and the loading skeleton;
+      // it must match the real button count or the actions crowd together.
+      meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
     },
   ].map((c: any) => ({
     ...c,
