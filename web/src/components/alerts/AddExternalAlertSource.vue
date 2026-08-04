@@ -82,7 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.alertSettings.addNewDestination") }}
             </OButton>
           </div>
-          <p class="text-text-secondary text-xs">{{ t("alert_sources.incidentDestinationHint") }}</p>
+          <p class="text-text-secondary text-xs">
+            {{ t("alert_sources.incidentDestinationHint") }}
+          </p>
         </div>
       </OForm>
 
