@@ -71,3 +71,13 @@ Run against the emulator + booted iOS simulator on the migrated dev cluster:
 Shipped negatives: **404/4xx resource status captured** (RN, validated), **PII must not leak** into
 the replay (masking), **no Datadog hosts** in the app (no-phone-home), **handled error must be
 is_crash=false** (all platforms). Offline/airplane-mode behavior remains a possible later addition.
+
+## Product findings (log to o2-enterprise#2289)
+
+- **Mobile SDK install docs are incomplete in the OpenObserve UI.** The RUM ingestion setup cards
+  (`web/src/components/ingestion/setupCard/content/`) cover **Browser** (`rum.ts`) and **React
+  Native** (`rumReactNative.ts`) only — there is **no Android-native (Kotlin) and no iOS-native
+  (Swift)** install card. A customer choosing those platforms has no in-product install guide, even
+  though the SDKs exist and are tested here. Recommend adding `rumAndroid`/`rumIos` setup cards
+  (mirroring `rumReactNative.ts`) and, once present, a UI test asserting the RUM page lists every
+  supported platform.

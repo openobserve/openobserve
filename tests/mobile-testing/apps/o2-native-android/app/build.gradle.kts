@@ -38,12 +38,16 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 
+// SDK version is overridable at build time (CI sets O2_ANDROID_SDK_VERSION on a release event to
+// test the LATEST SDK); with none set it falls back to the committed pin, so builds stay reproducible.
+val ooSdkVersion = System.getenv("O2_ANDROID_SDK_VERSION") ?: "0.1.0-alpha5"
+
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
 
     // OpenObserve native Android RUM SDK (fork of Datadog android-sdk)
-    implementation("ai.openobserve:o2-sdk-android-rum:0.1.0-alpha5")
-    implementation("ai.openobserve:o2-sdk-android-logs:0.1.0-alpha5")
-    implementation("ai.openobserve:o2-sdk-android-session-replay:0.1.0-alpha5")
+    implementation("ai.openobserve:o2-sdk-android-rum:$ooSdkVersion")
+    implementation("ai.openobserve:o2-sdk-android-logs:$ooSdkVersion")
+    implementation("ai.openobserve:o2-sdk-android-session-replay:$ooSdkVersion")
 }

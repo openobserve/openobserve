@@ -35,6 +35,22 @@ With none set, every generator writes the **committed defaults** — so running 
 - Cleartext HTTP to the local instance: Android manifests set `usesCleartextTraffic="true"`; the RN
   iOS build adds an ATS `NSAllowsLocalNetworking` key at build time (committed source stays HTTPS).
 
+## Testing the latest SDK (version injection)
+
+The fixture apps **pin** the SDK version (RN `alpha.6`, android/iOS `alpha.5`) so ordinary runs are
+reproducible. But on a **release** we want to test the *new* version, not the frozen pin. So the SDK
+version is a build input, defaulting to the pin:
+
+| App | Override mechanism | Env |
+|---|---|---|
+| RN | workflow `npm install @openobserve/mobile-react-native@<ver>` before build | `O2_RN_SDK_VERSION` |
+| Android-native | `build.gradle.kts`: `System.getenv("O2_ANDROID_SDK_VERSION") ?: "<pin>"` | `O2_ANDROID_SDK_VERSION` |
+| iOS-native | workflow `sed` of `project.yml` `exactVersion` before xcodegen | `O2_IOS_SDK_VERSION` |
+
+The **`mobile-sdk-release` dispatch** carries `{sdk, version}`; the "Resolve SDK version override" step
+maps it to the right env so a release **builds + tests against the latest SDK**. A manual run can do the
+same via the `sdk` + `sdk_version` inputs. Unset → the committed pin (reproducible).
+
 ## Triggers
 
 | Trigger | Fires when | Runs |

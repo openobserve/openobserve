@@ -42,6 +42,15 @@ on:
         type: choice
         options: [both, android, ios]
         default: both
+      sdk:
+        description: "Override one SDK to test its latest version (else the committed pin is used)"
+        type: choice
+        options: [none, react-native, android, ios]
+        default: none
+      sdk_version:
+        description: "SDK version to test (used with 'sdk' above)"
+        type: string
+        default: ""
   pull_request:
     paths:
       - "tests/mobile-testing/**"
@@ -133,6 +142,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Test the LATEST SDK on a release event: the mobile-sdk-release dispatch carries {sdk, version};
+      # a manual run can also override via the sdk/sdk_version inputs. Unset → committed pin (reproducible).
+      - name: Resolve SDK version override
+        run: |
+          SDK=''; VER=''
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            SDK='${{ github.event.client_payload.sdk }}'; VER='${{ github.event.client_payload.version }}'
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SDK='${{ inputs.sdk }}'; VER='${{ inputs.sdk_version }}'
+          fi
+          [ -z "$VER" ] && { echo "no SDK override — using committed pins"; exit 0; }
+          case "$SDK" in
+            ios) echo "O2_IOS_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            android) echo "O2_ANDROID_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            react-native|rn) echo "O2_RN_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            *) echo "no SDK override" ;;
+          esac
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -175,7 +202,12 @@ jobs:
       - name: Build RN-Android APK
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
-          npm ci || npm install
+          if [ -n "$O2_RN_SDK_VERSION" ]; then
+            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+                        "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
+          else
+            npm ci || npm install
+          fi
           (cd android && ./gradlew --no-daemon assembleDebug)
 
       # Native app: gradle reads O2_RUM_* via System.getenv into BuildConfig. No wrapper committed →
@@ -221,6 +253,23 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve SDK version override
+        run: |
+          SDK=''; VER=''
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            SDK='${{ github.event.client_payload.sdk }}'; VER='${{ github.event.client_payload.version }}'
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SDK='${{ inputs.sdk }}'; VER='${{ inputs.sdk_version }}'
+          fi
+          [ -z "$VER" ] && { echo "no SDK override — using committed pins"; exit 0; }
+          case "$SDK" in
+            ios) echo "O2_IOS_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            android) echo "O2_ANDROID_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            react-native|rn) echo "O2_RN_SDK_VERSION=$VER" >> "$GITHUB_ENV" ;;
+            *) echo "no SDK override" ;;
+          esac
+
       # Pin Xcode so a runner-image update can't silently move the toolchain under the alpha SDK.
       - uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -268,7 +317,12 @@ jobs:
       - name: Build + install RN-iOS app
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
-          npm ci || npm install
+          if [ -n "$O2_RN_SDK_VERSION" ]; then
+            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+                        "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
+          else
+            npm ci || npm install
+          fi
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" ios/O2RumTester/Info.plist || true
           (cd ios && pod install)
           xcodebuild -workspace ios/O2RumTester.xcworkspace -scheme O2RumTester \
@@ -280,6 +334,9 @@ jobs:
       - name: Build + install iOS-native app
         working-directory: tests/mobile-testing/apps/o2-native-ios
         run: |
+          if [ -n "$O2_IOS_SDK_VERSION" ]; then
+            sed -i '' "s/exactVersion:.*/exactVersion: $O2_IOS_SDK_VERSION/" project.yml
+          fi
           O2_RUM_HOST="$O2_RUM_HOST" O2_RUM_ORG="$O2_RUM_ORG" O2_RUM_TOKEN="$O2_RUM_TOKEN" O2_RUM_ENV="$O2_RUM_ENV" bash gen-config.sh
           xcodegen generate
           xcodebuild -project O2NativeIOS.xcodeproj -scheme O2NativeIOS \
