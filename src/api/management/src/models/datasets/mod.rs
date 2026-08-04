@@ -12,15 +12,19 @@
 //!
 //! - `POST /{org_id}/datasets/{dataset_id}/items` for manual or direct trace/span entry.
 //! - `POST /{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset` for
-//!   explicit queue adjudication; the target Dataset and telemetry input are resolved server-side
-//!   from the Queue Item.
+//!   explicit queue adjudication; the caller selects the target Dataset while telemetry input is
+//!   resolved server-side from the Queue Item.
 //! - `POST /{org_id}/datasets/{dataset_id}/items/import` for multipart CSV import; malformed rows
 //!   are skipped and summarized.
 //!
 //! Stored source, logical/physical IDs, MVCC versions, actors, timestamps, and
 //! queue provenance are server-owned on every entry path.
 
-use openobserve_core::llm_evaluations::datasets::{CreateDataset, Dataset, UpdateDataset};
+use openobserve_core::llm_evaluations::datasets::{
+    CreateDataset, CreateDatasetItem, Dataset, DatasetItem, DatasetItemSource,
+    PushDatasetItemResult, PushQueueItemToDataset, TelemetryDatasetItemRefType as ServiceRefType,
+    UpdateDataset,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -86,6 +90,12 @@ pub enum PushDatasetItemRequestBody {
         ref_type: TelemetryDatasetItemRefType,
         #[serde(rename = "refId")]
         ref_id: String,
+        /// Trace stream containing the immutable reference.
+        #[serde(rename = "sourceStream")]
+        source_stream: String,
+        /// Positive microsecond lower bound used to retrieve the reference.
+        #[serde(rename = "refTraceStartTime")]
+        ref_trace_start_time: i64,
         #[serde(rename = "expectedOutput")]
         expected_output: Value,
         #[serde(default)]
@@ -98,6 +108,8 @@ pub enum PushDatasetItemRequestBody {
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PushAnnotationQueueItemToDatasetRequestBody {
+    /// User-selected destination Dataset.
+    pub dataset_id: String,
     /// Logical `_llm_scores` N/N submission selected as adjudication evidence.
     pub review_submission_id: String,
     /// Explicit human-finalized golden; never inferred from an ordinary score.
@@ -199,6 +211,108 @@ impl From<Vec<Dataset>> for ListDatasetsResponseBody {
     }
 }
 
+impl From<TelemetryDatasetItemRefType> for ServiceRefType {
+    fn from(value: TelemetryDatasetItemRefType) -> Self {
+        match value {
+            TelemetryDatasetItemRefType::Trace => Self::Trace,
+            TelemetryDatasetItemRefType::Span => Self::Span,
+        }
+    }
+}
+
+impl From<PushDatasetItemRequestBody> for CreateDatasetItem {
+    fn from(value: PushDatasetItemRequestBody) -> Self {
+        match value {
+            PushDatasetItemRequestBody::Manual {
+                input,
+                expected_output,
+                metadata,
+                tags,
+            } => Self::Manual {
+                input,
+                expected_output,
+                metadata,
+                tags,
+            },
+            PushDatasetItemRequestBody::Telemetry {
+                ref_type,
+                ref_id,
+                source_stream,
+                ref_trace_start_time,
+                expected_output,
+                metadata,
+                tags,
+            } => Self::Telemetry {
+                ref_type: ref_type.into(),
+                ref_id,
+                source_stream,
+                ref_trace_start_time,
+                expected_output,
+                metadata,
+                tags,
+            },
+        }
+    }
+}
+
+impl From<PushAnnotationQueueItemToDatasetRequestBody> for PushQueueItemToDataset {
+    fn from(value: PushAnnotationQueueItemToDatasetRequestBody) -> Self {
+        Self {
+            dataset_id: value.dataset_id,
+            review_submission_id: value.review_submission_id,
+            expected_output: value.expected_output,
+            metadata: value.metadata,
+            tags: value.tags,
+        }
+    }
+}
+
+impl From<DatasetItemSource> for DatasetItemSourceResponseBody {
+    fn from(value: DatasetItemSource) -> Self {
+        match value {
+            DatasetItemSource::Trace => Self::Trace,
+            DatasetItemSource::Annotation => Self::Annotation,
+            DatasetItemSource::Manual => Self::Manual,
+        }
+    }
+}
+
+impl From<DatasetItem> for DatasetItemResponseBody {
+    fn from(value: DatasetItem) -> Self {
+        Self {
+            row_id: value.row_id,
+            logical_id: value.logical_id,
+            org_id: value.org_id,
+            dataset_id: value.dataset_id,
+            input: value.input,
+            expected_output: value.expected_output,
+            global_version: value.global_version,
+            is_deleted: value.is_deleted,
+            source: value.source.into(),
+            source_ref: value.source_ref,
+            source_span_id: value.source_span_id,
+            metadata: value.metadata,
+            tags: value.tags,
+            queue_id: value.queue_id,
+            review_submission_id: value.review_submission_id,
+            adjudicated_by: value.adjudicated_by,
+            adjudicated_at: value.adjudicated_at,
+            import_filename: value.import_filename,
+            updated_by: value.updated_by,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
+impl From<PushDatasetItemResult> for PushDatasetItemResponseBody {
+    fn from(value: PushDatasetItemResult) -> Self {
+        Self {
+            created: value.created,
+            item: value.item.into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod dataset_item_contract_tests {
     use super::*;
@@ -233,6 +347,8 @@ mod dataset_item_contract_tests {
             "entryPoint": "telemetry",
             "refType": "trace",
             "refId": "trace-1",
+            "sourceStream": "default",
+            "refTraceStartTime": 1,
             "expectedOutput": "corrected answer"
         }))
         .unwrap();
@@ -249,6 +365,8 @@ mod dataset_item_contract_tests {
                 "entryPoint": "telemetry",
                 "refType": "session",
                 "refId": "session-1",
+                "sourceStream": "default",
+                "refTraceStartTime": 1,
                 "expectedOutput": "not supported"
             }));
         assert!(session.is_err());
@@ -258,6 +376,8 @@ mod dataset_item_contract_tests {
                 "entryPoint": "telemetry",
                 "refType": "trace",
                 "refId": "trace-1",
+                "sourceStream": "default",
+                "refTraceStartTime": 1,
                 "refTraceId": "trace-1",
                 "expectedOutput": "corrected answer"
             }));
@@ -265,22 +385,35 @@ mod dataset_item_contract_tests {
     }
 
     #[test]
-    fn queue_entry_exposes_adjudication_choice_but_not_provenance() {
+    fn queue_entry_exposes_destination_and_adjudication_choice_but_not_provenance() {
         let body: PushAnnotationQueueItemToDatasetRequestBody =
             serde_json::from_value(serde_json::json!({
+                "datasetId": "dataset-1",
                 "reviewSubmissionId": "submission-1",
                 "expectedOutput": {"answer": "final"},
                 "metadata": {"difficulty": "hard"}
             }))
             .unwrap();
+        assert_eq!(body.dataset_id, "dataset-1");
         assert_eq!(body.review_submission_id, "submission-1");
+
+        let service_input: PushQueueItemToDataset = body.into();
+        assert_eq!(service_input.dataset_id, "dataset-1");
 
         let spoofed: Result<PushAnnotationQueueItemToDatasetRequestBody, _> =
             serde_json::from_value(serde_json::json!({
+                "datasetId": "dataset-1",
                 "reviewSubmissionId": "submission-1",
                 "expectedOutput": "final",
                 "queueId": "other-queue"
             }));
         assert!(spoofed.is_err());
+
+        let missing_dataset: Result<PushAnnotationQueueItemToDatasetRequestBody, _> =
+            serde_json::from_value(serde_json::json!({
+                "reviewSubmissionId": "submission-1",
+                "expectedOutput": "final"
+            }));
+        assert!(missing_dataset.is_err());
     }
 }
