@@ -23,5 +23,7 @@ module.exports = defineConfig({
     { name: 'android-native', testMatch: /android-native\..*\.spec\.js/ },
     { name: 'rn-ios', testMatch: /rn-ios\..*\.spec\.js/ },
     { name: 'ios-native', testMatch: /ios-native\..*\.spec\.js/ },
+    // Docs-freshness check (no device); all skipped for now — see sdk-version-drift.spec.js.
+    { name: 'sdk-drift', testMatch: /sdk-version-drift\.spec\.js/ },
   ],
 });

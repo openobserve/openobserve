@@ -74,10 +74,24 @@ is_crash=false** (all platforms). Offline/airplane-mode behavior remains a possi
 
 ## Product findings (log to o2-enterprise#2289)
 
-- **Mobile SDK install docs are incomplete in the OpenObserve UI.** The RUM ingestion setup cards
-  (`web/src/components/ingestion/setupCard/content/`) cover **Browser** (`rum.ts`) and **React
-  Native** (`rumReactNative.ts`) only — there is **no Android-native (Kotlin) and no iOS-native
-  (Swift)** install card. A customer choosing those platforms has no in-product install guide, even
-  though the SDKs exist and are tested here. Recommend adding `rumAndroid`/`rumIos` setup cards
-  (mirroring `rumReactNative.ts`) and, once present, a UI test asserting the RUM page lists every
-  supported platform.
+- **The RUM install docs in the UI pin a STALE SDK version.** The Data Sources → Real User
+  Monitoring page has all four platform tabs (Browser · React Native · Android · iOS, all BETA) — so
+  the docs exist. But the versions are hardcoded and have drifted behind the shipped SDKs:
+  | Platform | Version shown in the UI | Version we build/test | Drift |
+  |---|---|---|---|
+  | React Native | `0.1.0-alpha.4` (`RUM_RN_SDK_VERSION`, OSS `rumReactNative.ts`) | `alpha.6` | 2 behind |
+  | Android | `0.1.0-alpha4` (enterprise card) | `alpha5` | 1 behind |
+  | iOS | `from: "0.1.0-alpha.4"` (enterprise card) | `alpha.5` | 1 behind |
+  A customer copy-pasting from this page installs an older SDK than what's published. Root cause: the
+  version is a hardcoded constant with no freshness check.
+- **The mobile RUM SDK is NOT enterprise-gated** — corrected. RUM ingestion (`/rum/v1/...` in the base
+  OSS router, no enterprise import), the RUM dashboard (`web/src/views/RUM/*`), and the SDK packages
+  (public npm/Maven/GitHub) are all **open source**. The ONLY edition difference is which *install-doc
+  cards* are surfaced: OSS `FrontendRumConfig.vue` ships `PLATFORMS = [browser, reactNative]` (code
+  comment: "Adding iOS / Android / Flutter later"), while the enterprise build additionally shows the
+  Android + iOS cards. So a docs-presence/drift test for Android/iOS runs `@enterprise`, but the SDK
+  *functionality* tests are all OSS — which is why the self-contained (plain-OSS) CI works.
+- **How to verify (proposed):** (1) a **drift test** comparing the UI-pinned version against the
+  latest published (npm / Maven / GitHub releases) — currently RED; (2) **executable docs** — this
+  E2E suite already proves "these coordinates + this init code produce working RUM"; with the new
+  version injection it can run against the *documented* version and the *latest* to prove both work.
