@@ -57,18 +57,18 @@ describe("synthetics route builders", () => {
   });
 
   it("adds the display name and trigger time to the results route", () => {
-    expect(syntheticsResultsRoute(CTX, "chk1", { name: "Checkout", lastTriggeredAt: 1700 })).toEqual(
-      {
-        name: "synthetic-monitor-results",
-        params: { id: "chk1" },
-        query: {
-          org_identifier: "acme",
-          folder: "f_ksuid_01",
-          name: "Checkout",
-          last_triggered_at: "1700",
-        },
+    expect(
+      syntheticsResultsRoute(CTX, "chk1", { name: "Checkout", lastTriggeredAt: 1700 }),
+    ).toEqual({
+      name: "synthetic-monitor-results",
+      params: { id: "chk1" },
+      query: {
+        org_identifier: "acme",
+        folder: "f_ksuid_01",
+        name: "Checkout",
+        last_triggered_at: "1700",
       },
-    );
+    });
   });
 
   it("omits last_triggered_at when the check has never run", () => {

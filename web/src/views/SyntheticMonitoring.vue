@@ -965,12 +965,7 @@ async function bulkPauseMonitors() {
   });
   const results = await Promise.allSettled(
     toPause.map((m) =>
-      syntheticsService.enable(
-        orgIdentifier.value,
-        String(m.id),
-        { enabled: false },
-        m.folderId,
-      ),
+      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: false }, m.folderId),
     ),
   );
   dismiss();
@@ -1045,9 +1040,7 @@ async function bulkTriggerMonitors() {
     timeout: 0,
   });
   const results = await Promise.allSettled(
-    toTrigger.map((m) =>
-      syntheticsService.run(orgIdentifier.value, String(m.id), {}, m.folderId),
-    ),
+    toTrigger.map((m) => syntheticsService.run(orgIdentifier.value, String(m.id), {}, m.folderId)),
   );
   dismiss();
   const failed = results.filter((r) => r.status === "rejected").length;

@@ -736,7 +736,6 @@ describe("SyntheticMonitoring", () => {
       });
     });
 
-
     it("closes the dialog without an extra error toast on a 403", async () => {
       mockServiceCreate.mockRejectedValueOnce({ response: { status: 403 } });
       wrapper = mountPage();
