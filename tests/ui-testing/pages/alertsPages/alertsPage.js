@@ -1080,10 +1080,16 @@ export class AlertsPage {
         const folderItem = this.page.locator(`div.folder-item:has-text("${folderName}")`).first();
         const folderVisible = await folderItem.isVisible({ timeout: 5000 }).catch(() => false);
         if (folderVisible) {
-            await folderItem.click();
+            // The folder list is virtualized/animated: the row re-renders/moves mid-click, so
+            // Playwright's actionability (visible+stable) check never settles and a plain click
+            // 45s-timed-out on alpha1. Scroll it in and force-click past the reflow, retrying.
+            await expect(async () => {
+                await folderItem.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                await folderItem.click({ force: true, timeout: 5000 });
+            }).toPass({ timeout: 30000 });
         } else {
             // Fallback to generic text selector
-            await this.page.getByText(folderName).first().click();
+            await this.page.getByText(folderName).first().click({ force: true });
         }
         try {
             await Promise.race([
