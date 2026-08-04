@@ -27,7 +27,7 @@ const i18n = createI18n({
   messages: { "en-US": en as Record<string, unknown> },
 });
 
-function render(step: Partial<BrowserStep> = {}) {
+function render(step: Partial<BrowserStep> = {}, props: Record<string, unknown> = {}) {
   const full: BrowserStep = {
     id: "s1",
     action: "click",
@@ -36,7 +36,7 @@ function render(step: Partial<BrowserStep> = {}) {
     ...step,
   };
   return mount(BrowserJourneyStepEditor, {
-    props: { step: full },
+    props: { step: full, ...props },
     global: { plugins: [i18n] },
   });
 }
@@ -80,6 +80,40 @@ describe("BrowserJourneyStepEditor targeting", () => {
   it("renders no target block for navigate", () => {
     const wrapper = render({ action: "navigate", value: "https://example.com" });
     expect(wrapper.find(test("synthetics-journey-step-locator")).exists()).toBe(false);
+  });
+});
+
+// The host has passed `selectorErrorMessage` and listened for `selector-edited`
+// since before D7. This component declared both and bound neither: the v1
+// Selector field the error rendered on was deleted and the error was left with
+// no render site, so a blocked save expanded the step and then showed the author
+// no reason on any field inside it.
+describe("BrowserJourneyStepEditor missing-target error", () => {
+  const MESSAGE = "Add at least one locator so this step knows which element to act on";
+
+  it("hands the host's message to the block that owns the field", () => {
+    const wrapper = render({}, { selectorErrorMessage: MESSAGE });
+    const locator = wrapper.findComponent({ name: "BrowserJourneyLocator" });
+    expect(locator.props("errorMessage")).toBe(MESSAGE);
+  });
+
+  it("passes nothing on when the host reports nothing", () => {
+    const locator = render().findComponent({ name: "BrowserJourneyLocator" });
+    expect(locator.props("errorMessage")).toBeUndefined();
+  });
+
+  // Without this the message outlives the author fixing the very thing it
+  // complains about — and since the error also force-expands the step, a stale
+  // one keeps re-opening a row that is already correct.
+  it("reports the edit, so the host can clear the error", async () => {
+    const wrapper = render({}, { selectorErrorMessage: MESSAGE });
+
+    await wrapper
+      .findComponent({ name: "BrowserJourneyLocator" })
+      .vm.$emit("update:locator", { candidates: [{ kind: "css", value: "#go" }] });
+
+    expect(wrapper.emitted("selector-edited")).toHaveLength(1);
+    expect(wrapper.emitted("update:step")).toBeTruthy();
   });
 });
 

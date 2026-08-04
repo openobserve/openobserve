@@ -120,6 +120,8 @@ const showDragColumn = computed(
 
 // ── Replay helpers ──────────────────────────────────────────────────────────
 const isReplayRunning = computed(() => props.replayPhase === "running");
+/** Stop pressed, extension not yet confirmed — still live, but no longer advancing. */
+const isReplayStopping = computed(() => props.replayPhase === "stopping");
 const isReplayActive = computed(() => props.replayPhase && props.replayPhase !== "idle");
 const isReplayTerminal = computed(
   () =>
@@ -127,7 +129,9 @@ const isReplayTerminal = computed(
     props.replayPhase === "failed" ||
     props.replayPhase === "stopped",
 );
-const isReplayLocked = computed(() => isReplayRunning.value); // editing suppressed during running
+// Editing stays suppressed until the stop is confirmed — the journey can still be
+// executing while `stopping`, so letting a step be edited would race the player.
+const isReplayLocked = computed(() => isReplayRunning.value || isReplayStopping.value);
 
 /** Index of the first failing step in journey order, or -1 when none failed. */
 const firstFailedIndex = computed(() =>
@@ -184,8 +188,11 @@ function stepDotState(stepId: string): StepDotState | undefined {
   if (result) {
     return result.passed ? "pass" : "fail";
   }
-  // Currently executing step
-  if (props.activeStepId === stepId) return "active";
+  // Currently executing step. Gated on `running` deliberately: a stopped replay leaves
+  // the step it was interrupted on with no result, and rendering that as "active" is what
+  // left the journey showing a step spinning forever. Outside `running` it falls through
+  // to "pending" — an empty circle, which is the truth: that step never completed.
+  if (isReplayRunning.value && props.activeStepId === stepId) return "active";
   const stepIndex = props.modelValue.findIndex((s) => s.id === stepId);
   if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return "skip";
   if (props.replayPhase === "running") return "pending";
@@ -244,7 +251,7 @@ watch(
 );
 
 const multiSelectEnabled = computed(
-  () => !isRecording.value && !props.readonly && !isReplayRunning.value,
+  () => !isRecording.value && !props.readonly && !isReplayLocked.value,
 );
 
 // ── Recording state ────────────────────────────────────────────────────────
@@ -414,7 +421,9 @@ function stopActiveRecording(): boolean {
 
 /** Sync stop for replay — called by parent's route guard. */
 function stopActiveReplay(): boolean {
-  if (!isReplayRunning.value) return false;
+  // `stopping` included: the extension has been asked to stop but has not confirmed, so
+  // the replay is still live and leaving without the sync stop can orphan it.
+  if (!isReplayLocked.value) return false;
   recorder.stopReplayAndForget();
   return true;
 }
@@ -422,7 +431,7 @@ function stopActiveReplay(): boolean {
 /** Sync fire-and-forget on tab close — prevents orphaned extension tabs. */
 function handleBeforeUnload() {
   if (recorder.isRecording.value) recorder.stopAndForget();
-  else if (isReplayRunning.value) recorder.stopReplayAndForget();
+  else if (isReplayLocked.value) recorder.stopReplayAndForget();
 }
 
 onMounted(() => {
@@ -671,7 +680,7 @@ function openChromeExtensions() {
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
       <div class="flex w-100 items-center justify-end gap-2">
         <OButton
-          v-if="!isRecording && !isReplayRunning"
+          v-if="!isRecording && !isReplayLocked"
           variant="outline"
           size="sm"
           :disabled="readonly || isRecording"
@@ -704,6 +713,19 @@ function openChromeExtensions() {
             icon-left="stop"
           >
             {{ t("synthetics.journey.stop") }}
+          </OButton>
+          <!-- Stop acknowledged, extension not yet confirmed. Same slot, so no layout
+               shift; disabled so a second click cannot queue another stopReplay. -->
+          <OButton
+            v-else-if="isReplayStopping"
+            variant="destructive"
+            size="sm"
+            loading
+            disabled
+            data-test="synthetics-journey-stopping-replay-btn"
+            icon-left="stop"
+          >
+            {{ t("synthetics.journey.stopping") }}
           </OButton>
           <OButton
             v-else-if="isReplayTerminal"
@@ -742,7 +764,7 @@ function openChromeExtensions() {
           v-else
           variant="primary"
           size="sm"
-          :disabled="readonly || isRecording || isReplayRunning"
+          :disabled="readonly || isRecording || isReplayLocked"
           data-test="synthetics-journey-record-btn"
           @click="onRecordButtonClick"
           icon-left="smart-display"
@@ -759,7 +781,7 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
-      class="mx-3"
+      class="mx-2!"
     />
 
     <!-- Zero test attributes across a whole recording is a misconfiguration,
@@ -768,18 +790,23 @@ function openChromeExtensions() {
       v-if="!readonly"
       :steps="modelValue"
       :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
-      class="mx-3"
+      class="mx-2!"
     />
 
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="rounded-default bg-warning-50 mx-3 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] py-3"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-2! mb-3 flex flex-col gap-3 border py-3"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="visibility-off" size="sm" class="text-warning-600" aria-hidden="true" />
+        <OIcon
+          name="visibility-off"
+          size="sm"
+          class="text-badge-warning-ol-text"
+          aria-hidden="true"
+        />
         <span class="text-text-heading text-sm font-semibold">{{
           t("synthetics.journey.incognitoTitle")
         }}</span>
@@ -837,12 +864,17 @@ function openChromeExtensions() {
     -->
     <div
       v-else-if="blockedReason"
-      class="rounded-default bg-warning-50 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] px-3 py-3"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mb-3 flex flex-col gap-3 border px-3 py-3"
       role="alert"
       data-test="synthetics-journey-preflight-warning"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="error_outline" size="sm" class="text-warning-600" aria-hidden="true" />
+        <OIcon
+          name="error_outline"
+          size="sm"
+          class="text-badge-warning-ol-text"
+          aria-hidden="true"
+        />
         <span class="text-text-heading text-sm font-semibold">
           {{
             blockedReason === "in-progress"
@@ -905,6 +937,19 @@ function openChromeExtensions() {
       </span>
     </div>
 
+    <!-- Replay stopping banner — the wait between Stop and the extension confirming -->
+    <div
+      v-else-if="replayPhase === 'stopping'"
+      class="rounded-default border-border-default bg-surface-subtle mx-2 mb-3 flex items-center gap-2 border px-3 py-2"
+      role="status"
+      data-test="synthetics-journey-stopping-banner"
+    >
+      <OIcon name="sync" size="sm" class="text-text-secondary animate-spin" aria-hidden="true" />
+      <span class="text-text-body text-sm" data-test="synthetics-journey-stopping-banner-text">
+        {{ t("synthetics.journey.replayStopping") }}
+      </span>
+    </div>
+
     <!-- Replay passed banner -->
     <div
       v-else-if="replayPhase === 'passed'"
@@ -935,7 +980,7 @@ function openChromeExtensions() {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="rounded-default border-badge-error-ol-border/30 mb-3 flex items-start gap-2 border bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
+      class="rounded-default border-badge-error-ol-border/30 mx-2 mb-3 flex items-start gap-2 border bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >
@@ -966,7 +1011,7 @@ function openChromeExtensions() {
     <!-- Replay stopped banner -->
     <div
       v-else-if="replayPhase === 'stopped'"
-      class="rounded-default bg-surface-subtle border-border-default mb-3 flex items-center gap-2 border px-3 py-2"
+      class="rounded-default bg-surface-subtle border-border-default mx-2 mb-3 flex items-center gap-2 border px-3 py-2"
       role="status"
       data-test="synthetics-journey-stopped-banner"
     >
@@ -999,7 +1044,7 @@ function openChromeExtensions() {
     <!-- Recorder error (extension missing / failed to start) -->
     <div
       v-if="recordingError && !isRecording"
-      class="rounded-default bg-status-error-bg text-status-error-text mb-3 flex items-center gap-2 px-3 py-2 text-sm"
+      class="rounded-default bg-status-error-bg text-status-error-text mx-2 mb-3 flex items-center gap-2 px-3 py-2 text-sm"
       role="alert"
       data-test="synthetics-journey-record-error"
     >
@@ -1011,7 +1056,7 @@ function openChromeExtensions() {
     <template v-if="isRecording">
       <!-- Recording banner with current URL + controls -->
       <div
-        class="rounded-default bg-status-error-bg border-border-default mb-3 flex items-center gap-3 border px-3 py-2"
+        class="rounded-default bg-status-error-bg border-border-default mx-2 mb-3 flex items-center gap-3 border px-3 py-2"
       >
         <span class="flex items-center gap-1.5">
           <span
@@ -1139,6 +1184,10 @@ function openChromeExtensions() {
           :step-number="stepNumberOf(row)"
           @retry-replay="emit('replay-up-to', stepNumberOf(row))"
         />
+        <!-- `selector-error-message` is field-scoped, not step-scoped: it renders
+             inside the step it describes, so naming that step again only crowds
+             out the one sentence that says what to do. `selectorRequired` keeps
+             the name — it is the toast, which fires with no step in view. -->
         <BrowserJourneyStepEditor
           class="px-8 pt-3 pb-3"
           :step="row"
@@ -1149,15 +1198,8 @@ function openChromeExtensions() {
           "
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
-            (selectorErrors.has(row.id)
-              ? t('synthetics.validation.selectorRequired', {
-                  step:
-                    row.name ||
-                    t('synthetics.results.steps.step', {
-                      step: props.modelValue.indexOf(row) + 1,
-                    }),
-                })
-              : '') || fieldError(row.id, 'selector')
+            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : '') ||
+            fieldError(row.id, 'selector')
           "
           :value-error-message="fieldError(row.id, 'value')"
           :expected-error-message="fieldError(row.id, 'assertion.expected')"

@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.checks")
             }}</span>
-            <span class="font-medium">{{ detail.monitors_count }}</span>
+            <span class="font-medium">{{ detail.checks_count ?? detail.monitors_count ?? 0 }}</span>
           </div>
           <div class="flex flex-col">
             <span class="text-text-muted text-xs">{{
