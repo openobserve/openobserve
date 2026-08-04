@@ -231,11 +231,12 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          # NB: the emulator-runner executes each line in a SEPARATE shell, so `cd` does not persist —
+          # the test command must chain `cd && npx` on one line.
           script: |
             adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/debug/app-debug.apk
             adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
-            cd tests/mobile-testing
-            npx playwright test --project=rn-android --project=android-native
+            cd tests/mobile-testing && npx playwright test --project=rn-android --project=android-native
 
       - name: Upload Playwright report
         if: always()
@@ -259,7 +260,9 @@ jobs:
        (inputs.platforms == 'both' || inputs.platforms == 'ios')) ||
       (github.event_name == 'pull_request' &&
        contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
-    runs-on: macos-latest
+    # macos-15 ships Xcode 16.x (RN 0.75-compatible + still includes the Swift compatibility libs the
+    # SDK references). macos-latest moved to Xcode 26, which removed libswiftCompatibility56 → link error.
+    runs-on: macos-15
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
