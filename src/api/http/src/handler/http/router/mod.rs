@@ -1064,6 +1064,10 @@ pub fn service_routes() -> Router {
                         .post(annotation_queues::review_annotation_queue_item),
                 )
                 .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset",
+                    post(datasets::push_annotation_queue_item_to_dataset),
+                )
+                .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/archive",
                     post(annotation_queues::archive_annotation_queue_items),
                 )
@@ -1076,6 +1080,18 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/datasets",
                     get(datasets::list_datasets).post(datasets::create_dataset),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items/import",
+                    post(datasets::import_dataset_items),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items",
+                    get(datasets::list_dataset_items).post(datasets::push_dataset_item),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items/{item_id}",
+                    put(datasets::update_dataset_item).delete(datasets::delete_dataset_item),
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}",
