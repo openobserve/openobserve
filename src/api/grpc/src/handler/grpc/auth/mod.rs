@@ -13,14 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use common::infra::config::ROOT_USER;
+use common::infra::config::{ORG_INGESTION_TOKENS, ROOT_USER};
 use config::meta::cluster::get_internal_grpc_token;
 use db::{org_users::get_cached_user_org, user::is_root_user};
 use http_auth_basic::Credentials;
+use infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX;
 use openobserve_core::auth::get_hash;
 use tonic::{Request, Status, metadata::MetadataValue};
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
+    check_auth_inner(req, false)
+}
+
+/// Authenticate external OTLP ingestion requests.
+///
+/// Org-level ingestion tokens are deliberately accepted only by the OTLP
+/// logs, metrics, and traces services. Internal cluster RPCs continue to use
+/// [`check_auth`], so an ingestion token cannot authorize query or node APIs.
+pub fn check_otlp_auth(req: Request<()>) -> Result<Request<()>, Status> {
+    check_auth_inner(req, true)
+}
+
+fn check_auth_inner(
+    req: Request<()>,
+    allow_org_ingestion_token: bool,
+) -> Result<Request<()>, Status> {
     let cfg = config::get_config();
     let metadata = req.metadata();
     if !metadata.contains_key(&cfg.grpc.org_header_key) && !metadata.contains_key("authorization") {
@@ -69,6 +86,19 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         };
 
         let user_id = credentials.user_id;
+        if allow_org_ingestion_token && credentials.password.starts_with(ORG_INGESTION_TOKEN_PREFIX)
+        {
+            let org_id = org_id.unwrap().to_str().unwrap();
+            let cache_key = db::org_ingestion_tokens::cache_key(org_id, &credentials.password);
+            if ORG_INGESTION_TOKENS.contains_key(&cache_key) {
+                let mut req = req;
+                let user_id_metadata = MetadataValue::try_from(&user_id).unwrap();
+                req.metadata_mut().append("user_id", user_id_metadata);
+                return Ok(req);
+            }
+            return Err(Status::unauthenticated("No valid auth token[5]"));
+        }
+
         let user = if is_root_user(&user_id) {
             ROOT_USER.get("root").unwrap().to_owned()
         } else if let Some(user) = get_cached_user_org(org_id.unwrap().to_str().unwrap(), &user_id)
@@ -101,7 +131,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
-    use common::infra::config::ORG_USERS;
+    use common::infra::config::{ORG_INGESTION_TOKENS, ORG_USERS};
     use config::{
         cache_instance_id, get_config,
         meta::user::{User, UserRole},
@@ -222,5 +252,60 @@ mod tests {
 
         let res = check_auth(request);
         assert!(res.is_err())
+    }
+
+    fn org_token_request(org_id: &str, encoded_credentials: &str) -> tonic::Request<()> {
+        let mut request = tonic::Request::new(());
+        request.metadata_mut().insert(
+            "authorization",
+            format!("basic {encoded_credentials}").parse().unwrap(),
+        );
+        request
+            .metadata_mut()
+            .insert("organization", org_id.parse().unwrap());
+        request
+    }
+
+    #[test]
+    fn test_otlp_auth_accepts_org_ingestion_token() {
+        let cache_key = db::org_ingestion_tokens::cache_key("default", "o2oi_valid_token");
+        ORG_INGESTION_TOKENS.insert(cache_key.clone(), "collector-token".to_string());
+
+        let request = org_token_request(
+            "default",
+            "Y29sbGVjdG9yQGV4YW1wbGUuY29tOm8yb2lfdmFsaWRfdG9rZW4=",
+        );
+        let request = check_otlp_auth(request).unwrap();
+
+        assert_eq!(
+            request.metadata().get("user_id").unwrap().to_str().unwrap(),
+            "collector@example.com"
+        );
+        ORG_INGESTION_TOKENS.remove(&cache_key);
+    }
+
+    #[test]
+    fn test_internal_auth_rejects_org_ingestion_token() {
+        let cache_key = db::org_ingestion_tokens::cache_key("default", "o2oi_internal_token");
+        ORG_INGESTION_TOKENS.insert(cache_key.clone(), "collector-token".to_string());
+
+        let request = org_token_request(
+            "default",
+            "Y29sbGVjdG9yQGV4YW1wbGUuY29tOm8yb2lfaW50ZXJuYWxfdG9rZW4=",
+        );
+
+        assert!(check_auth(request).is_err());
+        ORG_INGESTION_TOKENS.remove(&cache_key);
+    }
+
+    #[test]
+    fn test_otlp_auth_rejects_missing_org_ingestion_token() {
+        let request = org_token_request(
+            "default",
+            "Y29sbGVjdG9yQGV4YW1wbGUuY29tOm8yb2lfbWlzc2luZ190b2tlbg==",
+        );
+
+        let status = check_otlp_auth(request).unwrap_err();
+        assert_eq!(status.code(), tonic::Code::Unauthenticated);
     }
 }
