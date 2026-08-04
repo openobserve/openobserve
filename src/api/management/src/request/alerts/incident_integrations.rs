@@ -270,29 +270,23 @@ pub async fn update_integration(
         return resp;
     }
 
-    if let Some(name) = &payload.name {
-        if let Err(e) = validate_name(name) {
-            return MetaHttpResponse::bad_request(e);
-        }
-        if let Err(e) =
-            infra::table::incident_integrations::set_name(&org_id, &integration_id, name).await
-        {
-            return MetaHttpResponse::internal_error(e);
-        }
-    }
-
-    if let Some(destinations) = &payload.destinations
-        && let Err(e) = infra::table::incident_integrations::set_destinations(
-            &org_id,
-            &integration_id,
-            destinations,
-        )
-        .await
+    if let Some(name) = &payload.name
+        && let Err(e) = validate_name(name)
     {
-        return MetaHttpResponse::internal_error(e);
+        return MetaHttpResponse::bad_request(e);
     }
 
-    MetaHttpResponse::ok("updated")
+    match infra::table::incident_integrations::update(
+        &org_id,
+        &integration_id,
+        payload.name.as_deref(),
+        payload.destinations.as_deref(),
+    )
+    .await
+    {
+        Ok(()) => MetaHttpResponse::ok("updated"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 #[cfg(feature = "enterprise")]

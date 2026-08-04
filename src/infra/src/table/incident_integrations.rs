@@ -251,47 +251,37 @@ pub async fn set_enabled(org_id: &str, id: &str, enabled: bool) -> Result<(), er
     Ok(())
 }
 
-/// Set an integration's incident-notification destinations, replacing
-/// whatever was there. Empty list clears back to "use the org default".
-pub async fn set_destinations(
+/// Update an integration's name and/or incident-notification destinations
+/// in a single write. `None` leaves that field untouched; `destinations:
+/// Some(&[])` clears destinations back to "use the org default". `name` is
+/// just a label — it doesn't affect routing/matching, so it's safe to
+/// change at any time, including for the org's "default" source.
+pub async fn update(
     org_id: &str,
     id: &str,
-    destinations: &[String],
+    name: Option<&str>,
+    destinations: Option<&[String]>,
 ) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
-    let encoded = if destinations.is_empty() {
-        None
-    } else {
-        Some(serde_json::to_string(destinations).map_err(|e| {
-            Error::DbError(DbError::SeaORMError(format!(
-                "failed to encode destinations: {e}"
-            )))
-        })?)
-    };
+    let mut q = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
+    if let Some(name) = name {
+        q = q.col_expr(Column::Name, Expr::value(name));
+    }
+    if let Some(destinations) = destinations {
+        let encoded = if destinations.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(destinations).map_err(|e| {
+                Error::DbError(DbError::SeaORMError(format!(
+                    "failed to encode destinations: {e}"
+                )))
+            })?)
+        };
+        q = q.col_expr(Column::Destinations, Expr::value(encoded));
+    }
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::update_many()
-        .col_expr(Column::Destinations, Expr::value(encoded))
-        .col_expr(Column::UpdatedAt, Expr::value(now))
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Id.eq(id))
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(())
-}
-
-/// Rename an integration. `name` is just a label — it doesn't affect
-/// routing/matching, so this is safe to change at any time, including for
-/// the org's "default" source.
-pub async fn set_name(org_id: &str, id: &str, name: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let now = chrono::Utc::now().timestamp_micros();
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::update_many()
-        .col_expr(Column::Name, Expr::value(name))
-        .col_expr(Column::UpdatedAt, Expr::value(now))
-        .filter(Column::OrgId.eq(org_id))
+    q.filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(client)
         .await
