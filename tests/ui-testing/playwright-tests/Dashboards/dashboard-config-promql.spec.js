@@ -8,6 +8,7 @@ import { cleanupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
   setupPromQLPanelWithConfig,
+  setupPromQLMetricPanelWithConfig,
   setupPromQLPiePanelWithConfig,
   setupPromQLDonutPanelWithConfig,
   setupPromQLTablePanelWithConfig,
@@ -756,6 +757,73 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
     await expect(legendField).toHaveValue("Legend Q2");
     testLogger.info("Query 2 legend persisted");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("sparkline (PromQL metric): enable → Apply fires exactly 1 query_range (no histogram) → renders", {
+    tag: ['@dashboard', '@configPanel', '@sparkline', '@promql', '@P1', '@all'],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
+    await pm.dashboardPanelConfigs.enableSparkline();
+    expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
+
+    const promqlCalls = [];
+    const onRequest = (req) => {
+      // matches /prometheus/api/v1/query and .../query_range, not .../format_query
+      if (req.url().includes("/prometheus/api/v1/query")) promqlCalls.push(req.url());
+    };
+    page.on("request", onRequest);
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    page.off("request", onRequest);
+
+    expect(promqlCalls.length).toBe(1);
+    testLogger.info("PromQL sparkline Apply fired exactly 1 query_range (no histogram)");
+
+    // Metric renders as SVG; the sparkline trend draws at least one path
+    const chart = page.locator('[data-test="chart-renderer"]');
+    await expect(chart).toBeVisible();
+    await chart.locator("svg path").first().waitFor({ state: "attached", timeout: 10000 });
+    expect(await chart.locator("svg path").count()).toBeGreaterThan(0);
+    testLogger.info("PromQL sparkline trend rendered on the metric SVG");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("value mapping (PromQL metric): Between-range mapping reflects mapped text on the chart", {
+    tag: ['@dashboard', '@configPanel', '@valueMapping', '@promql', '@P1', '@all'],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
+
+    const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
+    // "Between" range covering any real value → deterministic mapped text
+    await pm.dashboardPanelConfigs.selectValueMappingType(popup, 0, "Between");
+    await pm.dashboardPanelConfigs.fillValueMappingRange(popup, 0, {
+      from: "-999999999999",
+      to: "999999999999",
+      text: "PROMQL_MAPPED",
+    });
+    await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
+    testLogger.info("Between-range value mapping configured on PromQL metric panel");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    // The mapped text replaces the metric value on the SVG renderer
+    const chart = page.locator('[data-test="chart-renderer"]');
+    await expect(chart).toBeVisible();
+    await expect(chart).toContainText("PROMQL_MAPPED");
+    testLogger.info("Mapped text reflected in the PromQL metric chart");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

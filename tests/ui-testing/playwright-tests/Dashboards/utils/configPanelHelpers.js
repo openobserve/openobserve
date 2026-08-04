@@ -327,6 +327,18 @@ export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelN
 }
 
 /**
+ * PromQL metric chart panel — config sidebar opened and ready.
+ * Used for sparkline + value-mapping tests on PromQL metric panels (the sparkline
+ * trend is drawn from the query's own query_range matrix — no separate histogram fetch).
+ * Caller's test.beforeAll must call ensureMetricsIngested().
+ */
+export async function setupPromQLMetricPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, { chartType: "metric", panelName });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL metric panel with config ready", { dashboardName, panelName });
+}
+
+/**
  * PromQL pie chart panel — config sidebar opened and ready.
  * Used for aggregation function tests (only visible on pie/donut/geomap/maps in PromQL mode).
  */

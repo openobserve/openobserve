@@ -711,6 +711,125 @@ export default class DashboardPanelConfigs {
     await popup.waitFor({ state: "hidden", timeout: 5000 });
   }
 
+  /**
+   * Fill a value-mapping row's value and/or display-text inputs (type=value rows).
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index
+   * @param {{value?: string, text?: string}} fields
+   */
+  async fillValueMappingRow(popup, index, { value, text } = {}) {
+    if (value !== undefined) {
+      await popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-value-input-${index}"]`)
+        .locator('[data-test$="-field"]')
+        .fill(value);
+    }
+    if (text !== undefined) {
+      await popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-text-input-${index}"]`)
+        .locator('[data-test$="-field"]')
+        .fill(text);
+    }
+  }
+
+  /** Append a new mapping row via the dialog's "Add New Mapping" (neutral) button. */
+  async addValueMappingRow(popup) {
+    await popup.locator('[data-test="o-dialog-neutral-btn"]').click();
+  }
+
+  /** Remove a mapping row via its per-row delete button (sits outside the row border). */
+  async deleteValueMappingRow(popup, index) {
+    await popup
+      .locator(`[data-test="dashboard-addpanel-config-value-mapping-delete-btn-${index}"]`)
+      .click();
+  }
+
+  /** Mapping rows locator (every row renders a type-select regardless of its type). */
+  valueMappingRows(popup) {
+    return popup.locator(
+      '[data-test^="dashboard-addpanel-config-value-mapping-type-select-"]'
+    );
+  }
+
+  /** Apply the value-mapping dialog (primary button) and wait for it to close. */
+  async applyValueMappingPopup(popup) {
+    await popup.locator('[data-test="o-dialog-primary-btn"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Select a value-mapping row's type via its OSelect ("Equals"/"Between"/"Matches regex").
+   * Options are portaled, so match by label on the page (not scoped to the popup).
+   */
+  async selectValueMappingType(popup, index, label) {
+    const parent = `dashboard-addpanel-config-value-mapping-type-select-${index}`;
+    await popup.locator(`[data-test="${parent}-trigger"]`).click();
+    await this._clickVirtualOption(parent, label);
+  }
+
+  /**
+   * Fill a "Between" (range) mapping row: from/to bounds + display text.
+   * The row's type must already be set to range (see selectValueMappingType).
+   */
+  async fillValueMappingRange(popup, index, { from, to, text } = {}) {
+    const field = (kind) =>
+      popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-${kind}-input-${index}"]`)
+        .locator('[data-test$="-field"]');
+    if (from !== undefined) await field("from").fill(String(from));
+    if (to !== undefined) await field("to").fill(String(to));
+    if (text !== undefined) await field("text").fill(String(text));
+  }
+
+  /** Toggle the sparkline enable switch. */
+  async enableSparkline() {
+    const enableSwitch = this.page.locator('[data-test="dashboard-config-sparkline-enable"]');
+    await this.scrollSidebarToElement(enableSwitch);
+    await enableSwitch.locator('[data-test$="-btn"]').click();
+  }
+
+  /** Read the sparkline enable switch state (aria-checked on the inner button). */
+  async isSparklineEnabled() {
+    const btn = this.page.locator(
+      '[data-test="dashboard-config-sparkline-enable"] [data-test$="-btn"]'
+    );
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    return (await btn.getAttribute("aria-checked")) === "true";
+  }
+
+  /** Select a sparkline chart type by its option label ("Auto (Area)"/"Line"/"Area"/"Bar"). */
+  async selectSparklineType(label) {
+    const trigger = this.page.locator('[data-test="dashboard-config-sparkline-type-trigger"]');
+    await this.scrollSidebarToElement(trigger);
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-sparkline-type", label);
+  }
+
+  /** Select a sparkline layout by its option label ("Auto"/"Bottom"/"Background"). */
+  async selectSparklineLayout(label) {
+    const trigger = this.page.locator('[data-test="dashboard-config-sparkline-layout-trigger"]');
+    await this.scrollSidebarToElement(trigger);
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-sparkline-layout", label);
+  }
+
+  /** Pick a sparkline colour swatch by index (0..7 are the series palette). Returns the swatch. */
+  async pickSparklineColorSwatch(index = 0) {
+    const swatch = this.page.locator(
+      `[data-test="dashboard-config-sparkline-color-swatch-${index}"]`
+    );
+    await this.scrollSidebarToElement(swatch);
+    await swatch.click();
+    return swatch;
+  }
+
+  /** Set the sparkline line width (numeric OInput; hidden for Bar type). */
+  async setSparklineLineWidth(width) {
+    const input = this.page.locator('[data-test="dashboard-config-sparkline-line-width"]');
+    await this.scrollSidebarToElement(input);
+    await input.locator('[data-test$="-field"]').fill(String(width));
+  }
+
   // Add and configure override with dynamic column and type
   // Click-hold on the sidebar and scroll down until the Override button is visible
   async scrollDownSidebarUntilOverrideVisible() {
