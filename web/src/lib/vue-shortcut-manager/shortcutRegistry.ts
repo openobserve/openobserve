@@ -91,6 +91,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     pages: [
       "shortcuts.pages.alerts",
       "shortcuts.pages.alertDestinations",
+      "shortcuts.pages.alertSources",
       "shortcuts.pages.alertTemplates",
       "shortcuts.pages.alertIncidents",
     ],
@@ -438,6 +439,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         display: "del / ⌫",
         descriptionKey: "shortcuts.actions.tableRowDelete",
       },
+    ],
+  },
+
+  // ── Alert Sources ───────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.alertSources",
+    scope: "alert-sources",
+    shortcuts: [
+      { id: "alertSourcesAdd", key: "n", descriptionKey: "shortcuts.actions.alertSourcesAdd" },
+      {
+        id: "alertSourcesRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.alertSourcesRefresh",
+      },
+      { id: "alertSourcesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
 
