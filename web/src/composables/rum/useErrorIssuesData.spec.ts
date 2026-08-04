@@ -245,6 +245,84 @@ describe("useErrorIssuesData", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Zero-event rows (the GROUP BY-less aggregate shape)
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("when the issues search returns a zero-event aggregate row", () => {
+    // A stream carrying none of error_type/error_message/error_handling makes
+    // buildIssuesSql drop GROUP BY, and a bare aggregate SELECT returns one row even
+    // when nothing matches: COUNT(*) = 0, every other column NULL.
+    const EMPTY_WINDOW_AGGREGATE_HIT = {
+      zo_sql_timestamp: null,
+      first_seen: null,
+      events: 0,
+      users_affected: null,
+      sessions_affected: null,
+      latest_error_id: null,
+    };
+
+    it("shows no issues when the only row reports zero events", async () => {
+      // Arrange
+      vi.mocked(searchService.search).mockResolvedValueOnce(
+        makeHitsResponse([EMPTY_WINDOW_AGGREGATE_HIT]),
+      );
+
+      const { fetchAll, issues } = useErrorIssuesData();
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert — the phantom row must not reach the table
+      expect(issues.value).toEqual([]);
+    });
+
+    it("skips the chart/KPI/deploy fan-out when the only row reports zero events", async () => {
+      // Arrange
+      vi.mocked(searchService.search).mockResolvedValueOnce(
+        makeHitsResponse([EMPTY_WINDOW_AGGREGATE_HIT]),
+      );
+
+      const { fetchAll, isLoadingChart, isLoadingKpis } = useErrorIssuesData();
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert — an empty window is an empty window, whichever shape reported it
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(isLoadingChart.value).toBe(false);
+      expect(isLoadingKpis.value).toBe(false);
+    });
+
+    it("keeps a single aggregate row that reports real events", async () => {
+      // Arrange — same GROUP BY-less shape, but the window DOES have errors, so the
+      // one row legitimately represents them and must survive the filter.
+      const populatedAggregateHit = {
+        ...EMPTY_WINDOW_AGGREGATE_HIT,
+        zo_sql_timestamp: WINDOW_END_US,
+        first_seen: WINDOW_START_US,
+        events: 17,
+      };
+      vi.mocked(searchService.search)
+        .mockResolvedValueOnce(makeHitsResponse([populatedAggregateHit]))
+        .mockResolvedValueOnce(makeHitsResponse(MOCK_HISTOGRAM_HITS))
+        .mockResolvedValueOnce(makeHitsResponse([MOCK_KPI_HIT]))
+        .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
+        .mockResolvedValueOnce(makeHitsResponse(MOCK_DEPLOY_HITS_AT_EDGE));
+
+      const { fetchAll, issues } = useErrorIssuesData();
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert
+      expect(issues.value).toHaveLength(1);
+      expect(issues.value[0].events).toBe(17);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Deploy verification (lookback before the window)
   // ─────────────────────────────────────────────────────────────────────────
   describe("deploy verification", () => {
