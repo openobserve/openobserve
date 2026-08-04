@@ -1416,8 +1416,19 @@ export class PipelinesPage {
 
         // Navigate and explore
         await this.navigateToStreams();
-        await this.refreshStreamStats();
-        await this.searchStream(streamName);
+        // The just-ingested source stream may not be listed immediately (stream-stats/index
+        // lag on loaded envs), so the row's Explore action is absent and clickExplore()
+        // 45s-timed-out. Poll: refresh stats + re-search until the Explore button appears.
+        // Non-masking: if the stream never lists, the poll times out and we fail.
+        await expect.poll(async () => {
+            await this.refreshStreamStats().catch(() => {});
+            await this.searchStream(streamName).catch(() => {});
+            await this.page.waitForTimeout(1000);
+            return await this.exploreButton.first().isVisible({ timeout: 2000 }).catch(() => false);
+        }, {
+            intervals: [2000, 3000, 5000, 5000, 10000, 10000],
+            timeout: 90000,
+        }).toBe(true);
         await this.clickExplore();
         await this.openTimestampMenu();
         await this.navigateToPipeline();
@@ -1742,7 +1753,37 @@ export class PipelinesPage {
     }
 
     async openPipelineForEdit(pipelineName) {
-        await this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`).click();
+        const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+        // A naked click here 45s-timed-out on alpha1: after save the pipeline list can be long
+        // (shared org) or not-yet-refreshed, so the target row isn't clickable. Filter to the
+        // pipeline and wait for its edit button, polling with a reload if the list hasn't caught
+        // up. Mirrors the proven readiness path in createAndVerifyPipeline. Non-masking: if the
+        // pipeline never appears (i.e. save genuinely failed) the poll times out and we fail.
+        await this.searchPipeline(pipelineName).catch(() => {});
+        if (!(await editBtn.isVisible({ timeout: 15000 }).catch(() => false))) {
+            testLogger.info(`openPipelineForEdit: ${pipelineName} not in list yet — polling with reload`);
+            await expect.poll(async () => {
+                const reloadApi = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 20000 }
+                ).catch(() => null);
+                await this.page.reload().catch(() => {});
+                await reloadApi;
+                const allTab = this.page.locator('[data-test="tab-all"]');
+                if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await allTab.click().catch(() => {});
+                }
+                await this.waitForPipelineListSettled(15000);
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+                await this.pipelineSearchInputField.fill('').catch(() => {});
+                await this.searchPipeline(pipelineName).catch(() => {});
+                return await editBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000],
+                timeout: 120000,
+            }).toBe(true);
+        }
+        await editBtn.click();
         await this.page.waitForTimeout(2000);
     }
 
