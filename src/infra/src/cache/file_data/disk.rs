@@ -1178,7 +1178,7 @@ mod tests {
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
         let data_size = content.len();
-        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
+        let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
             .set(&file_key, &tmp_file, data_size)
@@ -1202,7 +1202,7 @@ mod tests {
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         let data_size = content.len();
-        let (file_key1, tmp_file) = write_tmp_file(&file_key1, content.clone()).await.unwrap();
+        let (file_key1, tmp_file) = write_tmp_file(file_key1, content.clone()).await.unwrap();
         // set one key
         file_data
             .set(&file_key1, &tmp_file, data_size)
@@ -1210,7 +1210,7 @@ mod tests {
             .unwrap();
         assert!(file_data.exist(&file_key1).await);
         // set another key, will release first key
-        let (file_key2, tmp_file) = write_tmp_file(&file_key2, content.clone()).await.unwrap();
+        let (file_key2, tmp_file) = write_tmp_file(file_key2, content.clone()).await.unwrap();
         file_data
             .set(&file_key2, &tmp_file, data_size)
             .await
@@ -1250,7 +1250,7 @@ mod tests {
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
         let data_size = content.len();
-        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
+        let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
             .set(&file_key, &tmp_file, data_size)
@@ -1274,7 +1274,7 @@ mod tests {
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");
         let data_size = content.len();
-        let (file_key1, tmp_file) = write_tmp_file(&file_key1, content.clone()).await.unwrap();
+        let (file_key1, tmp_file) = write_tmp_file(file_key1, content.clone()).await.unwrap();
         // set one key
         file_data
             .set(&file_key1, &tmp_file, data_size)
@@ -1282,7 +1282,7 @@ mod tests {
             .unwrap();
         assert!(file_data.exist(&file_key1).await);
         // set another key, will release first key
-        let (file_key2, tmp_file) = write_tmp_file(&file_key2, content.clone()).await.unwrap();
+        let (file_key2, tmp_file) = write_tmp_file(file_key2, content.clone()).await.unwrap();
         file_data
             .set(&file_key2, &tmp_file, data_size)
             .await
@@ -1309,7 +1309,7 @@ mod tests {
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_7_1.parquet";
         let content = Bytes::from("Some text");
         let data_size = content.len();
-        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
+        let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
 
         file_data
             .set(&file_key, &tmp_file, data_size)
@@ -1550,16 +1550,8 @@ mod tests {
 
         // Used size and length should not decrease significantly (may change due to concurrent
         // tests) Allow some variance due to cache operations (GC, additions)
-        let used_diff = if used2 > used1 {
-            used2 - used1
-        } else {
-            used1 - used2
-        };
-        let len_diff = if len2 > len1 {
-            len2 - len1
-        } else {
-            len1 - len2
-        };
+        let used_diff = used2.abs_diff(used1);
+        let len_diff = len2.abs_diff(len1);
         assert!(used_diff < 10000 || used1 == 0 || used2 == 0); // Allow reasonable variance
         assert!(len_diff < 100 || len1 == 0 || len2 == 0); // Allow reasonable variance
     }
