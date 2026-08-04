@@ -109,18 +109,101 @@ contributes no literal) · `:label="'—'"` (no letters).
 `TEXT_ATTRS` is **gone** — prop types now decide what counts as a text prop, so there
 is no list to maintain (§8). Declaring a prop `I18nText` is what makes it enforced.
 
-- **`NON_TRANSLATABLE`** (39 entries) — tokens that must read identically in every
-  language: units (`px`, `ms`, `ns`, `min`), symbols (`×`, `→`, `~`), protocol and
-  spec identifiers (`GET`, `UTC`, `SQL`, `PromQL`, the OpenTelemetry statuses
-  `OK`/`ERROR`/`UNSET`), and code identifiers rendered as-is (`_timestamp`,
-  `[RAF]`/`[RBF]`, the `devices` icon name). One curated place read by both rules,
-  so no scattered `eslint-disable` comments. **Never put real UI copy here.**
+**`NON_TRANSLATABLE`** (24 entries) is composed from three named groups, so a
+reviewer can apply the right scrutiny to each and "is this a glyph or a spec name?"
+is answered by structure rather than by comment:
+
+| Group | Contents | Why it must be global |
+|---|---|---|
+| `GLYPHS_AND_UNITS` | `px` `s` `ms` `min` `~` `×` `→` `≠` `$` `fx` `x` `●` `…` `🕑` `$_` | appended to interpolated numbers or used as bare symbols, in dozens of files |
+| `SPEC_IDENTIFIERS` | `GET` `UTC` `SQL` `PromQL` `OK` `ERROR` | defined by an external spec, identical in every locale |
+| `TEXT_NODE_LITERALS` | `1000` `./.env` `trace.zip` | bare text nodes; convert the markup to an interpolation and these can go too |
+
+An entry here is a **global, permanent, context-free** exemption — it silences that
+string in every file forever. It is only for tokens that are genuinely universal
+**and** recur. Anything that fires once or twice belongs in `raw()` at the call site.
+
+> **Finding dead entries.** Entries outlive their sites — convert a token to `raw()`
+> and its entry silently stops doing anything, but reads as though it still matters.
+> To find them, set `NON_TRANSLATABLE = []`, run ESLint with `-f json`, and attribute
+> each error to a token by reading the reported **source range** out of the file.
+> Do not parse the token from the message text: `local/no-bare-bound-text-props`
+> doesn't quote it, so message-parsing under-reports badly. Any entry with no
+> matching error is dead. (`ns`, `p` and `UNSET` were removed this way — each was
+> only ever a union member, a `v-for` variable, or a script fallback, none of which
+> the rules check.) **Restore the config afterwards** — do the edit in a script with
+> a `trap` so an interrupted run can't leave the allowlist emptied.
+**Never put real UI copy here.**
+
+> `s` means SECONDS. Manual pluralisation (`{{ n }} {{ t('x') }}{{ n > 1 ? 's' : '' }}`)
+> is i18n debt, not a unit — use a pipe plural (§ Plurals).
 
 ### File-level exemptions
 
 Only the SQL/PromQL cheat-sheets (`src/plugins/{logs,traces,metrics}/SyntaxGuide*.vue`),
 whose "text" is query syntax. Add a file only when it is genuinely code, with a
 one-line reason.
+
+### No `eslint-disable` for i18n — use `raw()`
+
+There are **zero** `eslint-disable` comments for the i18n rules in `src/`, and that
+is deliberate. `raw()` reaches every position a disable could — including a bare text
+node, via `<code>{{ raw("time_bucket") }}</code>` — while being type-checked,
+refactor-proof, and visible in one inventory (`grep -rn "raw(" src`). A comment is
+prose that can drift from the code it guards; a `raw()` call cannot.
+
+(Disables for *other* rules — `vue/attribute-hyphenation`, `vue/x-invalid-end-tag`,
+`vue/no-unused-components` — are fine and still present in ~50 files. Only the i18n
+ones were eliminated.)
+
+> **Spotting a dead disable.** A disable whose reason still reads plausibly may be
+> suppressing nothing — several guarded attributes that stopped being checked when
+> `attributes: {}` landed. The only reliable test is empirical: delete it, run
+> `lint:ci`, and see whether anything fires.
+
+### Moving text into `raw()` changes its parsing context
+
+A text node is HTML; a `raw("…")` argument is a JavaScript string literal. Four
+differences bite, and each fails *silently*:
+
+| | HTML | JS string literal |
+|---|---|---|
+| `\` | literal backslash | escape prefix — `raw("\w+")` renders `w+`; write `raw("\\w+")` |
+| `&amp;` `&lt;` | decoded to `&` `<` | NOT decoded — use the real character |
+| `<` `>` | tag delimiters | ordinary chars, but **Prettier** still parses `{{ raw("<Foo>") }}` as a tag and hard-fails the file — hoist to a `<script setup>` const |
+| whitespace | condensed to one space | the surrounding whitespace-only nodes are dropped: `<div>\n  OO\n</div>` renders `" OO "`, `<div>\n  {{ raw("OO") }}\n</div>` renders `"OO"` |
+
+The whitespace change is invisible in normal flow (HTML collapses it anyway) but
+**check it inside `<pre>` or `white-space: pre-line`**. In a `<pre>`, put the
+interpolation flush against the tag — `<pre>{{ raw(sample) }}</pre>` — because the
+browser strips a leading newline only when the first child is a text node.
+
+### Plurals
+
+Use vue-i18n pipe syntax; never concatenate a suffix.
+
+```jsonc
+// en-US.json
+"occurrence": "{count} occurrence | {count} occurrences"
+```
+```ts
+t("alerts.occurrence", { count: n }, n)
+```
+
+The named bag fills `{count}`; the third argument selects the branch (keep them
+equal). The anti-pattern is `{{ n }} {{ t('x') }}{{ n > 1 ? 's' : '' }}` — no other
+language pluralises that way, and a translator reading `en-US.json` sees only
+`"occurrence"` with no clue that the template appends an `s`.
+
+For a unit chosen at runtime, give each unit its own key and select the KEY, since
+vue-i18n picks the plural branch per key:
+
+```ts
+const countUnitKey = computed<I18nKey>(() =>
+  isMetrics.value ? "ingestion.setupCard.countMetricStreams" : "ingestion.setupCard.countLogs",
+);
+// {{ t(countUnitKey, { count: n }, n) }}
+```
 
 ---
 
@@ -159,8 +242,16 @@ interface Preset {
 ### `I18nKey` is derived, not maintained
 
 ```ts
-export type I18nKey = Leaves<typeof enLocale>; // every dotted path in en-US.json
+import type { JsonPaths } from "@intlify/core-base";
+export type I18nKey = JsonPaths<typeof enLocale>; // every dotted path in en-US.json
 ```
+
+This is vue-i18n's OWN key-path type (re-exported by `@intlify/core-base`, declared
+as an explicit devDependency pinned to the version vue-i18n resolves), rather than a
+hand-rolled recursive type — so the key vocabulary is derived exactly the way the
+library derives it. One known difference: for the single array-valued message
+`JsonPaths` also admits JS array members (`…Aliases.length`); that key is read via
+`tm()`, never `t()`, so nothing real is affected.
 
 Add a key and it is instantly valid; delete one and every reference becomes an
 error, with a suggestion:
@@ -194,7 +285,7 @@ perf concern.
    }
    ```
 
-   This is the standard for non-component code (**35 files**). It is preferred over
+   This is the standard for non-component code (**36 files**). It is preferred over
    `gt()` because these functions are also called directly by specs, outside any
    component, where `useI18n()` would throw. Specs pass the real translator:
 
@@ -277,20 +368,22 @@ annotation is made by hand at the declaration rather than by a pattern match.
 | Template bound props, `v-text`/`v-html`, `{{ }}` | enforced (ESLint)                                 |
 | Template **composed** expressions                | enforced (ESLint)                                 |
 | `t()` keys — literal                             | enforced (ESLint, `.vue` **and** `.ts`)           |
-| i18n keys stored as data                         | enforced (`I18nKey`, 19 files)                    |
+| i18n keys stored as data                         | enforced (`I18nKey`, 32 files)                    |
 | Toast / notification text                        | enforced (`I18nText`, incl. the store + wrappers) |
-| Text reached via `useI18nTyped()`                | branded across **668** files                      |
-| Composables / utils taking `t: TranslateFn`      | **27** files                                      |
+| Text reached via `useI18nTyped()`                | branded across **694** files                      |
+| Composables / utils taking `t: TranslateFn`      | **36** files                                      |
 
-**Numbers** (re-measured 2026-07-31, after the post-review debt cleanup): en-US holds
-**9,837 keys** across **72 namespaces** (10,216 → 11,002 as text was migrated in,
-→ 9,648 after the dead-key sweep §9, → 9,837 as the remaining hardcoded prose —
-import validators, setup-card descriptions, status labels, dialog buttons — was
-keyed); **309** sit under `toastMessages.*`. **977** `raw()` opt-outs — the count
-rose steeply when props became `I18nText`, since every genuinely non-translatable
-value (units, tokens, glyphs, API data) has to say so explicitly, then fell as
-`raw()`-wrapped prose was converted to keys. **10** `gt()` call sites in **4**
-files (see §3 case 3 for the per-file justification).
+**Numbers** (re-measured 2026-08-04, after two merges from `main`): en-US holds
+**10,437 keys** across **74 namespaces**; **309** sit under `toastMessages.*`.
+**1,185** `raw()` opt-outs — the count rose steeply when props became `I18nText`,
+since every genuinely non-translatable value (units, tokens, glyphs, API data) has
+to say so explicitly, then rose again when the remaining `eslint-disable` comments
+were converted to `raw()` calls (§2). **10** `gt()` call sites in **4** files (see
+§3 case 3 for the per-file justification).
+
+> These counts drift with every merge from `main` — treat them as a snapshot, not a
+> contract. Re-measure rather than cite. The key count is
+> `node -e '…'` over `en-US.json`; the rest are `grep -rl` over `src/`.
 
 **Where the two checkers divide.** `no-missing-keys` validates `t('x.y')` **calls**;
 it cannot see a key assigned to a field. Keys stored as **data** are validated instead
@@ -379,8 +472,11 @@ worth burying this one under 2,655 unrelated errors.
 | `Cannot find name 't'`                               | in a component `const { t } = useI18nTyped()`; in a composable/util add a `t: TranslateFn` param (§3) |
 | `Cannot find name 't'` in an Options-API `methods:`  | use `this.t` — `methods` is a sibling of `setup()`, not inside its closure                            |
 | `'x.y' is not assignable to type 'I18nKey'`          | the key is missing or misspelled; tsc suggests the nearest match                                      |
-| A recurring unit/symbol/code token                   | add to `NON_TRANSLATABLE` with a one-line reason                                                      |
+| A one-off code token in a text node `<code>x</code>` | `<code>{{ raw("x") }}</code>` — **not** an eslint-disable                                              |
+| A recurring unit/symbol/code token                   | add to the right group in `NON_TRANSLATABLE` with a one-line reason                                    |
 | A whole file that is genuinely code                  | add to the SyntaxGuide exemption block                                                                |
+| `raw("\w+")` renders `w+`                            | JS ate the escape — write `raw("\\w+")`                                                               |
+| Prettier hard-fails on `{{ raw("<Foo>") }}`          | hoist to `<script setup>`: `const tag = raw("<Foo>")`, then `{{ tag }}`                                |
 
 New text-carrying **component prop** → declare it `I18nText`. In `<script setup>`,
 `defineProps<{ label: I18nText }>()`. In the Options API the double cast is required,

@@ -101,7 +101,6 @@ const GLYPHS_AND_UNITS = [
   "px",
   "s", // SECONDS — never a plural suffix; manual pluralisation is i18n debt, use a pipe plural
   "ms",
-  "ns", // nanoseconds — trace span durations
   "min", // minutes, appended to a number
   "~", // "approximately" prefix on a numeric rate (e.g. ~12 checks/min)
   "×",
@@ -109,7 +108,6 @@ const GLYPHS_AND_UNITS = [
   "≠",
   "$",
   "fx",
-  "p", // percentile prefix (p50, p95 …)
   "x", // "times" multiplier suffix on a number
   // Decorative glyphs / emoji — visual only, no language content.
   "●",
@@ -126,7 +124,6 @@ const SPEC_IDENTIFIERS = [
   "PromQL", // query language name (proper noun)
   "OK", // OpenTelemetry span status code
   "ERROR", // OpenTelemetry span status code
-  "UNSET", // OpenTelemetry span status code
 ];
 
 /**
@@ -541,17 +538,12 @@ export default [
     },
   },
   {
-    // Tests build their own i18n instances as fixtures.
+    // Tests build their own i18n instances as fixtures, and use throwaway keys
+    // (`test.key`) that intentionally are not in en-US.json — so neither the
+    // import ban nor the key contract applies to them.
     files: ["**/*.{spec,test}.{js,ts,jsx,tsx}", "**/__tests__/**", "**/test/**"],
     rules: {
       "no-restricted-imports": "off",
-    },
-  },
-  {
-    // Tests use throwaway i18n keys as fixtures — don't hold them to the
-    // en-US.json contract.
-    files: ["**/*.{spec,test}.{js,ts,jsx,tsx}", "**/__tests__/**", "**/test/**"],
-    rules: {
       "@intlify/vue-i18n/no-missing-keys": "off",
     },
   },

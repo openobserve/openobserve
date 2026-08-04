@@ -18,8 +18,11 @@ description: >-
   never define one, never add a .body--dark block — migrate any --o2-* you touch to
   its --color-* equivalent); all of this is CI-enforced and fails the build,
   (6) no hardcoded user-facing text — every label, title, placeholder, and
-  message comes from i18n (useI18n t()) with keys added to
-  web/src/locales/languages/en-US.json. It also settles the recurring
+  message comes from i18n (useI18nTyped t(), never useI18n from vue-i18n, which
+  is banned) with keys added to web/src/locales/languages/en-US.json; text-carrying
+  props/fields are typed I18nText and i18n keys stored as data are typed I18nKey,
+  and the ONLY opt-out for a genuinely non-translatable string is raw() — never an
+  eslint-disable. It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
   view → service → Vuex/local-ref layering for fetching list data, choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
@@ -140,56 +143,73 @@ read it once, it is the backbone of everything below.
    > `cd web && node scripts/check-design-consistency.mjs --baseline` and commit
    > the tightened `scripts/design-debt-baseline.json` with your change.
 6. **No hardcoded user-facing text** — every label, title, placeholder, tooltip,
-   empty-state, toast, and validation message comes from `useI18n()`'s `t()`, with
-   keys added to `web/src/locales/languages/en-US.json` (other locales follow from
-   there — never hand-edit them).
+   empty-state, toast, and validation message comes from `useI18nTyped()`'s `t()`,
+   with keys added to `web/src/locales/languages/en-US.json` (other locales follow
+   from there — never hand-edit them).
 
-   > **Three ESLint rules in `eslint.config.js` enforce this (all ERROR — they fail
-   > `lint:ci`), and you see every one as you type (editor squiggles) + in
-   > `npm run lint`:**
-   > - **`@intlify/vue-i18n/no-missing-keys`** — a `t('some.key')` whose key is
-   >   absent from `en-US.json` (it would render the literal `some.key` at runtime).
-   >   When you add a `t('x.y')`, add `x.y` to `en-US.json` in the *same* change.
-   >   Keys resolve against **en-US only** (the other locales are generated).
-   >   Dynamically-built keys (`t(varName)`) are ignored — the rule only checks literals.
-   > - **`vue/no-bare-strings-in-template`** — a hardcoded string in a `<template>`,
-   >   covering both **text nodes** (`<div>Save</div>`) and **static text props**
-   >   (`<OButton label="Save" />`).
-   > - **`local/no-bare-bound-text-props`** (custom, in `eslint.config.js`) — hardcoded
-   >   text the two rules above can't see: a **bound literal** prop (`:label="'Save'"`),
-   >   a **v-text / v-html literal** (`v-text="'Save'"`), or a **mustache literal**
-   >   (`{{ 'Save' }}`). So you can't dodge the check by adding a `:`, a `v-text`, or
-   >   `{{ }}`. Only *bare* literals are caught — composed expressions (concatenation
-   >   like `'a' + b`, ternaries, or `${…}` template interpolation) are a separate,
-   >   not-yet-enforced gap.
+   > **Where each surface is enforced.** Lint sees only `<template>`; everything
+   > else is enforced by the TYPES at `npm run type-check:app`. Both gate CI.
    >
-   > **The component-prop standard:** because the app is built from O2 components (not
-   > raw HTML), user-facing text usually arrives through a *prop* — `label`,
-   > `placeholder`, `hint`, `tooltip`, `message`, `content`, `help-text`,
-   > `*-button-label`, … The exact set lives in **one place**, the `TEXT_ATTRS` array
-   > in `eslint.config.js`, and feeds both the static and bound rules. **When you add
-   > a component prop that carries user-facing text, add its name to `TEXT_ATTRS`** —
-   > that is how the linter learns a new prop needs translating. Correct usage is
-   > always `:prop="t('key')"` (or `<Comp>{{ t('key') }}</Comp>` for slots); a
-   > variable binding (`:label="row.name"`) and punctuation/number/emoji-only literals
-   > pass. **Non-translatable tokens** (code / units / symbols) — handle in this order:
-   > (1) a letter-free glyph/number passes automatically **only in a bound / mustache /
-   > v-text position** (`{{ '×' }}`, `:label="'1'"`, `v-text="'●'"`) — the bound rule
-   > ignores letter-free literals. **In a plain text node or static attr it is still
-   > flagged** (the built-in rule flags any char outside its allowlist, so a bare `5` or
-   > `●` in `<span>…</span>` fails) — move it into `{{ … }}` or use (2); (2) a
-   > **recurring** universal token — a unit (`px`, `ms`), a symbol (`×`, `→`, `$`, `fx`),
-   > a decorative glyph/emoji (`●`, `🕑`), or a specific literal token (`{rows}`,
-   > `./.env`, `1000`) — goes in the shared **`NON_TRANSLATABLE`** list in
-   > `eslint.config.js`: one curated,
-   > commented place read by BOTH rules, so no per-use comment is needed; (3) a whole
-   > code-example file (SQL/PromQL syntax guide) is exempted by path; (4) only a genuine
-   > one-off code token that can't move, isn't universal, and lives in a **mixed** file
-   > (real UI + a few example tokens) falls back to an inline
-   > `<!-- eslint-disable-next-line <rule> -->` — for a **text node**, a
-   > `<!-- eslint-disable <rule> -->` … `<!-- eslint-enable <rule> -->` block instead,
-   > since `disable-next-line` reports at the comment's line and misses text nodes.
-   > Prefer (2) for anything that repeats; **never** exempt real UI text.
+   > | Surface | Enforced by |
+   > |---|---|
+   > | Text node — `<div>Save</div>` | `vue/no-bare-strings-in-template` |
+   > | Mustache literal — `{{ 'Save' }}` | `local/no-bare-bound-text-props` |
+   > | `v-text` / `v-html` literal | `local/no-bare-bound-text-props` |
+   > | Component prop — `label="Save"` **or** `:label="'Save'"` | **`I18nText` type** |
+   > | Any string in `<script>` / `.ts` | **`I18nText` type** |
+   > | `t('x.y')` key exists | `@intlify/vue-i18n/no-missing-keys` |
+   > | A key stored as data (`titleKey`) | **`I18nKey` type** |
+   >
+   > Two consequences worth internalising:
+   > - **The lint rules do NOT check attributes.** `attributes: {}` in the rule config
+   >   switches that off deliberately — a text-carrying prop is caught by its
+   >   `I18nText` declaration instead, which is strictly stronger (it also rejects a
+   >   plain `string` variable, which no lint rule could). There is no `TEXT_ATTRS`
+   >   list any more; **declare the prop `I18nText` and you are done.**
+   > - **A NATIVE HTML attribute is currently checked by nothing** — `title=`,
+   >   `placeholder=`, `alt=` on a plain `<div>`/`<input>` are `string`, not
+   >   `I18nText`. There are no offenders today; don't add the first one.
+   >
+   > **Non-translatable text — the ladder.** Decide in this order:
+   >
+   > 1. **Does code branch on it?** (`"px" | "%"`, `"sm" | "md"`) → it is not text at
+   >    all. Use a **union type**. Never an i18n concern.
+   > 2. **Everywhere else → `raw("…")`** from `@/types/i18n`. This is the default and
+   >    covers script data, typed props, bound expressions **and** text nodes:
+   >    `<code>{{ raw("time_bucket") }}</code>`. It is type-checked, survives
+   >    refactors, and `grep -rn "raw(" src` enumerates every exemption in the app
+   >    (~1,185 of them).
+   > 3. **Only if the token is short, universal and RECURS across files** → add it to
+   >    the allowlist in `eslint.config.js`, which is split into three named groups so
+   >    reviewers can apply the right scrutiny:
+   >    `GLYPHS_AND_UNITS` (`px`, `ms`, `×`, `→`, `●`, `…`), `SPEC_IDENTIFIERS`
+   >    (`GET`, `UTC`, `SQL`, `OK`), `TEXT_NODE_LITERALS` (`1000`, `./.env`,
+   >    `trace.zip`). An entry here is **global, permanent and context-free** — it
+   >    silences that string in every file forever, so it must be genuinely universal.
+   >
+   > **Do NOT use `eslint-disable` for i18n.** There are **zero** of them left in
+   > `src/` and that is deliberate — `raw()` says the same thing at the call site, is
+   > type-checked, and shows up in one greppable inventory. (Disables for *other*
+   > rules — hyphenation, `x-invalid-end-tag` — are fine and still present.)
+   >
+   > **Moving a text node into `raw()` changes its parsing context from HTML to
+   > JavaScript.** Four things bite:
+   > - `\` becomes an escape prefix. `raw("\w+")` silently renders `w+`. Write
+   >   `raw("\\w+")` to render `\w+`.
+   > - HTML entities stop decoding. `&amp;` renders literally — use the real
+   >   character: `raw("a & b")`.
+   > - A literal `<` **breaks Prettier**, which parses `{{ raw("<Foo>") }}` as a tag
+   >   and hard-fails the file (`format:check` is a CI gate). Hoist it into
+   >   `<script setup>`: `const tag = raw("<Foo>")` and interpolate `{{ tag }}`.
+   > - Surrounding whitespace is dropped. `<div>\n  OO\n</div>` renders `" OO "` but
+   >   `<div>\n  {{ raw("OO") }}\n</div>` renders `"OO"` — invisible in normal flow,
+   >   but check it inside `<pre>` / `white-space: pre-line`.
+   >
+   > **Plurals use vue-i18n pipe syntax, never string concatenation.** Write the key
+   > as `"{count} occurrence | {count} occurrences"` and call
+   > `t("alerts.occurrence", { count: n }, n)`. Never
+   > `{{ n }} {{ t('x') }}{{ n > 1 ? 's' : '' }}` — no other language pluralises that
+   > way, and a translator reading en-US.json cannot see the appended `s`.
 
    > **Text in `<script>` — use the TYPES, not a lint rule.** The three rules above
    > only see `<template>`. A string in `<script>`/`.ts` — a table column `label`, a
@@ -411,10 +431,12 @@ considering the UI done:
       a text node, a static prop `label="…"`, a bound prop `:label="'…'"`, a
       `{{ '…' }}` mustache, or `v-text`) uses
       `t()` with the key added to `web/src/locales/languages/en-US.json` in the same
-      change. Enforced by three ESLint rules, all **error** (`no-missing-keys`,
-      `vue/no-bare-strings-in-template`, `local/no-bare-bound-text-props`) — a clean
-      `cd web && npm run lint`. New text-carrying component prop → add it to
-      `TEXT_ATTRS` in `eslint.config.js`.
+      change. Text NODES, `{{ '…' }}` mustaches and `v-text`/`v-html` are caught by
+      ESLint (`no-missing-keys`, `vue/no-bare-strings-in-template`,
+      `local/no-bare-bound-text-props` — all **error**); PROPS (static or bound) are
+      caught by declaring them `I18nText`, not by any lint rule. New text-carrying
+      component prop → type it `I18nText`; there is no `TEXT_ATTRS` list any more.
+      Non-translatable strings use `raw("…")` — **never** an `eslint-disable`.
 - [ ] Any **new type / interface / `*.types.ts`** field that carries UI text or an
       i18n key is declared `I18nText` / `I18nKey` (from `@/types/i18n`), not bare
       `string` — that is what guards `<script>`, which the ESLint rules cannot see.
