@@ -397,13 +397,11 @@ mod tests {
 
     #[test]
     fn test_postgres_pipeline_table_new() {
-        let t = PostgresPipelineTable::new();
-        drop(t);
+        let _table = PostgresPipelineTable::new();
     }
 
     #[test]
     fn test_postgres_pipeline_table_default() {
-        let t = PostgresPipelineTable::default();
-        drop(t);
+        let _table = PostgresPipelineTable::default();
     }
 }

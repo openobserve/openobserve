@@ -609,13 +609,11 @@ mod tests {
 
     #[test]
     fn test_sqlite_scheduler_new() {
-        let s = SqliteScheduler::new();
-        drop(s);
+        let _scheduler = SqliteScheduler::new();
     }
 
     #[test]
     fn test_sqlite_scheduler_default() {
-        let s = SqliteScheduler::default();
-        drop(s);
+        let _scheduler = SqliteScheduler::default();
     }
 }
