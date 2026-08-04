@@ -91,6 +91,12 @@
       "import": "Import destination",
       "importDesc": "Import from a JSON file"
     },
+    "noAlertSources": {
+      "title": "No alert sources yet",
+      "description": "Alert sources give external tools — Grafana, Alertmanager, or any webhook — a URL to send alerts to, so they become Incidents here.",
+      "action": "New alert source",
+      "actionDesc": "Create a webhook URL and token"
+    },
     "noPipelineDestinations": {
       "title": "No destinations yet",
       "description": "External targets for pipeline output — HTTP endpoints and remote write targets.",
@@ -344,6 +350,7 @@
       "ingestionTokens": "ingestion tokens",
       "organizations": "organizations",
       "alertDestinations": "destinations",
+      "alertSources": "alert sources",
       "pipelineDestinations": "destinations",
       "alertTemplates": "templates",
       "evalTemplates": "evaluation templates",
@@ -5525,6 +5532,7 @@
     "rejectedCount": "Rejected",
     "resolveHintMessage": "Receiving alerts but no resolved events seen yet — check your source's resolve/recovery settings so incidents can auto-resolve.",
     "refresh": "Refresh",
+    "searchPlaceholder": "Search alert sources",
     "advancedSectionTitle": "Advanced: additional sources",
     "advancedSectionDesc": "Only needed if you want a second, separate webhook URL — for example, to keep one team's alerts deduplicated apart from another's. Most setups only need the default source above.",
     "add": "Add source",
@@ -10822,6 +10830,7 @@
       "iamGroups": "IAM — Groups",
       "iamServiceAccounts": "IAM — Service Accounts",
       "alertDestinations": "Alerts — Destinations",
+      "alertSources": "Alerts — External Sources",
       "alertTemplates": "Alerts — Templates",
       "panelEditor": "Panel Editor",
       "traceDetail": "Trace Detail",
@@ -10912,6 +10921,8 @@
       "iamServiceAccountsRefresh": "Refresh list",
       "alertDestinationsAdd": "Add new destination",
       "alertDestinationsRefresh": "Refresh list",
+      "alertSourcesAdd": "Add new alert source",
+      "alertSourcesRefresh": "Refresh list",
       "alertTemplatesAdd": "Add new template",
       "alertTemplatesRefresh": "Refresh list",
       "logsSearchHistory": "Open search history",
