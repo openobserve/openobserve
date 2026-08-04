@@ -222,6 +222,14 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     );
   };
 
+  const appliedSparklineEnabled = ref(false);
+  let sparklineBaselineCaptured = false;
+  const sparklinePendingApply = computed(
+    () =>
+      dashboardPanelData.data?.config?.sparkline?.enabled === true &&
+      !appliedSparklineEnabled.value,
+  );
+
   /**
    * Whether the chart is out of date (panel data differs from chart data)
    */
@@ -279,7 +287,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       );
     }
 
-    return configNeedsApiCall || variablesChanged;
+    return configNeedsApiCall || variablesChanged || sparklinePendingApply.value;
   });
 
   /**
@@ -334,6 +342,8 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
       // Copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // Applied — capture the sparkline state so the "pending" banner clears.
+      appliedSparklineEnabled.value = dashboardPanelData.data?.config?.sparkline?.enabled === true;
 
       // Refresh the date time picker if available
       if (dateTimePickerRef?.value) {
@@ -760,6 +770,13 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     // to date" on edit load.
     nextTick(() => {
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      // Capture the sparkline baseline only on the first (load) init; later inits
+      // fire on every config edit and must NOT clear the pending banner.
+      if (!sparklineBaselineCaptured) {
+        appliedSparklineEnabled.value =
+          dashboardPanelData.data?.config?.sparkline?.enabled === true;
+        sparklineBaselineCaptured = true;
+      }
     });
   };
 
