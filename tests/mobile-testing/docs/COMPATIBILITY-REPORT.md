@@ -9,10 +9,11 @@
 
 ## 1. Executive verdict
 
-**Functionally, the SDK is compatible across React-Native-Android, Android-native, and
-React-Native-iOS** — the full core RUM surface (sessions, views, actions, errors, native crashes,
-network resources, vitals) ingests correctly on every platform tested, with native crashes flagged
-`is_crash=true`.
+**Functionally, the SDK is compatible across all four mobile tracks — RN-Android, Android-native,
+RN-iOS, and iOS-native** — the full core RUM surface (sessions, views, actions, errors, native
+crashes, network resources, vitals) ingests correctly on every platform tested, with native crashes
+flagged `is_crash=true` on all three native/iOS tracks. Distinct sources: `android` (native), `ios`
+(native), `react-native` (both RN platforms).
 
 **BUT two build-blocking bugs mean the SDK does not build out-of-the-box** per the published docs —
 the session-replay package ships un-rebranded Datadog references on **both Android and iOS**. Every
@@ -30,7 +31,7 @@ inconsistencies.
 | **RN-Android** (alpha.6) | ✅ (after patch) | ✅ emulator | sessions, views(named), actions, network, handled-err, attributes, bg/fg, setUser | `react-native`→`android`* | delivered |
 | **Android-native** (Kotlin, alpha5) | ✅ | ✅ emulator | sessions, views(Activity), actions, handled-err, **crash is_crash=true**, vitals, long_tasks | `android` | **is_crash=true** |
 | **RN-iOS** (alpha.6) | ✅ (after 2 patches) | ✅ simulator | sessions, views(named), actions, network, handled-err, **crash is_crash=true**, vitals | `react-native` | **is_crash=true** |
-| **iOS-native** (Swift) | ⬜ not built standalone | — | — (iOS SDK core **validated via RN-iOS**, which wraps it) | — | — |
+| **iOS-native** (Swift, alpha.5) | ✅ | ✅ simulator | sessions, views(UIKit VC), actions, handled-err, **crash is_crash=true (SIGTRAP)**, vitals, long_tasks | `ios` | **is_crash=true** |
 | **Browser/Web** | n/a | ✅ | web-vitals (real values), sessions, errors | `browser` | n/a |
 
 *RN-Android platform tag flipped `React Native` → `Android` between alpha.5 and alpha.6.
@@ -97,8 +98,8 @@ on the old cluster before it died; RN-iOS was re-pointed and verified on the new
 3. **Investigate replay/breadcrumb inconsistency** (missing replays, empty breadcrumbs).
 4. **Clarify** the RN `source=react-native` (add platform disambiguation) and the RN crash `is_crash`
    classification to match native.
-5. Build the standalone **iOS-native (Swift)** track to close the matrix (low risk — the iOS SDK core
-   is already validated via RN-iOS).
+5. **iOS-native (Swift) — done:** built + verified (`source=ios`, `is_crash=true`). The full
+   4-platform mobile matrix is now covered.
 
 ## 10. What's automated
 `tests/mobile-testing/` — Maestro flows + API + Playwright UI assertions across RN-Android (11 specs),

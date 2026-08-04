@@ -1,0 +1,32 @@
+name: O2NativeIOS
+options:
+  bundleIdPrefix: com.o2native
+  deploymentTarget:
+    iOS: "16.0"
+packages:
+  OpenObserve:
+    url: https://github.com/openobserve/openobserve-sdk-ios.git
+    exactVersion: 0.1.0-alpha.5
+targets:
+  O2NativeIOS:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.o2native.ios
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - package: OpenObserve
+        product: OpenObserveCore
+      - package: OpenObserve
+        product: OpenObserveRUM
+      - package: OpenObserve
+        product: OpenObserveLogs
+      - package: OpenObserve
+        product: OpenObserveSessionReplay
+      - package: OpenObserve
+        product: OpenObserveCrashReporting
