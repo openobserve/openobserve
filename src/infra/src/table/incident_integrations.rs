@@ -63,6 +63,25 @@ pub struct IncidentIntegrationRecord {
 
 impl From<Model> for IncidentIntegrationRecord {
     fn from(m: Model) -> Self {
+        let config: serde_json::Value =
+            serde_json::from_str(&m.config).unwrap_or_else(|_| serde_json::json!({}));
+        // Rows created before the typed `destinations` column existed have
+        // their destinations inside `config["destinations"]` — fall back to
+        // that so pre-existing integrations don't silently lose their
+        // notification targets on first read after the migration.
+        let destinations = m
+            .destinations
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+            .filter(|d: &Vec<String>| !d.is_empty())
+            .or_else(|| {
+                config["destinations"].as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+            })
+            .unwrap_or_default();
         Self {
             id: m.id,
             org_id: m.org_id,
@@ -70,12 +89,8 @@ impl From<Model> for IncidentIntegrationRecord {
             source_type: m.source_type,
             token: m.token,
             enabled: m.enabled,
-            config: serde_json::from_str(&m.config).unwrap_or_else(|_| serde_json::json!({})),
-            destinations: m
-                .destinations
-                .as_deref()
-                .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
-                .unwrap_or_default(),
+            config,
+            destinations,
             created_by: m.created_by,
             created_at: m.created_at,
             updated_at: m.updated_at,
@@ -559,5 +574,46 @@ mod tests {
         };
         let r = IncidentIntegrationRecord::from(m);
         assert!(r.destinations.is_empty());
+    }
+
+    #[test]
+    fn test_record_from_model_falls_back_to_config_destinations_when_column_absent() {
+        // Rows written before the typed `destinations` column existed (main's
+        // shipped contract) have destinations inside `config["destinations"]`
+        // and a NULL `destinations` column — must not read back as empty.
+        let m = super::super::entity::incident_integrations::Model {
+            id: "i1".into(),
+            org_id: "o1".into(),
+            name: "grafana-prod".into(),
+            source_type: "grafana".into(),
+            token: "o2iat_x".into(),
+            enabled: true,
+            config: r#"{"destinations":["sre-pages"]}"#.into(),
+            destinations: None,
+            created_by: "a@b.c".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        let r = IncidentIntegrationRecord::from(m);
+        assert_eq!(r.destinations, vec!["sre-pages"]);
+    }
+
+    #[test]
+    fn test_record_from_model_prefers_typed_column_over_config() {
+        let m = super::super::entity::incident_integrations::Model {
+            id: "i1".into(),
+            org_id: "o1".into(),
+            name: "grafana-prod".into(),
+            source_type: "grafana".into(),
+            token: "o2iat_x".into(),
+            enabled: true,
+            config: r#"{"destinations":["stale-config-value"]}"#.into(),
+            destinations: Some(r#"["sre-pages"]"#.into()),
+            created_by: "a@b.c".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        let r = IncidentIntegrationRecord::from(m);
+        assert_eq!(r.destinations, vec!["sre-pages"]);
     }
 }
