@@ -37,6 +37,7 @@ import {
   mapResponseToProtocolCheck,
 } from "@/utils/synthetics/buildPayload";
 import { getFoldersListByType } from "@/utils/commons";
+import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -117,6 +118,15 @@ const validationErrors = ref<Record<string, string>>({});
 
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
+);
+
+/**
+ * Where every exit from this wizard lands — mirrors CreateBrowserTest.backTo.
+ * Tracks `check.folder` so backing out after a folder change returns to the
+ * folder the check now lives in, with `org_identifier` stamped from the store.
+ */
+const backTo = computed(() =>
+  syntheticsListRoute({ orgIdentifier: orgIdentifier.value, folderId: check.value.folder }),
 );
 
 /** Resolves once orgIdentifier is populated — on a hard reload or browser
@@ -236,7 +246,7 @@ async function loadForEdit(id: string) {
     // redirect to the synthetics list with a message.
     if (err?.response?.status === 404) {
       forceLeave = true;
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isLoadingEdit.value = false;
       return;
@@ -316,12 +326,12 @@ async function saveCheck() {
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
     isDirty.value = false;
-    router.push({ name: "synthetics", query: { folder: check.value.folder } });
+    router.push(backTo.value);
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) {
       forceLeave = true;
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isSaving.value = false;
       return;
@@ -344,7 +354,7 @@ async function saveCheck() {
   <OPageLayout
     :back="{
       label: t('synthetics.newCheck.back'),
-      to: { name: 'synthetics' },
+      to: backTo,
       dataTest: 'synthetics-create-back-btn',
     }"
     bleed
@@ -391,7 +401,7 @@ async function saveCheck() {
           variant="ghost"
           size="sm"
           data-test="synthetics-create-cancel-btn"
-          @click="router.push({ name: 'synthetics' })"
+          @click="router.push(backTo)"
         >
           {{ t("common.cancel") }}
         </OButton>

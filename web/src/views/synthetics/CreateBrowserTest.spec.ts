@@ -452,7 +452,7 @@ describe("CreateBrowserTest", () => {
       );
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetics",
-        query: { folder: "folder-1" },
+        query: { org_identifier: "default", folder: "folder-1" },
       });
     });
 
@@ -500,7 +500,7 @@ describe("CreateBrowserTest", () => {
   describe("edit mode — check deleted while editing (404)", () => {
     const notFound = { response: { status: 404, data: {} } };
 
-    it("'Save & Exit' should navigate to the list once, without a folder query", async () => {
+    it("'Save & Exit' should navigate to the list exactly once", async () => {
       mockServiceUpdate.mockRejectedValue(notFound);
       wrapper = await mountValidEdit();
 
@@ -508,9 +508,13 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       // persist() already navigated for the 404 case — onSaveAndExit must bail
-      // out instead of pushing a second, folder-scoped route on top of it.
+      // out instead of pushing a second route on top of it. Both pushes are the
+      // same `backTo` target now, so the count is what distinguishes them.
       expect(mockRouterPush).toHaveBeenCalledTimes(1);
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: "synthetics" });
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics",
+        query: { org_identifier: "default", folder: "folder-1" },
+      });
     });
 
     it("'Save & Exit' should warn (not error) when the check no longer exists", async () => {
@@ -536,7 +540,10 @@ describe("CreateBrowserTest", () => {
         false,
       );
       expect(mockRouterPush).toHaveBeenCalledTimes(1);
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: "synthetics" });
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics",
+        query: { org_identifier: "default", folder: "folder-1" },
+      });
     });
 
     it("should clear the saving state after the 404 early return", async () => {
@@ -593,7 +600,7 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetics",
-        query: { folder: "folder-1" },
+        query: { org_identifier: "default", folder: "folder-1" },
       });
     });
 
@@ -612,7 +619,7 @@ describe("CreateBrowserTest", () => {
       );
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetics",
-        query: { folder: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 

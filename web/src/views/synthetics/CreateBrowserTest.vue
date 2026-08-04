@@ -42,6 +42,7 @@ import {
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { getFoldersListByType } from "@/utils/commons";
+import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -98,6 +99,17 @@ const folderName = computed(() => {
   if (!fid || fid === "default") return "";
   return folders.value.find((f) => f.folderId === fid)?.name ?? "";
 });
+/**
+ * Where every exit from this wizard lands.
+ *
+ * Tracks `check.folder` rather than `?folder=` so that changing the folder in
+ * the Configure step and then backing out returns to the folder the check now
+ * lives in. `org_identifier` comes from the store, matching the app-wide
+ * convention — reading it back off the URL is what let it go missing.
+ */
+const backTo = computed(() =>
+  syntheticsListRoute({ orgIdentifier: orgIdentifier.value, folderId: check.value.folder }),
+);
 const currentStep = ref(1);
 const journeyStepDone = ref(false);
 const checkName = ref("");
@@ -257,7 +269,7 @@ async function loadForEdit(id: string) {
   } catch (err) {
     console.error("[synthetics] failed to load check for edit", err);
     if ((err as any)?.response?.status === 404) {
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isLoadingEdit.value = false;
       return;
@@ -608,7 +620,7 @@ async function persist(): Promise<boolean> {
     if (err?.response?.status === 404) {
       // Already navigated away — the caller must not push on top of this.
       forceLeave = true;
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return false;
     }
@@ -660,7 +672,7 @@ async function onSaveAndContinue() {
 /** Persist, then return to the checks list. */
 async function onSaveAndExit() {
   if (!(await persist())) return;
-  router.push({ name: "synthetics", query: { folder: check.value.folder } });
+  router.push(backTo.value);
 }
 
 // ── Replay — uses the composable's phase-based state machine ────────────────
@@ -767,7 +779,7 @@ function onClearResults() {
     :subtitle="folderName"
     :back="{
       label: t('synthetics.newCheck.back'),
-      to: { name: 'synthetics' },
+      to: backTo,
       dataTest: 'synthetics-create-back-btn',
     }"
     bleed
@@ -1095,7 +1107,7 @@ function onClearResults() {
               variant="ghost"
               size="sm"
               data-test="synthetics-create-cancel-btn"
-              @click="router.push({ name: 'synthetics' })"
+              @click="router.push(backTo)"
             >
               {{ t("common.cancel") }}
             </OButton>
@@ -1138,7 +1150,7 @@ function onClearResults() {
               variant="ghost"
               size="sm"
               data-test="synthetics-create-cancel-btn"
-              @click="router.push({ name: 'synthetics' })"
+              @click="router.push(backTo)"
             >
               {{ t("common.cancel") }}
             </OButton>
