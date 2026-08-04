@@ -7,6 +7,7 @@ import { TabsTrigger } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import useDragHandle from "@/composables/useDragHandle";
 
 // Disable auto-attribute inheritance so the consumer's `data-test="..."` lands
 // on the inner clickable TabsTrigger (Reka button) instead of the wrapper
@@ -28,6 +29,11 @@ const isVertical = computed<boolean>(() => context?.value.isVertical ?? false);
 const isReorderable = computed<boolean>(() => context?.value.reorderable ?? false);
 /** Reorderable, and this tab hasn't opted out (e.g. while its label is edited). */
 const isDraggable = computed<boolean>(() => isReorderable.value && !props.disableDrag);
+// Drag starts only from the grip: mousedown on the grip arms the tab's
+// `draggable` attribute for the duration of that press (useDragHandle disarms
+// on mouseup/dragend), so grabbing the tab body just clicks/selects — text on
+// the label stays selectable-feeling and accidental drags can't happen.
+const { arm: armDrag, isArmed: isDragArmed } = useDragHandle();
 /** This tab is the one being dragged → dim it. */
 const isDragging = computed<boolean>(
   () => isReorderable.value && context?.value.draggingName === props.name,
@@ -61,6 +67,9 @@ const isOIcon = computed<boolean>(() =>
 const baseClasses = computed<string>(() =>
   [
     "o-tab",
+    // Named group so the grip (and consumer affordances like a rename pencil)
+    // can fade in on tab hover without colliding with consumer `group` usage.
+    "group/otab",
     "relative items-center gap-1.5",
     isVertical.value ? "flex justify-start" : "inline-flex justify-center",
     // Horizontal inset. A vertical (side-rail) tab is a selectable PILL, so the
@@ -69,7 +78,11 @@ const baseClasses = computed<string>(() =>
     // + this pl-1, the label lands on the page-edge grid line (12px) while the
     // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
     // their own padding override.
-    isVertical.value ? "pl-1 pr-2" : "px-2",
+    // Reorderable tabs widen the left inset to a 0.75rem gutter that hosts the
+    // hover-revealed drag grip. The gutter is tied to `reorderable` (not
+    // per-press state), so a tab is pixel-identical at rest, on hover, and
+    // while its label is being edited — the grip only ever changes opacity.
+    isReorderable.value ? "pl-3 pr-2" : isVertical.value ? "pl-1 pr-2" : "px-2",
     "font-normal text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
     "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
@@ -142,35 +155,42 @@ const heightClasses = computed<string>(() => {
       :aria-disabled="disable || undefined"
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
-      :class="[
-        baseClasses,
-        stateClasses,
-        heightClasses,
-        isDraggable ? 'cursor-grab active:cursor-grabbing' : '',
-        isReorderable && disableDrag ? 'cursor-text' : '',
-        isDragging ? 'opacity-40' : '',
-      ]"
-      :draggable="isDraggable || undefined"
+      :class="[baseClasses, stateClasses, heightClasses, isDragging ? 'opacity-40' : '']"
+      :draggable="(isDraggable && isDragArmed()) || undefined"
       :data-otab-name="name"
       v-bind="$attrs"
     >
       <!-- Insertion line — shows where the dragged tab will land (before/after
-           this drop-target tab) so the drop position is visible during drag. -->
+           this drop-target tab) so the drop position is visible during drag.
+           Together with the grab cursor and the FLIP slide it carries the whole
+           reorder affordance — reorderable tabs stay clean text (no grip icon),
+           matching Sheets/Datadog/Grafana tab strips. -->
       <span
         v-if="isDropTarget"
         aria-hidden="true"
         class="bg-tabs-indicator pointer-events-none absolute z-20 rounded-full"
         :class="dropIndicatorClass"
       />
-      <!-- Drag handle — shown only in reorderable mode to signal the tab can be
-           dragged to reorder. Purely an affordance; the whole tab is draggable. -->
-      <OIcon
-        v-if="isReorderable"
-        name="drag-indicator"
-        size="sm"
-        class="o-tab__drag-handle -ml-0.5 shrink-0 opacity-40"
+      <!-- Drag grip — lives inside the reorderable tab's 1rem left gutter
+           (absolute, so it never participates in layout) and fades in on tab
+           hover, Gmail-style: at rest the gutter reads as ordinary padding.
+           Dragging is armed only by pressing the grip; while the tab opts out
+           (disableDrag, e.g. label editing) the grip stays mounted but inert so
+           nothing shifts. Decorative for AT — drag has no keyboard path. -->
+      <span
+        v-if="isReorderable && !disable"
         aria-hidden="true"
-      />
+        data-otab-grip
+        class="absolute inset-y-0 left-0 z-10 flex w-3 items-center justify-center transition-opacity duration-150"
+        :class="
+          isDraggable
+            ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing'
+            : 'pointer-events-none opacity-0'
+        "
+        @mousedown="isDraggable && armDrag()"
+      >
+        <OIcon name="drag-indicator" size="sm" />
+      </span>
       <!--
         If label or icon props are provided, render them (prop-driven mode).
         If neither is set, fall back to the default slot (custom content mode:

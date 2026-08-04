@@ -274,9 +274,10 @@ describe("TabList", () => {
       expect(addButton.exists()).toBe(true);
 
       // Migrated to OTooltip with :content prop; verify prop instead of DOM.
+      // t() is mocked as identity, so the prop carries the i18n key.
       const tooltip = wrapper.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.props("content")).toBe("Add Tab");
+      expect(tooltip.props("content")).toBe("dashboard.newTab");
     });
 
     it("should open add tab dialog when clicked", async () => {
@@ -288,42 +289,72 @@ describe("TabList", () => {
       expect(wrapper.vm.showAddTabDialog).toBe(true);
     });
 
-    it("should initially hide add button until hovered", async () => {
+    it("should show add button without requiring hover", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      // Button should have v-show="isHovered" directive
-      expect(wrapper.vm.isHovered).toBe(false);
+      // The + is a persistent affordance (Sheets/Datadog-style tab bars).
+      const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
+      expect(addButton.isVisible()).toBe(true);
     });
   });
 
-  describe("Hover Interaction", () => {
-    it("should handle mouseover event", async () => {
+  describe("Rename Pencil", () => {
+    it("should render a hover-revealed pencil on every tab when editable", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
-      await container.trigger("mouseover");
-
-      expect(wrapper.vm.isHovered).toBe(true);
+      for (const id of ["tab1", "tab2", "tab3"]) {
+        const pencil = wrapper.find(`[data-test="dashboard-tab-${id}-rename-btn"]`);
+        expect(pencil.exists()).toBe(true);
+        // Hidden at rest; revealed by tab hover (group/otab), never layout.
+        expect(pencil.classes()).toContain("opacity-0");
+        expect(pencil.classes()).toContain("group-hover/otab:opacity-60");
+      }
     });
 
-    it("should handle mouseleave event", async () => {
+    it("should keep the pencil out of flow so revealing it cannot resize the tab", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
-      await container.trigger("mouseover");
-      expect(wrapper.vm.isHovered).toBe(true);
-
-      await container.trigger("mouseleave");
-      expect(wrapper.vm.isHovered).toBe(false);
+      const pencil = wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]');
+      expect(pencil.classes()).toContain("absolute");
     });
 
-    it("should show add button on hover", async () => {
+    it("should swap the pencil for a confirm tick while its tab is being edited", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
-      await container.trigger("mouseover");
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
 
-      expect(wrapper.vm.isHovered).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]').exists()).toBe(false);
+      const tick = wrapper.find('[data-test="dashboard-tab-tab1-rename-confirm-btn"]');
+      expect(tick.exists()).toBe(true);
+      // Same absolute slot as the pencil — out of flow, so no width change.
+      expect(tick.classes()).toContain("absolute");
+      // Other tabs don't get a tick, only the one being edited.
+      expect(wrapper.find('[data-test="dashboard-tab-tab2-rename-confirm-btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("should commit the rename when the confirm tick is clicked", async () => {
+      wrapper = createWrapper({ viewOnly: false });
+
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
+      wrapper.vm.editingName = "Ticked Name";
+      await wrapper.find('[data-test="dashboard-tab-tab1-rename-confirm-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockEditTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "default", "tab1", {
+        name: "Ticked Name",
+      });
+      expect(wrapper.vm.editingTabId).toBe(null);
+    });
+
+    it("should not show any pencil in viewOnly mode", () => {
+      wrapper = createWrapper({ viewOnly: true });
+
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-tab-tab2-rename-btn"]').exists()).toBe(false);
     });
   });
 
@@ -523,12 +554,6 @@ describe("TabList", () => {
       expect(wrapper.vm.showAddTabDialog).toBe(false);
     });
 
-    it("should initialize isHovered as false", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.isHovered).toBe(false);
-    });
-
     it("should maintain reactive state", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
@@ -602,7 +627,8 @@ describe("TabList", () => {
       const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
       expect(addButton.exists()).toBe(true);
       const tooltip = wrapper.findComponent({ name: "OTooltip" });
-      expect(tooltip.props("content")).toBe("Add Tab");
+      // t() is mocked as identity, so the prop carries the i18n key.
+      expect(tooltip.props("content")).toBe("dashboard.newTab");
     });
 
     it("should prevent click propagation on tabs", () => {

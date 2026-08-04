@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex items-center"
-    data-test="dashboard-tab-list-container"
-    @mouseover="isHovered = true"
-    @mouseleave="isHovered = false"
-  >
+  <div class="flex items-center" data-test="dashboard-tab-list-container">
     <OTabs
       class="max-w-[calc(100%_-_2.5rem)]"
       v-model="selectedTabId"
@@ -40,11 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
-        <!-- Display and edit share ONE row: name/input on the left, an
-             always-present pencil on the right. The name and the input carry the
-             same box (px-0.5), and the pencil stays in flow while editing (just
-             hidden), so switching between them never changes the tab's width. -->
-        <div class="group flex w-full flex-nowrap items-center gap-1">
+        <!-- Display and edit share ONE row. Affordances are Gmail-style quiet:
+             the drag grip (OTab) and the rename pencil live in reserved gutters
+             that read as padding and only fade in on tab hover — at rest every
+             tab is clean text. The name and the input carry the same box
+             (px-0.5), the pencil is absolutely positioned (out of flow) in the
+             pr-3 reserve, and both gutters exist in display AND edit mode, so
+             entering/leaving edit never changes the tab's width. -->
+        <div class="flex w-full flex-nowrap items-center" :class="canManage ? 'pr-2.5' : ''">
           <!-- Auto-size the input to its text via an invisible sizer sharing the
                input's grid cell, so the field is exactly as wide as the name.
                `size="1"` neutralises the input's default ~20ch intrinsic width so
@@ -84,29 +82,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @dblclick="canManage ? startRename(tab) : undefined"
             >{{ tab?.name }}</span
           >
-          <!-- Editable affordance: a faint pencil that brightens on tab hover and
-               renames on click. Rendered in BOTH modes (hidden, not removed, while
-               editing) so its width is always reserved and the tab never resizes
-               when you enter or leave edit mode. -->
+          <!-- Editable affordance: a pencil in the tab's right gutter that
+               fades in when the tab is hovered (group/otab comes from OTab) and
+               renames on click. While editing, the same slot shows a tick that
+               commits the rename. Both are absolutely positioned in the pr-2.5
+               reserve, so swapping them never affects the tab's width. -->
           <OIcon
-            v-if="canManage"
+            v-if="canManage && editingTabId !== tab.tabId"
             name="edit"
             size="sm"
-            class="text-text-secondary shrink-0 cursor-pointer transition-opacity duration-150"
-            :class="
-              editingTabId === tab.tabId ? 'invisible' : 'opacity-40 group-hover:opacity-100'
-            "
+            :aria-label="t('common.edit')"
+            class="text-text-secondary absolute top-1/2 right-0.5 -translate-y-1/2 cursor-pointer opacity-0 transition-opacity duration-150 group-hover/otab:opacity-60 hover:!opacity-100"
             :data-test="`dashboard-tab-${tab.tabId}-rename-btn`"
             @click.stop="startRename(tab)"
             @mousedown.stop
             @dblclick.stop
           />
+          <!-- mousedown.prevent keeps the input focused (no blur-commit race);
+               the click then commits explicitly. -->
+          <OIcon
+            v-else-if="canManage"
+            name="check"
+            size="sm"
+            :aria-label="t('common.save')"
+            class="text-text-secondary absolute top-1/2 right-0.5 -translate-y-1/2 cursor-pointer opacity-70 transition-opacity duration-150 hover:opacity-100"
+            :data-test="`dashboard-tab-${tab.tabId}-rename-confirm-btn`"
+            @click.stop="commitRename(tab)"
+            @mousedown.prevent.stop
+            @dblclick.stop
+          />
         </div>
       </OTab>
     </OTabs>
+    <!-- Always-visible + (Sheets/Datadog-style tab bars keep the add affordance
+         persistent, not hover-revealed). -->
     <OButton
       v-if="!viewOnly"
-      v-show="isHovered"
       variant="ghost"
       size="icon"
       class="ml-1"
@@ -118,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-tab-add-btn"
       icon-left="add"
     >
-      <OTooltip content="Add Tab" />
+      <OTooltip :content="t('dashboard.newTab')" />
     </OButton>
     <AddTab
       v-model:open="showAddTabDialog"
@@ -175,7 +186,6 @@ export default defineComponent({
     } = useNotifications();
 
     const showAddTabDialog = ref(false);
-    const isHovered = ref(false);
 
     // inject selected tab, default will be default tab
     const selectedTabId: any = inject("selectedTabId", ref("default"));
@@ -304,7 +314,6 @@ export default defineComponent({
       refreshDashboard,
       tabs,
       route,
-      isHovered,
       selectedTabId,
       canManage,
       onReorder,
