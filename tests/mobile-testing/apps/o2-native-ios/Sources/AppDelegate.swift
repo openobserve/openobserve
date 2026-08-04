@@ -5,9 +5,10 @@ import OpenObserveLogs
 import OpenObserveCrashReporting
 import OpenObserveSessionReplay
 
-// reactnativeapp org on the migrated cluster (same org as the RN app).
-private let ORG = "3HOStgiihM8H43cMLWY3BUfXV5r"
-private let BASE = "https://dev.common-dev.internal.zinclabs.dev/rum/v1/\(ORG)"
+// RUM target comes from GeneratedConfig (committed defaults = dev cluster; CI regenerates it via
+// gen-config.sh to point at a local instance).
+private let ORG = GeneratedConfig.org
+private let BASE = "\(GeneratedConfig.host)/rum/v1/\(ORG)"
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -18,8 +19,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         let configuration = OpenObserve.Configuration(
-            clientToken: "rumtbJXyJcgC8jB9Otu",
-            env: "testing",
+            clientToken: GeneratedConfig.token,
+            env: GeneratedConfig.env,
             service: "o2-native-ios"
         )
         OpenObserve.initialize(with: configuration, trackingConsent: .granted)

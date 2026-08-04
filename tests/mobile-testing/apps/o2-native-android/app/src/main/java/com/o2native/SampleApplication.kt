@@ -15,17 +15,18 @@ import com.openobserve.android.sessionreplay.SessionReplayConfiguration
 import com.openobserve.android.sessionreplay.TextAndInputPrivacy
 import com.openobserve.android.sessionreplay.TouchPrivacy
 
-// reactnativeapp org on the migrated cluster (same org as the RN app).
-private const val ORG = "3HOStgiihM8H43cMLWY3BUfXV5r"
-private const val BASE = "https://dev.common-dev.internal.zinclabs.dev/rum/v1/$ORG"
+// RUM target comes from BuildConfig (build.gradle.kts injects env-overridable values; defaults are
+// the dev cluster). Lets CI retarget the app at a local instance without editing source.
+private val ORG = BuildConfig.OO_ORG
+private val BASE = "${BuildConfig.OO_HOST}/rum/v1/$ORG"
 
 class SampleApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
         val configuration = Configuration.Builder(
-            clientToken = "rumtbJXyJcgC8jB9Otu",
-            env = "testing",
+            clientToken = BuildConfig.OO_TOKEN,
+            env = BuildConfig.OO_ENV,
             service = "o2-native-android",
         ).build()
         OpenObserve.initialize(this, configuration, TrackingConsent.GRANTED)

@@ -8,7 +8,7 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "postinstall": "node scripts/patch-sdk.js"
+    "postinstall": "node scripts/patch-sdk.js && node scripts/gen-config.js"
   },
   "dependencies": {
     "@openobserve/mobile-react-native": "0.1.0-alpha.6",

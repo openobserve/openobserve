@@ -32,13 +32,17 @@ import {
   TouchPrivacyLevel,
 } from '@openobserve/mobile-react-native-session-replay';
 
-const RUM_INTAKE =
-  'https://dev.common-dev.internal.zinclabs.dev/rum/v1/3HOStgiihM8H43cMLWY3BUfXV5r';
+// Build-time overridable RUM target. The committed rum.config.json holds the default (dev-cluster)
+// values; CI regenerates it (scripts/gen-config.js) to point at a locally-built OpenObserve.
+// See docs/CI-NOTES.md.
+import rumCfg from './rum.config.json';
 
-// --- SDK configuration (reactnativeapp org on the migrated cluster) ---
+const RUM_INTAKE = `${rumCfg.host}/rum/v1/${rumCfg.org}`;
+
+// --- SDK configuration ---
 const config = new OpenObserveProviderConfiguration(
-  'rumtbJXyJcgC8jB9Otu', // clientToken — this org's RUM token
-  'testing', // env — distinguishes our data from ShopSphere (dev)
+  rumCfg.token, // clientToken
+  rumCfg.env, // env
   TrackingConsent.GRANTED,
   {
     rumConfiguration: {

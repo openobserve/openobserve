@@ -13,7 +13,16 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        // Build-time overridable RUM target: CI sets these env vars to point at a local instance;
+        // with none set they fall back to the dev-cluster defaults (identical to before).
+        buildConfigField("String", "OO_HOST", "\"${System.getenv("O2_RUM_HOST") ?: "https://dev.common-dev.internal.zinclabs.dev"}\"")
+        buildConfigField("String", "OO_ORG", "\"${System.getenv("O2_RUM_ORG") ?: "3HOStgiihM8H43cMLWY3BUfXV5r"}\"")
+        buildConfigField("String", "OO_TOKEN", "\"${System.getenv("O2_RUM_TOKEN") ?: "rumtbJXyJcgC8jB9Otu"}\"")
+        buildConfigField("String", "OO_ENV", "\"${System.getenv("O2_RUM_ENV") ?: "testing"}\"")
     }
+
+    buildFeatures { buildConfig = true }
 
     buildTypes {
         release {

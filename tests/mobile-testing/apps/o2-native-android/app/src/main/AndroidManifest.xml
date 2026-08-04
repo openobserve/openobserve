@@ -8,6 +8,7 @@
         android:name=".SampleApplication"
         android:allowBackup="true"
         android:label="O2 Native Android"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
