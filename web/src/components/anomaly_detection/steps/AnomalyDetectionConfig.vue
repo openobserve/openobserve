@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    both the column AND time_bucket as params. -->
               <i18n-t keypath="alerts.anomaly.timestampAliasBanned" tag="span">
                 <template #column>
-                  <code>{{ store.state.zoConfig.timestamp_column || "_timestamp" }}</code>
+                  <code>{{ store.state.zoConfig.timestamp_column || raw("_timestamp") }}</code>
                 </template>
                 <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "time_bucket" is a literal SQL column alias name, not translatable UI copy -->
                 <template #timeBucket><code>time_bucket</code></template>

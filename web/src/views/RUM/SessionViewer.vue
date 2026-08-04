@@ -64,8 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="text-severity-warning-color font-semibold"
             data-test="frustration-summary-text"
-            >{{ frustrationCount }} {{ t("rum.frustration")
-            }}{{ frustrationCount > 1 ? "s" : "" }}</span
+            >{{ t("rum.frustration", { count: frustrationCount }, frustrationCount) }}</span
           >
         </div>
       </div>

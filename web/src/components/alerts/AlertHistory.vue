@@ -197,8 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #content>
                     {{ t("alerts.suppressedByDeduplication") }}
                     <div v-if="row.dedup_count">
-                      {{ row.dedup_count }} {{ t("alerts.occurrence")
-                      }}{{ row.dedup_count > 1 ? "s" : "" }}
+                      {{ t("alerts.occurrence", { count: row.dedup_count }, row.dedup_count) }}
                     </div>
                   </template>
                 </OTooltip>

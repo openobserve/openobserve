@@ -91,8 +91,15 @@ const dataNoun = computed(() =>
   isMetricsStream.value ? "metrics" : isLogsStream.value ? "logs" : "spans",
 );
 // Singular unit for the connected count ("3 metric streams" / "5 spans").
-const countUnit = computed(() =>
-  isMetricsStream.value ? "metric stream" : isLogsStream.value ? "log" : "span",
+// The count and its unit are ONE message: English appends "s", other languages
+// inflect differently, so the number must live inside the translated string.
+// Each unit needs its own key because vue-i18n selects the plural branch per key.
+const countUnitKey = computed<I18nKey>(() =>
+  isMetricsStream.value
+    ? "ingestion.setupCard.countMetricStreams"
+    : isLogsStream.value
+      ? "ingestion.setupCard.countLogs"
+      : "ingestion.setupCard.countSpans",
 );
 const connectedHeadline = computed(() =>
   isMetricsStream.value
@@ -703,7 +710,7 @@ function fireConfetti() {
                 <span v-else-if="detect.connected.value" class="sb-txt"
                   >{{ connectedHeadline
                   }}<span class="sb-sub"
-                    >{{ detect.count.value }} {{ countUnit }}{{ detect.count.value === 1 ? "" : "s"
+                    >{{ t(countUnitKey, { count: detect.count.value }, detect.count.value)
                     }}<template v-if="content.detect.modelLabel">
                       · {{ content.detect.modelLabel }}</template
                     ></span

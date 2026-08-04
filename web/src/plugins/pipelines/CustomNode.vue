@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import useDragAndDrop from "./useDnD";
 import { ref, computed, type PropType } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -389,7 +389,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           align="left"
         >
           {{ data.name }} -
-          <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+          <strong>{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
         </div>
 
         <template v-else-if="data.node_type == 'stream'">

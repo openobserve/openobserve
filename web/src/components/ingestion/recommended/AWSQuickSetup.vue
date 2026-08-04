@@ -244,12 +244,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("ingestion.selectAtLeastOneTargetRegion") }}
         </span>
         <span v-else class="text-sm" :class="hintTextClass">
-          {{ enabledServices.length }} {{ t("ingestion.service")
-          }}{{ enabledServices.length > 1 ? "s" : "" }}
+          {{ t("ingestion.service", { count: enabledServices.length }, enabledServices.length) }}
           {{ t("ingestion.selected") }}
           <template v-if="deploymentMode === 'stackset'">
-            · {{ targetRegions.length }} {{ t("ingestion.region")
-            }}{{ targetRegions.length > 1 ? "s" : "" }}</template
+            · {{ t("ingestion.region", { count: targetRegions.length }, targetRegions.length) }}</template
           >
         </span>
       </div>

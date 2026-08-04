@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-body text-sm font-medium"
                   :class="svc.latencyFlag ? 'text-warning-700' : ''"
                 >
-                  {{ svc.latencyMultiplier ? svc.latencyMultiplier + "x" : "—" }}
+                  {{ svc.latencyMultiplier ? raw(svc.latencyMultiplier + "x") : raw("—") }}
                 </span>
               </div>
               <div class="flex items-baseline justify-between gap-2">
@@ -506,7 +506,7 @@ const _anomalyCache = new Map<
   string,
   { ts: number; startTime: number; endTime: number; data: any[] }
 >();
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";

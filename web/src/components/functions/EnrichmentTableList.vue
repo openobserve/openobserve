@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{
                     job.total_bytes_fetched
                       ? formatSizeFromMB((job.total_bytes_fetched / 1024 / 1024).toFixed(2))
-                      : "0 MB"
+                      : raw("0 MB")
                   }}
                 </span>
                 <span
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -1040,6 +1040,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       qTable,
       store,
       router,

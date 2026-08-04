@@ -107,7 +107,7 @@
                 data-test="dashboard-add-x-data"
                 @click.stop="addXAxisItem(row)"
               >
-                {{ dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y" }}
+                {{ dashboardPanelData.data.type != "h-bar" ? raw("+X") : raw("+Y") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -116,7 +116,7 @@
                 data-test="dashboard-add-y-data"
                 @click.stop="addYAxisItem(row)"
               >
-                {{ dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X" }}
+                {{ dashboardPanelData.data.type != "h-bar" ? raw("+Y") : raw("+X") }}
               </OButton>
               <OButton
                 v-if="dashboardPanelData.data.type == 'table'"

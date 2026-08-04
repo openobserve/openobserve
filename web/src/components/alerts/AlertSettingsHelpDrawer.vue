@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -262,7 +262,7 @@ defineExpose({ applyTemplate, previewTemplate });
           {{ t("alerts.alertSettings.helpLegendSample") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--opaque">{{ "{rows}" }}</span>
+          <span class="help-legend__swatch help-legend__swatch--opaque">{{ raw("{rows}") }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendOpaque") }}
         </span>

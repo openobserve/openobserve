@@ -73,31 +73,53 @@ const noLegacyO2Tokens = {
   },
 };
 
-// Non-translatable literal tokens — code/syntax/units that must stay identical in
-// every language (a CSS unit, a fixed filename, a documented template-variable token).
-// Fed to BOTH i18n rules so they pass WITHOUT a scattered inline eslint-disable
-// comment. Keep this curated and reasoned — NEVER add real UI text here.
-const NON_TRANSLATABLE = [
-  // Units / symbols — language-agnostic, appended to numbers or used as bare glyphs.
-  // (The rule strips these, so a token only passes when it is the WHOLE text — e.g.
-  // "settings" is NOT allowed by "s", only a bare "s" node is.)
+// Non-translatable literal tokens, fed to BOTH i18n rules so they pass without a
+// scattered inline eslint-disable comment.
+//
+// SCOPE — read before adding anything. An entry here is a GLOBAL, PERMANENT,
+// CONTEXT-FREE exemption: it silences that token in every file forever, and
+// nothing at the call site explains why. It is therefore only for strings that are
+// genuinely global AND unreachable by any other mechanism:
+//
+//   • the string is BEHAVIOURAL (code branches on it) → use a union type; it is
+//     not text at all (see OSplitter.types.ts).
+//   • the string is DISPLAYED from script data or a typed prop → use `raw("…")`.
+//   • the string is DISPLAYED in a bound template expression `{{ a ? "X" : "Y" }}`
+//     → use `raw()`; the custom rule skips call expressions, so it silences at the
+//     call site, and `grep -rn "raw(" src` enumerates every exemption.
+//   • the string is DISPLAYED in a bare TEXT NODE `<span>●</span>` → THIS list is
+//     the only option, because there is no declaration to annotate.
+//
+// NEVER add real UI text here. Prefer `raw()` for anything that fires once or twice.
+
+/**
+ * Units and glyphs — language-agnostic, appended to interpolated numbers or used
+ * as bare symbols. (The rule matches the WHOLE text, so "s" allows a bare `s`
+ * node, not the "s" inside "settings".)
+ */
+const GLYPHS_AND_UNITS = [
   "px",
-  "s",
+  "s", // SECONDS — never a plural suffix; manual pluralisation is i18n debt, use a pipe plural
   "ms",
   "ns", // nanoseconds — trace span durations
   "min", // minutes, appended to a number
+  "~", // "approximately" prefix on a numeric rate (e.g. ~12 checks/min)
   "×",
   "→",
   "≠",
-  "~", // "approximately" prefix on a numeric rate (e.g. ~12 checks/min)
   "$",
   "fx",
+  "p", // percentile prefix (p50, p95 …)
+  "x", // "times" multiplier suffix on a number
   // Decorative glyphs / emoji — visual only, no language content.
   "●",
   "…", // ellipsis marking a truncated list
   "🕑",
   "$_",
-  // Protocol / standard identifiers — defined by a spec, identical in every locale.
+];
+
+/** Protocol / standard identifiers — defined by an external spec, identical in every locale. */
+const SPEC_IDENTIFIERS = [
   "GET", // HTTP method, shown as the default when a request has none
   "UTC", // timezone designator
   "SQL", // query language name (proper noun)
@@ -105,27 +127,20 @@ const NON_TRANSLATABLE = [
   "OK", // OpenTelemetry span status code
   "ERROR", // OpenTelemetry span status code
   "UNSET", // OpenTelemetry span status code
-  "PerDayCount", // license limit enum value returned by the API
-  // Code identifiers rendered as-is — column names, axis handles, node markers.
-  "_timestamp", // reserved SQL column name
-  "+X", // chart axis handle
-  "+Y", // chart axis handle
-  "[RAF]", // pipeline node marker — "run after flatten"
-  "[RBF]", // pipeline node marker — "run before flatten"
-  "var_", // generated variable-name prefix
-  "p", // percentile prefix (p50, p95 …)
-  "x", // "times" multiplier suffix on a number
-  "devices", // Material icon name used as the device-icon fallback
-  "0us", // zero-duration literal
-  "0 MB", // zero-size literal
-  // Specific literal tokens shown to the user as documentation / code.
+];
+
+/**
+ * Literal tokens rendered as bare TEXT NODES (documentation / code shown to the
+ * user), where `raw()` has no expression to wrap. Convert the surrounding markup
+ * to an interpolated value and these can go too.
+ */
+const TEXT_NODE_LITERALS = [
   "1000", // hardcoded record-limit value
   "./.env", // relative config-file path shown in setup steps
   "trace.zip", // fixed download-artifact filename
-  "{rows}", // literal template-variable token shown as documentation
-  "{field_name}", // literal template-variable placeholder token shown as documentation
-  "{{ input }}", // documented template syntax rendered inside a <code> block
 ];
+
+const NON_TRANSLATABLE = [...GLYPHS_AND_UNITS, ...SPEC_IDENTIFIERS, ...TEXT_NODE_LITERALS];
 const NON_TRANSLATABLE_SET = new Set(NON_TRANSLATABLE);
 
 // The built-in rule's DEFAULT allowlist (punctuation it always ignores). Supplying an

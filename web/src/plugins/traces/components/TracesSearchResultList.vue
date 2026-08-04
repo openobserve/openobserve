@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #cell-duration="{ row }">
                   <span class="text-text-body font-mono text-xs" data-test="trace-row-duration">
-                    {{ formatTimeWithSuffix(row.duration) || "0us" }}
+                    {{ formatTimeWithSuffix(row.duration) || raw("0us") }}
                   </span>
                 </template>
 
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";

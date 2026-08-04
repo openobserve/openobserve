@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("about.usage_limits") }}
               </p>
               <p class="text-text-muted m-0 mb-4 text-xs">
-                {{ licenseData.license.limits?.Ingestion?.typ || "PerDayCount" }}
+                {{ licenseData.license.limits?.Ingestion?.typ || raw("PerDayCount") }}
                 {{ t("about.limitPrefix") }}
                 {{ licenseData.license.limits?.Ingestion?.value || 50 }} {{ t("about.gbPerDay") }}
               </p>
@@ -454,7 +454,7 @@ import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../utils/zincutils";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
@@ -561,6 +561,7 @@ export default defineComponent({
     return {
       isDark,
       t,
+      raw,
       store,
       config,
       pageData,

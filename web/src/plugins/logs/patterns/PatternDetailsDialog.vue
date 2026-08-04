@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #cell-name="{ row }">
                 <div class="text-primary text-left font-bold">
-                  {{ row.name || "var_" + row.index }}
+                  {{ raw(row.name || "var_" + row.index) }}
                 </div>
               </template>
 
@@ -354,7 +354,7 @@ import useTheme from "@/composables/useTheme";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

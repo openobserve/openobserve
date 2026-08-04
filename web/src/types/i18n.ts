@@ -30,6 +30,7 @@
 // compile time, so adding a key makes it instantly valid and deleting one turns every
 // reference into a type error.
 
+import type { JsonPaths } from "@intlify/core-base";
 import { useI18n } from "vue-i18n";
 
 import i18nInstance from "@/locales";
@@ -41,16 +42,19 @@ import type enLocale from "@/locales/languages/en-US.json";
  *
  * Derived, never hand-written. Use for any field that stores an i18n KEY as data
  * (`titleKey`, `labelKey`, …) rather than the resolved text.
+ *
+ * Uses vue-i18n's own `JsonPaths` (re-exported by `@intlify/core-base`, declared
+ * as a devDependency and pinned to the version vue-i18n resolves) rather than a
+ * local recursive type, so the key vocabulary is derived exactly the way the
+ * library derives it.
+ *
+ * Known difference from the hand-rolled predecessor: for an array-valued message
+ * `JsonPaths` recurses into the array type and also admits JS array members
+ * (`…Aliases.length`). The one array key in en-US.json is read via `tm()`, not
+ * `t()`, so it never flows through {@link TranslateFn} and nothing real is
+ * affected.
  */
-export type I18nKey = Leaves<typeof enLocale>;
-
-type Leaves<T, P extends string = ""> = {
-  [K in keyof T & string]: T[K] extends string
-    ? P extends ""
-      ? K
-      : `${P}.${K}`
-    : Leaves<T[K], P extends "" ? K : `${P}.${K}`>;
-}[keyof T & string];
+export type I18nKey = JsonPaths<typeof enLocale>;
 
 declare const i18nTextBrand: unique symbol;
 

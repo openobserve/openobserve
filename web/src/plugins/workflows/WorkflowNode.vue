@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #body>
       <div v-if="isConfiguredFunction" class="flex gap-1">
         {{ data.name }} -
-        <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+        <strong>{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
       </div>
       <div v-else class="whitespace-nowrap">{{ nodeLabel }}</div>
     </template>
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

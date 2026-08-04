@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Bottom footer -->
           <template #bottom="{ totalRows }">
             <div class="mr-4 flex items-center py-2 text-xs font-normal">
-              {{ totalRows }} {{ t("pipeline.backfillJobLabel") }}{{ totalRows === 1 ? "" : "s" }}
+              {{ t("pipeline.backfillJobLabel", { count: totalRows }, totalRows) }}
             </div>
           </template>
 
