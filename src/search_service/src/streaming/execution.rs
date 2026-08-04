@@ -1102,10 +1102,11 @@ mod tests {
     use super::*;
 
     fn slice_with(n: usize) -> Response {
-        let mut r = Response::default();
-        r.hits = (0..n).map(|i| serde_json::json!({ "i": i })).collect();
-        r.total = n;
-        r
+        Response {
+            hits: (0..n).map(|i| serde_json::json!({ "i": i })).collect(),
+            total: n,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -1134,7 +1135,7 @@ mod tests {
         let total: usize = slices.iter().map(|s| s.hits.len()).sum();
         assert_eq!(total, 10_000, "must fill the budget exactly");
         for (i, s) in slices.iter().enumerate() {
-            assert!(s.hits.len() > 0, "slice {i} was dropped entirely");
+            assert!(!s.hits.is_empty(), "slice {i} was dropped entirely");
         }
     }
 

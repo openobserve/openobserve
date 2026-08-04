@@ -1229,10 +1229,9 @@ describe("Use Logs Composable", () => {
         wrapper.vm.routeToSearchSchedule();
 
         expect(mockPush).toHaveBeenCalledWith({
+          name: "searchScheduler",
           query: {
-            action: "search_scheduler",
             org_identifier: "default",
-            type: "search_scheduler_list",
           },
         });
       });
@@ -1245,9 +1244,9 @@ describe("Use Logs Composable", () => {
 
         expect(mockPush).toHaveBeenCalledTimes(1);
         expect(mockPush).toHaveBeenCalledWith({
+          name: "searchScheduler",
           query: expect.objectContaining({
-            action: "search_scheduler",
-            type: "search_scheduler_list",
+            org_identifier: expect.anything(),
           }),
         });
       });

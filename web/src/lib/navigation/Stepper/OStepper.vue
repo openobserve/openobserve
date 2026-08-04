@@ -17,6 +17,7 @@ const props = withDefaults(defineProps<OStepperProps>(), {
   animated: true,
   navigable: false,
   expanded: false,
+  hideHeader: false,
 });
 
 const emit = defineEmits<OStepperEmits>();
@@ -125,7 +126,7 @@ function triggerClasses(step: StepRegistration): string {
       reactively whenever a step's done/error state changes.
     -->
     <div
-      v-if="isHorizontal"
+      v-if="isHorizontal && !hideHeader"
       role="list"
       aria-label="Steps"
       class="bg-surface-base! sticky top-0 z-10 flex w-full items-start pb-2"

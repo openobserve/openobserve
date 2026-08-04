@@ -33,10 +33,20 @@ import type { BlockedReason } from "@/types/synthetics";
  * access. …" and a busy player with "A replay is already in progress". Anything
  * unrecognised is `preflight`, which shows the real message rather than
  * claiming a cause it cannot support.
+ *
+ * ORDER MATTERS. playwright-crx rejects a second concurrent session with
+ * "incognito crxApplication is already started" — a slot that is still held, not
+ * a missing permission. That string contains the word "incognito", so the generic
+ * test below used to claim it and render the chrome://extensions walkthrough:
+ * the author was told to switch on a setting that was already on, and Retry threw
+ * the same error forever. Both "already …" forms mean the same thing to the
+ * author — wait for the running session, or reload the extension — which is
+ * exactly what the `in-progress` card says.
  */
 export function classifyPreflightFailure(error: string | undefined | null): BlockedReason {
   const message = (error ?? "").toLowerCase();
+  if (message.includes("already in progress") || message.includes("already started"))
+    return "in-progress";
   if (message.includes("incognito")) return "incognito";
-  if (message.includes("already in progress")) return "in-progress";
   return "preflight";
 }

@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- inline create destination form (own save/cancel) -->
     <div v-if="createNewDestination" class="w-full">
       <CreateDestinationForm
+        :forced-type="forcedType"
         @created="onDestinationCreated"
         @cancel="createNewDestination = false"
       />
@@ -76,8 +77,11 @@ import {
   type ExternalDestinationForm,
 } from "@/components/pipeline/NodeForm/ExternalDestination.schema";
 
-const props = withDefaults(defineProps<{ initialName?: string }>(), {
+// `forcedType`, when set, is forwarded to the inline create form to lock its
+// destination type and skip the type-selection step (workflows → "custom").
+const props = withDefaults(defineProps<{ initialName?: string; forcedType?: string }>(), {
   initialName: "",
+  forcedType: undefined,
 });
 const emit = defineEmits<{ (e: "expand", value: boolean): void }>();
 
