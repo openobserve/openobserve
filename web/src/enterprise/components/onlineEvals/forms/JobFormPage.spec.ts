@@ -48,7 +48,24 @@ const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },
 });
 
-const scorers = [{ id: "s1", entityId: "s1", name: "Scorer 1" }];
+const scorers = [
+  {
+    id: "s1",
+    entityId: "s1",
+    name: "Scorer 1",
+    template: "Judge {{ input }}",
+    variables: ["input"],
+  },
+];
+const spansScorers = [
+  {
+    id: "s1",
+    entityId: "s1",
+    name: "Trace evidence scorer",
+    template: "Judge {{ input }} using {{ spans }}",
+    variables: ["input", "spans"],
+  },
+];
 
 const endSignal = {
   version: 2,
@@ -330,7 +347,9 @@ describe("JobFormPage", () => {
     expect(payload.samplingValue).toBe(0.1);
     expect(typeof payload.samplingValue).toBe("number");
     expect(payload.filterCondition).toEqual({ type: "all" }); // empty filter
-    expect(payload.inputMapping).toBeNull(); // no template vars → no mapping
+    expect(payload.inputMapping).toEqual({
+      s1: { input: "{{gen_ai_input_messages}}" },
+    });
     // draft path → no activation
     expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
     expect(wrapper.emitted("saved")).toBeTruthy();
@@ -371,8 +390,23 @@ describe("JobFormPage", () => {
     expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
   });
 
-  it("blocks trace activation until every scorer has a selector binding", async () => {
+  it("activates a trace job without selectors when its scorers do not use spans", async () => {
     wrapper = createWrapper();
+    setField(wrapper, "name", "trace-active");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+    await wrapper.find('[data-test="job-form-save-activate-btn"]').trigger("click");
+
+    await submit(wrapper);
+
+    expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
+    expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith("test-org", "job-1");
+  });
+
+  it("blocks trace activation when a scorer using spans has no selector", async () => {
+    wrapper = createWrapper({ scorers: spansScorers });
     setField(wrapper, "name", "trace-active");
     setField(wrapper, "stream", "default");
     setField(wrapper, "targetScope", "trace");
@@ -387,7 +421,7 @@ describe("JobFormPage", () => {
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({
         variant: "error",
-        message: "Select a Span Selector for every scorer.",
+        message: "Select a Span Selector for each scorer that uses trace spans.",
       }),
     );
   });
