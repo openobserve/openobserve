@@ -773,21 +773,28 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
 
     const promqlCalls = [];
-    const onRequest = (req) => {
+    const onResponse = (res) => {
       // matches /prometheus/api/v1/query and .../query_range, not .../format_query
-      if (req.url().includes("/prometheus/api/v1/query")) promqlCalls.push(req.url());
+      if (res.url().includes("/prometheus/api/v1/query")) promqlCalls.push(res.url());
     };
-    page.on("request", onRequest);
+    page.on("response", onResponse);
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-    page.off("request", onRequest);
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+    page.off("response", onResponse);
 
     expect(promqlCalls.length).toBe(1);
     testLogger.info("PromQL sparkline Apply fired exactly 1 query_range (no histogram)");
 
-    // Metric renders as SVG; the sparkline trend draws at least one path
+    // Metric renders as SVG; the sparkline trend draws at least one path. Wait
     const chart = page.locator('[data-test="chart-renderer"]');
+    const errorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
+    await Promise.race([
+      chart.waitFor({ state: "visible", timeout: 15000 }),
+      errorMessage.waitFor({ state: "visible", timeout: 15000 }),
+    ]).catch(() => {});
+    const errText = await errorMessage.textContent().catch(() => null);
+    expect(errText, "chart-renderer did not appear; panel error").toBeNull();
     await expect(chart).toBeVisible();
     await chart.locator("svg path").first().waitFor({ state: "attached", timeout: 10000 });
     expect(await chart.locator("svg path").count()).toBeGreaterThan(0);
@@ -817,10 +824,17 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Between-range value mapping configured on PromQL metric panel");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
 
     // The mapped text replaces the metric value on the SVG renderer
     const chart = page.locator('[data-test="chart-renderer"]');
+    const errorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
+    await Promise.race([
+      chart.waitFor({ state: "visible", timeout: 15000 }),
+      errorMessage.waitFor({ state: "visible", timeout: 15000 }),
+    ]).catch(() => {});
+    const errText = await errorMessage.textContent().catch(() => null);
+    expect(errText, "chart-renderer did not appear; panel error").toBeNull();
     await expect(chart).toBeVisible();
     await expect(chart).toContainText("PROMQL_MAPPED");
     testLogger.info("Mapped text reflected in the PromQL metric chart");

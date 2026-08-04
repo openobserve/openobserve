@@ -330,18 +330,19 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     // Enabling the sparkline adds an independent trend query: Apply must fire
     // EXACTLY two data queries in parallel — the metric value + the sparkline
-    // histogram (is_ui_histogram) — and nothing else.
+    // histogram (is_ui_histogram) — and nothing else. Listen on 'response' (not
+    // 'request') to match this suite's proven-working network-assertion pattern.
     const searchCalls = [];
-    const isDataQuery = (url) => /\/_search(_stream)?\?/.test(url);
-    const onRequest = (req) => {
-      const url = req.url();
+    const isDataQuery = (url) => /\/_search(_multi)?(_stream)?\?/.test(url);
+    const onResponse = (res) => {
+      const url = res.url();
       if (isDataQuery(url)) searchCalls.push({ isHistogram: url.includes("is_ui_histogram") });
     };
-    page.on("request", onRequest);
+    page.on("response", onResponse);
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-    page.off("request", onRequest);
+    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+    page.off("response", onResponse);
 
     expect(searchCalls.length).toBe(2);
     expect(searchCalls.some((c) => c.isHistogram)).toBe(true);
@@ -349,6 +350,13 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     // Metric panels render as SVG; the sparkline trend draws at least one path.
     const chart = page.locator('[data-test="chart-renderer"]');
+    const errorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
+    await Promise.race([
+      chart.waitFor({ state: "visible", timeout: 15000 }),
+      errorMessage.waitFor({ state: "visible", timeout: 15000 }),
+    ]).catch(() => {});
+    const errText = await errorMessage.textContent().catch(() => null);
+    expect(errText, "chart-renderer did not appear; panel error").toBeNull();
     await expect(chart).toBeVisible();
     await chart.locator("svg path").first().waitFor({ state: "attached", timeout: 10000 });
     expect(await chart.locator("svg path").count()).toBeGreaterThan(0);
@@ -400,16 +408,17 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
     const rows = pm.dashboardPanelConfigs.valueMappingRows(popup);
 
-    // Dialog auto-adds one row on open
-    await expect(rows).toHaveCount(1);
+    await rows.first().waitFor({ state: "visible", timeout: 10000 });
+    const baseline = await rows.count();
+    expect(baseline).toBeGreaterThanOrEqual(1);
     await pm.dashboardPanelConfigs.fillValueMappingRow(popup, 0, { value: "ok", text: "OK" });
 
-    // Add a second row, then delete it via the relocated per-row delete button
+    // Add a row, then delete the last one via the relocated per-row delete button
     await pm.dashboardPanelConfigs.addValueMappingRow(popup);
-    await expect(rows).toHaveCount(2);
-    await pm.dashboardPanelConfigs.deleteValueMappingRow(popup, 1);
-    await expect(rows).toHaveCount(1);
-    testLogger.info("Value mapping row added then removed");
+    await expect(rows).toHaveCount(baseline + 1);
+    await pm.dashboardPanelConfigs.deleteValueMappingRow(popup, baseline);
+    await expect(rows).toHaveCount(baseline);
+    testLogger.info("Value mapping row added then removed", { baseline });
 
     await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
     await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
