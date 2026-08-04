@@ -116,12 +116,26 @@ vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
         name: z.string().optional(),
       }),
     makeBrowserCheckSaveSchema: (t: any) =>
-      z.object({
-        name: z.string().min(1, "Name is required"),
-        url: z.string().optional(),
-        locations: z.array(z.any()).optional(),
-        journey: z.array(z.any()).optional(),
-      }),
+      z
+        .object({
+          name: z.string().min(1, "Name is required"),
+          url: z.string().optional(),
+          locations: z.array(z.any()).optional(),
+          journey: z.array(z.any()).optional(),
+        })
+        // Stands in for the real per-step rules: enough to emit an issue whose
+        // path starts with `journey.`, which is the branch of `persist` under test.
+        .superRefine((val: any, ctx: any) => {
+          (val.journey ?? []).forEach((step: any, i: number) => {
+            if (step?.needsFix) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["journey", i, "value"],
+                message: "Step value is required",
+              });
+            }
+          });
+        }),
   };
 });
 
@@ -168,18 +182,30 @@ const baseStubs = {
     emits: ["click:primary", "click:secondary", "update:open"],
     inheritAttrs: true,
   },
+  // OStepper/OStep run in WIZARD mode in this view (no `expanded` prop), so only
+  // the active step's panel is mounted. The previous stub rendered every panel
+  // unconditionally, which kept `journeyRef` alive on the Configure step and hid
+  // the create-mode bug where save-time journey issues reached nothing.
   OStepper: {
-    template: "<div><slot /></div>",
+    template: '<div class="o-stepper-stub"><slot /></div>',
     props: ["modelValue", "navigable", "class"],
   },
   OStep: {
-    template: '<div v-if="$parent.$parent || true"><slot /></div>',
+    template: '<div v-if="isActivePanel"><slot /></div>',
     props: ["name", "title", "icon", "done", "class"],
+    computed: {
+      isActivePanel(): boolean {
+        const stepper = (this as any).$parent;
+        const active = stepper?.modelValue;
+        return active === undefined || active === (this as any).name;
+      },
+    },
   },
   BrowserJourney: {
     template: '<div data-test="synthetics-browser-journey" />',
     props: [
       "modelValue",
+      "fieldIssues",
       "startUrl",
       "extensionReady",
       "autoRecord",
@@ -593,6 +619,54 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceCreate).not.toHaveBeenCalled();
       expect(mockRouterPush).not.toHaveBeenCalled();
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+  });
+
+  // Regression: in create mode the only Save button lives on the Configure step,
+  // and OStepper is a wizard — so BrowserJourney is UNMOUNTED at the moment
+  // `persist` runs. The view used to push issues into it via `journeyRef`, which
+  // was null there, so `?.` swallowed the call and the author got the toast and
+  // nothing else: no expanded rows, no highlighted fields. The issues are now
+  // parent-owned state handed down as a prop, so they survive the remount.
+  describe("create mode — journey validation errors reach the journey", () => {
+    async function saveWithABrokenStep() {
+      const w = await mountCreateAtConfigure();
+      const journeyStep = { id: "s1", action: "type", name: "Fill", needsFix: true };
+      // Seed the journey through the component the user would have used.
+      w.findComponent('[data-test="synthetics-browser-journey"]');
+      (w.vm as any).check.journey = [journeyStep];
+      await flushPromises();
+
+      await w.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+      return w;
+    }
+
+    it("should not create the check", async () => {
+      wrapper = await saveWithABrokenStep();
+
+      expect(mockServiceCreate).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    // The journey step must become the active one, or the expanded rows are on a
+    // tab the author is not looking at.
+    it("should switch back to the Journey step", async () => {
+      wrapper = await saveWithABrokenStep();
+
+      expect(wrapper.find('[data-test="synthetics-browser-journey"]').exists()).toBe(true);
+    });
+
+    // The assertion that would have caught the reported bug: the journey is
+    // handed the issues, rather than them being dropped into a null ref.
+    it("should hand the journey issues to BrowserJourney", async () => {
+      wrapper = await saveWithABrokenStep();
+
+      const journey = wrapper.findComponent('[data-test="synthetics-browser-journey"]');
+      const issues = journey.props("fieldIssues") as { path: PropertyKey[] }[];
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].path.join(".")).toBe("journey.0.value");
     });
   });
 

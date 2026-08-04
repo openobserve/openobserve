@@ -474,15 +474,20 @@ async function persist(): Promise<boolean> {
     if (errors["name"] || errors["url"] || errors["locations"]) {
       currentStep.value = 2;
     } else if (Object.keys(errors).some((k) => k.startsWith("journey."))) {
-      // Step errors — switch to Journey tab and auto-expand
+      // Step errors — switch to the Journey tab so the expanded rows are on screen.
       currentStep.value = 1;
-      journeyRef.value?.validateStepSelectors?.();
     }
-    // Hand every step-scoped issue to the journey so it renders against the
-    // field it names, rather than only as the toast below. Done unconditionally:
-    // a journey issue can coexist with a Details-tab one, and the author should
-    // find both waiting when they switch tabs.
-    journeyRef.value?.setStepFieldErrors?.(result.error.issues);
+    // Hand every step-scoped issue to the journey so it renders against the field
+    // it names, rather than only as the toast below. Done unconditionally: a
+    // journey issue can coexist with a Details-tab one, and the author should find
+    // both waiting when they switch tabs.
+    //
+    // State, not a method call. OStepper is a wizard, so BrowserJourney is not
+    // mounted unless the Journey step is active — and create mode's only Save
+    // button lives on Configure. `journeyRef` was null there, so the push was
+    // swallowed by `?.` and the toast fired alone. Assigning the issues lets them
+    // wait for whenever the journey next renders.
+    journeyFieldIssues.value = result.error.issues;
     toast({
       variant: "error",
       message: t("synthetics.validation.fixHighlightedFields"),
@@ -516,6 +521,11 @@ async function persist(): Promise<boolean> {
 
   isSaving.value = true;
   validationErrors.value = {};
+  // The parse just succeeded, so any message a previous failed save left on a
+  // step field is now false. It was only ever written on the failure branch, so
+  // without this it stayed red — and, since a field error force-expands its row,
+  // kept re-opening steps that are correct.
+  journeyFieldIssues.value = [];
   const dismiss = toast({
     variant: "loading",
     message: t("synthetics.newCheck.saving"),
@@ -556,6 +566,15 @@ async function persist(): Promise<boolean> {
 
 // ── Selection state (synced from BrowserJourney) ───────────────────────────
 const journeyRef = ref<InstanceType<typeof BrowserJourney>>();
+
+/**
+ * Save-time zod issues for the journey, handed down as a prop.
+ *
+ * Owned here rather than pushed into the child because the child is unmounted
+ * whenever the Journey step is not the active one (OStepper is a wizard). See the
+ * assignment in `persist`.
+ */
+const journeyFieldIssues = ref<{ path: PropertyKey[]; message: string }[]>([]);
 const journeySelectionState = ref({ count: 0, isRecording: false });
 const showBulkDeleteDialog = ref(false);
 
@@ -937,6 +956,7 @@ function onClearResults() {
               :active-step-id="activeStepId"
               :blocked-reason="blockedReason"
               :blocked-detail="blockedDetail"
+              :field-issues="journeyFieldIssues"
               class="h-full!"
               @need-extension-setup="onNeedExtensionSetup"
               @replay="onReplay"
