@@ -382,6 +382,11 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import {
+  syntheticsCreateRoute,
+  syntheticsEditRoute,
+  syntheticsResultsRoute,
+} from "@/utils/synthetics/routes";
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -694,15 +699,15 @@ const onMoveUpdated = async () => {
 
 // ── Row click → Monitor Results page ───────────────────────────────────
 const openDetail = (monitor: any) => {
-  const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name };
-  if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt);
-  const orgIdentifier = route.query.org_identifier;
-  if (typeof orgIdentifier === "string" && orgIdentifier) query.org_identifier = orgIdentifier;
-  router.push({
-    name: "synthetic-monitor-results",
-    params: { id: String(monitor.id) },
-    query,
-  });
+  // `folderId`, not `folder_name` — the server gates RBAC on the folder ID, and
+  // the display name degrades to "—" before the folder list has loaded.
+  router.push(
+    syntheticsResultsRoute(
+      { orgIdentifier: orgIdentifier.value, folderId: monitor.folderId ?? activeFolderId.value },
+      String(monitor.id),
+      { name: monitor.name, lastTriggeredAt: monitor.lastTriggeredAt },
+    ),
+  );
 };
 
 const typeTabs = computed(() => [
@@ -960,12 +965,7 @@ async function bulkPauseMonitors() {
   });
   const results = await Promise.allSettled(
     toPause.map((m) =>
-      syntheticsService.enable(
-        orgIdentifier.value,
-        String(m.id),
-        { enabled: false },
-        m.folder_name,
-      ),
+      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: false }, m.folderId),
     ),
   );
   dismiss();
@@ -1003,7 +1003,7 @@ async function bulkEnableMonitors() {
   });
   const results = await Promise.allSettled(
     toEnable.map((m) =>
-      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }, m.folder_name),
+      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }, m.folderId),
     ),
   );
   dismiss();
@@ -1040,9 +1040,7 @@ async function bulkTriggerMonitors() {
     timeout: 0,
   });
   const results = await Promise.allSettled(
-    toTrigger.map((m) =>
-      syntheticsService.run(orgIdentifier.value, String(m.id), {}, m.folder_name),
-    ),
+    toTrigger.map((m) => syntheticsService.run(orgIdentifier.value, String(m.id), {}, m.folderId)),
   );
   dismiss();
   const failed = results.filter((r) => r.status === "rejected").length;
@@ -1076,7 +1074,12 @@ const onEmptyAction = (actionId: string) => {
 };
 
 const openCreate = (type: SyntheticCheckType = "browser") =>
-  router.push({ name: "synthetics-add", query: { folder: activeFolderId.value, type } });
+  router.push(
+    syntheticsCreateRoute(
+      { orgIdentifier: orgIdentifier.value, folderId: activeFolderId.value },
+      type,
+    ),
+  );
 
 const onTypeSelected = (type: SyntheticCheckType) => {
   showTypePicker.value = false;
@@ -1084,11 +1087,14 @@ const onTypeSelected = (type: SyntheticCheckType) => {
 };
 
 const openEdit = (m: any) => {
-  router.push({
-    name: "synthetics-edit",
-    params: { id: String(m.id) },
-    query: { folder: activeFolderId.value },
-  });
+  // The monitor's own folder, not the active tab: with "search across folders"
+  // on, the two differ and the RBAC gate needs the folder the check lives in.
+  router.push(
+    syntheticsEditRoute(
+      { orgIdentifier: orgIdentifier.value, folderId: m.folderId ?? activeFolderId.value },
+      String(m.id),
+    ),
+  );
 };
 
 const toggleLoadingMap = ref<Record<string, boolean>>({});
@@ -1108,7 +1114,7 @@ async function toggleEnabled(m: any) {
     timeout: 0,
   });
   try {
-    await syntheticsService.enable(org, id, { enabled: newEnabled }, m.folder_name);
+    await syntheticsService.enable(org, id, { enabled: newEnabled }, m.folderId);
     const found = monitors.value.find((mon) => String(mon.id) === id);
     if (found) found.enabled = newEnabled;
     dismiss();
@@ -1264,7 +1270,7 @@ async function runMonitor(m: any) {
     timeout: 0,
   });
   try {
-    await syntheticsService.run(org, id, {}, m.folder_name);
+    await syntheticsService.run(org, id, {}, m.folderId);
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.triggerSuccessSingle", { name }) });
   } catch (err: any) {

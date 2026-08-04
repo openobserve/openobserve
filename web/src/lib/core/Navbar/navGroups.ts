@@ -135,6 +135,16 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertTemplates",
         requires: "alertList",
       },
+      // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
+      // Gated on incidentList, not alertList: this only makes sense where
+      // Incidents is enabled, matching the enterprise/cloud + incidents_enabled
+      // visibility check it already carried as a Settings tab.
+      {
+        titleKey: "alert_sources.header",
+        icon: "webhook",
+        name: "alertSources",
+        requires: "incidentList",
+      },
     ],
   },
   {

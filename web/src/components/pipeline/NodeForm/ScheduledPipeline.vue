@@ -736,6 +736,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query="query"
                       :keywords="effectiveKeywords"
                       :suggestions="effectiveSuggestions"
+                      :field-value-resolver="resolveFieldValues"
                       :disable-ai="!selectedStreamName"
                       :disable-ai-reason="t('search.selectStreamForAI')"
                       @update:query="updateQueryValue"
@@ -1262,6 +1263,7 @@ const {
   getSuggestions,
   updateFieldKeywords,
   updateStreamKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 const PERCENTILE_LABELS = [

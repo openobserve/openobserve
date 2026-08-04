@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // Create/edit view for protocol checks (http/tcp/tls/ssh) — single configure
 // page, no journey step. Mirrors CreateBrowserTest's data fetching and save
 // flow; the per-type request card is slotted into CheckConfigure.
-import { computed, onMounted, ref, type Component } from "vue";
+import { computed, onMounted, ref, watch, type Component } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -37,6 +37,7 @@ import {
   mapResponseToProtocolCheck,
 } from "@/utils/synthetics/buildPayload";
 import { getFoldersListByType } from "@/utils/commons";
+import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -110,15 +111,78 @@ const typeLabel = computed(() => t(`synthetics.newCheck.${props.checkType}`));
 const locations = ref<SyntheticsLocation[]>([]);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
+const foldersLoading = ref(false);
+/** Only ever carries `folder` today — the folder select is the one field this
+ *  view can invalidate on its own. */
+const validationErrors = ref<Record<string, string>>({});
+
+const orgIdentifier = computed<string>(
+  () => (store.state as any).selectedOrganization?.identifier ?? "",
+);
+
+/**
+ * Where every exit from this wizard lands — mirrors CreateBrowserTest.backTo.
+ * Tracks `check.folder` so backing out after a folder change returns to the
+ * folder the check now lives in, with `org_identifier` stamped from the store.
+ */
+const backTo = computed(() =>
+  syntheticsListRoute({ orgIdentifier: orgIdentifier.value, folderId: check.value.folder }),
+);
+
+/** Resolves once orgIdentifier is populated — on a hard reload or browser
+ *  back-navigation onto this route the store is not hydrated synchronously yet.
+ *  Mirrors waitForOrgIdentifier in SyntheticMonitoring.vue. */
+function waitForOrgIdentifier(): Promise<void> {
+  if (orgIdentifier.value) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const stop = watch(orgIdentifier, (val) => {
+      if (val) {
+        stop();
+        resolve();
+      }
+    });
+  });
+}
 
 async function fetchFolders() {
+  foldersLoading.value = true;
   try {
+    // Without this wait a reload of /synthetics/add?folder=… fires the request
+    // against an empty org, and the single catch below would pin the list to []
+    // for the rest of the session — leaving the folder select unable to resolve
+    // the preselected id and rendering it raw.
+    await waitForOrgIdentifier();
     const res = await getFoldersListByType(store, "synthetics");
     folders.value = (res ?? []) as SyntheticsFolder[];
-  } catch {
+  } catch (err) {
+    console.error("[synthetics] failed to load folders", err);
     folders.value = [];
+  } finally {
+    foldersLoading.value = false;
   }
 }
+
+/**
+ * Reconcile the selected folder against the folders this org actually has.
+ * Same hazard as the browser flow: `?folder=` and stored checks are unvalidated,
+ * and an unresolvable id is rendered raw and then sent back as `?folder=`, which
+ * the server treats as authoritative for the destination folder and the RBAC
+ * gate. Skipped while the list is empty — that means the fetch has not landed.
+ */
+watch(
+  [folders, () => check.value.folder],
+  () => {
+    if (!folders.value.length) return;
+    const folderId = check.value.folder;
+    if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
+    check.value = { ...check.value, folder: "default" };
+    validationErrors.value = {
+      ...validationErrors.value,
+      folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
+    };
+  },
+  { immediate: true },
+);
 
 async function fetchLocations() {
   try {
@@ -182,7 +246,7 @@ async function loadForEdit(id: string) {
     // redirect to the synthetics list with a message.
     if (err?.response?.status === 404) {
       forceLeave = true;
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isLoadingEdit.value = false;
       return;
@@ -262,12 +326,12 @@ async function saveCheck() {
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
     isDirty.value = false;
-    router.push({ name: "synthetics", query: { folder: check.value.folder } });
+    router.push(backTo.value);
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) {
       forceLeave = true;
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isSaving.value = false;
       return;
@@ -290,7 +354,7 @@ async function saveCheck() {
   <OPageLayout
     :back="{
       label: t('synthetics.newCheck.back'),
-      to: { name: 'synthetics' },
+      to: backTo,
       dataTest: 'synthetics-create-back-btn',
     }"
     bleed
@@ -310,6 +374,8 @@ async function saveCheck() {
           :locations="locations"
           :destinations="destinations"
           :folders="folders"
+          :folders-loading="foldersLoading"
+          :validation-errors="validationErrors"
           allow-private-locations
           class="w-full!"
           @refresh:destinations="fetchDestinations"
@@ -335,7 +401,7 @@ async function saveCheck() {
           variant="ghost"
           size="sm"
           data-test="synthetics-create-cancel-btn"
-          @click="router.push({ name: 'synthetics' })"
+          @click="router.push(backTo)"
         >
           {{ t("common.cancel") }}
         </OButton>

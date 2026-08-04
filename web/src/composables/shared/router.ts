@@ -516,6 +516,31 @@ const useRoutes = () => {
       },
     },
     {
+      // Alert Sources feeds Incidents (correlation, resolve lifecycle) — same
+      // Reliability workflow as Alerts/SLOs/Incidents/Destinations/Templates
+      // above, so it's flat and top-level for the same reason those are.
+      // Moved out of /settings/alert_sources, which redirects here.
+      //
+      // Enterprise/cloud-only (unlike destinations/templates): the route stays
+      // registered so the redirect below has somewhere to land, but bounces to
+      // Alerts on OSS builds — mirrors the anomaly-detection routes above.
+      path: "alert-sources",
+      name: "alertSources",
+      component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
+      meta: {
+        title: "External Alert Sources",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
       // Alert status page. Replaces the row-click side panel, and is where a
       // multi-alert's per-group state lives (alerts_2.md §5.4).
       path: "alerts/detail/:alert_id",

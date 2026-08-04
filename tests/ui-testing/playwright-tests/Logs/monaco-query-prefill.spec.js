@@ -191,10 +191,12 @@ test.describe("Monaco Editor Query Pre-fill Tests", () => {
 
     // Click the saved view to apply
     await pm.logsPage.clickSavedViewByName(savedViewName);
-    await page.waitForTimeout(2000);
 
-    // Step 10: Verify Monaco editor contains the saved query
-    const editorContent = await pm.logsPage.getQueryEditorText();
+    // Step 10: Verify Monaco editor contains the saved query. Monaco is lazy-loaded and
+    // prefills asynchronously after the saved view is applied, so poll the editor value
+    // until the query lands instead of reading once after a fixed wait (which caught an
+    // empty editor on CI). Still fails if the editor never populates.
+    const editorContent = await pm.logsPage.getQueryEditorTextWhenReady('SELECT', 20000);
     testLogger.info('Editor content after applying saved view', { content: editorContent });
 
     // Verify query structure is preserved

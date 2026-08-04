@@ -131,24 +131,37 @@ vi.mock("vuex", async () => {
 let mockStoreInstance: any;
 
 // Mock useSuggestions composable
-vi.mock("@/composables/useSuggestions", () => ({
-  default: vi.fn(() => ({
-    autoCompleteData: {
-      value: {
-        query: "",
-        cursorIndex: 0,
-        org: "",
-        streamType: "",
-        streamName: "",
-        popup: { open: null },
+vi.mock("@/composables/useSuggestions", async () => {
+  // Real refs, so the template unwraps them exactly as it does in production.
+  // Plain { value } objects are NOT unwrapped by Vue and would reach the child
+  // component as the wrapper object itself.
+  const { ref: vueRef } = await vi.importActual<typeof import("vue")>("vue");
+  return {
+    default: vi.fn(() => ({
+      autoCompleteData: {
+        value: {
+          query: "",
+          cursorIndex: 0,
+          org: "",
+          streamType: "",
+          streamName: "",
+          popup: { open: null },
+        },
       },
-    },
-    autoCompleteIsSuggesting: { value: false },
-    updateFieldValues: vi.fn(),
-    updateFieldKeywords: vi.fn(),
-    getSuggestions: vi.fn().mockResolvedValue([]),
-  })),
-}));
+      autoCompleteIsSuggesting: { value: false },
+      // Deliberately DISTINCT arrays: a test can then tell whether the template
+      // binds the base list or the context-aware view (tmp/code.md N1).
+      autoCompleteKeywords: vueRef([{ label: "BASE_FIELD", kind: "Field" }]),
+      autoCompleteSuggestions: vueRef([{ label: "BASE_FN", kind: "Function" }]),
+      effectiveKeywords: vueRef([{ label: "CONTEXT_VALUE", kind: "Value" }]),
+      effectiveSuggestions: vueRef([]),
+      updateFieldValues: vi.fn(),
+      updateFieldKeywords: vi.fn(),
+      updateStreamKeywords: vi.fn(),
+      getSuggestions: vi.fn().mockResolvedValue([]),
+    })),
+  };
+});
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
@@ -2024,4 +2037,97 @@ describe("QueryConfig.vue", () => {
       h.unmount();
     });
   });
+  // ─── Phase 1 (tmp/code.md N1) ─────────────────────────────────────────────
+  // QueryConfig wires the full autocomplete pipeline in handleInlineQueryUpdate
+  // (query, cursorIndex, org/stream context, popup.open, getSuggestions) but binds
+  // :keywords="autoCompleteKeywords" — the BASE list — instead of effectiveKeywords.
+  //
+  // Asserting "editor.props(keywords) === vm.effectiveKeywords" is NOT enough:
+  // effectiveKeywords returns autoCompleteKeywords verbatim whenever no context is
+  // active, so such a test passes with the bug still present. The only honest probe
+  // is to drive a real VALUE context and require Value-kind items to reach the editor.
+
+  describe("QueryConfig — N1 context keywords reach the inline editor", () => {
+    let host: any;
+    let editorStub: any;
+
+    const inlineEditorStub = {
+      name: "UnifiedQueryEditor",
+      template: '<div class="stub-inline-editor" />',
+      props: ["query", "keywords", "suggestions", "dataTestPrefix"],
+      emits: ["update:query", "focus", "blur"],
+      methods: {
+        // handleInlineQueryUpdate reads these off the ref.
+        getCursorIndex() {
+          return 9999; // past end-of-query => analyse the whole string
+        },
+        triggerAutoComplete() {},
+      },
+    };
+
+    beforeEach(async () => {
+      mockStore = createMockStore();
+      mockStoreInstance = mockStore;
+      const props = reactive({ ...baseQCProps(), tab: "sql" });
+      const Host = defineComponent({
+        components: { OForm, QueryConfig },
+        setup: () => ({
+          schema: addAlertSchema,
+          defaultValues: hostDefaults({}),
+          qcProps: props,
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <QueryConfig v-bind="qcProps" />
+          </OForm>
+        `,
+      });
+      host = mount(Host, {
+        global: {
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+          plugins: [i18n],
+          stubs: { UnifiedQueryEditor: inlineEditorStub },
+        },
+      });
+      // Two UnifiedQueryEditors render here (inline SQL and inline VRL); only
+      // the SQL one carries the autocomplete bindings.
+      editorStub = host
+        .findAllComponents({ name: "UnifiedQueryEditor" })
+        .find((c: any) => c.props("dataTestPrefix") === "alert-inline-sql");
+    });
+
+    afterEach(() => host?.unmount());
+
+    it("renders the inline sql editor on the sql tab", () => {
+      expect(editorStub).toBeDefined();
+      expect(editorStub.exists()).toBe(true);
+    });
+
+    // NOTE: this spec mocks @/composables/useSuggestions wholesale, so the real
+    // value-context pipeline cannot run here — QueryEditorDialog.spec.ts covers
+    // that end to end against the real composable. What IS provable here, and
+    // what N1 actually is, is WHICH list the template binds. The mock returns
+    // distinct arrays for the base and context-aware views.
+
+    it("binds the context-aware keyword view, not the base list", () => {
+      const delivered = editorStub.props("keywords") as any[];
+      expect(delivered).toBeDefined();
+      expect(delivered.map((k) => k.label)).toEqual(["CONTEXT_VALUE"]);
+      expect(delivered.map((k) => k.label)).not.toContain("BASE_FIELD");
+    });
+
+    it("binds the context-aware suggestion view, not the base list", () => {
+      const delivered = editorStub.props("suggestions") as any[];
+      expect(delivered).toBeDefined();
+      // effectiveSuggestions is [] in value context; the base list is not.
+      expect(delivered).toEqual([]);
+    });
+  });
 });
+
+// Stored field values for the N1 value-context probe above. Only useSuggestions
+// consumes this module, so mocking it does not affect the rest of the suite.
+vi.mock("@/composables/fieldValueStore", () => ({
+  getFieldValuesForSuggestion: vi.fn().mockResolvedValue(["error", "warn"]),
+}));

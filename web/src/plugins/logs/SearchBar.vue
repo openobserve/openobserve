@@ -1318,6 +1318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :query="searchObj.data.query"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
+                :field-value-resolver="resolveFieldValues"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -2398,6 +2399,7 @@ export default defineComponent({
       updateFieldKeywords,
       updateFunctionKeywords,
       updateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     const refreshTimeChange = (item) => {
@@ -4949,6 +4951,7 @@ export default defineComponent({
       autoCompleteKeywords,
       autoCompleteSuggestions,
       effectiveKeywords,
+      resolveFieldValues,
       effectiveSuggestions,
       onRefreshIntervalUpdate,
       updateTimezone,

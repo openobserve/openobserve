@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :debounce-time="300"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               @focus="onQueryEditorFocus"
               @blur="onQueryEditorBlur"
               @update:query="updateAutoComplete"
@@ -322,6 +323,7 @@ const {
   effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 const updateAutoComplete = (value: string) => {

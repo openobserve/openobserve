@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -64,17 +65,12 @@ export const useSearchBar = (t: TranslateFn) => {
       }
 
       store.state.organizationData.functions.map((data: any) => {
-        const args: any = [];
-        for (let i = 0; i < parseInt(data.num_args); i++) {
-          args.push("'${1:value}'");
-        }
-
         const itemObj: {
           name: any;
           args: string;
         } = {
           name: data.name,
-          args: "(" + args.join(",") + ")",
+          args: buildFunctionArgs(data.num_args),
         };
         searchObj.data.transforms.push({
           name: data.name,

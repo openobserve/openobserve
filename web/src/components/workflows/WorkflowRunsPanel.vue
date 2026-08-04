@@ -343,13 +343,14 @@ const openRun = (row: any) => {
   emit("select-run", row.run_id);
 };
 
-// Fetch on mount and whenever the workflow changes.
+// Refetch when the workflow changes. The INITIAL fetch is NOT triggered here — the
+// DateTime picker emits `@on:date-change` on mount (→ updateDateTime → fetchHistory)
+// with the actual displayed range, so an `immediate` watch would double-fetch.
 watch(
   () => props.workflowId,
-  (id) => {
-    if (id) fetchHistory();
+  (id, prev) => {
+    if (id && id !== prev) fetchHistory();
   },
-  { immediate: true },
 );
 
 defineExpose({ fetchHistory });

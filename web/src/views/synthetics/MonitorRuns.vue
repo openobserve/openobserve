@@ -1132,9 +1132,9 @@ const emit = defineEmits<{
 const store = useStore();
 const route = useRoute();
 const orgIdentifier = computed(() => (store.state as any).selectedOrganization?.identifier ?? "");
-// The check's folder (name), carried on the results-page route as ?folder=.
+// The check's folder ID, carried on the results-page route as ?folder=.
 // Passed to per-check API calls so RBAC can resolve folder-scoped grants.
-const folderName = computed(() => String(route.query.folder ?? ""));
+const folderId = computed(() => String(route.query.folder ?? ""));
 
 // id -> "Name (region)" — run records carry the raw location id (KSUID for
 // private, "aws-us-east-1" for public); resolve to a human label wherever
@@ -1346,7 +1346,7 @@ async function triggerRun() {
     timeout: 0,
   });
   try {
-    await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderName.value);
+    await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderId.value);
     dismiss();
     // "Queued", not "Done": the API enqueues a job, and a browser run takes tens
     // of seconds to land in the results stream. The refresh below fires

@@ -21,7 +21,7 @@ vi.mock("@/utils/commons", () => ({
   updateDashboard: vi.fn(),
 }));
 
-// Mock CodeQueryEditor to avoid codemirror issues
+// Mock CodeQueryEditor — mounting monaco under jsdom is not the subject here.
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: {
     name: "CodeQueryEditor",

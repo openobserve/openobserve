@@ -30,6 +30,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ProtocolRunSummarySkeleton from "./ProtocolRunSummarySkeleton.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import syntheticsService from "@/services/synthetics";
+import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
 import type { HttpAssertion } from "@/types/synthetics";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
@@ -60,11 +61,20 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
-// The check's folder (name), carried on the results-page route as ?folder=.
-const folderName = computed(() => String(route.query.folder ?? ""));
+// The check's folder ID, carried on the results-page route as ?folder=.
+const folderId = computed(() => String(route.query.folder ?? ""));
 const synthetics = useSyntheticResults(t);
 
 const run = computed(() => synthetics.protocolRunDetail.value);
+
+/** Back to this run's monitor, keeping org, folder and the display name. */
+const backTo = computed(() =>
+  syntheticsResultsRoute(
+    { orgIdentifier: store.state.selectedOrganization?.identifier, folderId: folderId.value },
+    props.monitorId,
+    { name: run.value?.monitorName },
+  ),
+);
 const loading = computed(() => synthetics.loading.value);
 
 // Assertion definitions come from the monitor config; the result record only
@@ -87,7 +97,7 @@ async function loadRun() {
 async function loadAssertionDefs() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, props.monitorId, folderName.value);
+    const res = await syntheticsService.get(org, props.monitorId, folderId.value);
     assertionDefs.value = ((res.data as any)?.config?.assertions ?? []) as HttpAssertion[];
   } catch {
     assertionDefs.value = [];
@@ -248,7 +258,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         :subtitle="raw(run ? fmtTs(run.timestamp) : '')"
         :back="{
           label: t('synthetics.results.monitors'),
-          to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
+          to: backTo,
           dataTest: 'synthetics-protocol-run-back-btn',
         }"
       >

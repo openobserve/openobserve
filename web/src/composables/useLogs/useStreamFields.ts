@@ -23,7 +23,7 @@ import config from "@/aws-exports";
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { captureFromSearchHits } from "@/composables/useFieldValueStore";
+import { captureFromSearchHits } from "@/composables/fieldValueStore";
 
 import {
   useLocalLogFilterField,

@@ -28,6 +28,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps<{
   check: BrowserCheck;
   folders?: SyntheticsFolder[];
+  /** True while the parent is still fetching the folder list. */
+  foldersLoading?: boolean;
   validationErrors?: Record<string, string>;
   /** Override the target field label/placeholder (protocol checks take a host, not a URL). */
   targetLabel?: I18nText;
@@ -69,12 +71,14 @@ const description = computed({
 
 const tagInput = ref("");
 
-const folderOptions = computed(() => {
-  const opts = (props.folders ?? []).map((f) => ({ label: raw(f.name), value: f.folderId }));
-  return opts.length
-    ? opts
-    : [{ label: t("synthetics.checkDetails.defaultFolder"), value: "default" }];
-});
+// No fabricated fallback option. The loaded list always carries a "default"
+// entry (getFoldersListByType prepends one), so an empty list means the fetch
+// has not landed — and standing a fake "Default" in for it made a failed load
+// look identical to an org that only has the default folder, while the select
+// rendered the unresolvable id verbatim.
+const folderOptions = computed(() =>
+  (props.folders ?? []).map((f) => ({ label: raw(f.name), value: f.folderId })),
+);
 
 function addTag() {
   const tag = tagInput.value.trim();
@@ -124,9 +128,18 @@ function handleTagKeydown(event: KeyboardEvent) {
         v-model="folder"
         :label="t('synthetics.checkDetails.folder')"
         :options="folderOptions"
+        :loading="props.foldersLoading"
+        :error="!!props.validationErrors?.folder"
+        :error-message="props.validationErrors?.folder"
         :placeholder="t('synthetics.checkDetails.folderPlaceholder')"
         data-test="synthetics-check-details-folder-select"
-      />
+      >
+        <template #empty>{{
+          props.foldersLoading
+            ? t("synthetics.checkDetails.foldersLoading")
+            : t("synthetics.checkDetails.foldersUnavailable")
+        }}</template>
+      </OSelect>
 
       <OSwitch
         v-model="enabled"

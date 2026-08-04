@@ -20,6 +20,13 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
+// Validation raises toasts, so the call has to be observable. The real
+// implementation is a no-op in jsdom, which is why nothing needed this before.
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: unknown[]) => mockToast(...args),
+}));
+
 import BrowserJourney from "./BrowserJourney.vue";
 
 // Stubs emit native-component click so parent @click handlers fire.
@@ -407,6 +414,276 @@ describe("BrowserJourney step validation", () => {
 
   it("should fail when the first step does not navigate", () => {
     expect(validate([{ id: "1", action: "click", selector: "#login" }])).toBe(false);
+  });
+
+  // The case above is not isolated: that step names no element either, so it
+  // fails the target rule too and would keep failing with the first-step rule
+  // deleted. This one carries a valid locator, so only the first-step rule can
+  // reject it.
+  it("should fail a first step that does not navigate even when it names its element", () => {
+    expect(
+      validate([
+        {
+          id: "1",
+          action: "click",
+          locator: { candidates: [{ kind: "css", value: "#login" }] },
+        },
+      ]),
+    ).toBe(false);
+  });
+});
+
+// ── validateStepSelectors side effects ────────────────────────────────────
+// The cases above assert only the boolean. Auto-expand has been in this file
+// since the first commit and had no test at all, so it was free to stop covering
+// new rules unnoticed — which is exactly what happened. The toast is asserted
+// here too because `persist` now suppresses it.
+describe("BrowserJourney validateStepSelectors side effects", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => {
+    mockToast.mockClear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function expandedIds(): string[] {
+    return wrapper.findComponent(JourneyStepsStub).props("expandedIds") as string[];
+  }
+
+  const NAV = { id: "s1", action: "navigate", name: "Open", value: "https://app.test" };
+
+  it("should expand a step that names no element", async () => {
+    wrapper = mountJourney({ modelValue: [NAV, { id: "s2", action: "click", name: "Sign in" }] });
+
+    (wrapper.vm as any).validateStepSelectors();
+    await wrapper.vm.$nextTick();
+
+    expect(expandedIds()).toContain("s2");
+  });
+
+  it("should expand the first step when it does not navigate", async () => {
+    wrapper = mountJourney({
+      modelValue: [
+        {
+          id: "s1",
+          action: "click",
+          name: "Sign in",
+          locator: { candidates: [{ kind: "css", value: "#a" }] },
+        },
+      ],
+    });
+
+    (wrapper.vm as any).validateStepSelectors();
+    await wrapper.vm.$nextTick();
+
+    expect(expandedIds()).toContain("s1");
+  });
+
+  // A filtered-out row is not rendered, so expanding it puts nothing on screen.
+  it("should clear an active filter so the errored step is rendered", async () => {
+    wrapper = mountJourney({ modelValue: [NAV, { id: "s2", action: "click", name: "Sign in" }] });
+    await wrapper
+      .find('[data-test="synthetics-journey-filter-input"]')
+      .setValue("nothing-matches-this");
+
+    (wrapper.vm as any).validateStepSelectors();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.findComponent(JourneyStepsStub).props("data")).toHaveLength(2);
+  });
+
+  it("should raise an error toast by default", () => {
+    wrapper = mountJourney({ modelValue: [NAV, { id: "s2", action: "click", name: "Sign in" }] });
+
+    (wrapper.vm as any).validateStepSelectors();
+
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+  });
+});
+
+// ── Schema-issue auto-expand ──────────────────────────────────────────────
+// `validateJourneySteps` knows two rules (first-step-navigate, missing target).
+// Every OTHER save-blocking rule lives in the zod schema and reaches this
+// component only through `setStepFieldErrors`, which recorded the message but
+// never opened the row — so "fix the highlighted fields" pointed at a collapsed
+// row with no highlight on it.
+describe("BrowserJourney fieldIssues auto-expand", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function expandedIds(): string[] {
+    return wrapper.findComponent(JourneyStepsStub).props("expandedIds") as string[];
+  }
+
+  const JOURNEY = [
+    { id: "s1", action: "navigate", name: "Open", value: "https://app.test" },
+    { id: "s2", action: "type", name: "", locator: { candidates: [{ kind: "css", value: "#u" }] } },
+    {
+      id: "s3",
+      action: "assert",
+      name: "Check",
+      assertion: { kind: "element_text", expected: "" },
+      locator: { candidates: [{ kind: "css", value: "#h" }] },
+    },
+  ];
+
+  // The imperative push cannot work in create mode: OStepper is a wizard, so this
+  // component is unmounted whenever the Journey step is not the active one — and
+  // create mode's only Save button lives on the Configure step. `journeyRef` is
+  // null there, so both calls were swallowed by `?.` and the toast fired alone.
+  // Switching tabs first does not help either: the ref is still null in that tick,
+  // and a freshly mounted child starts with an empty error map. So the issues must
+  // arrive as a PROP the child applies on mount, not as a method call.
+  it("should apply issues supplied as a prop at mount time", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+    });
+    await wrapper.vm.$nextTick();
+
+    expect(expandedIds()).toContain("s2");
+  });
+
+  it("should apply issues supplied as a prop after mount", async () => {
+    wrapper = mountJourney({ modelValue: JOURNEY, fieldIssues: [] });
+
+    await wrapper.setProps({
+      fieldIssues: [
+        { path: ["journey", 2, "assertion", "expected"], message: "Expected value is required" },
+      ],
+    });
+
+    expect(expandedIds()).toContain("s3");
+  });
+
+  it("should clear applied issues when the prop empties on a successful save", async () => {
+    const StubWithStatusColor = {
+      props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
+      template: `<div class="journey-steps-stub">
+        <div v-for="item in data" :key="item.id" class="step-row"
+             :data-status-color="getRowStatusColor ? getRowStatusColor(item) : ''" />
+      </div>`,
+    };
+    wrapper = mount(BrowserJourney, {
+      props: {
+        modelValue: JOURNEY,
+        fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+      },
+      global: { stubs: { ...STUBS, JourneySteps: StubWithStatusColor } },
+    }) as VueWrapper;
+    await wrapper.vm.$nextTick();
+    // Guard: without this the assertion below passes on a component that never
+    // recorded the error in the first place.
+    expect(wrapper.findAll(".step-row")[1].attributes("data-status-color")).toBe(
+      "var(--color-status-error-text)",
+    );
+
+    await wrapper.setProps({ fieldIssues: [] });
+
+    expect(wrapper.findAll(".step-row")[1].attributes("data-status-color")).toBeFalsy();
+  });
+
+  it("should expand a step whose only error is a blank name", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [{ path: ["journey", 1, "name"], message: "Step name is required" }],
+    });
+    await wrapper.vm.$nextTick();
+    expect(expandedIds()).toContain("s2");
+  });
+
+  it("should expand a step whose only error is a missing value", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+    });
+    await wrapper.vm.$nextTick();
+    expect(expandedIds()).toContain("s2");
+  });
+
+  it("should expand a step whose only error is a missing assertion expectation", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [
+        { path: ["journey", 2, "assertion", "expected"], message: "Expected value is required" },
+      ],
+    });
+    await wrapper.vm.$nextTick();
+    expect(expandedIds()).toContain("s3");
+  });
+
+  // Steps are opened in journey order, so the reveal scroll lands on the first
+  // error the author would reach rather than on whichever issue zod emitted first.
+  it("should expand every errored step, in journey order", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [
+        { path: ["journey", 2, "assertion", "expected"], message: "Expected value is required" },
+        { path: ["journey", 1, "name"], message: "Step name is required" },
+      ],
+    });
+    await wrapper.vm.$nextTick();
+    expect(expandedIds()).toEqual(["s2", "s3"]);
+  });
+
+  // A field error that outlives the edit fixing it keeps re-opening a row that
+  // is already correct — the editor emits no per-field event for these three,
+  // so the cleared field is derived from the replacement step.
+  it("should clear a value error once the author edits that value", async () => {
+    const StubWithBoth = {
+      props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
+      template: `<div class="journey-steps-stub">
+        <div v-for="item in data" :key="item.id" class="step-row"
+             :data-status-color="getRowStatusColor ? getRowStatusColor(item) : ''">
+          <slot name="expansion" :row="item" />
+        </div>
+      </div>`,
+    };
+    wrapper = mount(BrowserJourney, {
+      props: {
+        modelValue: JOURNEY,
+        fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+      },
+      global: { stubs: { ...STUBS, JourneySteps: StubWithBoth } },
+    }) as VueWrapper;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findAll(".step-row")[1].attributes("data-status-color")).toBe(
+      "var(--color-status-error-text)",
+    );
+
+    // navigate (s1) and type (s2) both render a value input; s2's is the second.
+    const valueInputs = wrapper.findAll('[data-test="synthetics-journey-step-value-input"]');
+    await valueInputs[1].setValue("hello");
+
+    expect(wrapper.findAll(".step-row")[1].attributes("data-status-color")).toBeFalsy();
+  });
+
+  it("should mark a step carrying only a schema error as errored in the row status color", () => {
+    const StubWithStatusColor = {
+      props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
+      template: `<div class="journey-steps-stub">
+        <div v-for="item in data" :key="item.id" class="step-row"
+             :data-status-color="getRowStatusColor ? getRowStatusColor(item) : ''" />
+      </div>`,
+    };
+    wrapper = mount(BrowserJourney, {
+      props: {
+        modelValue: JOURNEY,
+        fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+      },
+      global: { stubs: { ...STUBS, JourneySteps: StubWithStatusColor } },
+    }) as VueWrapper;
+
+    return wrapper.vm.$nextTick().then(() => {
+      const rows = wrapper.findAll(".step-row");
+      expect(rows[1].attributes("data-status-color")).toBe("var(--color-status-error-text)");
+    });
   });
 });
 
