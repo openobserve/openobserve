@@ -195,7 +195,7 @@ jobs:
             http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // .rum_token // .token // empty')
           [ -z "$TOKEN" ] && TOKEN="ci-rum-token"   # ingestion tolerates a static token; refine after first run
           {
-            echo "O2_RUM_HOST=http://10.0.2.2:5080"
+            echo "O2_RUM_HOST=http://localhost:5080"
             echo "O2_RUM_ORG=default"
             echo "O2_RUM_TOKEN=$TOKEN"
             echo "O2_RUM_ENV=testing"
@@ -216,7 +216,10 @@ jobs:
           else
             npm ci || npm install
           fi
-          (cd android && ./gradlew --no-daemon assembleDebug)
+          # Release build: embeds the JS bundle (Debug loads it from the Metro dev server, which
+          # isn't running in CI → blank screen). The release buildType is debug-signed in the RN
+          # template, so it installs on the emulator without a real keystore.
+          (cd android && ./gradlew --no-daemon assembleRelease)
 
       # Native app: gradle reads O2_RUM_* via System.getenv into BuildConfig. No wrapper committed →
       # use the setup-gradle `gradle`.
@@ -234,7 +237,8 @@ jobs:
           # NB: the emulator-runner executes each line in a SEPARATE shell, so `cd` does not persist —
           # the test command must chain `cd && npx` on one line.
           script: |
-            adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/debug/app-debug.apk
+            adb reverse tcp:5080 tcp:5080
+            adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
             adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
             cd tests/mobile-testing && npx playwright test --project=rn-android --project=android-native
 
@@ -286,7 +290,9 @@ jobs:
       # Pin Xcode so a runner-image update can't silently move the toolchain under the alpha SDK.
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          # Pin 16.4 explicitly: macos-15's 'latest-stable' is now Xcode 26, which dropped the Swift
+          # compatibility libs the SDK's static libs force-load → arm64 link error. 16.x still ships them.
+          xcode-version: "16.4"
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
 
@@ -338,10 +344,12 @@ jobs:
           fi
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" ios/O2RumTester/Info.plist || true
           (cd ios && pod install)
+          # Release: embeds the JS bundle (Debug expects the Metro dev server → blank screen in CI).
+          # Simulator builds need no code signing.
           xcodebuild -workspace ios/O2RumTester.xcworkspace -scheme O2RumTester \
-            -configuration Debug -sdk iphonesimulator -destination "id=$IOS_SIM_UDID" \
-            -derivedDataPath ios/build build
-          xcrun simctl install "$IOS_SIM_UDID" ios/build/Build/Products/Debug-iphonesimulator/O2RumTester.app
+            -configuration Release -sdk iphonesimulator -destination "id=$IOS_SIM_UDID" \
+            -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build
+          xcrun simctl install "$IOS_SIM_UDID" ios/build/Build/Products/Release-iphonesimulator/O2RumTester.app
 
       # iOS-native: gen-config.sh writes GeneratedConfig.swift (localhost) before xcodegen.
       - name: Build + install iOS-native app
