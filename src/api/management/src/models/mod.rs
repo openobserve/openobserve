@@ -28,6 +28,8 @@ pub mod dashboards;
 pub mod datasets;
 pub mod destinations;
 #[cfg(feature = "enterprise")]
+pub mod discovery;
+#[cfg(feature = "enterprise")]
 pub mod eval_jobs;
 pub mod folders;
 #[cfg(feature = "enterprise")]
