@@ -75,6 +75,11 @@ test.describe("Logs Visualize SELECT * handling testcases", () => {
     await pm.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
 
+    // Precondition gate: the editor really holds a select-all. Without this, a
+    // failure to enter SQL mode would surface as the confusing "expected a toast,
+    // none emitted" below instead of pointing at the actual cause.
+    await pm.logsPage.expectQueryEditorContainsText('SELECT * FROM');
+
     // 2. Open Visualize — a histogram chart type is selected by default and must render.
     await pm.logsPage.clickVisualizeToggle();
     await pm.logsPage.expectVisualizeTabContentVisible();
@@ -94,6 +99,11 @@ test.describe("Logs Visualize SELECT * handling testcases", () => {
     await pm.logsPage.verifyChartTypeSelected('table', false);
     await pm.logsPage.verifyChartTypeSelected(typeBeforeTable);
 
+    // 6. The revert must leave a WORKING panel, not a blank one — the guard returns
+    //    early after reverting, so this proves the previous chart survived intact.
+    await pm.logsPage.expectVisualizeChartRendered();
+    await pm.logsPage.expectNoDashboardErrors();
+
     testLogger.info(`SELECT * table guard fired and reverted to "${typeBeforeTable}"`);
   });
 
@@ -106,6 +116,13 @@ test.describe("Logs Visualize SELECT * handling testcases", () => {
     await pm.logsPage.enableSQLMode();
     await pm.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
+
+    // Precondition gate — ESSENTIAL here. This test's payload assertion is the
+    // ABSENCE of a toast, which passes trivially if the query was never a
+    // select-all in the first place (e.g. SQL mode failed to engage and quick mode
+    // rewrote it to SELECT <fields>). Verifying the editor holds a select-all is
+    // what stops this from becoming a test that can never fail.
+    await pm.logsPage.expectQueryEditorContainsText('SELECT * FROM');
 
     // 2. Arm the recorder BEFORE entering Visualize — the pre-fix code emitted the
     //    toast on entry, ahead of any chart-type choice, so recording from here is
