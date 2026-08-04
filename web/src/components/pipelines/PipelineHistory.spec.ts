@@ -57,7 +57,7 @@ const mockHttpGet = vi.fn().mockResolvedValue({
         timestamp: 1700000000000000,
         start_time: 1700000000000000,
         end_time: 1700003600000000,
-        status: "success",
+        status: "firing",
         is_realtime: false,
         is_silenced: false,
         retries: 0,
@@ -224,7 +224,7 @@ describe("PipelineHistory", () => {
             timestamp: 1700000000000000,
             start_time: 1700000000000000,
             end_time: 1700003600000000,
-            status: "success",
+            status: "firing",
             is_realtime: false,
             is_silenced: false,
             retries: 0,
@@ -330,6 +330,7 @@ describe("PipelineHistory", () => {
       const vm = wrapper.vm as any;
       expect(vm.rows.length).toBe(1);
       expect(vm.rows[0].pipeline_name).toBe("Alpha Pipeline");
+      expect(vm.rows[0].status).toBe("firing");
     });
 
     it("updates pagination.rowsNumber from API response total", async () => {

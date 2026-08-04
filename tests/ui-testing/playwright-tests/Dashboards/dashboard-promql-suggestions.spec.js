@@ -260,20 +260,42 @@ test.describe("Dashboard PromQL Query Editor Suggestions", () => {
     }
 
     // Stage 1: trigger label NAME suggestions inside cpu_usage{}
+    //
+    // Two timing rules this test used to break, both of them about WHEN the
+    // suggestion list is built rather than what it contains.
+    //
+    // The list is rebuilt from the editor's `update-query`, so it belongs to
+    // wherever the caret was when the TEXT last changed. Typing `cpu_usage{}`
+    // and stepping back in with ArrowLeft never changes the text, so the list
+    // stays the one built past the closing brace — where metric names, not
+    // labels, are what belongs. Typing `cpu_usage{` and letting Monaco
+    // auto-close leaves the caret inside the braces on the last edit.
+    //
+    // And `update-query` is debounced by CodeQueryEditor (500ms), so pressing
+    // Ctrl+Space immediately after typing reads the list from BEFORE the `{`.
+    // That is how this test came to accept `active_sessions` — a metric name —
+    // as a label, and then ask for the values of a label cpu_usage does not
+    // have.
     await editor.clearEditor();
-    await editor.typeInEditor("cpu_usage{}");
-    await editor.pressKey("ArrowLeft");
+    await editor.typeInEditor("cpu_usage{");
+    await page.waitForTimeout(1000);
     await editor.triggerSuggestionsAndWait();
 
     const nameLabels = await editor.getSuggestionLabels(10);
     expect(nameLabels.length).toBeGreaterThan(0);
+    // The metric's labels, not the metric list: `cpu_usage{active_sessions=`
+    // is not a query, and the value lookup below can only succeed for a label
+    // this metric actually has.
+    expect(nameLabels[0]).not.toContain("(");
     testLogger.info(`First label name suggestion: ${nameLabels[0]}`);
 
     // Accept the first label name suggestion.
     await editor.pressKey("Enter");
 
     // Stage 2: type '=' to switch the suggestion context to label VALUES.
+    // Same debounce as stage 1, plus the values themselves are a network call.
     await editor.typeInEditor("=");
+    await page.waitForTimeout(1000);
     await editor.waitForSuggestionsReady();
 
     const valueLabels = await editor.getSuggestionLabels(5);

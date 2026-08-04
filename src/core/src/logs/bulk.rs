@@ -20,7 +20,7 @@ use std::{
 
 use axum::body::Bytes;
 #[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
+use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     BLOCKED_STREAMS, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
@@ -150,7 +150,7 @@ pub async fn ingest(
             // non-bulk `IngestionRequest::Usage` channel), so this is safe.
             // Cloud-only: OSS / self-hosted may legitimately use these names.
             #[cfg(feature = "cloud")]
-            if is_reserved_self_reporting_stream(&stream_name) {
+            if is_reserved_internal_stream(&stream_name) {
                 let err_msg =
                     format!("stream '{stream_name}' is reserved and cannot be ingested into");
                 log::warn!("[LOGS:BULK] {err_msg}");

@@ -43,6 +43,7 @@ pub mod service_graph;
 pub mod service_streams;
 pub mod session;
 pub mod short_url;
+pub mod slo;
 pub mod sql;
 pub mod stream;
 pub mod synthetics;

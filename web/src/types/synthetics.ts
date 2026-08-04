@@ -1,9 +1,23 @@
 // Copyright 2026 OpenObserve Inc.
-
-export type SelectorType = "CSS" | "XPath" | "Text" | "TestID" | "Role";
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // ── Replay state machine ──────────────────────────────────────────────────────
-export type ReplayPhase = "idle" | "running" | "passed" | "failed" | "stopped";
+// `stopping` is the interval between the user pressing Stop and the extension
+// confirming it: the run is no longer advancing but is not yet torn down, so the
+// UI must neither offer Re-run nor claim the journey has stopped.
+export type ReplayPhase = "idle" | "running" | "stopping" | "passed" | "failed" | "stopped";
 
 /** Machine-readable error from the extension's replay pipeline. */
 export interface StructuredError {
@@ -15,6 +29,16 @@ export interface StructuredError {
 }
 
 /** Per-step outcome pushed by the extension via stepReplayResult. */
+/**
+ * What the player reported about one replayed step.
+ *
+ * `fidelity` carries the X-8.2 divergence notes: the preview cannot reproduce every
+ * probe behaviour (ordered candidate fallback, navigation and response settle, some
+ * assertion kinds, an author-set timeout below 60 s, uploads, retired actions), and
+ * the requirement is that it SAYS so per step rather than diverging in silence. The
+ * extension emits these; the web layer used to drop them here, so every one of those
+ * divergences was invisible and a skipped step could read as a pass.
+ */
 export interface StepReplayResult {
   stepId: string;
   stepName: string;
@@ -22,6 +46,7 @@ export interface StepReplayResult {
   durationMs: number;
   error?: string;
   structuredError?: StructuredError;
+  fidelity?: { level: string; notes: string[] };
 }
 
 export type StepAction =
@@ -30,21 +55,149 @@ export type StepAction =
   | "type"
   | "select"
   | "press"
+  // `check` / `uncheck` / `upload` are version-2 additions. The recorder used to
+  // collapse a checkbox interaction to a plain click, which made the replayed
+  // journey depend on the box's starting state — a page that renders it
+  // pre-ticked silently inverted the journey (spec X-9.3).
+  | "check"
+  | "uncheck"
+  | "upload"
   | "hover"
   | "scroll"
   | "wait"
   | "assert"
   | "screenshot";
 
+// ── Locator bundle ──────────────────────────────────────────────────────────
+// A step carries every way to find its element, tried in order, so a cosmetic
+// markup change no longer breaks a monitor that is otherwise healthy.
+//
+// The ORDER IS THE AUTHOR'S. It arrives as Playwright's, and from there they
+// drag rows, add locators of their own, delete ones they do not want and
+// combine recorded ones into something stricter. That replaced pinning, which
+// was exclusive: the only way to say "prefer this one" was to turn fallback off
+// entirely.
+//
+// Ordering is not cosmetic. Candidates only agree while the markup is
+// unchanged; once it changes — the case fallback exists for — a later candidate
+// may match a *different* element.
+
+/** How the element is found. Says nothing about how long it will keep working. */
+export type LocatorKind = "test_attribute" | "role" | "text" | "css" | "xpath";
+
+/**
+ * Where a candidate came from.
+ *
+ * The heal-suppression signal (H1-H6): healing may replace the value of a
+ * `recorded` entry in place, and must not touch anything else.
+ */
+export type LocatorOrigin = "recorded" | "authored" | "composite";
+
+/** How one part of a combined locator attaches to the part before it. */
+export type CompositeRelation = "and" | "has" | "has_not" | "descendant";
+
+export interface CompositePart {
+  value: string;
+  /** Absent on the first (base) part. */
+  relation?: CompositeRelation;
+}
+
+export interface LocatorCandidate {
+  kind: LocatorKind;
+  value: string;
+  /** Absent means `recorded` — the shape every pre-Phase-2b bundle has. */
+  origin?: LocatorOrigin;
+  /**
+   * What a combined locator was built from, and how. Present only on a
+   * `composite`. Structured rather than `string[]` because the relation cannot
+   * be recomputed: it depends on DOM structure the editor never sees.
+   */
+  from?: CompositePart[];
+}
+
+export interface StepLocator {
+  /** Tried in order, top first. The first one that matches is used. */
+  candidates: LocatorCandidate[];
+  /**
+   * A human has reordered, added, deleted or combined. Healing must never
+   * reorder such a list.
+   */
+  author_ordered?: boolean;
+}
+
+// ── Version-2 settle block ──────────────────────────────────────────────────
+// What the page demonstrably did after a step, observed while recording and
+// waited for again at run time. This is what replaces hard sleeps: a sleep is
+// simultaneously too short when the application is slow and pure waste when it
+// is fast, whereas a settle signal is neither.
+//
+// Every signal is advisory unless an author marks it required. A recorded signal
+// is evidence from one session, not a contract — an endpoint that gets renamed
+// must annotate the step, not turn a healthy journey red.
+
+export interface SettleNavigation {
+  /** Glob over the URL with the query string stripped, e.g. `**\/web/**`. */
+  url_pattern: string;
+}
+
+export interface SettleResponse {
+  url_pattern: string;
+  method?: string;
+  /**
+   * Author-set only. The recorder always emits `false`: deciding that a run is
+   * meaningless without a given call is a judgement about the application, not
+   * something a recording can observe.
+   */
+  required?: boolean;
+}
+
+export interface StepSettle {
+  navigation?: SettleNavigation;
+  responses?: SettleResponse[];
+  /** How long settling took while recording. Reporting only — never a timeout. */
+  observed_duration_ms?: number;
+  /** How long this step may spend settling. Absent means the runner's 30s. */
+  budget_ms?: number;
+}
+
+// ── Version-2 assertions ────────────────────────────────────────────────────
+// A journey that only clicks can click its way through a broken application and
+// still pass. An assertion is what turns a sequence of interactions into a
+// statement about an outcome.
+
+export type AssertionKind =
+  | "element_visible"
+  | "element_not_visible"
+  | "element_text"
+  | "url_matches"
+  | "page_title"
+  | "element_attribute";
+
+export interface StepAssertion {
+  kind: AssertionKind;
+  /** Required for every kind except the two visibility ones. */
+  expected?: string;
+  /** Required for `element_attribute`. */
+  attribute?: string;
+}
+
 export interface BrowserStep {
   id: string;
   action: StepAction;
   name?: string;
   selector?: string;
-  selectorType?: SelectorType;
+  /** Version-2 locator bundle. Absent on v1 steps, which use `selector`. */
+  locator?: StepLocator;
+  /** Version-2 settle block: what to wait for after this step's action. */
+  settle?: StepSettle;
+  /** Version-2 typed assertion. Required on `assert`, forbidden elsewhere. */
+  assertion?: StepAssertion;
+  /** Failure skips the step and the run continues (cookie banners, popups). */
+  optional?: boolean;
+  /** Runs even after an earlier step failed (logout, cleanup). */
+  alwaysRun?: boolean;
   value?: string;
-  timeout?: number; // ms, default 30000
-  code: string;
+  timeout?: number; // ms; undefined = runner's per-category default
   // Original, untouched extension step (see WireStep). Preserved for replay,
   // which sends the rich step back to the extension verbatim. Absent on
   // manually-added steps.
@@ -63,9 +216,17 @@ export type RecorderMode = "recording" | "inspecting" | "asserting" | "playing";
  */
 export interface WireStep {
   id: string;
-  action: string; // navigate | click | type | press | select | setInputFiles | waitFor | assert | screenshot
+  action: string; // navigate | click | type | press | select | check | uncheck | setInputFiles | waitFor | assert | screenshot
   selector?: string;
-  selector_type?: "css" | "xpath" | "text" | "role" | "data-test";
+  /**
+   * Version-2 evidence captured by the extension. Present on recorded steps
+   * only; a hand-added step has none until it is re-recorded.
+   */
+  locator?: StepLocator;
+  settle?: StepSettle;
+  assertion?: StepAssertion;
+  optional?: boolean;
+  always_run?: boolean;
   name?: string;
   timeout_ms?: number;
   url?: string;
@@ -139,6 +300,18 @@ export interface ReplayResponse {
   error?: string;
 }
 
+/**
+ * Why a replay never got as far as running a step.
+ *
+ * `incognito` — the extension has no incognito access; the one case with a
+ *   known, user-actionable fix, so it gets the chrome://extensions walkthrough.
+ * `in-progress` — a previous replay is still running in the extension.
+ * `preflight` — anything else. The extension's own message is shown verbatim
+ *   rather than guessed at; this exists so an unrecognised failure reports
+ *   itself honestly instead of being labelled as one of the two above.
+ */
+export type BlockedReason = "incognito" | "in-progress" | "preflight";
+
 // ── Live data pushed over the port ──────────────────────────────────────────
 // Mirrors the extension's `ExtensionToO2Message` / `ExtensionToO2Payload`
 // (examples/synthetics-recorder/src/messaging.ts). The discriminant for data
@@ -164,6 +337,17 @@ export type RecorderPushPayload =
       duration_ms: number;
       error?: string;
       structuredError?: StructuredError;
+      /**
+       * What the preview could not evaluate for this step (X-8.2).
+       *
+       * Declared because the extension really sends it — `background.ts` sets it
+       * from `replayFidelity`, and `useSyntheticsRecorder` reads it straight
+       * into {@link StepReplayResult}. Omitting it here made that read a type
+       * error while the value flowed anyway: a green result WITH notes is a
+       * weaker claim than one without, and this is the field carrying the
+       * difference.
+       */
+      fidelity?: { level: string; notes: string[] };
     }
   | { method: "stepReplayStarted"; stepId: string; stepName?: string };
 
@@ -390,7 +574,10 @@ export interface SyntheticLocation {
   /** Name of the most recently seen agent, live or stale. */
   last_agent_name?: string;
   last_seen_at?: number;
-  monitors_count: number;
+  /** Renamed from `monitors_count`; the optional alias keeps a UI bundle
+   *  working against a server on either side of that rename. */
+  checks_count: number;
+  monitors_count?: number;
   checks_per_min: number;
 }
 

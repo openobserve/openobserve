@@ -15,7 +15,7 @@
 
 use std::time::Instant;
 
-use ::search::{QueryDelta, SearchResultType};
+use ::search::{QueryDelta, SearchResultType, datafusion::distributed_plan::streaming_aggs_exec};
 use config::meta::{
     search::{
         PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
@@ -25,8 +25,6 @@ use config::meta::{
     stream::StreamType,
 };
 use log;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 
@@ -35,8 +33,6 @@ use super::{
     utils::{calculate_progress_percentage, get_top_k_values},
 };
 use crate as SearchService;
-#[cfg(feature = "enterprise")]
-use crate::cache::cacher::delete_cache;
 
 /// Time slices the query window is cut into for pattern-extraction sampling.
 ///
@@ -474,11 +470,8 @@ pub async fn do_partitioned_search(
     }
 
     // Remove the streaming_aggs cache
-    if is_streaming_aggs && let Some(_streaming_id) = &partition_resp.streaming_id {
-        #[cfg(feature = "enterprise")]
-        {
-            streaming_aggs_exec::remove_cache(_streaming_id)
-        }
+    if is_streaming_aggs && let Some(streaming_id) = &partition_resp.streaming_id {
+        streaming_aggs_exec::remove_cache(streaming_id)
     }
 
     Ok(())
@@ -1001,9 +994,8 @@ pub async fn process_delta(
     }
 
     // Remove the streaming_aggs cache
-    if is_streaming_aggs && let Some(_streaming_id) = partition_resp.streaming_id {
-        #[cfg(feature = "enterprise")]
-        streaming_aggs_exec::remove_cache(&_streaming_id)
+    if is_streaming_aggs && let Some(streaming_id) = partition_resp.streaming_id {
+        streaming_aggs_exec::remove_cache(&streaming_id)
     }
 
     Ok(())
@@ -1097,61 +1089,6 @@ async fn send_partial_search_resp(
     if sender.send(Ok(response)).await.is_err() {
         log::warn!("[trace_id {trace_id}] Sender is closed, stop sending partial search response");
         return Ok(());
-    }
-
-    Ok(())
-}
-
-/// Clear streaming aggregation cache files for the given streaming_id
-/// This should be called once before processing partitions when clear_cache is true
-#[deprecated]
-#[allow(dead_code)]
-#[cfg(feature = "enterprise")]
-async fn clear_streaming_agg_cache(
-    trace_id: &str,
-    streaming_id: &str,
-    start_time: i64,
-    end_time: i64,
-) -> Result<(), infra::errors::Error> {
-    use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec::GLOBAL_CACHE;
-
-    log::info!(
-        "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] clear_cache is set, deleting old cache files",
-        trace_id,
-        streaming_id
-    );
-
-    // Get the cache file path from GLOBAL_CACHE
-    let streaming_item = GLOBAL_CACHE.id_cache.get(streaming_id);
-    if let Some(item) = streaming_item {
-        let cache_file_path = item.get_cache_file_path();
-
-        // Delete cache files in the time range using DeletionCriteria::TimeRange
-        if let Err(e) = delete_cache(&cache_file_path, 0, Some(start_time), Some(end_time)).await {
-            log::error!(
-                "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] Error deleting cache files: {}",
-                trace_id,
-                streaming_id,
-                e
-            );
-            return Err(infra::errors::Error::Message(format!(
-                "Failed to delete cache: {e}",
-            )));
-        }
-
-        log::info!(
-            "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] Successfully deleted cache files for time range: {} - {}",
-            trace_id,
-            streaming_id,
-            start_time,
-            end_time
-        );
-    } else {
-        log::warn!(
-            "[HTTP2_STREAM] [trace_id: {}] [streaming_id: {}] No cache file path found in GLOBAL_CACHE",
-            trace_id,
-            streaming_id
-        );
     }
 
     Ok(())

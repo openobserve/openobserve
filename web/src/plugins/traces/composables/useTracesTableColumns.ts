@@ -21,8 +21,8 @@
  * rebuilt — e.g. after loading selectedFields from localStorage, after a
  * mode switch, or after the user adds/removes/reorders a column.
  *
- * Cell rendering is handled via scoped slots on <TenstackTable>:
- *   #cell-{columnId}="{ item, cell }"
+ * Cell rendering is handled via scoped slots on <OTable>:
+ *   #cell-{columnId}="{ row, value, column }"
  *
  * Column order is fully driven by `selectedFields` (an ordered string[]).
  * LLM columns (input_tokens, output_tokens, cost) are injected dynamically
@@ -35,11 +35,11 @@
  */
 
 import { ref } from "vue";
-import { type ColumnDef } from "@tanstack/vue-table";
 import { useStore } from "vuex";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
 export const LLM_COLUMN_IDS = new Set(["input_tokens", "output_tokens", "cost"]);
@@ -61,20 +61,19 @@ const KNOWN_COLUMN_META: Record<
   service_name: {
     header: "Service",
     size: 160,
-    meta: { cellClass: "text-[var(--color-text-secondary)]", slot: true },
+    meta: { cellClass: "text-text-secondary" },
   },
   operation_name: {
     header: "Operation Name",
     size: 200,
-    meta: { cellClass: "text-[var(--color-text-secondary)]", slot: true },
+    meta: { cellClass: "text-text-secondary" },
   },
   duration: {
     header: "Duration",
     size: 120,
     meta: {
       sortable: true,
-      slot: true,
-      cellClass: "text-[var(--color-text-heading)]!",
+      cellClass: "text-text-heading!",
     },
   },
   spans: {
@@ -82,53 +81,52 @@ const KNOWN_COLUMN_META: Record<
     size: 100,
     meta: {
       align: "right",
-      slot: false,
-      cellClass: "text-[var(--color-text-secondary)]!",
+      cellClass: "text-text-secondary!",
     },
     accessorFn: (row: any) => row.spans,
   },
   span_kind: {
     header: "Span Kind",
     size: 120,
-    meta: { align: "left", slot: false, closable: true },
+    meta: { align: "left", closable: true },
     accessorFn: (row: any) => SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
   },
   span_status: {
     header: "Span Status",
     size: 120,
-    meta: { align: "left", slot: true, disableCellAction: true },
+    meta: { align: "left", disableCellAction: true },
   },
   status: {
     header: "Status",
     size: 120,
-    meta: { align: "left", slot: true, disableCellAction: true },
+    meta: { align: "left", disableCellAction: true },
   },
   service_latency: {
     header: "Service Latency",
     size: 160,
-    meta: { slot: true, disableCellAction: true },
+    meta: { disableCellAction: true },
   },
   input_tokens: {
     header: "Input Tokens",
     size: 130,
-    meta: { align: "right", slot: true },
+    meta: { align: "right" },
   },
   output_tokens: {
     header: "Output Tokens",
     size: 130,
-    meta: { align: "right", slot: true },
+    meta: { align: "right" },
   },
   cost: {
     header: "Cost",
     size: 130,
-    meta: { align: "right", slot: true },
+    meta: { align: "right" },
   },
 };
 
 function toColumnDef(
   fieldName: string,
   searchMode?: "traces" | "spans",
-): ColumnDef<Record<string, any>> {
+): OTableColumnDef<Record<string, any>> {
   const known = KNOWN_COLUMN_META[fieldName];
   // "status" is a traces-mode special column; in spans mode treat it as generic
   if (known && !(fieldName === "status" && searchMode === "spans")) {
@@ -147,7 +145,7 @@ function toColumnDef(
     id: fieldName,
     header,
     size: 160,
-    meta: { slot: false, closable: true },
+    meta: { closable: true },
     accessorFn: (row: any) => row[fieldName],
   };
 }
@@ -157,7 +155,7 @@ export function useTracesTableColumns() {
    * Rebuild the `columns` ref from the given parameters.
    * Call this whenever selectedFields, searchMode, or showLlmColumns changes.
    */
-  const columns = ref<ColumnDef<Record<string, any>>[]>([]);
+  const columns = ref<OTableColumnDef<Record<string, any>>[]>([]);
   const store = useStore();
   const { t } = useI18n();
 
@@ -165,8 +163,8 @@ export function useTracesTableColumns() {
     showLlmColumns: boolean,
     searchMode: "traces" | "spans",
     selectedFields: string[],
-  ): ColumnDef<Record<string, any>>[] => {
-    const cols: ColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
+  ): OTableColumnDef<Record<string, any>>[] => {
+    const cols: OTableColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
       toColumnDef(field, searchMode),
     );
 
@@ -176,7 +174,7 @@ export function useTracesTableColumns() {
         id: timestampCol,
         header: t("traces.timestamp") + ` (${store.state.timezone})`,
         size: 210,
-        meta: { slot: true, sortable: true, class: "capitalize!" },
+        meta: { sortable: true, headerClass: "capitalize!" },
         accessorFn: (row: any) =>
           timestampToTimezoneDate(
             (row[timestampCol] ?? row["zo_sql_timestamp"]) / 1000,
@@ -189,7 +187,7 @@ export function useTracesTableColumns() {
     // They are not stored in selectedFields — managed by the showLlmColumns flag.
     if (searchMode === "traces" && showLlmColumns) {
       const tailIdx = cols.findIndex((c) => c.id === "service_latency");
-      const llm: ColumnDef<Record<string, any>>[] = [];
+      const llm: OTableColumnDef<Record<string, any>>[] = [];
 
       if (!selectedFields.includes("input_tokens")) {
         llm.push(toColumnDef("input_tokens", searchMode));

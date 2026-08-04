@@ -36,7 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nothing here — their content components have their own headers. -->
       <OPageHeader
         :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
-        :subtitle="showPipelineActions ? t('pipeline.subtitle') : ''"
+        :subtitle="
+          showPipelineActions
+            ? t('pipeline.subtitle')
+            : routeName === 'createPipeline'
+              ? breadcrumbLabel
+              : ''
+        "
+        :title-overflow="routeName === 'createPipeline' ? 'visible' : 'truncate'"
         :icon="showPipelineActions ? 'lan' : undefined"
         :back="detailBack"
         :tabs-below="showPipelineActions"
@@ -49,11 +56,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #tabs>
           <PipelineSectionTabs v-if="showPipelineActions" />
         </template>
-        <!-- Teleport target for the create-page pipeline name input. The input
-           itself is owned and teleported here by PipelineEditor.vue, so it sits
-           with the save logic that validates it (OForm migration). -->
-        <template v-if="routeName === 'createPipeline'" #title-trail>
-          <div id="o2-page-title-trail"></div>
+        <!-- Teleport target for the create-page pipeline NAME, which IS the
+           title here (the "New pipeline" label moves to the subtitle above, as
+           on the panel/alert/function editors). The control itself is owned and
+           teleported in by PipelineEditor.vue, so it sits with the save logic
+           that validates it. -->
+        <template v-if="routeName === 'createPipeline'" #title>
+          <span id="o2-page-title" class="contents"></span>
         </template>
         <template #actions>
           <template v-if="showPipelineActions">

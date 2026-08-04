@@ -365,7 +365,7 @@ export default defineComponent({
     );
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
-    // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // enterprise `O2_EVAL_ENABLED`. Reactive so the menu picks it up regardless
     // of whether the config response arrived before or after this component
     // mounted.
     const isOnlineEvalsEnabled = computed(() => {
@@ -384,6 +384,26 @@ export default defineComponent({
         Boolean(store.state.zoConfig?.synthetics_enabled)
       );
     });
+
+    // Backend `/config` flag `slo_enabled` — controlled by `ZO_SLO_ENABLED`.
+    // NOT build-gated: SLO measurement is an OSS capability, so unlike
+    // Synthetics/Incidents this deliberately has no enterprise/cloud check.
+    // `=== true`, not truthy: /config is fetched without await, so the flag is
+    // briefly undefined and the entry must stay hidden rather than flash in
+    // and then navigate to a page the API answers with 501.
+    // TEMPORARY, for the release: SLOs are hidden from the nav whatever
+    // `slo_enabled` says. To restore, set this to false (or delete it and the
+    // `!SLO_HIDDEN_FOR_RELEASE &&` below). Nothing else is touched — the flag,
+    // the routes, the pages and the Reliability group's `sloList` child are all
+    // still there, so the entry returns exactly as it was, and /slos remains
+    // reachable by typing the URL.
+    //
+    // Typed as boolean rather than left to literal inference so the `&&` below
+    // is not a constant expression.
+    const SLO_HIDDEN_FOR_RELEASE: boolean = true;
+    const isSloEnabled = computed(
+      () => !SLO_HIDDEN_FOR_RELEASE && store.state.zoConfig?.slo_enabled === true,
+    );
 
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
@@ -446,6 +466,8 @@ export default defineComponent({
         link: "/alerts",
         name: "alertList",
       },
+      // SLOs are spliced in by updateSloMenu() when `slo_enabled` is on —
+      // directly after Alerts, since an SLO is what an SLO alert burns against.
       {
         title: t("menu.ingestion"),
         icon: "data-plus-line",
@@ -613,6 +635,33 @@ export default defineComponent({
       }
     };
 
+    // Insert / remove the SLOs entry directly after Alerts. Like Workflows and
+    // Synthetics this REMOVES when the flag is off rather than merely skipping:
+    // the menu is rebuilt on org switch and `slo_enabled` can differ per
+    // deployment, so an add-only guard would leave a stale entry behind.
+    const updateSloMenu = () => {
+      const existingIndex = linksList.value.findIndex((l: any) => l.name === "sloList");
+
+      if (!isSloEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const alertIndex = linksList.value.findIndex((l: any) => l.name === "alertList");
+      if (alertIndex === -1) return;
+
+      linksList.value.splice(alertIndex + 1, 0, {
+        title: t("menu.slos"),
+        icon: "target",
+        link: "/slos",
+        name: "sloList",
+      });
+    };
+
+    // Keep the menu in sync if /config resolves after mount.
+    watch(isSloEnabled, () => updateSloMenu(), { immediate: false });
+
     const updateActionsMenu = () => {
       if (isActionsEnabled.value) {
         const incidentIndex = linksList.value.findIndex((link) => link.name === "incidentList");
@@ -722,6 +771,8 @@ export default defineComponent({
 
     const filterMenus = () => {
       updateIncidentsMenu();
+      // After Incidents, so the flat order reads Alerts → SLOs → Incidents.
+      updateSloMenu();
       updateActionsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();

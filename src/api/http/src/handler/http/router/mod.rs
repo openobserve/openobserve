@@ -25,9 +25,16 @@ use axum::{
 };
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
+use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::cloud;
+#[cfg(feature = "profiling")]
+use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, authz, dashboards, folders, organization, users,
+    alerts, authz, dashboards, folders, kv, model_pricing, organization, service_accounts,
+    short_url, slos, sourcemaps, status, stream, users,
 };
+use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
 use openobserve_core::auth::AuthExtractor;
 use tower_http::{
@@ -46,9 +53,17 @@ use {
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::get_config as get_o2_config,
     },
+    openobserve_api_management::request::{
+        actions, ai, anomaly_detection, domain_management, eval_jobs, gen_ai, keys, license,
+        providers, score_configs, scorers, service_streams, synthetics, workflows,
+    },
+    openobserve_api_pipelines::request::re_pattern,
+    openobserve_api_search::search::patterns,
 };
 
-use super::request::*;
+use super::request::mcp;
+#[cfg(feature = "enterprise")]
+use super::request::ratelimit;
 use crate::{
     common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
@@ -64,7 +79,7 @@ pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
 
-pub use common::meta::http::ERROR_HEADER;
+use common::meta::http::ERROR_HEADER;
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -633,6 +648,23 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
+    // External alert source webhooks — token-authenticated inside the handler itself
+    // (never via auth_middleware), so these must stay in basic_routes rather than
+    // service_routes. See GHSA-wffq-g8qf-ccmv: do not widen the shared token
+    // classifier in validator.rs to cover this token type.
+    router = router
+        .route(
+            "/api/v2/{org_id}/incidents/events",
+            post(alerts::external_events::ingest_events),
+        )
+        .route(
+            "/api/v2/{org_id}/incidents/events/{token}",
+            post(alerts::external_events::ingest_events_url_token),
+        )
+        .route_layer(DefaultBodyLimit::max(
+            alerts::external_events::MAX_BODY_BYTES,
+        ));
+
     router
 }
 
@@ -774,6 +806,7 @@ pub fn service_routes() -> Router {
 
         // Search
         .route("/{org_id}/_search", post(search::search))
+        .route("/{org_id}/query_functions", get(search::query_functions::list))
         .route("/{org_id}/_search_partition", post(search::search_partition))
         .route("/{org_id}/{stream_name}/_around", get(search::around_v1).post(search::around_v2))
         .route("/{org_id}/{stream_name}/_values", get(search::values))
@@ -829,6 +862,26 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
+        // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
+        // measurement is an enterprise capability, and the handlers already
+        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
+        // registered before the {slo_id} catch-all, per the router's ordering
+        // rule.
+        .route(
+            "/{org_id}/slos",
+            get(slos::list_slos).post(slos::create_slo),
+        )
+        // Before the {slo_id} catch-all, or "move" is parsed as an SLO id.
+        .route("/{org_id}/slos/move", post(slos::move_slos))
+        .route("/{org_id}/slos/{slo_id}/enable", put(slos::enable_slo))
+        .route("/{org_id}/slos/{slo_id}/groups", get(slos::get_slo_groups))
+        .route(
+            "/{org_id}/slos/{slo_id}",
+            get(slos::get_slo)
+                .put(slos::update_slo)
+                .delete(slos::delete_slo),
+        )
+
         // Folders (v2)
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))
@@ -837,6 +890,8 @@ pub fn service_routes() -> Router {
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/groups", get(alerts::list_alert_groups))
+        .route("/v2/{org_id}/alerts/{alert_id}/groups/transitions", get(alerts::list_alert_group_transitions))
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
         .route("/v2/{org_id}/alerts/{alert_id}/enable", patch(alerts::enable_alert))
@@ -846,18 +901,25 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/{alert_id}/clone", post(alerts::clone_alert))
         .route("/v2/{org_id}/alerts/generate_sql", post(alerts::generate_sql))
         .route("/v2/{org_id}/alerts/move", patch(alerts::move_alerts))
+        .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/dedup/summary", get(alerts::dedup_stats::get_dedup_summary))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents))
         .route("/v2/{org_id}/alerts/incidents/stats", get(alerts::incidents::get_incident_stats))
+        .route("/v2/{org_id}/alerts/incidents/external-alerts/{external_alert_id}/payload", get(alerts::incidents::get_external_alert_payload))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}", get(alerts::incidents::get_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca", post(alerts::incidents::trigger_incident_rca).delete(alerts::incidents::cancel_incident_rca))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/history", get(alerts::incidents::get_incident_rca_history))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
+        .route("/v2/{org_id}/incidents/integrations", get(alerts::incident_integrations::list_integrations).post(alerts::incident_integrations::create_integration))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}", delete(alerts::incident_integrations::delete_integration))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}/enable", patch(alerts::incident_integrations::set_integration_enabled))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}/rotate", post(alerts::incident_integrations::rotate_integration_token))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}/senders", get(alerts::incident_integrations::list_integration_senders))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
@@ -958,7 +1020,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/settings/gen_ai/agent_registry", delete(gen_ai::clear_agent_registry))
             .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents));
 
-        if get_o2_config().common.online_evals_enabled {
+        if get_o2_config().llm_eval_config.enabled {
             router = router
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
@@ -1451,6 +1513,117 @@ mod tests {
                 .and_then(Value::as_array)
                 .is_some_and(|keywords| !keywords.is_empty())
         );
+    }
+
+    // NOTE ON WHAT IS TESTABLE HERE.
+    //
+    // service_routes() wraps the entire router in auth_middleware, which
+    // short-circuits BEFORE routing: a completely nonexistent path also answers
+    // 401. So an HTTP-level test against service_routes() cannot tell a
+    // registered route from an absent one — an assertion like "not 404", or
+    // even "== 401", passes whether or not the endpoint exists.
+    //
+    // Registration is therefore pinned two ways that DO discriminate: the route
+    // appears in the OpenAPI surface, and a minimal router carrying only this
+    // route dispatches GET to the handler and rejects other methods.
+
+    #[tokio::test]
+    async fn query_functions_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route(
+            "/{org_id}/query_functions",
+            get(search::query_functions::list),
+        );
+
+        let ok = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/myorg/query_functions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+
+        let wrong_method = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/myorg/query_functions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            wrong_method.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "the catalog is read-only; the frontend issues GET"
+        );
+    }
+
+    #[test]
+    fn query_functions_is_published_in_the_openapi_surface() {
+        // Discriminating: this fails if the handler is dropped from openapi.rs.
+        let spec = super::openapi::ApiDoc::openapi();
+        let json = serde_json::to_string(&spec).unwrap();
+        assert!(
+            json.contains("/{org_id}/query_functions"),
+            "query_functions is missing from the OpenAPI surface"
+        );
+    }
+
+    // ── tmp/code.md B4 — the query-function catalog route ─────────────────────
+    //
+    // catalog_functions() can be perfect while no HTTP route exposes it. This is
+    // the only assertion that fails if the endpoint is simply never registered.
+
+    #[tokio::test]
+    async fn query_functions_handler_returns_the_documented_payload_shape() {
+        // Calls the handler DIRECTLY, bypassing auth, so the body contract the
+        // frontend service depends on ({ list: [...] }) is actually asserted.
+        use axum::extract::Path;
+
+        let response =
+            openobserve_api_search::search::query_functions::list(Path("default".to_string()))
+                .await
+                .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: Value = serde_json::from_slice(&body).expect("body must be JSON");
+
+        let list = payload
+            .get("list")
+            .and_then(Value::as_array)
+            .expect("payload must be { list: [...] } — the frontend reads data.list");
+        assert!(!list.is_empty(), "catalog must not be empty");
+
+        let entry = list
+            .iter()
+            .find(|f| f.get("name").and_then(Value::as_str) == Some("match_all"))
+            .expect("match_all must be present");
+        for field in ["name", "signature", "doc", "kind", "deprecated"] {
+            assert!(
+                entry.get(field).is_some(),
+                "serialized entry is missing `{field}`"
+            );
+        }
+
+        // Assert non-empty doc on an entry the SERVER is the sole source for.
+        // The frontend catalog carries its own prose for the O2 UDFs and wins
+        // on merge, so requiring a server-side doc for match_all would pin data
+        // the UI never renders.
+        let alias = list
+            .iter()
+            .find(|f| f.get("name").and_then(Value::as_str) == Some("match_all_raw"))
+            .expect("rewriter alias must be present");
+        assert!(!alias["doc"].as_str().unwrap_or("").is_empty());
+        assert_eq!(alias["deprecated"], Value::Bool(true));
     }
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────

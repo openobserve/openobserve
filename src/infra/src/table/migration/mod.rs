@@ -141,7 +141,38 @@ mod m20260720_000001_create_workflows_table;
 mod m20260723_000001_add_env_version_to_gen_ai_agents;
 mod m20260724_000001_add_name_is_default_to_synthetics_probe_tokens;
 mod m20260724_000002_add_token_id_to_synthetics_agents;
+mod m20260725_000001_create_alert_states_tables;
+mod m20260725_000002_add_threshold_and_level_columns;
+mod m20260726_000001_add_priority_and_tags_to_alerts;
+mod m20260726_000002_add_priority_and_tags_to_anomaly_config;
+mod m20260726_000003_add_group_lifecycle_columns;
+mod m20260727_000001_create_slo_tables;
+mod m20260727_000002_add_slo_columns_to_alerts;
 mod m20260728_000001_create_workflows_associations_table;
+mod m20260729_000001_add_promql_multi_alert_to_alerts;
+mod m20260730_000001_add_alert_state_to_synthetics_monitors;
+mod m20260730_000002_create_incident_integrations;
+mod m20260730_000003_create_external_alerts;
+mod m20260730_000004_add_alert_kind_to_incident_alerts;
+mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
+
+/// Apply **only** the SLO tables, for targeted integration tests.
+///
+/// `Migrator::up` replays the whole chain from 2022, whose earliest migrations
+/// assume the legacy `meta` table already exists — it is created outside the
+/// migrator during normal startup. Tests that only care about the SLO tables
+/// would otherwise have to reconstruct that history, which would test the
+/// fixture rather than the schema.
+#[cfg(test)]
+pub(crate) async fn create_slo_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260727_000001_create_slo_tables::Migration
+        .up(&manager)
+        .await
+}
 
 pub struct Migrator;
 
@@ -272,7 +303,20 @@ impl MigratorTrait for Migrator {
             Box::new(m20260723_000001_add_env_version_to_gen_ai_agents::Migration),
             Box::new(m20260724_000001_add_name_is_default_to_synthetics_probe_tokens::Migration),
             Box::new(m20260724_000002_add_token_id_to_synthetics_agents::Migration),
+            Box::new(m20260725_000001_create_alert_states_tables::Migration),
+            Box::new(m20260725_000002_add_threshold_and_level_columns::Migration),
+            Box::new(m20260726_000001_add_priority_and_tags_to_alerts::Migration),
+            Box::new(m20260726_000002_add_priority_and_tags_to_anomaly_config::Migration),
+            Box::new(m20260726_000003_add_group_lifecycle_columns::Migration),
+            Box::new(m20260727_000001_create_slo_tables::Migration),
+            Box::new(m20260727_000002_add_slo_columns_to_alerts::Migration),
             Box::new(m20260728_000001_create_workflows_associations_table::Migration),
+            Box::new(m20260729_000001_add_promql_multi_alert_to_alerts::Migration),
+            Box::new(m20260730_000001_add_alert_state_to_synthetics_monitors::Migration),
+            Box::new(m20260730_000002_create_incident_integrations::Migration),
+            Box::new(m20260730_000003_create_external_alerts::Migration),
+            Box::new(m20260730_000004_add_alert_kind_to_incident_alerts::Migration),
+            Box::new(m20260803_000001_add_down_notified_at_to_synthetics_locations::Migration),
         ]
     }
 }

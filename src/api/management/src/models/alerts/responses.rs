@@ -70,6 +70,158 @@ pub struct ListAlertsResponseBodyItem {
     /// Last error message from training or detection. Only present for `anomaly_detection` items.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
+    /// Outcome of the most recent evaluation: "firing" | "normal" | "error" |
+    /// "notify_failed" | "succeeded". Absent when the alert has never run.
+    ///
+    /// This is the LAST RUN OUTCOME, not a live "currently firing" flag —
+    /// always render it alongside `last_outcome_at`. See Part IV of alerts.md.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome: Option<String>,
+    /// When `last_outcome` was recorded (microseconds).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome_at: Option<i64>,
+    /// When `last_outcome` last CHANGED (microseconds) — i.e. how long the
+    /// alert has been in its current state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome_since: Option<i64>,
+    /// Severity of the last classification: "ok" | "warning" | "critical".
+    ///
+    /// A SEPARATE axis from `last_outcome`: that says whether the evaluation
+    /// fired, this says how bad. An alert can be `firing` at `warning`.
+    /// Absent for single-level alerts that never classified.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// When `level` last CHANGED — powers "critical for 20 minutes".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_since: Option<i64>,
+    /// Configured priority as the integer storage id 1..=5 (Feature 2, PT-3).
+    ///
+    /// A THIRD axis: `enabled` is is-it-running, `last_outcome` is
+    /// did-it-fire, `level` is how-bad-now, and this is how much humans care.
+    /// Absent when unset, which is every pre-Feature-2 alert.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<u8>, example = 3)]
+    pub priority: Option<u8>,
+    /// Normalized selection tags (PT-6). Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    /// Multi-alerts only (§5.4): how many groups the last evaluation observed,
+    /// counted **before** the M-6 cap truncated them. Absent for every alert
+    /// that has not opted in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_observed: Option<i32>,
+    /// Multi-alerts only: how many of those groups were warning-or-worse,
+    /// also counted pre-cap. With `groups_observed` this is the "N of M groups
+    /// firing" chip. Counting retained state rows instead would silently
+    /// under-report whenever more than the cap's worth of groups fire, which
+    /// is the silent truncation M-6 forbids.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_firing: Option<i32>,
+    /// Whether `groups_observed` is a `>=` lower bound — the bounded fetch
+    /// page came back full, so groups beyond it were never seen. Render the
+    /// count with a `≥`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_observed_is_lower_bound: Option<bool>,
+    /// Whether `groups_firing` is a `>=` lower bound. Tracked separately
+    /// because the two diverge: a full page that still reached healthy groups
+    /// has seen every firing group, so this stays exact while
+    /// `groups_observed` does not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_firing_is_lower_bound: Option<bool>,
+}
+
+/// One tracked group of a multi-alert (§5.4's group table).
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct AlertGroupResponseItem {
+    /// Deterministic hash of the group's label set — the state identity, and
+    /// the key the per-group history filter takes.
+    pub group_key: String,
+    /// Rendered `k=v,k=v` labels, for display only. `group_key` stays the
+    /// identity because a readable rendering is ambiguous once a label value
+    /// contains the separators.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_labels: Option<String>,
+    /// Parsed form of `group_labels`, so the UI does not re-parse the string.
+    pub labels: Vec<AlertGroupLabel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// When `level` last changed — "critical for 20 minutes".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_since: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome_at: Option<i64>,
+    /// Last evaluation that actually included this group (M-7). A group whose
+    /// `last_seen` is falling behind is on its way to being resolved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen: Option<i64>,
+    /// Per-group silence window (MN-2): suppress re-delivery until this
+    /// instant. Absent when the group is not silenced.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub silenced_until: Option<i64>,
+    /// Level of this group's last *successful* delivery — what escalation is
+    /// measured against. Absent when it has never paged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_notified_level: Option<String>,
+}
+
+/// One `key=value` pair of a group's label set.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct AlertGroupLabel {
+    pub name: String,
+    pub value: String,
+}
+
+/// HTTP response body for `ListAlertGroups`.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct ListAlertGroupsResponseBody {
+    /// Tracked groups, most severe first.
+    pub list: Vec<AlertGroupResponseItem>,
+    /// Pre-cap totals from the rollup row, so the caller can render
+    /// "N of M groups firing" without counting the (post-cap) list above.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_observed: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_firing: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_observed_is_lower_bound: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub groups_firing_is_lower_bound: Option<bool>,
+    /// True when the last evaluation observed more groups than the M-6 cap
+    /// tracks, so `list` is a truncated view. Drives the cap banner — M-6
+    /// forbids truncating silently.
+    pub capped: bool,
+    /// The cap in force, for the banner's wording.
+    pub group_cap: usize,
+}
+
+/// One per-group state transition (M-8's history source).
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct AlertGroupTransitionItem {
+    pub group_key: String,
+    /// Carried on the transition itself, so history outlives the state row the
+    /// reaper deletes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_labels: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_outcome: Option<String>,
+    pub to_outcome: String,
+    pub at: i64,
+    /// Observed value at transition time. `None` where nothing was observed —
+    /// a group that vanished has no reading, and rendering 0 would be a lie.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
+}
+
+/// HTTP response body for `ListAlertGroupTransitions`.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct ListAlertGroupTransitionsResponseBody {
+    pub list: Vec<AlertGroupTransitionItem>,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -137,6 +289,19 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             last_trained_at: None,
             status: None,
             last_error: None,
+            last_outcome: None,
+            last_outcome_at: None,
+            last_outcome_since: None,
+            level: None,
+            level_since: None,
+            priority: alert.priority.map(|p| p.to_i32() as u8),
+            tags: alert.tags,
+            // Filled from the rollup state row by `enrich_with_run_state`,
+            // alongside the other run-state fields above.
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         })
     }
 }
@@ -206,11 +371,35 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         is_real_time: false,
         last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
         status,
+        // Anomaly configs do not flow through the alert scheduler's state
+        // write path; leave run state unset rather than implying "never fired".
+        last_outcome: None,
+        last_outcome_at: None,
+        last_outcome_since: None,
+        level: None,
+        level_since: None,
         last_error: v
             .get("last_error")
             .and_then(|e| e.as_str())
             .filter(|s| !s.is_empty())
             .map(String::from),
+        // Feature 2: anomaly configs now carry the same triage metadata as
+        // alerts, so they filter and sort alongside them instead of being
+        // excluded wholesale.
+        priority: v
+            .get("priority")
+            .and_then(|p| p.as_u64())
+            .and_then(|p| u8::try_from(p).ok())
+            .filter(|p| (1..=5).contains(p)),
+        tags: v
+            .get("tags")
+            .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
+            .unwrap_or_default(),
+        // Anomaly configs have no grouping, so there is nothing to count.
+        groups_observed: None,
+        groups_firing: None,
+        groups_observed_is_lower_bound: None,
+        groups_firing_is_lower_bound: None,
     })
 }
 
@@ -284,6 +473,17 @@ mod tests {
             last_trained_at: None,
             status: None,
             last_error: None,
+            last_outcome: None,
+            last_outcome_at: None,
+            last_outcome_since: None,
+            level: None,
+            level_since: None,
+            priority: None,
+            tags: vec![],
+            groups_observed: None,
+            groups_firing: None,
+            groups_observed_is_lower_bound: None,
+            groups_firing_is_lower_bound: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();
@@ -292,6 +492,13 @@ mod tests {
         assert!(!obj.contains_key("last_trained_at"));
         assert!(!obj.contains_key("status"));
         assert!(!obj.contains_key("last_error"));
+        // §5.4: a non-multi alert must not advertise a group summary at all —
+        // an absent field reads as "not a multi-alert", a zero would read as
+        // "observed no groups".
+        assert!(!obj.contains_key("groups_observed"));
+        assert!(!obj.contains_key("groups_firing"));
+        assert!(!obj.contains_key("groups_observed_is_lower_bound"));
+        assert!(!obj.contains_key("groups_firing_is_lower_bound"));
     }
 
     #[test]
@@ -466,4 +673,79 @@ pub struct GenerateSqlMetadata {
 
     /// Whether GROUP BY is present
     pub has_group_by: bool,
+}
+#[cfg(test)]
+mod anomaly_priority_tag_tests {
+    use super::*;
+
+    fn cfg(extra: serde_json::Value) -> serde_json::Value {
+        let mut base = serde_json::json!({
+            "anomaly_id": <Ksuid as svix_ksuid::KsuidLike>::new(None, None).to_string(),
+            "name": "anom",
+            "folder_id": "default",
+            "stream_name": "s",
+            "stream_type": "logs",
+            "enabled": true,
+        });
+        if let (Some(b), Some(e)) = (base.as_object_mut(), extra.as_object()) {
+            for (k, v) in e {
+                b.insert(k.clone(), v.clone());
+            }
+        }
+        base
+    }
+
+    /// Feature 2: anomaly configs surface priority/tags on the list, so they
+    /// render and filter alongside alerts instead of always showing "—".
+    #[test]
+    fn test_anomaly_list_item_carries_priority_and_tags() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "priority": 2,
+            "tags": ["prod", "service:checkout"],
+        })))
+        .expect("should map");
+        assert_eq!(item.priority, Some(2));
+        assert_eq!(item.tags, vec!["prod", "service:checkout"]);
+    }
+
+    /// Pre-Feature-2 configs have neither key; they must map to unset rather
+    /// than failing the whole list.
+    #[test]
+    fn test_anomaly_list_item_without_the_fields_is_unset() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({}))).expect("should map");
+        assert_eq!(item.priority, None);
+        assert!(item.tags.is_empty());
+    }
+
+    /// A corrupt row must degrade to unset, never take the alert list down:
+    /// an out-of-range id is not a valid priority, and a non-array tags blob
+    /// is not a tag list.
+    #[test]
+    fn test_anomaly_list_item_degrades_on_corrupt_values() {
+        for bad in [
+            serde_json::json!(0),
+            serde_json::json!(6),
+            serde_json::json!(99),
+        ] {
+            let item =
+                anomaly_config_to_list_item(&cfg(serde_json::json!({ "priority": bad }))).unwrap();
+            assert_eq!(item.priority, None, "id {bad} must not decode");
+        }
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "tags": {"not": "an array"}
+        })))
+        .unwrap();
+        assert!(item.tags.is_empty());
+    }
+
+    /// The list response omits both when unset, so a pre-Feature-2 anomaly
+    /// config serializes exactly as it did before.
+    #[test]
+    fn test_unset_fields_are_omitted_from_the_response() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({}))).unwrap();
+        let json = serde_json::to_value(&item).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("priority"));
+        assert!(!obj.contains_key("tags"));
+    }
 }

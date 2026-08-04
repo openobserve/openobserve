@@ -32,6 +32,7 @@ use infra::{
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use tokio::sync::mpsc;
 
+mod bloom;
 pub mod deleted;
 pub mod dump;
 pub mod flatten;

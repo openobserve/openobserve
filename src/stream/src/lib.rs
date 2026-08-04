@@ -29,7 +29,7 @@ use common::meta::{
 // Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
 // these streams for billing); OSS / self-hosted must not block user streams.
 #[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
+use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
@@ -242,7 +242,7 @@ pub async fn create_stream(
     // its schema directly (not via create_stream), so blocking here is safe.
     // Cloud-only: OSS / self-hosted may legitimately use these stream names.
     #[cfg(feature = "cloud")]
-    if is_reserved_self_reporting_stream(stream_name) {
+    if is_reserved_internal_stream(stream_name) {
         return Ok((
             http::StatusCode::BAD_REQUEST,
             [(ERROR_HEADER, "stream name is reserved")],
@@ -784,7 +784,7 @@ where
     // compaction uses a separate internal path, so blocking this user-facing
     // delete is safe and preserves billing/usage accounting. Cloud-only.
     #[cfg(feature = "cloud")]
-    if is_reserved_self_reporting_stream(stream_name) {
+    if is_reserved_internal_stream(stream_name) {
         return Ok((
             http::StatusCode::BAD_REQUEST,
             [(ERROR_HEADER, "stream name is reserved")],

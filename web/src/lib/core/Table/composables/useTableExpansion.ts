@@ -15,7 +15,7 @@ export function useTableExpansion<TData>(
      *  `() => props.expandedIds`) closes over OTable's reactive props
      *  so the watcher below can track the dependency reactively. */
     expandedIds?: () => string[] | undefined;
-    rowKey?: string;
+    rowKey?: string | ((row: TData) => string);
     getSubRows?: (row: TData) => TData[];
   },
   emit: any,
@@ -41,7 +41,9 @@ export function useTableExpansion<TData>(
   );
 
   function getRowId(row: TData): string {
-    return (row as any)[keyField.value]?.toString() ?? "";
+    const key = keyField.value;
+    if (typeof key === "function") return key(row);
+    return (row as any)[key]?.toString() ?? "";
   }
 
   function isExpanded(row: TData): boolean {

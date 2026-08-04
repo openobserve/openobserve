@@ -30,6 +30,8 @@ const {
   mockServiceGet,
   mockRouterPush,
   mockToast,
+  mockRecorderStopReplay,
+  mockRecorderReplayPhase,
 } = vi.hoisted(() => ({
   mockServiceGetLocations: vi.fn().mockResolvedValue({
     data: { locations: [], browsers: [], devices: [] },
@@ -39,6 +41,10 @@ const {
   mockServiceGet: vi.fn().mockResolvedValue({ data: {} }),
   mockRouterPush: vi.fn(),
   mockToast: vi.fn(() => vi.fn()),
+  // Shared so a test can assert the view delegates the stop instead of driving
+  // the phase itself. The composable owns stopping → stopped.
+  mockRecorderStopReplay: vi.fn().mockResolvedValue(undefined),
+  mockRecorderReplayPhase: { value: "idle" },
 }));
 
 vi.mock("vue-router", () => ({
@@ -56,13 +62,13 @@ vi.mock("vue-router", () => ({
 vi.mock("@/composables/useSyntheticsRecorder", () => ({
   default: () => ({
     detectExtension: vi.fn().mockResolvedValue(false),
-    replayPhase: { value: "idle" },
+    replayPhase: mockRecorderReplayPhase,
     stepResults: new Map(),
     activeStepId: { value: null },
     replayResult: { value: null },
     error: { value: null },
     replay: vi.fn().mockResolvedValue({}),
-    stopReplay: vi.fn().mockResolvedValue({}),
+    stopReplay: mockRecorderStopReplay,
     stopReplayAndForget: vi.fn(),
     registerAutoDetect: vi.fn(),
     isReplaying: { value: false },
@@ -181,6 +187,7 @@ const baseStubs = {
       "stepResults",
       "activeStepId",
       "blockedReason",
+      "blockedDetail",
       "class",
     ],
   },
@@ -647,6 +654,30 @@ describe("CreateBrowserTest", () => {
       // Validation should fail before any API call
       expect(mockServiceCreate).not.toHaveBeenCalled();
       expect(mockServiceUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("stopping a replay", () => {
+    beforeEach(() => {
+      mockRecorderStopReplay.mockClear();
+      mockRecorderReplayPhase.value = "idle";
+    });
+
+    // Regression: this used to set replayPhase to "stopped" itself, before the
+    // extension had confirmed — claiming the run was over while it was still
+    // winding down, and leaving the interrupted step showing as in progress.
+    it("should delegate the stop to the recorder rather than driving the phase", async () => {
+      mockRecorderReplayPhase.value = "running";
+      wrapper = await mountValidEdit();
+
+      const journey = wrapper.findComponent('[data-test="synthetics-browser-journey"]');
+      expect(journey.exists()).toBe(true);
+      journey.vm.$emit("stop-replay");
+      await flushPromises();
+
+      expect(mockRecorderStopReplay).toHaveBeenCalledTimes(1);
+      // The view must not pre-empt the composable's stopping → stopped transition.
+      expect(mockRecorderReplayPhase.value).toBe("running");
     });
   });
 });

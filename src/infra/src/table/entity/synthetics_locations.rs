@@ -31,6 +31,14 @@ pub struct Model {
     /// Queue routing key (unique), e.g. `net-aws-us-east-1`, `private-acme-dc1`.
     pub pool: String,
     pub enabled: bool,
+    /// When this location's "down" notification was sent, in microseconds.
+    /// 0 = not currently notified as down.
+    ///
+    /// Cluster-wide one-shot state. The staleness watcher runs on every
+    /// alert_manager, so the suppression flag cannot live in process memory —
+    /// N nodes would each send their own notification for one outage.
+    #[sea_orm(default_value = 0)]
+    pub down_notified_at: i64,
     pub created_at: i64,
     pub updated_at: i64,
 }

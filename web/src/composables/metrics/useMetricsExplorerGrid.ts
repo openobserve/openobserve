@@ -41,7 +41,9 @@ import {
 import {
   buildPresenceQuery,
   computeRateWindow,
+  computePercentileWindow,
   computeStepSeconds,
+  computeWidenedRateWindows,
   DEFAULT_SCRAPE_INTERVAL_SECONDS,
   getMetricDefaults,
   isRateBasedKind,
@@ -105,7 +107,9 @@ export interface CardPreview {
    * The metric HAS samples in the window, but its rate-based default query could
    * not produce a single point from them — `rate()` needs two samples inside its
    * window, and there are not two to be had (a one-off scrape, or a scrape
-   * interval longer than the window).
+   * interval longer than the window). Raised only after retrying with widened
+   * windows (see `computeWidenedRateWindows`) also produced nothing — or the
+   * retries failed, in which case sparse is still the best answer in hand.
    *
    * Emphatically NOT "no data": the card stays visible and says what is actually
    * wrong, instead of being hidden as empty and taking a real, ingested metric
@@ -113,6 +117,19 @@ export interface CardPreview {
    * decides emptiness too. See `buildPresenceQuery`.
    */
   sparse: boolean;
+  /**
+   * The rate window that actually charted this data, when the standard one
+   * could not — the widened-retry rung that succeeded (e.g. "4m"), else `null`.
+   *
+   * Carried for the drill-in: the editor normally receives `$__rate_interval`
+   * and re-derives the window from the org's scrape interval — the very value
+   * whose overstatement forced the widening — so it would resolve straight back
+   * to the window that just returned nothing. A card that needed widening hands
+   * the editor this concrete window instead. Survives the persisted cache for
+   * the same reason `nanGuardApplied` does: a restore fires no query, so it has
+   * no way to re-learn it.
+   */
+  widenedRateWindow: string | null;
   /**
    * When the data was actually fetched (ms). Survives the persisted cache, so a
    * card restored from it reports the true age of what it shows — the same
@@ -956,14 +973,14 @@ export function useMetricsExplorerGrid() {
   const effectiveVariant = (
     card: MetricCard,
     points = pointsFor(card),
-    opts?: { applyNanGuard?: boolean; rateWindow?: string },
+    opts?: { applyNanGuard?: boolean; rateWindow?: string; percentileWindow?: string },
   ) => {
     const epoch = variantEpoch.value;
     if (epoch !== cachedEpoch) {
       variantCache.clear();
       cachedEpoch = epoch;
     }
-    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}`;
+    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}`;
     const hit = variantCache.get(cacheKey);
     if (hit) return hit;
 
@@ -990,6 +1007,11 @@ export function useMetricsExplorerGrid() {
         rateWindow:
           opts?.rateWindow ??
           computeRateWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
+        // Wider than the rate window on purpose — a quantile needs samples, not
+        // just two points. See `computePercentileWindow`.
+        percentileWindow:
+          opts?.percentileWindow ??
+          computePercentileWindow(rangeSeconds.value, points, scrapeIntervalSeconds.value),
         labels: card.labels ?? labelsByStream.value[card.name],
         applyNanGuard: opts?.applyNanGuard,
       },
@@ -1212,8 +1234,17 @@ export function useMetricsExplorerGrid() {
    * override and the rate window, so they are the whole identity — there is no
    * separate variables/schema object to compare, as there is for a dashboard
    * panel.
+   *
+   * `v` is the SHAPE version of the cached value, bumped when the preview
+   * grows a field a restore cannot reconstruct. v2: `widenedRateWindow` — a
+   * pre-v2 entry can hold results a widened retry fetched with no memory of
+   * the window that fetched them, and restoring it hands the drill-in
+   * `$__rate_interval`, which resolves back to the window that returned
+   * nothing: the card charts, the editor opens blank. Missing the cache once
+   * and re-learning the window live is the cheap way out.
    */
   const cacheIdentity = (queries: any[], step: number) => ({
+    v: 2,
     queries: queries.map((q: any) => q.expr),
     step,
     org: org.value,
@@ -1296,6 +1327,7 @@ export function useMetricsExplorerGrid() {
       // paint fine on the live path and then vanish from the grid on the next
       // visit, when the cache answered instead.
       sparse: !!cached.value.sparse,
+      widenedRateWindow: cached.value.widenedRateWindow ?? null,
       lastTriggeredAt: cached.value.lastTriggeredAt ?? cached.timestamp ?? null,
       cachedDataDiffersFromTimeRange: differs,
       footerLabel: resolved.footerLabel,
@@ -1316,6 +1348,7 @@ export function useMetricsExplorerGrid() {
           results: preview.results,
           nanGuardApplied: preview.nanGuardApplied,
           sparse: preview.sparse,
+          widenedRateWindow: preview.widenedRateWindow,
           lastTriggeredAt: preview.lastTriggeredAt,
         },
         {
@@ -1365,6 +1398,7 @@ export function useMetricsExplorerGrid() {
         stale: false,
         nanGuardApplied: false,
         sparse: false,
+        widenedRateWindow: null,
         lastTriggeredAt: null,
         cachedDataDiffersFromTimeRange: false,
         footerLabel: resolved.footerLabel,
@@ -1422,6 +1456,10 @@ export function useMetricsExplorerGrid() {
       stale: false,
       nanGuardApplied: false,
       sparse: false,
+      // Carried like `results`: the old (possibly widened) chart stays on
+      // screen while the re-query runs, so a drill-in during that window must
+      // still hand the editor the window that chart is true of.
+      widenedRateWindow: existing?.widenedRateWindow ?? null,
       lastTriggeredAt: existing?.lastTriggeredAt ?? null,
       cachedDataDiffersFromTimeRange: false,
       // Carried with `results` above: a re-query keeps the OLD chart on screen
@@ -1469,11 +1507,54 @@ export function useMetricsExplorerGrid() {
       // calling it empty and hiding it. Gated on `card.hasData` so the long tail
       // of registered-but-never-written metrics — the ones the "With data" filter
       // is FOR — is settled from the stream list without a second query.
-      const sparse =
+      let sparse =
         !results.some(hasSamples) &&
         isRateBasedKind(defaults.cardKind) &&
         card.hasData &&
         (await hasSamplesInWindow(card, step, opts));
+
+      // The samples are THERE — the probe just said so — the window is merely
+      // too narrow to catch two of them, which means the org's configured
+      // scrape interval overstates how often this metric actually arrives.
+      // Before settling for the "too few samples" card, re-ask with wider
+      // windows and chart the data if any of them can. The step stays the
+      // same on purpose: the retry changes how far back each point may look,
+      // not which points the chart is made of.
+      let widenedRateWindow: string | null = null;
+      if (sparse) {
+        for (const rateWindow of computeWidenedRateWindows(
+          rangeSeconds.value,
+          points,
+          scrapeIntervalSeconds.value,
+        )) {
+          const widened = effectiveVariant(card, points, { rateWindow });
+          if (!widened.resolved?.queries.length) break;
+          let retried: any[];
+          try {
+            retried = await runQueries(
+              widened.resolved.queries,
+              step,
+              card.name,
+              opts?.priority ?? PRIORITY.VISIBLE,
+              !!opts?.skipCache,
+            );
+          } catch (error) {
+            // A cancel means the user left this state — abort like any other
+            // request. Any OTHER failure must not escape to the error handler:
+            // the card's own query already succeeded and its honest answer —
+            // sparse — is in hand, so a retry that merely tried to improve on
+            // it settles for it instead of repainting the card as an error.
+            if (isCancelled(error)) throw error;
+            break;
+          }
+          if (retried.some(hasSamples)) {
+            results = retried;
+            sparse = false;
+            widenedRateWindow = rateWindow;
+            break;
+          }
+        }
+      }
 
       // The response outlived the state that asked for it: a bulk clear empties
       // the map and cancels what is in flight, but a request that had ALREADY
@@ -1491,6 +1572,7 @@ export function useMetricsExplorerGrid() {
         stale: false,
         nanGuardApplied,
         sparse,
+        widenedRateWindow,
         // Stamped on the real fetch, and persisted — this is what lets a
         // cache-restored card tell the user how old its data actually is.
         lastTriggeredAt: Date.now(),
@@ -1544,6 +1626,7 @@ export function useMetricsExplorerGrid() {
         stale: previous.length > 0,
         nanGuardApplied: existing?.nanGuardApplied ?? false,
         sparse: existing?.sparse ?? false,
+        widenedRateWindow: existing?.widenedRateWindow ?? null,
         lastTriggeredAt: existing?.lastTriggeredAt ?? null,
         cachedDataDiffersFromTimeRange: existing?.cachedDataDiffersFromTimeRange ?? false,
         // Carried with `results`: this path KEEPS the previous chart up, so it
@@ -1562,7 +1645,11 @@ export function useMetricsExplorerGrid() {
    * Includes the NaN-guarded rewrite: when the first query comes back all-NaN we
    * re-run a *different* query string, so its result lives under a different
    * key. Omitting it here would let a refresh re-serve the stale guarded
-   * response from cache and appear to do nothing.
+   * response from cache and appear to do nothing. The widened-window retries
+   * (see `computeWidenedRateWindows`) are extra query strings for the same
+   * reason, and omitting THEM would be worse than a no-op refresh: the standard
+   * window re-runs live, comes back empty as ever, and the retry then replays
+   * the stale widened response from cache — a refresh that lies.
    */
   const previewKeysOf = (card: MetricCard): string[] => {
     const points = pointsFor(card);
@@ -1573,6 +1660,16 @@ export function useMetricsExplorerGrid() {
       const { resolved } = effectiveVariant(card, points, {
         applyNanGuard: guarded,
       });
+      for (const q of (resolved?.queries ?? []) as any[]) {
+        keys.add(previewCacheKey(q.expr, step));
+      }
+    }
+    for (const rateWindow of computeWidenedRateWindows(
+      rangeSeconds.value,
+      points,
+      scrapeIntervalSeconds.value,
+    )) {
+      const { resolved } = effectiveVariant(card, points, { rateWindow });
       for (const q of (resolved?.queries ?? []) as any[]) {
         keys.add(previewCacheKey(q.expr, step));
       }

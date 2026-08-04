@@ -21,7 +21,7 @@ use std::{
 use axum::http;
 use chrono::Utc;
 #[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
+use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
@@ -107,14 +107,14 @@ pub async fn ingest(
         return Err(Error::IngestionError("Stream name is empty".to_string()));
     }
 
-    // Block user ingestion into reserved self-reporting streams
-    // (usage/stats/triggers/errors/...). The internal self-reporting job writes
+    // Block user ingestion into reserved internal streams
+    // (usage/stats/triggers/errors/slo_slices/...). The internal job writes
     // these via `IngestionRequest::Usage` (for which `should_report_usage()` is
     // false → `need_usage_report == false`), so it is exempt; any other request
     // targeting a reserved stream is a user write and is rejected. Cloud-only:
     // OSS / self-hosted may legitimately use these stream names.
     #[cfg(feature = "cloud")]
-    if need_usage_report && is_reserved_self_reporting_stream(&stream_name) {
+    if need_usage_report && is_reserved_internal_stream(&stream_name) {
         return Err(Error::IngestionError(format!(
             "stream '{stream_name}' is reserved and cannot be ingested into"
         )));

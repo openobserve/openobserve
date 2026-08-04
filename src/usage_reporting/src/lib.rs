@@ -552,7 +552,7 @@ mod tests {
     use config::meta::{
         self_reporting::{
             error::ErrorData,
-            usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+            usage::{RunOutcome, TriggerData, TriggerDataType},
         },
         stream::StreamParams,
     };
@@ -607,7 +607,7 @@ mod tests {
             next_run_at: 1234567890,
             is_realtime: false,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 1234567890,
             end_time: 1234567890,
             retries: 0,
@@ -626,6 +626,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         }
     }
 

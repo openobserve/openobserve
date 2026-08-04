@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #before>
         <div class="border-r4 border-border-default flex h-full flex-col border-r">
           <div class="sticky top-0 shrink-0 px-2">
-            <div class="flex items-center justify-between p-2" style="font-size: var(--text-lg)">
+            <div class="flex items-center justify-between p-2 text-lg">
               <span class="flex items-center gap-1">
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
@@ -418,14 +418,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-h-0 flex-1"
             ref="qTable"
             data-test="nodes-main-table"
-            :data="visibleRows"
+            :data="displayedRows"
             :columns="computedOTableColumns"
             row-key="name"
+            show-index
             pagination="client"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :footer-title="t('nodes.header')"
-            :row-class="(row) => `status-row status-${row.status?.toLowerCase()}`"
+            :row-class="nodeRowClass"
+            :get-row-style="nodeRowStyle"
             sorting="client"
             filter-mode="client"
             :default-columns="false"
@@ -435,6 +437,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :loading="loading"
           >
+            <!-- Health strip: node counts by status, doubling as the status facet.
+                 Attention-first — offline, then starting, then online, Total last. -->
+            <template #subheader>
+              <div
+                class="px-page-edge border-table-row-divider border-b py-1.5"
+                data-test="nodes-summary"
+              >
+                <OStatStrip
+                  :items="summaryStats"
+                  :loading="loading"
+                  selectable
+                  :selected-key="statusFilter"
+                  @select="onStatSelect"
+                />
+              </div>
+            </template>
+
             <template #toolbar>
               <OSearchInput
                 data-test="nodes-search-input"
@@ -459,18 +478,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 preset="no-nodes"
-                :filtered="!!filterQuery"
-                :hide-action="!filterQuery"
-                @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+                :filtered="!!(filterQuery || statusFilter)"
+                :hide-action="!(filterQuery || statusFilter)"
+                @action="
+                  (id) => id === 'clear-filters' && ((filterQuery = ''), (statusFilter = null))
+                "
               />
-            </template>
-
-            <template #cell-id="{ row }">
-              {{ row.id }}
             </template>
 
             <template #cell-name="{ row }">
               {{ row.name }}
+            </template>
+
+            <template #cell-status="{ row }">
+              <OTag type="serviceStatus" :value="row.status" size="sm" />
+            </template>
+
+            <!-- Roles are a category, so they get stable per-role colours from the
+                 nodeRole badge group rather than a severity tone. -->
+            <template #cell-role="{ row }">
+              <span class="flex min-w-0 flex-wrap items-center gap-1">
+                <OTag v-for="r in row.role || []" :key="r" type="nodeRole" :value="r" size="sm" />
+              </span>
             </template>
 
             <template v-if="store.state.zoConfig.super_cluster_enabled" #cell-region="{ row }">
@@ -490,24 +519,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}, T:{{ row.tcp_conns_time_wait }})
             </template>
 
+            <!-- Utilisation: a token-backed proportion bar that turns amber at 70%
+                 and red at 85%, so a saturated node is visible without reading the
+                 number. The track is always drawn, so rows never shift. -->
             <template #cell-cpu="{ row }">
-              <OProgressBar
-                size="sm"
-                class="inline-block w-[80%]! max-w-[80%] bg-[lightgrey]"
-                :value="row.cpu_usage / 100"
-                :variant="row.cpu_usage > 85 ? 'danger' : 'default'"
-              />
-              {{ row.cpu_usage }}%
+              <div class="flex w-full min-w-0 items-center justify-end gap-2">
+                <OProgressBar
+                  size="sm"
+                  class="min-w-0 flex-1"
+                  :value="row.cpu_usage / 100"
+                  :variant="usageVariant(row.cpu_usage)"
+                />
+                <span class="shrink-0 tabular-nums">{{ row.cpu_usage }}%</span>
+              </div>
             </template>
 
             <template #cell-memory="{ row }">
-              <OProgressBar
-                size="sm"
-                class="inline-block w-[80%]! max-w-[80%] bg-[lightgrey]"
-                :value="row.percentage_memory_usage / 100"
-                :variant="row.percentage_memory_usage > 85 ? 'danger' : 'default'"
-              />
-              {{ row.percentage_memory_usage }}%
+              <div class="flex w-full min-w-0 items-center justify-end gap-2">
+                <OProgressBar
+                  size="sm"
+                  class="min-w-0 flex-1"
+                  :value="row.percentage_memory_usage / 100"
+                  :variant="usageVariant(row.percentage_memory_usage)"
+                />
+                <span class="shrink-0 tabular-nums">{{ row.percentage_memory_usage }}%</span>
+              </div>
             </template>
           </OTable>
         </div>
@@ -532,7 +568,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORange from "@/lib/forms/Range/ORange.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -562,6 +601,7 @@ export default defineComponent({
     OSeparator,
     OSplitter,
     OTable,
+    OStatStrip,
   },
   setup() {
     const store = useStore();
@@ -594,8 +634,11 @@ export default defineComponent({
     ];
 
     const computedOTableColumns = computed(() => {
+      // No hand-rolled "#" column — OTable's `show-index` renders the row index as
+      // a fixed, non-resizable, non-hideable gutter. A data column pretending to be
+      // an index is draggable/resizable and stops matching the visible row order the
+      // moment the table is sorted or filtered.
       const columns: OTableColumnDef[] = [
-        { id: "id", header: "#", accessorKey: "id", size: 67, meta: { align: "center" } },
         {
           id: "name",
           header: t("nodes.name"),
@@ -613,6 +656,28 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: 50,
+          meta: { align: "left" },
+        },
+        {
+          id: "status",
+          header: t("nodes.status"),
+          accessorKey: "status",
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.status,
+          minSize: 96,
+          meta: { align: "left" },
+        },
+        {
+          id: "role",
+          header: t("nodes.nodetype"),
+          // Sorts by the joined role list so same-role nodes group together.
+          accessorFn: (row: any) => (row.role || []).join(", "),
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.role,
           meta: { align: "left" },
         },
         {
@@ -655,8 +720,10 @@ export default defineComponent({
           meta: { align: "right" },
         },
       ];
+      // Region/cluster only mean something in a super-cluster. Filter by id rather
+      // than by position so adding a column can't silently drop the wrong one.
       if (!store.state.zoConfig.super_cluster_enabled) {
-        columns.splice(2, 1);
+        return columns.filter((col) => col.id !== "region");
       }
       return columns;
     });
@@ -913,6 +980,7 @@ export default defineComponent({
 
     const clearAll = () => {
       filterQuery.value = "";
+      statusFilter.value = null;
       selectedRegions.value = [];
       selectedClusters.value = [];
       selectedNodetypes.value = [];
@@ -953,6 +1021,132 @@ export default defineComponent({
     const visibleRows = computed(() => {
       if (!filterQuery.value) return tabledata.value || [];
       return filterData(tabledata.value || [], filterQuery.value);
+    });
+
+    // ── Node health — the page's primary signal ──────────────────────────────
+    // The API reports Prepare | Online | Offline; "prepare" is a node that is
+    // starting up and not yet serving traffic.
+    const nodeHealth = (row: any): "offline" | "prepare" | "online" => {
+      const status = String(row?.status ?? "").toLowerCase();
+      if (status === "offline") return "offline";
+      if (status === "prepare") return "prepare";
+      return "online";
+    };
+
+    // Full-row wash for the EXCEPTIONS only — an offline node is a light red, a
+    // starting one amber; healthy nodes stay clean and read from the green rail.
+    const nodeRowClass = (row: any): string => {
+      const h = nodeHealth(row);
+      return h === "offline"
+        ? "!bg-status-error-bg"
+        : h === "prepare"
+          ? "!bg-status-warning-bg"
+          : "";
+    };
+
+    // Extreme-left health rail — inset box-shadow so it paints regardless of
+    // border-collapse; rem width + token colour keep it theme-aware.
+    const nodeRowStyle = (row: any): Record<string, string> => {
+      const h = nodeHealth(row);
+      const color =
+        h === "offline"
+          ? "var(--color-error-500)"
+          : h === "prepare"
+            ? "var(--color-warning-500)"
+            : "var(--color-success-500)";
+      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+    };
+
+    // Utilisation tiers shared by the CPU and memory bars: amber from 70%, red
+    // from 85%, so a saturated node stands out before it is a problem.
+    const usageVariant = (usage: unknown): ProgressBarVariant => {
+      const n = Number(usage);
+      if (!Number.isFinite(n)) return "default";
+      if (n > 85) return "danger";
+      if (n > 70) return "warning";
+      return "default";
+    };
+
+    // ── Health facet + summary strip ─────────────────────────────────────────
+    // Counts run over the search-filtered rows (not the facet-filtered ones) so
+    // the tiles keep their totals while a facet is active.
+    const statusFilter = ref<"offline" | "prepare" | "online" | null>(null);
+
+    const displayedRows = computed(() => {
+      const rows = visibleRows.value || [];
+      const f = statusFilter.value;
+      if (!f) return rows;
+      return rows.filter((row: any) => nodeHealth(row) === f);
+    });
+
+    const onStatSelect = (key: string) => {
+      if (key === "total") {
+        statusFilter.value = null;
+        return;
+      }
+      statusFilter.value =
+        statusFilter.value === key ? null : (key as "offline" | "prepare" | "online");
+    };
+
+    const healthCounts = computed(() => {
+      const rows = visibleRows.value || [];
+      let offline = 0;
+      let prepare = 0;
+      let online = 0;
+      for (const row of rows) {
+        const h = nodeHealth(row);
+        if (h === "offline") offline += 1;
+        else if (h === "prepare") prepare += 1;
+        else online += 1;
+      }
+      return { offline, prepare, online, total: rows.length };
+    });
+
+    const summaryStats = computed<StatItem[]>(() => {
+      const c = healthCounts.value;
+      const hasData = c.total > 0;
+      const v = (n: number): string | number => (hasData ? n : "—");
+      const share = hasData ? c.total : undefined;
+      return [
+        {
+          key: "offline",
+          label: t("nodes.summaryOffline"),
+          value: v(c.offline),
+          icon: "error-outline",
+          tone: "error",
+          max: share,
+          dataTest: "nodes-summary-offline",
+        },
+        {
+          key: "prepare",
+          label: t("nodes.summaryStarting"),
+          value: v(c.prepare),
+          icon: "hourglass-empty",
+          tone: "warning",
+          max: share,
+          dataTest: "nodes-summary-prepare",
+        },
+        {
+          key: "online",
+          label: t("nodes.summaryOnline"),
+          value: v(c.online),
+          icon: "check-circle",
+          tone: "success",
+          max: share,
+          dataTest: "nodes-summary-online",
+        },
+        {
+          key: "total",
+          label: t("nodes.summaryTotal"),
+          value: v(c.total),
+          icon: "hub",
+          tone: "primary",
+          // Clickable (it CLEARS the status facet) but never shows the ring — the
+          // selected key is only ever a real status, never "total". No bar: its
+          // share of itself is always 100%.
+          dataTest: "nodes-summary-total",
+        },
+      ];
     });
 
     // Pre-filter for sidebar region table
@@ -1005,6 +1199,14 @@ export default defineComponent({
       loading,
       tabledata,
       computedOTableColumns,
+      nodeHealth,
+      nodeRowClass,
+      nodeRowStyle,
+      usageVariant,
+      statusFilter,
+      displayedRows,
+      onStatSelect,
+      summaryStats,
       splitterModel,
       getData,
       resultTotal,

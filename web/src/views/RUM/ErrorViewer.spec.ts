@@ -184,9 +184,6 @@ describe("ErrorViewer.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          QSeparator: {
-            template: "<hr data-test='separator' />",
-          },
           OSeparator: {
             template: "<hr data-test='separator' />",
           },

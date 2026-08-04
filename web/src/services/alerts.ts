@@ -228,6 +228,28 @@ const alerts = {
   retrain_by_id: (org_identifier: string, alert_id: string) => {
     return http().patch(`/api/v2/${org_identifier}/alerts/${alert_id}/retrain`);
   },
+  // GET /api/v2/{org}/alerts/{id}/groups — per-group states of a multi-alert,
+  // most severe first, plus the PRE-cap counts the "N of M firing" chip needs.
+  // Empty list for alerts that have not opted in to per-group evaluation.
+  list_groups: (org_identifier: string, alert_id: string) => {
+    return http().get(`/api/v2/${org_identifier}/alerts/${alert_id}/groups`);
+  },
+  // GET /api/v2/{org}/alerts/{id}/groups/transitions — per-group level history
+  // (M-8). Reads the durable transitions table, not the triggers stream, so
+  // history survives a group being reaped. Omit group_key for every group.
+  list_group_transitions: (
+    org_identifier: string,
+    alert_id: string,
+    group_key?: string,
+    limit = 100,
+  ) => {
+    const params = new URLSearchParams();
+    if (group_key) params.append("group_key", group_key);
+    params.append("limit", String(limit));
+    return http().get(
+      `/api/v2/${org_identifier}/alerts/${alert_id}/groups/transitions?${params.toString()}`,
+    );
+  },
 };
 
 export default alerts;

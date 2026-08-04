@@ -54,7 +54,9 @@ const CHROME_USE = {
   ...devices['Desktop Chrome'],
   viewport: { width: 1500, height: 1024 },
   permissions: ['clipboard-read', 'clipboard-write'],
-  // Reuse auth state from global setup (Dex email login)
+  // Reuse auth state from global setup (Dex email login). Filename is canonical;
+  // multi-user splitting happens at the CI layer (each shard downloads its own
+  // user's artifact into this path). See global-setup-alpha1.js AUTH_FILE.
   storageState: path.join(__dirname, 'playwright-tests/utils/auth/user.json'),
 };
 

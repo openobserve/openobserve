@@ -87,6 +87,7 @@ pub async fn add_alert_to_incident(
     incident_id: &str,
     alert_id: &str,
     alert_name: &str,
+    alert_kind: &str,
     alert_fired_at: i64,
     correlation_reason: &str,
 ) -> Result<bool, errors::Error> {
@@ -129,6 +130,7 @@ pub async fn add_alert_to_incident(
         alert_id: Set(alert_id.to_string()),
         alert_fired_at: Set(alert_fired_at),
         alert_name: Set(alert_name.to_string()),
+        alert_kind: Set(alert_kind.to_string()),
         correlation_reason: Set(Some(correlation_reason.to_string())),
         created_at: Set(now),
     };
@@ -309,6 +311,38 @@ pub async fn find_open_incident_by_alert_id(
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Status.ne("resolved"))
         .filter(alert_incidents::Column::KeyType.eq("AlertId"))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Find the open incident (of any key type) that a given alert_id currently
+/// belongs to, via the junction table. Unlike `find_open_incident_by_alert_id`,
+/// this does not filter to `KeyType::AlertId` — used to locate an incident to
+/// auto-resolve when its source alert clears, regardless of how it was
+/// originally correlated.
+pub async fn find_open_incident_containing_alert(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let rows = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if rows.is_empty() {
+        return Ok(None);
+    }
+
+    let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
+
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
         .filter(alert_incidents::Column::Id.is_in(incident_ids))
         .one(client)
         .await

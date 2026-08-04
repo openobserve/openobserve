@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { test as base } from '@playwright/test';
 import fs from 'fs';
 import { AlertDestinationsPage } from './alertDestinationsPage.js';
+import { openNavFlyoutChild } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class AlertTemplatesPage {
@@ -9,10 +10,11 @@ export class AlertTemplatesPage {
         this.page = page;
         this.alertDestinationsPage = new AlertDestinationsPage(page);
         
-        // Navigation locators
-        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
-        this.templatesTab = '[data-test="alert-templates-tab"]';
-        
+        // Navigation: Templates moved out of Settings into the Reliability nav
+        // group, so there is no settings tab to click — use
+        // openNavFlyoutChild(page, 'templates'). The list table selector lives
+        // on `templateTable` below.
+
         // Template creation locators
         this.addTemplateButton = '[data-test="template-list-add-btn"]';
         // OInput wrapper (use for visibility/state assertions); inner native input gets `-field` suffix
@@ -74,16 +76,16 @@ export class AlertTemplatesPage {
             // Try URL-based navigation first (more reliable than menu clicking)
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
             const orgIdentifier = process.env.ORGNAME || 'default';
-            const templatesUrl = `${baseUrl}/web/settings/templates?org_identifier=${orgIdentifier}`;
+            const templatesUrl = `${baseUrl}/web/alert-templates?org_identifier=${orgIdentifier}`;
 
             try {
                 await this.page.goto(templatesUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
                 await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForTimeout(2000);
 
-                // Check if templates page loaded (look for templates tab content or add button)
+                // Check if templates page loaded (add button or the list table)
                 const addBtn = this.page.locator(this.addTemplateButton);
-                const templatesContent = this.page.locator('[data-test="alert-templates-tab"], [class*="template"]').first();
+                const templatesContent = this.page.locator(this.templateTable).first();
                 const addBtnVisible = await addBtn.isVisible({ timeout: 3000 }).catch(() => false);
                 const contentVisible = await templatesContent.isVisible({ timeout: 3000 }).catch(() => false);
 
@@ -95,13 +97,8 @@ export class AlertTemplatesPage {
                 testLogger.warn('URL navigation to templates failed, trying menu path', { error: navError.message });
             }
 
-            // Fallback: Navigate via Settings menu
-            await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 15000 });
-            await this.page.locator(this.settingsMenuItem).click();
-            await this.page.waitForTimeout(2000);
-
-            await this.page.locator(this.templatesTab).waitFor({ state: 'visible', timeout: 15000 });
-            await this.page.locator(this.templatesTab).click();
+            // Fallback: navigate via the Reliability nav group (it left Settings).
+            await openNavFlyoutChild(this.page, 'templates');
             await this.page.waitForTimeout(2000);
 
             // Wait for templates page to load
@@ -745,7 +742,7 @@ export class AlertTemplatesPage {
         // The URL with action=import triggers TemplateList's onMounted → getTemplates → updateRoute → showImportTemplate
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const orgIdentifier = process.env.ORGNAME || 'default';
-        const importUrl = `${baseUrl}/web/settings/templates?org_identifier=${orgIdentifier}&action=import`;
+        const importUrl = `${baseUrl}/web/alert-templates?org_identifier=${orgIdentifier}&action=import`;
 
         try {
             await this.page.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -1219,7 +1216,7 @@ export class AlertTemplatesPage {
     async navigateToTemplatesPage() {
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const orgIdentifier = process.env.ORGNAME || 'default';
-        const templatesUrl = `${baseUrl}/web/settings/templates?org_identifier=${orgIdentifier}`;
+        const templatesUrl = `${baseUrl}/web/alert-templates?org_identifier=${orgIdentifier}`;
         await this.page.goto(templatesUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
         testLogger.info('Navigated directly to templates page via URL');

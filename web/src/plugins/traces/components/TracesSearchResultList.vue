@@ -37,115 +37,213 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div data-test="traces-search-result-list" class="relative h-auto! w-full">
-        <TenstackTable
-          class="h-auto!"
-          :columns="searchObj.data.resultGrid.columns"
-          :rows="hits"
-          :loading="loading"
-          :row-class="traceRowClass"
-          :sort-by="props.sortBy"
-          :sort-order="props.sortOrder"
-          :sort-field-map="sortFieldMap"
-          :row-height="28"
-          :scroll-el="scrollEl"
-          :scroll-margin="0"
-          :enable-column-reorder="true"
-          :enable-row-expand="false"
-          :enable-text-highlight="false"
-          :enable-status-bar="false"
-          :default-columns="false"
-          @click:data-row="(row: any) => emit('row-click', row)"
-          @sort-change="(by, order) => emit('sort-change', by, order)"
-          @update:columnOrder="onColumnReorder"
-          @closeColumn="onCloseColumn"
-        >
-          <template #cell-actions="{ row, column, active }">
-            <CellActions
-              v-if="showCellActions && active && !column.columnDef.meta.disableCellAction"
-              :column="column"
-              :row="row"
-              :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
-              :hide-search-term-actions="false"
-              :hide-ai="true"
-              @copy="copyToClipboard(column.id, row[column.id])"
-              @add-search-term="(field, value, action) => addSearchTerm(field, value, action, row)"
-              @send-to-ai-chat="sendToAiChat"
-            />
+        <!-- Row/cell actions live in a right-click context menu, same as logs:
+             anchored to the pointer, so every cell can offer actions regardless
+             of how narrow it is. -->
+        <OContextMenu @update:open="onContextMenuOpenChange">
+          <template #trigger>
+            <div class="contents" @contextmenu.capture="handleTableContextMenu">
+              <OTable
+                class="h-auto!"
+                :columns="searchObj.data.resultGrid.columns"
+                :data="hits"
+                :loading="loading"
+                :row-class="traceRowClass"
+                sorting="server"
+                :sort-by="props.sortBy"
+                :sort-order="props.sortOrder"
+                :sort-field-map="sortFieldMap"
+                :row-height="28"
+                virtual-scroll
+                :fill-height="false"
+                :scroll-el="scrollEl"
+                :scroll-margin="0"
+                :horizontal-scroll="true"
+                :enable-column-reorder="true"
+                :enable-column-resize="true"
+                :pinned-first-column="timestampCol"
+                :default-columns="false"
+                :show-global-filter="false"
+                pagination="none"
+                @row-click="(row: any) => emit('row-click', row)"
+                @sort-change="onSortChange"
+                @column-order-change="onColumnReorder"
+                @close-column="onCloseColumn"
+                @cell-contextmenu="handleCellContextMenu"
+              >
+                <!-- `column` is the OTableColumnDef, so `column.meta` (not
+               `column.columnDef.meta`) holds disableCellAction. -->
+                <template #cell-hover-actions="{ row, column, active }">
+                  <CellActions
+                    v-if="
+                      showCellActions &&
+                      active &&
+                      !contextMenuOpen &&
+                      !column.meta?.disableCellAction
+                    "
+                    :column="column"
+                    :row="row"
+                    :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
+                    :hide-search-term-actions="false"
+                    :hide-ai="true"
+                    @copy="copyToClipboard(column.id, row[column.id])"
+                    @add-search-term="
+                      (field, value, action) => addSearchTerm(field, value, action, row)
+                    "
+                    @send-to-ai-chat="sendToAiChat"
+                  />
+                </template>
+
+                <template #[`cell-${store.state.zoConfig.timestamp_column}`]="{ value }">
+                  <TraceTimestampCell :value="value" />
+                </template>
+
+                <template #cell-service_name="{ row }">
+                  <TraceServiceCell :item="row" />
+                </template>
+
+                <template #cell-operation_name="{ row }">
+                  <span
+                    class="text-text-body truncate text-xs"
+                    data-test="trace-row-operation-name"
+                  >
+                    {{ row.operation_name }}
+                    <OTooltip :content="row.operation_name" side="bottom" align="center" />
+                  </span>
+                </template>
+
+                <template #cell-duration="{ row }">
+                  <span class="text-text-body font-mono text-xs" data-test="trace-row-duration">
+                    {{ formatTimeWithSuffix(row.duration) || "0us" }}
+                  </span>
+                </template>
+
+                <template #cell-spans="{ row }">
+                  <span class="text-text-body font-mono text-xs" data-test="trace-row-spans">
+                    {{ row.spans }}
+                  </span>
+                </template>
+
+                <template #cell-status_code="{ row }">
+                  <SpanStatusCodeBadge :code="row.http_status_code" />
+                </template>
+
+                <template #cell-span_status="{ row }">
+                  <SpanStatusPill :status="row.span_status" />
+                </template>
+
+                <template #cell-status="{ row }">
+                  <TraceStatusCell :item="row" />
+                </template>
+                <template #cell-input_tokens="{ row }">
+                  <span class="text-text-body font-mono text-xs" data-test="trace-row-input-tokens">
+                    {{
+                      isLLMTrace(row) ? formatTokens(extractLLMData(row)?.usage?.input ?? 0) : "-"
+                    }}
+                  </span>
+                </template>
+
+                <template #cell-output_tokens="{ row }">
+                  <span
+                    class="text-text-body font-mono text-xs"
+                    data-test="trace-row-output-tokens"
+                  >
+                    {{
+                      isLLMTrace(row) ? formatTokens(extractLLMData(row)?.usage?.output ?? 0) : "-"
+                    }}
+                  </span>
+                </template>
+
+                <template #cell-cost="{ row }">
+                  <span class="text-text-body font-mono text-xs" data-test="trace-row-cost">
+                    {{
+                      isLLMTrace(row)
+                        ? `$${formatCost(extractLLMData(row)?.cost?.total ?? 0)}`
+                        : "-"
+                    }}
+                  </span>
+                </template>
+
+                <template #cell-service_latency="{ row }">
+                  <TraceLatencyCell :item="row" />
+                </template>
+
+                <template #empty><div /></template>
+              </OTable>
+            </div>
           </template>
 
-          <template #[`cell-${store.state.zoConfig.timestamp_column}`]="{ cell }">
-            <TraceTimestampCell :value="cell.getValue()" />
-          </template>
+          <!-- Actions apply to the cell that was right-clicked. `contextCell` is
+               recorded by the table's @cell-contextmenu, which fires before
+               reka-ui opens the menu, so the content is always in sync with the
+               pointer. -->
+          <template v-if="contextCell">
+            <OContextMenuLabel data-test="trace-context-menu-field">
+              {{ contextCell.columnId }}
+            </OContextMenuLabel>
+            <OContextMenuSeparator />
 
-          <template #cell-service_name="{ item }">
-            <TraceServiceCell :item="item" />
-          </template>
+            <OContextMenuItem
+              icon-left="content-copy"
+              data-test="trace-context-menu-copy-value"
+              @select="copyToClipboard(contextCell.columnId, contextCell.value)"
+            >
+              {{ t("logs.cellActions.copy") }}
+            </OContextMenuItem>
 
-          <template #cell-operation_name="{ item }">
-            <span class="text-text-body truncate text-xs" data-test="trace-row-operation-name">
-              {{ item.operation_name }}
-              <OTooltip :content="item.operation_name" side="bottom" align="center" />
-            </span>
-          </template>
+            <template v-if="contextCellIsStreamField">
+              <OContextMenuItem
+                data-test="trace-context-menu-include-term"
+                @select="
+                  addSearchTerm(
+                    contextCell.columnId,
+                    toSearchTermValue(contextCell.value),
+                    'include',
+                    contextCell.row,
+                  )
+                "
+              >
+                <!-- size="sm" matches the registry icons on the other items so the
+                  labels line up; the glyph is inset because it fills its viewBox
+                  edge-to-edge, unlike Material Symbols. -->
+                <template #icon-left>
+                  <OIcon name="" size="sm">
+                    <EqualIcon class="size-3" />
+                  </OIcon>
+                </template>
+                {{ t("logs.cellActions.includeTerm") }}
+              </OContextMenuItem>
 
-          <template #cell-duration="{ item }">
-            <span class="text-text-body font-mono text-xs" data-test="trace-row-duration">
-              {{ formatTimeWithSuffix(item.duration) || "0us" }}
-            </span>
+              <OContextMenuItem
+                data-test="trace-context-menu-exclude-term"
+                @select="
+                  addSearchTerm(
+                    contextCell.columnId,
+                    toSearchTermValue(contextCell.value),
+                    'exclude',
+                    contextCell.row,
+                  )
+                "
+              >
+                <template #icon-left>
+                  <OIcon name="" size="sm">
+                    <NotEqualIcon class="size-3" />
+                  </OIcon>
+                </template>
+                {{ t("logs.cellActions.excludeTerm") }}
+              </OContextMenuItem>
+            </template>
           </template>
-
-          <template #cell-spans="{ item }">
-            <span class="text-text-body font-mono text-xs" data-test="trace-row-spans">
-              {{ item.spans }}
-            </span>
-          </template>
-
-          <template #cell-status_code="{ item }">
-            <SpanStatusCodeBadge :code="item.http_status_code" />
-          </template>
-
-          <template #cell-span_status="{ item }">
-            <SpanStatusPill :status="item.span_status" />
-          </template>
-
-          <template #cell-status="{ item }">
-            <TraceStatusCell :item="item" />
-          </template>
-          <template #cell-input_tokens="{ item }">
-            <span class="text-text-body font-mono text-xs" data-test="trace-row-input-tokens">
-              {{ isLLMTrace(item) ? formatTokens(extractLLMData(item)?.usage?.input ?? 0) : "-" }}
-            </span>
-          </template>
-
-          <template #cell-output_tokens="{ item }">
-            <span class="text-text-body font-mono text-xs" data-test="trace-row-output-tokens">
-              {{ isLLMTrace(item) ? formatTokens(extractLLMData(item)?.usage?.output ?? 0) : "-" }}
-            </span>
-          </template>
-
-          <template #cell-cost="{ item }">
-            <span class="text-text-body font-mono text-xs" data-test="trace-row-cost">
-              {{
-                isLLMTrace(item) ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}` : "-"
-              }}
-            </span>
-          </template>
-
-          <template #cell-service_latency="{ item }">
-            <TraceLatencyCell :item="item" />
-          </template>
-
-          <template #empty />
-        </TenstackTable>
+        </OContextMenu>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
-import TenstackTable from "@/components/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import { useTracesTableColumns } from "@/plugins/traces/composables/useTracesTableColumns";
@@ -158,9 +256,17 @@ import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
 import { formatTimeWithSuffix } from "../../../utils/zincutils";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OContextMenu from "@/lib/overlay/ContextMenu/OContextMenu.vue";
+import OContextMenuItem from "@/lib/overlay/ContextMenu/OContextMenuItem.vue";
+import OContextMenuLabel from "@/lib/overlay/ContextMenu/OContextMenuLabel.vue";
+import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparator.vue";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TracesNoEventsState from "@/plugins/traces/TracesNoEventsState.vue";
 
 interface Props {
@@ -268,6 +374,87 @@ const addSearchTerm = (
 
 const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
+// ── Right-click cell actions ──────────────────────────────────────────────
+// Mirrors the logs table: the menu is anchored to the pointer so every cell can
+// offer actions, however narrow. Held as plain values (not the TanStack cell) so
+// the menu keeps rendering correctly if the virtualizer recycles the row under it.
+interface ContextCell {
+  columnId: string;
+  value: unknown;
+  row: Record<string, any>;
+}
+
+const { t } = useI18n();
+
+const contextCell = ref<ContextCell | null>(null);
+
+// Filters take a primitive; objects/arrays would stringify to "[object Object]".
+const toSearchTermValue = (value: unknown): string | number | boolean => {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (value === null || value === undefined) return "null";
+  return JSON.stringify(value);
+};
+
+const contextCellIsStreamField = computed(() => {
+  const columnId = contextCell.value?.columnId;
+  if (!columnId) return false;
+  const fields = (searchObj.data.stream.selectedStreamFields ?? []) as any[];
+  return fields.find((field: any) => field.name === columnId)?.isSchemaField ?? false;
+});
+
+// Capture-phase gate: only data cells offer actions, so right-clicking a header
+// leaves the native menu alone. reka-ui checks `defaultPrevented` before opening.
+const DATA_CELL_SELECTOR = "td[data-test^='o2-table-cell-']";
+
+const handleTableContextMenu = (event: MouseEvent) => {
+  contextCell.value = null;
+  const target = event.target;
+  if (!(target instanceof Element) || !target.closest?.(DATA_CELL_SELECTOR)) {
+    event.preventDefault();
+  }
+};
+
+const handleCellContextMenu = (params: { columnId: string; row: any; value: any }) => {
+  contextCell.value = {
+    columnId: params.columnId,
+    value: params.value,
+    row: (params.row ?? {}) as Record<string, any>,
+  };
+};
+
+// While the context menu is open the hover overlay offers the same actions, so
+// the two would sit on screen at once. Track open state and hide the overlay.
+const contextMenuOpen = ref(false);
+
+// Drop the reference on close so a recycled virtual row can't be held alive.
+const onContextMenuOpenChange = (open: boolean) => {
+  contextMenuOpen.value = open;
+  if (!open) contextCell.value = null;
+};
+
+/**
+ * OTable's server sort cycles asc → desc → cleared, but a trace list is never
+ * unsorted: it always falls back to `start_time desc`. Mapping the cleared tick
+ * straight to that default made the sort a dead end — the list starts on
+ * `start_time desc`, so the first click on the timestamp column IS the cleared
+ * tick, and it just re-applied desc. Ascending was unreachable.
+ *
+ * The pre-migration table had no cleared state at all — it toggled
+ * `desc ⇄ asc` on the active column:
+ *   field === sortBy ? (sortOrder === "desc" ? "asc" : "desc") : "desc"
+ * so treat "cleared" as "flip the current order" to restore that.
+ */
+const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
+  if (!params.column) {
+    const field = props.sortBy || "start_time";
+    emit("sort-change", field, props.sortOrder === "desc" ? "asc" : "desc");
+  } else {
+    emit("sort-change", params.column, params.order);
+  }
+};
+
 const { searchObj, updatedLocalLogFilterField } = useTraces();
 const { buildColumns } = useTracesTableColumns();
 
@@ -352,5 +539,12 @@ const hasResults = computed(() => props.searchPerformed && props.hits.length > 0
 /* keep(complex-state): :deep override to square off the child table's corners */
 .traces-table-container :deep(.table-container) {
   border-radius: 0 !important;
+}
+
+/* keep(generated-content): the error-row left border. `traceRowClass` puts
+   `oz-table__row--error` on table-rendered <tr>s and the rule reaches their
+   <td>, hence :deep. Mirrors PlayerTracesTab's `trace-row--error`. */
+.traces-table-container :deep(.oz-table__row--error td:first-child) {
+  box-shadow: inset 0.125rem 0 0 0 var(--color-status-error-text);
 }
 </style>

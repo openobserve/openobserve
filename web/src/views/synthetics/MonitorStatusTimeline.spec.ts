@@ -28,6 +28,13 @@ interface TimelineExecution {
   errorSnippet: string | null;
 }
 
+interface StatusTally {
+  passed: number;
+  warning: number;
+  failed: number;
+  total: number;
+}
+
 interface TimelineSegment {
   runId: string;
   status: "all-pass" | "all-warning" | "mixed" | "all-fail";
@@ -35,6 +42,7 @@ interface TimelineSegment {
   title: string;
   timestampMs: number;
   executions: TimelineExecution[];
+  tally: StatusTally;
 }
 
 function makePassExec(overrides?: Partial<TimelineExecution>): TimelineExecution {
@@ -59,16 +67,31 @@ function makeFailExec(overrides?: Partial<TimelineExecution>): TimelineExecution
   };
 }
 
-function makeSegment(overrides?: Partial<TimelineSegment>): TimelineSegment {
+/** Mirrors the parent's `tallyStatuses`: three buckets that sum to the total. */
+function tallyOf(executions: TimelineExecution[]): StatusTally {
+  const passed = executions.filter((e) => e.status === "pass").length;
+  const warning = executions.filter((e) => e.status === "warning").length;
   return {
+    passed,
+    warning,
+    failed: executions.length - passed - warning,
+    total: executions.length,
+  };
+}
+
+function makeSegment(overrides?: Partial<TimelineSegment>): TimelineSegment {
+  const base = {
     runId: "run-001",
-    status: "all-pass",
+    status: "all-pass" as const,
     color: "bg-[var(--color-badge-success-solid-bg)]",
     title: "Passed",
     timestampMs: 1_700_000_000_000,
     executions: [makePassExec()],
     ...overrides,
   };
+  // Derived by default so a fixture cannot state counts that contradict its own
+  // executions — the exact drift this tally was introduced to remove.
+  return { tally: tallyOf(base.executions), ...base };
 }
 
 const defaultProps = {

@@ -323,14 +323,14 @@ test.describe("Landing Page Test Cases", () => {
         }
       },
       {
-        name: 'Settings - Alert Destinations',
+        name: 'Reliability - Notification Destinations',
         navigate: async () => {
           await pm.homePage.navigateToAlertDestinations();
         },
-        urlPattern: /alert_destinations/,
+        urlPattern: /alert-destinations/,
         uiChecks: async () => {
           await pm.homePage.validateSettingsAlertDestinationsPageElements();
-          testLogger.info('Settings - Alert Destinations: Validated add destination button');
+          testLogger.info('Reliability - Notification Destinations: Validated add destination button');
         }
       },
       {
@@ -350,14 +350,14 @@ test.describe("Landing Page Test Cases", () => {
         skipIfNotVisible: true
       },
       {
-        name: 'Settings - Templates',
+        name: 'Reliability - Templates',
         navigate: async () => {
           await pm.homePage.navigateToTemplates();
         },
-        urlPattern: /templates/,
+        urlPattern: /alert-templates/,
         uiChecks: async () => {
           await pm.homePage.validateSettingsTemplatesPageElements();
-          testLogger.info('Settings - Templates: Validated add template button');
+          testLogger.info('Reliability - Templates: Validated add template button');
         }
       },
       {

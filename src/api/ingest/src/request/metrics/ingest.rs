@@ -31,8 +31,7 @@ use openobserve_core::auth::UserEmail;
 use openobserve_core::ingestion::check_ingestion_allowed;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
     service::metrics,
 };
 

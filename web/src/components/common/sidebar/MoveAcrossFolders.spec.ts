@@ -41,7 +41,7 @@ vi.mock("./SelectFolderDropDown.vue", () => ({
     name: "SelectFolderDropDown",
     template:
       "<div class='select-folder-dropdown' @folder-selected=\"$emit('folder-selected', $event)\"></div>",
-    props: ["type", "activeFolderId"],
+    props: ["type", "activeFolderId", "excludeFolderId"],
     emits: ["folder-selected"],
   },
 }));
@@ -513,14 +513,28 @@ describe("MoveAcrossFolders.vue", () => {
   });
 
   // Test 29: Initial selected folder setup
-  it("should initialize selected folder correctly from store", () => {
+  // The destination starts empty, NOT on the active folder. Seeding it there put
+  // the same folder name in both fields and read as "move this to where it
+  // already is"; the picker now excludes the active folder outright, so a seeded
+  // value would also name something the list cannot offer.
+  it("should initialize the destination empty rather than on the active folder", () => {
     wrapper = createWrapper({
       activeFolderId: "folder1",
       type: "alerts",
     });
 
-    expect(wrapper.vm.selectedFolder.label).toBe("Test Folder 1");
-    expect(wrapper.vm.selectedFolder.value).toBe("folder1");
+    expect(wrapper.vm.selectedFolder.label).toBe("");
+    expect(wrapper.vm.selectedFolder.value).toBe("");
+  });
+
+  it("should exclude the active folder from the destination picker", () => {
+    wrapper = createWrapper({
+      activeFolderId: "folder1",
+      type: "alerts",
+    });
+
+    const dropdown = wrapper.findComponent({ name: "SelectFolderDropDown" });
+    expect(dropdown.props("excludeFolderId")).toBe("folder1");
   });
 
   // Test 30: Form submission with empty moduleId
@@ -568,11 +582,11 @@ describe("MoveAcrossFolders.vue", () => {
   });
 
   // Test 34: Component exposes selectedFolder as a ref
-  it("should expose selectedFolder with correct initial value", () => {
+  it("should expose selectedFolder, unset until the author picks one", () => {
     wrapper = createWrapper({ activeFolderId: "folder1", type: "alerts" });
     expect(wrapper.vm.selectedFolder).toBeDefined();
-    expect(wrapper.vm.selectedFolder.value).toBe("folder1");
-    expect(wrapper.vm.selectedFolder.label).toBe("Test Folder 1");
+    expect(wrapper.vm.selectedFolder.value).toBe("");
+    expect(wrapper.vm.selectedFolder.label).toBe("");
   });
 
   // Test 35: onSubmit function existence
@@ -645,7 +659,11 @@ describe("MoveAcrossFolders.vue", () => {
   });
 
   // Test 40: primaryButtonDisabled with null selectedFolder value
-  it("should compute primaryButtonDisabled=false when selectedFolder value is null", async () => {
+  // Inverted deliberately. This asserted that a null destination ENABLES Move —
+  // which submits `dst_folder_id: null`. "Not the active folder" is not the same
+  // as "somewhere to move to", and the empty destination the dialog now opens in
+  // makes that state reachable on every open rather than only via a stray emit.
+  it("should keep Move disabled when the destination is empty or null", async () => {
     mockUseLoading.mockImplementation((fn: any) => ({
       execute: vi.fn().mockImplementation(async () => fn && (await fn())),
       isLoading: { value: false },
@@ -656,13 +674,15 @@ describe("MoveAcrossFolders.vue", () => {
       type: "alerts",
     });
 
-    // selectedFolder.value mutated to a non-matching object — drive via the public dropdown event
+    const drawer = wrapper.findComponent(ODialogStub);
+    // Unset on open — nothing has been chosen yet.
+    expect(drawer.props("primaryButtonDisabled")).toBe(true);
+
     const selectDropdown = wrapper.findComponent({ name: "SelectFolderDropDown" });
     await selectDropdown.vm.$emit("folder-selected", { value: null, label: "None" });
     await nextTick();
 
-    const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonDisabled")).toBe(false);
+    expect(drawer.props("primaryButtonDisabled")).toBe(true);
   });
 
   // Test 41: Handles API error gracefully when move fails

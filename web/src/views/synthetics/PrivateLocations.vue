@@ -1,4 +1,19 @@
-// Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <OTable
@@ -116,11 +131,11 @@
             variant="ghost-destructive"
             size="icon-sm"
             icon-left="delete"
-            :disabled="(row as any).monitors_count > 0"
+            :disabled="checksUsing(row) > 0"
             :title="
-              (row as any).monitors_count > 0
+              checksUsing(row) > 0
                 ? t('synthetics.privateLocations.deleteBlocked', {
-                    count: (row as any).monitors_count,
+                    count: checksUsing(row),
                   })
                 : t('synthetics.table.delete')
             "
@@ -184,6 +199,22 @@ const filteredLocations = computed(() => {
   );
 });
 
+/**
+ * How many checks reference this location — the delete guard.
+ *
+ * The API field was renamed `monitors_count` -> `checks_count`; both are read so
+ * a bundle and a server on opposite sides of that rename still guard correctly.
+ *
+ * Falls back to 1, not 0, when neither field is present. This gate exists to stop
+ * deleting a location that checks still point at, so an unknown count must block
+ * the delete rather than allow it — reading a renamed field as `undefined` is
+ * exactly how it silently stopped guarding.
+ */
+const checksUsing = (row: unknown): number => {
+  const r = row as { checks_count?: number; monitors_count?: number };
+  return r.checks_count ?? r.monitors_count ?? 1;
+};
+
 const statusVariant = (status: string) =>
   status === "online" ? "success" : status === "offline" ? "error" : "default";
 
@@ -239,7 +270,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "monitors",
     header: t("synthetics.privateLocations.table.checks"),
-    accessorKey: "monitors_count",
+    accessorKey: "checks_count",
     size: 90,
     minSize: 70,
     sortable: true,
