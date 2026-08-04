@@ -3340,6 +3340,25 @@ export class LogsPage {
         }, this.queryEditor);
     }
 
+    /**
+     * Read the query-editor text, polling until it is populated. Monaco is lazy-loaded and
+     * prefills its model asynchronously (e.g. after a saved view is applied on a fresh page
+     * load), so a one-shot read can catch an empty editor and return "". Poll instead: return
+     * the text once it is non-empty (or contains `expectedSubstring` when given). If the editor
+     * never populates, expect.poll throws on timeout — so a genuine prefill failure still fails
+     * the test rather than being masked.
+     * @param {string} [expectedSubstring] substring that must be present before returning
+     * @param {number} [timeout] max time to wait for the editor to populate, ms
+     */
+    async getQueryEditorTextWhenReady(expectedSubstring = '', timeout = 15000) {
+        let last = '';
+        await expect.poll(async () => {
+            last = (await this.getQueryEditorText()) || '';
+            return expectedSubstring ? last.includes(expectedSubstring) : last.trim().length > 0;
+        }, { timeout, intervals: [300, 500, 800, 1200] }).toBe(true);
+        return last;
+    }
+
     async clickLogTableColumnSource() {
         // Open the first result row's detail/search-around. With the FTS
         // default-column feature the first cell may be the generic "source"
