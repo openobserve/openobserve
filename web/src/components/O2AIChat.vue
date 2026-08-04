@@ -3638,6 +3638,13 @@ export default defineComponent({
     // after the stream ends and restores the conversation.
     const streamOwnerUnavailable = ref(false);
 
+    // Shown after a successful restore. Says plainly that only the dialogue came
+    // back, because the assistant no longer holds the tool results, files or
+    // permission decisions from before the interruption — continuing as if it
+    // did is how a restored conversation gives confidently wrong answers.
+    const RESTORED_NOTICE =
+      "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
+
     const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
       // `unknown`, not `any`: this comes straight from response.json(), so the
       // shape is whatever the server sent. Narrow before reading, or a
@@ -4269,6 +4276,13 @@ export default defineComponent({
       let hasReseeded = false;
       let reseedNotice = false;
 
+      // Clear any flag left over from a previous turn. processStream sets this,
+      // but the clear at the end of the try block is skipped whenever the turn
+      // throws or is aborted after the flag was set — and a stale `true` makes
+      // the NEXT turn abandon a perfectly healthy session, mint a new id, and
+      // re-post the whole transcript with a false "interrupted" notice.
+      streamOwnerUnavailable.value = false;
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
@@ -4359,10 +4373,7 @@ export default defineComponent({
         // has the tool results or file state from earlier in the conversation.
         if (reseedNotice) {
           reseedNotice = false;
-          appendErrorBlock(
-            "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.",
-            true,
-          );
+          appendErrorBlock(RESTORED_NOTICE, true);
         }
 
         if (!response.body) {
@@ -4386,18 +4397,29 @@ export default defineComponent({
         // This is the streaming counterpart of the pre-stream 409 handled
         // above: once the stream has opened, the failure arrives as an SSE
         // event inside a 200, so response.ok can no longer be branched on.
-        if (streamOwnerUnavailable.value && !hasReseeded) {
+        //
+        // Only while this turn is still the one on screen. If the user switched
+        // chats mid-stream the turn was detached (chatMessages.value now points
+        // at a DIFFERENT conversation), and restoring would work on that one
+        // instead: it would overwrite its currentSessionId, put the notice in
+        // its transcript, and re-post ITS messages under the new id. The
+        // detached turn is already finished and its transcript is saved; the
+        // user can resend from the affected chat.
+        const stillOnScreen = chatMessages.value === streamMsgs;
+        if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
           streamOwnerUnavailable.value = false;
           hasReseeded = true;
 
           if (streamController) backgroundStreams.delete(streamController);
           if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
 
-          currentSessionId.value = getUUIDv7();
-          appendErrorBlock(
-            "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.",
-            true,
-          );
+          // The replacement turn runs under a new id, so the cross-instance
+          // streaming registry has to follow it — otherwise another instance
+          // re-attaching to this chat never sees the stream finish. The
+          // pre-request id is still cleared on the way out of sendMessage.
+          const restoredSessionId = getUUIDv7();
+          currentSessionId.value = restoredSessionId;
+          sessionStreamingState[restoredSessionId] = true;
 
           const retry = await fetchAiChat(
             chatMessages.value,
@@ -4408,9 +4430,31 @@ export default defineComponent({
             currentSessionId.value,
             hasImages ? messagesToSend : undefined,
           );
+
           if (retry && !retry.cancelled && retry.ok && retry.body) {
+            // Announce the restore only once the replacement request has
+            // actually been accepted, matching the pre-stream path's
+            // reseedNotice. Announcing first and then failing would leave the
+            // user told their conversation was restored with nothing to show
+            // for it.
+            appendErrorBlock(RESTORED_NOTICE, true);
             await processStream(retry.body.getReader());
+          } else if (!(retry && retry.cancelled)) {
+            // The retry itself failed — non-OK, no body, or null (which is what
+            // fetchAiChat returns on a network error). Say so: hasReseeded now
+            // blocks any further attempt, so staying quiet here would end the
+            // turn with no answer and no explanation, which is the exact silent
+            // failure this restore flow exists to remove. A user-initiated
+            // cancel is not an error and stays silent.
+            appendErrorBlock(
+              "This conversation was interrupted and could not be restored. Please try sending your message again.",
+            );
           }
+
+          // The restored turn is done, whichever way it went. Clear its entry
+          // too, or a re-attaching instance shows a loading indicator forever.
+          sessionStreamingState[restoredSessionId] = false;
+          backgroundStreamMap.delete(restoredSessionId);
         }
         streamOwnerUnavailable.value = false;
 
@@ -5843,6 +5887,8 @@ export default defineComponent({
       // Session restore
       isSessionOwnerUnavailable,
       appendErrorBlock,
+      streamOwnerUnavailable,
+      currentSessionId,
       // Auto navigation
       isAutoNavigationEnabled,
       processedMessages,

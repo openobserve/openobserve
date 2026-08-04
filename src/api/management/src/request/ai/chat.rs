@@ -75,10 +75,14 @@ const SESSION_OWNER_UNAVAILABLE: &str = "session_owner_unavailable";
 /// Whether `val` is a well-formed o2 assistant session id (UUID 8-4-4-4-12).
 ///
 /// The id is client-supplied and ends up in outbound URLs and — under HA — as
-/// the routing key, so it is checked in one place for all three call sites
-/// (chat stream, feedback, confirm). The previous inline checks only counted
-/// length and hyphens, accepting inputs like `----zzzz…`; this verifies hex
-/// digits and hyphen positions.
+/// the routing key, so it is checked in one place for all four call sites
+/// (chat, chat stream, feedback, confirm). The previous inline checks only
+/// counted length and hyphens, accepting inputs like `----zzzz…`; this verifies
+/// hex digits and hyphen positions.
+///
+/// Deliberately duplicated by `AiAgentClient::is_safe_session_id` in the
+/// enterprise crate, which is the last gate before a request leaves the process
+/// and must not depend on its caller. Keep the two in step.
 fn is_valid_session_id(val: &str) -> bool {
     if val.len() != 36 {
         return false;
@@ -356,16 +360,42 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             },
         };
 
-        // Query agent with headers
-        // TODO: Once AiAgentClient.query_with_headers() method is available, pass headers
-        // For now, passthrough_headers are collected but not passed to maintain compatibility
+        // TODO: pass `passthrough_headers` too. They are still collected but not
+        // forwarded, to keep this endpoint's behavior unchanged.
         let _headers_to_forward = if passthrough_headers.is_empty() {
             None
         } else {
             Some(passthrough_headers)
         };
 
-        match client.query(agent_type, query_req, &auth_str).await {
+        // The session id IS forwarded, because without it this endpoint cannot
+        // hold a conversation under HA: every call load-balances to an arbitrary
+        // replica, which finds no session and starts a new one. o2-ai also mints
+        // a session id when the header is absent, so each call would leave a
+        // claim in the directory until it expires.
+        let mut session_headers = std::collections::HashMap::new();
+        if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            && let Ok(val) = session_id.to_str()
+        {
+            if is_valid_session_id(val) {
+                session_headers.insert(
+                    X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+                    val.to_string(),
+                );
+            } else {
+                return MetaHttpResponse::bad_request("Invalid session id");
+            }
+        }
+        let session_headers_ref = if session_headers.is_empty() {
+            None
+        } else {
+            Some(&session_headers)
+        };
+
+        match client
+            .query_with_headers(agent_type, query_req, &auth_str, session_headers_ref)
+            .await
+        {
             Ok(response) => {
                 // QueryResponse has a `response: String` field
                 let prompt_response = PromptResponse {
@@ -549,11 +579,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 val.to_string(),
             );
         } else {
-            // Dropping the header is not harmless under HA: without it the
-            // request cannot be routed to the session's owner and lands on an
-            // arbitrary replica, which looks to the user like the assistant
-            // forgetting the conversation.
+            // Rejected, not dropped. Dropping is not harmless under HA: without
+            // the header the request cannot be routed to the session's owner,
+            // lands on an arbitrary replica, and o2-ai mints a fresh session —
+            // which the user experiences as the assistant forgetting the
+            // conversation, silently, on every turn. A 400 says what happened.
             log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
+            return MetaHttpResponse::bad_request("Invalid session id");
         }
     }
 
@@ -943,15 +975,21 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
 
     let mut forward_headers = std::collections::HashMap::new();
 
-    // Forward session ID if present
+    // Forward session ID if present. Rejected rather than dropped, for the same
+    // reason as the stream path: feedback is recorded against the session's
+    // in-memory state on its owning replica, so an unroutable id silently files
+    // the feedback against the wrong conversation.
     if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
         && let Ok(val) = session_id.to_str()
-        && is_valid_session_id(val)
     {
-        forward_headers.insert(
-            X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
-            val.to_string(),
-        );
+        if is_valid_session_id(val) {
+            forward_headers.insert(
+                X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
+                val.to_string(),
+            );
+        } else {
+            return MetaHttpResponse::bad_request("Invalid session id");
+        }
     }
 
     // Parse JSON body

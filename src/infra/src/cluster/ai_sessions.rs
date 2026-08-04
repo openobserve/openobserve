@@ -36,6 +36,11 @@
 //! own, so a stale or unavailable directory costs efficiency, never
 //! correctness.
 
+use std::{
+    sync::RwLock,
+    time::{Duration, Instant},
+};
+
 use async_nats::jetstream;
 use config::{get_config, utils::hash::Sum64};
 use futures::StreamExt;
@@ -43,6 +48,81 @@ use serde::Deserialize;
 use tokio::sync::OnceCell;
 
 use crate::db::nats::get_nats_client;
+
+/// Result of the last NATS reachability probe, and when it ran.
+static NATS_PROBE: RwLock<Option<(Instant, bool)>> = RwLock::new(None);
+
+/// How long a *failed* probe is trusted before trying again. A success is cached
+/// for the process lifetime; a failure must not be, or a NATS that starts after
+/// openobserve would never be picked up.
+const NATS_PROBE_RETRY: Duration = Duration::from_secs(30);
+
+/// Whether NATS is actually reachable, without risking a panic to find out.
+///
+/// [`get_nats_client`] **panics** when it cannot connect (`db::nats::connect`
+/// ends in `panic!("NATS connect failed")`, and its address parsing `unwrap`s).
+/// On this path that would abort the request task on every AI turn — and since
+/// the `OnceCell` is left uninitialized, forever after. So probe with a separate
+/// bounded connection first and only touch the shared client once we know it
+/// will succeed.
+///
+/// Deliberately **not** gated on `local_mode`. One openobserve node in local
+/// mode routing to several o2-ai replicas is a legitimate topology — openobserve
+/// reaches NATS there perfectly well, it just doesn't use it as its own cluster
+/// coordinator. Gating on `local_mode` silently disables session affinity for
+/// exactly that deployment, which is the failure this whole feature exists to
+/// prevent.
+async fn nats_reachable() -> bool {
+    if let Ok(guard) = NATS_PROBE.read()
+        && let Some((probed_at, reachable)) = *guard
+        && (reachable || probed_at.elapsed() < NATS_PROBE_RETRY)
+    {
+        return reachable;
+    }
+
+    let cfg = get_config();
+    let addrs: Vec<async_nats::ServerAddr> = cfg
+        .nats
+        .addr
+        .split(',')
+        // `parse`, not `unwrap`: a malformed address is a config error, not a
+        // reason to take the process down from inside a chat turn.
+        .filter_map(|a| a.trim().parse().ok())
+        .collect();
+
+    let reachable = if addrs.is_empty() {
+        log::warn!("[AI_SESSIONS] no usable ZO_NATS_ADDR; session routing is inert");
+        false
+    } else {
+        let mut opts = async_nats::ConnectOptions::new()
+            .connection_timeout(Duration::from_secs(cfg.nats.connect_timeout.max(1)));
+        if !cfg.nats.user.is_empty() {
+            opts = opts.user_and_password(cfg.nats.user.clone(), cfg.nats.password.clone());
+        }
+        match async_nats::connect_with_options(addrs, opts).await {
+            Ok(client) => {
+                // Probe only — the real work goes through the shared pooled
+                // client. Drop this one rather than leaving it open.
+                drop(client);
+                true
+            }
+            Err(e) => {
+                log::warn!(
+                    "[AI_SESSIONS] NATS unreachable at {}: {e}. Session routing falls back to \
+                     the configured agent URL; retrying in {}s.",
+                    cfg.nats.addr,
+                    NATS_PROBE_RETRY.as_secs()
+                );
+                false
+            }
+        }
+    };
+
+    if let Ok(mut guard) = NATS_PROBE.write() {
+        *guard = Some((Instant::now(), reachable));
+    }
+    reachable
+}
 
 /// Bucket holding the session→owner records (prefixed with `ZO_NATS_PREFIX`,
 /// so o2-ai and openobserve share one NATS namespace). Must match the bucket
@@ -85,6 +165,10 @@ async fn session_bucket() -> Option<&'static jetstream::kv::Store> {
         return Some(bucket);
     }
 
+    if !nats_reachable().await {
+        return None;
+    }
+
     let cfg = get_config();
     let bucket_name = format!("{}{}", cfg.nats.prefix, BUCKET);
     let client = get_nats_client().await.clone();
@@ -110,22 +194,83 @@ struct ReplicaEntry {
     addr: String,
 }
 
-/// The o2-ai replicas currently heartbeating, as `(name, addr)` pairs.
+/// Cached handle to the replica-registry bucket, for the same reason as
+/// [`SESSION_BUCKET`]: resolving it costs a JetStream round-trip, and this runs
+/// on every session-routed request. Only successful resolutions are stored.
+static REPLICAS_BUCKET_HANDLE: OnceCell<jetstream::kv::Store> = OnceCell::const_new();
+
+/// How long a fetched live set may be reused.
 ///
-/// Deliberately not cached, unlike the session bucket: this is the *live* set,
-/// and a stale copy would keep routing to a replica that is gone.
-async fn live_replicas() -> Vec<(String, String)> {
+/// The set itself is only ever as fresh as the heartbeat that produces it —
+/// replicas beat every `O2_AI_REPLICA_HEARTBEAT_INTERVAL` (10s) and expire after
+/// `O2_AI_REPLICA_HEARTBEAT_TTL` (30s) — so a window this short adds no
+/// staleness that the registry's own resolution doesn't already have. What it
+/// removes is real: listing the registry costs a `get_key_value`, a freshly
+/// created ordered push consumer (`Store::keys` builds one per call), and a
+/// `get` per replica, all on the front of every chat turn.
+const LIVE_REPLICAS_TTL: Duration = Duration::from_secs(2);
+
+/// Last fetched live set and when it was fetched.
+///
+/// `std::sync` rather than `tokio::sync`: the critical section only clones a
+/// short Vec and never awaits, so an async lock would buy nothing. Two
+/// concurrent misses may both fetch; that is harmless and cheaper than
+/// serialising every caller behind one lock.
+static LIVE_REPLICAS_CACHE: RwLock<Option<(Instant, Vec<(String, String)>)>> = RwLock::new(None);
+
+async fn replicas_bucket() -> Option<&'static jetstream::kv::Store> {
+    if let Some(bucket) = REPLICAS_BUCKET_HANDLE.get() {
+        return Some(bucket);
+    }
+
+    if !nats_reachable().await {
+        return None;
+    }
+
     let cfg = get_config();
     let bucket_name = format!("{}{}", cfg.nats.prefix, REPLICAS_BUCKET);
-
     let client = get_nats_client().await.clone();
     let jetstream = jetstream::new(client);
-    let bucket = match jetstream.get_key_value(&bucket_name).await {
-        Ok(b) => b,
+
+    match jetstream.get_key_value(&bucket_name).await {
+        Ok(b) => Some(REPLICAS_BUCKET_HANDLE.get_or_init(|| async { b }).await),
         Err(e) => {
             log::debug!("[AI_SESSIONS] replica registry {bucket_name} unavailable: {e}");
-            return Vec::new();
+            None
         }
+    }
+}
+
+/// The o2-ai replicas currently heartbeating, as `(name, addr)` pairs.
+///
+/// Cached for [`LIVE_REPLICAS_TTL`] only. This is the *live* set — a long-lived
+/// copy would keep routing to a replica that is gone — but a window far shorter
+/// than the heartbeat interval that feeds it costs no accuracy.
+async fn live_replicas() -> Vec<(String, String)> {
+    if let Ok(guard) = LIVE_REPLICAS_CACHE.read()
+        && let Some((fetched_at, replicas)) = guard.as_ref()
+        && fetched_at.elapsed() < LIVE_REPLICAS_TTL
+    {
+        return replicas.clone();
+    }
+
+    let replicas = fetch_live_replicas().await;
+
+    // Don't cache an empty result: the registry being briefly unreadable must
+    // not pin routing to "no replicas" for the whole window, and an empty set is
+    // what makes `get_session_route` skip the liveness check entirely.
+    if !replicas.is_empty()
+        && let Ok(mut guard) = LIVE_REPLICAS_CACHE.write()
+    {
+        *guard = Some((Instant::now(), replicas.clone()));
+    }
+
+    replicas
+}
+
+async fn fetch_live_replicas() -> Vec<(String, String)> {
+    let Some(bucket) = replicas_bucket().await else {
+        return Vec::new();
     };
 
     let mut keys = match bucket.keys().await {
@@ -200,7 +345,21 @@ pub enum SessionRoute {
     /// condition so the UI can restore the conversation into a fresh session.
     OwnerUnavailable { owner: String },
     /// No claim recorded — a new conversation, free to be placed anywhere.
+    ///
+    /// This means the directory was read successfully and said "nothing here",
+    /// which is the only condition under which placing the session is correct.
     Unclaimed,
+    /// The directory could not answer: unreachable, a failed read, or a record
+    /// that cannot be used (malformed, or claimed with no advertised address).
+    ///
+    /// Distinct from [`SessionRoute::Unclaimed`] on purpose. "No claim" licenses
+    /// the caller to *place* the session on a replica of its choosing; "we don't
+    /// know" does not. An existing conversation routed as if it were new lands
+    /// on a replica that has never seen it, gets refused, and the UI abandons a
+    /// perfectly good session — so a transient directory error would cost the
+    /// user their working state. Callers must fall back to the configured agent
+    /// URL here, which is exactly today's non-HA behavior.
+    Unknown,
 }
 
 /// Where to route `session_id`.
@@ -218,19 +377,26 @@ pub enum SessionRoute {
 /// that crate.
 pub async fn get_session_route(session_id: &str) -> SessionRoute {
     if session_id.is_empty() {
-        return SessionRoute::Unclaimed;
+        // Not identifiable, so not placeable either — hashing "" would pin every
+        // anonymous request to one replica.
+        return SessionRoute::Unknown;
     }
 
     let Some(bucket) = session_bucket().await else {
-        return SessionRoute::Unclaimed;
+        // Either NATS is unreachable or no replica has ever claimed anything. In
+        // the first case placing would be actively wrong; in the second the
+        // replica registry is empty too, so placement would decline anyway.
+        return SessionRoute::Unknown;
     };
 
     let entry = match bucket.get(session_id).await {
         Ok(Some(v)) => v,
+        // The only "definitely no claim" answer, and so the only one that may
+        // be placed.
         Ok(None) => return SessionRoute::Unclaimed,
         Err(e) => {
             log::debug!("[AI_SESSIONS] lookup of session {session_id} failed: {e}");
-            return SessionRoute::Unclaimed;
+            return SessionRoute::Unknown;
         }
     };
 
@@ -269,16 +435,19 @@ pub async fn get_session_route(session_id: &str) -> SessionRoute {
         Ok(v) => {
             // Claimed, but the owner published no address — it is running
             // without O2_AI_ADVERTISE_URL, so it cannot be dialled directly.
+            // Emphatically NOT `Unclaimed`: the session belongs to someone, we
+            // just can't reach them by name. Placing it would hand an existing
+            // conversation to a replica guaranteed not to own it.
             log::warn!(
                 "[AI_SESSIONS] session {session_id} is owned by {} but has no advertised \
                  address; falling back to the configured agent URL",
                 v.owner
             );
-            SessionRoute::Unclaimed
+            SessionRoute::Unknown
         }
         Err(e) => {
             log::warn!("[AI_SESSIONS] malformed record for session {session_id}: {e}");
-            SessionRoute::Unclaimed
+            SessionRoute::Unknown
         }
     }
 }
