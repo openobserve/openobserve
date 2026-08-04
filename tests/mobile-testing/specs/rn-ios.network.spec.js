@@ -2,9 +2,10 @@ const { networkSuite } = require('../utils/rumChecks');
 const cfg = require('../utils/config');
 
 networkSuite({
-  name: 'RN Android · Network / resource tracking (A4)',
-  tags: ['@mobile', '@rn-android'],
+  name: 'RN iOS · Network / resource tracking (A4)',
+  tags: ['@mobile', '@rn-ios'],
   service: cfg.RN_SERVICE,
   urlSubstring: 'jsonplaceholder.typicode.com',
-  flows: ['react-native/network.yaml'],
+  flows: ['ios-react-native/network.yaml'],
+  device: cfg.IOS_SIM_UDID,
 });

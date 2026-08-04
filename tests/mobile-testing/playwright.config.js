@@ -23,6 +23,5 @@ module.exports = defineConfig({
     { name: 'android-native', testMatch: /android-native\..*\.spec\.js/ },
     { name: 'rn-ios', testMatch: /rn-ios\..*\.spec\.js/ },
     { name: 'ios-native', testMatch: /ios-native\..*\.spec\.js/ },
-    { name: 'known-bugs', testMatch: /known-bugs\..*\.spec\.js/ },
   ],
 });

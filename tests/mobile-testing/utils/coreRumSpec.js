@@ -65,7 +65,7 @@ function coreRumSuite({ name, tags, flows, service, expectedSource, viewSubstrin
         const dash = new RumDashboardPage(page);
         await dash.login();
         await dash.openSession(sessionId);
-        await dash.expectSessionViewable(sessionId);
+        await dash.expectSessionViewable();
       },
     );
 

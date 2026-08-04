@@ -2,9 +2,10 @@ const { attributesSuite } = require('../utils/rumChecks');
 const cfg = require('../utils/config');
 
 attributesSuite({
-  name: 'RN Android · Attributes / tagging',
-  tags: ['@mobile', '@rn-android'],
+  name: 'RN iOS · Attributes / tagging',
+  tags: ['@mobile', '@rn-ios'],
   service: cfg.RN_SERVICE,
   env: cfg.RN_ENV,
-  flows: ['react-native/network.yaml'],
+  flows: ['ios-react-native/network.yaml'],
+  device: cfg.IOS_SIM_UDID,
 });

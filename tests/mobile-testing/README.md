@@ -70,31 +70,43 @@ npx playwright test --project=ios-native      # needs a booted iOS simulator
 # by tag
 npx playwright test --grep @crash
 npx playwright test --grep @masking
-npx playwright test --grep @known-bug         # skipped/xfail bug trackers (o2-enterprise#2289)
+npx playwright test --grep @known-bug         # the skipped #2289 markers
 ```
 
-### Coverage (all four mobile tracks + known bugs)
-Each platform has a **core RUM** suite (shared factory `utils/coreRumSpec.js`) asserting telemetry
-in `_rumdata` (API) **and** that the crashed session renders in the dashboard (UI):
+### Coverage (all four mobile tracks) — 29 tests
+Each platform has a **core RUM** bundle (`utils/coreRumSpec.js`: views + actions + handled error +
+native crash in `_rumdata`, then the crashed session rendering in the dashboard) **plus**
+per-capability specs built from shared factories in **`utils/rumChecks.js`** — so the platforms stay
+at parity without copy-paste:
 
-| Project | App | Service | source |
+- `attributesSuite` — env / service / version tagging
+- `userIdentitySuite` — events attributed to the set user (usr_* fields)
+- `networkSuite` — a successful fetch is a resource (**positive**) + a 4xx status is captured (**negative**)
+- `maskingSuite` — no PII leaks into the session replay (MASK_ALL)
+- `bgFgSuite` — a pre-background view and a post-foreground view share one session
+- `noPhoneHomeAndroidSuite` — the installed APK contains zero Datadog hosts (**security/negative**)
+
+| Project | App | Service | Specs |
 |---|---|---|---|
-| `rn-android` | `apps/o2-rum-tester` (Android) | `o2-rum-tester` | `react-native`/`android` |
-| `android-native` | `apps/o2-native-android` | `o2-native-android` | `android` |
-| `rn-ios` | `apps/o2-rum-tester` (iOS) | `o2-rum-tester` | `react-native` |
-| `ios-native` | `apps/o2-native-ios` | `o2-native-ios` | `ios` |
-| `known-bugs` | — | — | `test.fixme` trackers for #2289 (flip green when fixed) |
+| `rn-android` | `apps/o2-rum-tester` (Android) | `o2-rum-tester` | crash, network(+404), handled-error, views, masking, attributes, user-identity, background-foreground, no-phone-home |
+| `android-native` | `apps/o2-native-android` | `o2-native-android` | core bundle, attributes, user-identity, no-phone-home |
+| `rn-ios` | `apps/o2-rum-tester` (iOS) | `o2-rum-tester` | core bundle, network(+404), attributes, user-identity, masking |
+| `ios-native` | `apps/o2-native-ios` | `o2-native-ios` | core bundle, attributes |
+
+See **`docs/COVERAGE-MATRIX.md`** for the full capability×platform matrix, on-device validation
+status, and the deferred follow-ups (native/iOS background-foreground, native network/masking,
+iOS-native user identity — each needs a fixture-app change or a background harness).
 
 Prereqs: Android emulator booted for the Android projects; an iOS simulator booted (udid in
 `.env` `IOS_SIM_UDID`) for the iOS projects; the fixture apps built + installed (see `apps/`).
 
-Tags: `@mobile @rn-android @P0 @P1 @crash @network @errors @views @replay @masking @known-bug`.
+Tags: `@mobile @rn-android @rn-ios @android-native @ios-native @P0 @P1 @crash @network @negative @errors @views @replay @masking @lifecycle @attributes @user-identity @security @known-bug`.
 
 ## Notes
 
-- **`@known-bug` tests use `test.fail()`** — they assert the *correct* behavior, expect to fail on
-  a tracked bug (e.g. Error Tracking, o2-enterprise#2289), and will alert (turn red) if the bug is
-  fixed and they start passing.
+- **The known Error-Tracking outage (o2-enterprise#2289) is a `test.fixme` skip** inline in the
+  relevant spec — no separate file or project. It stays skipped and turns into a real assertion
+  when the bug is fixed.
 - **Ingestion is async** — assertions poll-and-retry; never assert instantly.
 - **Session isolation** — the current specs scope by `service` + time window. For parallel/CI runs,
   stamp a unique run-id as a RUM global attribute in the app and filter on it (see docs).

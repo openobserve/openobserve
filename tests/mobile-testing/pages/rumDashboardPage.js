@@ -73,6 +73,7 @@ class RumDashboardPage {
 
   /** No PII string leaked into the session-replay DOM (masking guard). */
   async expectNoPiiInReplay(piiStrings) {
+    await this.page.waitForTimeout(4000); // let the replay player render before scanning
     for (const pii of piiStrings) {
       await expect(this.page.getByText(pii, { exact: false })).toHaveCount(0);
     }

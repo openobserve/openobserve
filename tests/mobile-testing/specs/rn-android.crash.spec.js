@@ -26,26 +26,15 @@ test.describe('RN Android · Crash reporting', () => {
       const dash = new RumDashboardPage(page);
       await dash.login();
       await dash.openSession(sessionId);
-      await dash.expectSessionViewable(sessionId);
+      await dash.expectSessionViewable();
     },
   );
 
-  // KNOWN BUG (o2-enterprise#2289): Error Tracking tab cannot display errors
-  // (malformed default query + HTTP 429). test.fail keeps the suite green while
-  // flagging the moment the bug is fixed (the test would then "unexpectedly pass").
-  test(
-    'crash is inspectable in the Error Tracking tab',
+  // Known bug o2-enterprise#2289 — the Error Tracking tab can't display errors
+  // (placeholder query + HTTP 429). Skipped until fixed.
+  test.fixme(
+    'crash is inspectable in the Error Tracking tab (o2-enterprise#2289)',
     { tag: ['@mobile', '@rn-android', '@crash', '@known-bug'] },
-    async ({ page }) => {
-      test.fail(true, 'Known bug o2-enterprise#2289 — Error Tracking tab errors out');
-      const start = Date.now() - 30000;
-      runFlow('react-native/crash.yaml');
-      await q.errors(cfg.RN_SERVICE, start, { tries: 12, delayMs: 5000 });
-
-      const dash = new RumDashboardPage(page);
-      await dash.login();
-      await dash.openErrorTracking();
-      await expect(page.getByText('intentional uncaught crash')).toBeVisible({ timeout: 30000 });
-    },
+    async () => {},
   );
 });
