@@ -446,6 +446,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "Copied to clipboard",
     "inlineEdit": {
       "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."
     },
@@ -8976,9 +8977,49 @@
       },
       "detail": {
         "fallbackTitle": "Queue",
-        "back": "Back to Queues",
-        "comingSoonTitle": "Review workbench coming soon",
-        "comingSoonBody": "The queue's items and the review workbench will appear here in an upcoming update."
+        "loadError": "Failed to load queue items",
+        "status": {
+          "pending": "Pending",
+          "reviewed": "Reviewed"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} of {total} reviewed",
+        "itemCounter": "Item {index} of {total} to review",
+        "prev": "Previous item",
+        "next": "Next item",
+        "collapseNav": "Collapse item list",
+        "expandNav": "Expand item list",
+        "openTrace": "Open full trace",
+        "openTraceSoon": "Full-trace view arrives in the next update.",
+        "input": "Input",
+        "output": "Output",
+        "retrievedContext": "Retrieved Context",
+        "systemScores": "System Scores",
+        "systemScoresHint": "Graded automatically by evaluators — for reference",
+        "copyContent": "Copy {label}",
+        "enterFullscreen": "Expand",
+        "showContext": "Show Retrieved Context",
+        "hideContext": "Hide Retrieved Context",
+        "scoreTitle": "Score",
+        "dimensionsBound": "{count} dimensions",
+        "appendOnlyNote": "Your scores are added alongside other reviewers' — nothing is overwritten.",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "healthy ≥ {threshold}",
+        "notScored": "Not scored",
+        "dragToScore": "drag to score",
+        "priorScores": "Other Reviewers",
+        "priorScoresHint": "How other reviewers scored it — open after forming your own view",
+        "commentLabel": "Comment",
+        "commentPlaceholder": "Notes for other reviewers...",
+        "dimensionsScored": "{scored}/{total} dimensions scored",
+        "skip": "Skip",
+        "submit": "Complete & Next",
+        "submitted": "Review submitted",
+        "true": "True",
+        "false": "False",
+        "allReviewedTitle": "All items reviewed",
+        "allReviewedBody": "Every item in this queue has a completed review."
       }
     },
     "datasets": {
@@ -8993,13 +9034,21 @@
         "sources": "Sources",
         "items": "Items",
         "version": "Version",
-        "updated": "Updated"
+        "updated": "Updated",
+        "actions": "Actions"
       },
       "source": {
         "trace": "trace",
         "annotation": "annotation",
         "manual": "manual"
       },
+      "editTitle": "Edit Dataset",
+      "editSuccess": "Dataset updated",
+      "editError": "Failed to update dataset",
+      "deleteTitle": "Delete Dataset",
+      "deleteMessage": "Delete \"{name}\" and all its items? This cannot be undone.",
+      "deleteSuccess": "Dataset deleted",
+      "deleteError": "Failed to delete dataset",
       "create": {
         "title": "New Dataset",
         "errors": {
@@ -9013,6 +9062,43 @@
         "tagsPlaceholder": "Type a tag, press Enter...",
         "success": "Dataset created",
         "error": "Failed to create dataset"
+      },
+      "detail": {
+        "fallbackTitle": "Dataset",
+        "meta": "{count} items · updated {updated}",
+        "loadError": "Failed to load dataset",
+        "footerTitle": "Items",
+        "searchPlaceholder": "Search Items...",
+        "emptyTitle": "No Items Yet",
+        "emptyBody": "Add a golden input and its expected output to start building this dataset.",
+        "columns": {
+          "input": "Input (Purified)",
+          "expectedOutput": "Expected Output",
+          "source": "Source",
+          "tags": "Tags",
+          "version": "Version",
+          "actions": "Actions"
+        },
+        "deleteItemTitle": "Delete Item",
+        "deleteItemMessage": "Delete this item from the dataset? This cannot be undone.",
+        "deleteItemSuccess": "Item deleted",
+        "deleteItemError": "Failed to delete item",
+        "addItem": {
+          "button": "Add Item",
+          "title": "Add Item",
+          "editTitle": "Edit Item",
+          "inputLabel": "Input",
+          "inputPlaceholder": "The input given to the model...",
+          "expectedLabel": "Expected Output",
+          "expectedPlaceholder": "The golden answer this input should produce...",
+          "versionNote": "Changing the expected output creates a new version of this item.",
+          "errors": {
+            "input": "Input is required",
+            "expectedOutput": "Expected output is required"
+          },
+          "success": "Item saved",
+          "error": "Failed to save item"
+        }
       }
     },
     "scope": {
