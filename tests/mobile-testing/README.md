@@ -23,15 +23,18 @@ failed to show it. An API-only suite would have been green on a broken product.
 
 ```
 mobile-testing/
-├── maestro/react-native/     Maestro flows (crash, network, handled-error, navigation, masking)
-├── specs/                    Playwright orchestration specs (rn-android.*.spec.js)
+├── apps/                     Vendored fixture apps (o2-rum-tester, o2-native-android, o2-native-ios)
+├── maestro/                  Maestro flows per track (react-native, android-native, ios-native, ios-react-native)
+├── specs/                    Playwright specs (rn-android.*, rn-ios.*, android-native.*, ios-native.*)
 ├── pages/rumDashboardPage.js Dashboard page object (login, open session, masking guard)
 ├── utils/
 │   ├── ooClient.js           OpenObserve Search API client (poll-and-retry)
+│   ├── rumChecks.js          per-capability test factories (attributes/user/network/masking/…)
+│   ├── coreRumSpec.js        the crash → dashboard core journey
 │   ├── maestro.js            Maestro flow runner
+│   ├── adb.js                device-level Android steps
 │   └── config.js             env loader
-├── platforms/                Scaffolds for iOS-RN, Android-native, iOS-native tracks
-├── docs/                     Test-case matrix (md + CSV)
+├── docs/                     Coverage matrix, CI notes, test-case matrix
 ├── playwright.config.js
 └── .env / .env.example       instance URL, org, creds, app id
 ```
@@ -109,6 +112,6 @@ Tags: `@mobile @rn-android @rn-ios @android-native @ios-native @P0 @P1 @crash @n
   when the bug is fixed.
 - **Ingestion is async** — assertions poll-and-retry; never assert instantly.
 - **Session isolation** — the current specs scope by `service` + time window. For parallel/CI runs,
-  stamp a unique run-id as a RUM global attribute in the app and filter on it (see docs).
-- **iOS / native tracks** — see `platforms/` for scaffolds + prerequisites (need their own sample
-  apps; iOS additionally needs Xcode/simulator).
+  stamp a unique run-id as a RUM global attribute in the app and filter on it (see `docs/CI-NOTES.md`).
+- **Fixture apps** — the four apps live in `apps/` (each builds against the SDK from npm/Maven/SPM);
+  iOS tracks additionally need Xcode/simulator. Build/run steps are in each app + `docs/CI-NOTES.md`.
