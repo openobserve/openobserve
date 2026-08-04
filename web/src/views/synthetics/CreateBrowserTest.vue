@@ -148,13 +148,42 @@ const browsers = ref<string[]>([]);
 const devices = ref<SyntheticsDevice[]>([]);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
+const foldersLoading = ref(false);
+
+const orgIdentifier = computed<string>(
+  () => (store.state as any).selectedOrganization?.identifier ?? "",
+);
+
+/** Resolves once orgIdentifier is populated — on a hard reload or browser
+ *  back-navigation onto this route the store is not hydrated synchronously yet.
+ *  Mirrors waitForOrgIdentifier in SyntheticMonitoring.vue. */
+function waitForOrgIdentifier(): Promise<void> {
+  if (orgIdentifier.value) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const stop = watch(orgIdentifier, (val) => {
+      if (val) {
+        stop();
+        resolve();
+      }
+    });
+  });
+}
 
 async function fetchFolders() {
+  foldersLoading.value = true;
   try {
+    // Without this wait a reload of /synthetics/add?folder=… fires the request
+    // against an empty org, and the single catch below would pin the list to []
+    // for the rest of the session — leaving the folder select unable to resolve
+    // the preselected id and rendering it raw.
+    await waitForOrgIdentifier();
     const res = await getFoldersListByType(store, "synthetics");
     folders.value = (res ?? []) as SyntheticsFolder[];
-  } catch {
+  } catch (err) {
+    console.error("[synthetics] failed to load folders", err);
     folders.value = [];
+  } finally {
+    foldersLoading.value = false;
   }
 }
 
@@ -313,6 +342,36 @@ const check = ref<BrowserCheck>({
   capture: { screenshot: "on-fail" as const, trace: "on-fail" as const },
   variables: [],
 });
+
+/**
+ * Reconcile the selected folder against the folders this org actually has.
+ *
+ * `check.folder` arrives from `?folder=` (New Monitor opened inside a folder)
+ * or from a stored check, and neither source is validated: a bookmarked link, a
+ * folder deleted since, or a link from another org all leave an id no option can
+ * resolve. The select then renders that id verbatim, and `persist` sends it
+ * straight back as `?folder=` — which the server treats as authoritative for
+ * both the destination folder and the RBAC gate, so the save fails on a folder
+ * the author never picked. Fall back to the default folder and say why.
+ *
+ * Skipped while the list is empty: that means the fetch has not landed (or
+ * failed), and a valid id must not be discarded on the strength of a list we
+ * do not have.
+ */
+watch(
+  [folders, () => check.value.folder],
+  () => {
+    if (!folders.value.length) return;
+    const folderId = check.value.folder;
+    if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
+    check.value = { ...check.value, folder: "default" };
+    validationErrors.value = {
+      ...validationErrors.value,
+      folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
+    };
+  },
+  { immediate: true },
+);
 
 function commitGate() {
   check.value = { ...check.value, url: startUrl.value, name: checkName.value };
@@ -981,6 +1040,7 @@ function onClearResults() {
               :devices="devices"
               :destinations="destinations"
               :folders="folders"
+              :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
               allow-private-locations
               class="w-full!"

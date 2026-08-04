@@ -32,6 +32,8 @@ const {
   mockToast,
   mockRecorderStopReplay,
   mockRecorderReplayPhase,
+  mockGetFoldersListByType,
+  mockRoute,
 } = vi.hoisted(() => ({
   mockServiceGetLocations: vi.fn().mockResolvedValue({
     data: { locations: [], browsers: [], devices: [] },
@@ -45,13 +47,14 @@ const {
   // the phase itself. The composable owns stopping → stopped.
   mockRecorderStopReplay: vi.fn().mockResolvedValue(undefined),
   mockRecorderReplayPhase: { value: "idle" },
+  mockGetFoldersListByType: vi.fn().mockResolvedValue([]),
+  // Mutable so a test can drive `?folder=` — the preselected folder is read
+  // from the route on mount.
+  mockRoute: { params: {} as Record<string, string>, query: {} as Record<string, string> },
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({
-    params: {},
-    query: {},
-  }),
+  useRoute: () => mockRoute,
   useRouter: () => ({
     push: mockRouterPush,
     replace: vi.fn(),
@@ -91,7 +94,7 @@ vi.mock("@/services/alert_destination", () => ({
 }));
 
 vi.mock("@/utils/commons", () => ({
-  getFoldersListByType: vi.fn().mockResolvedValue([]),
+  getFoldersListByType: mockGetFoldersListByType,
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -227,6 +230,7 @@ const baseStubs = {
       "devices",
       "destinations",
       "folders",
+      "foldersLoading",
       "validationErrors",
       "class",
     ],
@@ -314,6 +318,8 @@ describe("CreateBrowserTest", () => {
     mockServiceCreate.mockResolvedValue({ data: { id: "new-check-1" } });
     mockServiceUpdate.mockResolvedValue({});
     mockServiceGet.mockResolvedValue({ data: {} });
+    mockGetFoldersListByType.mockResolvedValue([]);
+    mockRoute.query = {};
   });
 
   afterEach(() => {
@@ -752,6 +758,58 @@ describe("CreateBrowserTest", () => {
       expect(mockRecorderStopReplay).toHaveBeenCalledTimes(1);
       // The view must not pre-empt the composable's stopping → stopped transition.
       expect(mockRecorderReplayPhase.value).toBe("running");
+    });
+  });
+
+  // Regression: `?folder=` was copied into the check unvalidated. A bookmarked
+  // link, a folder deleted since, or a link from another org left an id no
+  // option could resolve — the select rendered the raw id, and `persist` sent it
+  // back as `?folder=`, which the server treats as authoritative for both the
+  // destination folder and the RBAC gate, so the save failed on a folder the
+  // author never picked.
+  describe("create mode — preselected folder from ?folder=", () => {
+    const folders = [
+      { folderId: "default", name: "default" },
+      { folderId: "folder-1", name: "Critical Monitors" },
+    ];
+
+    /** The check as CheckConfigure currently sees it. */
+    const configuredCheck = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-check-configure"]').props("check") as any;
+
+    it("should keep a preselected folder that exists in this org", async () => {
+      mockRoute.query = { folder: "folder-1" };
+      mockGetFoldersListByType.mockResolvedValue(folders);
+
+      wrapper = await mountCreateAtConfigure();
+
+      expect(configuredCheck(wrapper).folder).toBe("folder-1");
+      expect(
+        wrapper.findComponent('[data-test="synthetics-check-configure"]').props("validationErrors"),
+      ).not.toHaveProperty("folder");
+    });
+
+    it("should fall back to the default folder when the preselected id is not in this org", async () => {
+      mockRoute.query = { folder: "folder-from-another-org" };
+      mockGetFoldersListByType.mockResolvedValue(folders);
+
+      wrapper = await mountCreateAtConfigure();
+
+      expect(configuredCheck(wrapper).folder).toBe("default");
+      const errors = wrapper
+        .findComponent('[data-test="synthetics-check-configure"]')
+        .props("validationErrors") as Record<string, string>;
+      expect(errors.folder).toContain("folder-from-another-org");
+    });
+
+    it("should not discard the preselected folder when the folder list failed to load", async () => {
+      mockRoute.query = { folder: "folder-1" };
+      mockGetFoldersListByType.mockRejectedValue(new Error("boom"));
+
+      wrapper = await mountCreateAtConfigure();
+
+      // An empty list means "we don't know", not "that folder is gone".
+      expect(configuredCheck(wrapper).folder).toBe("folder-1");
     });
   });
 });

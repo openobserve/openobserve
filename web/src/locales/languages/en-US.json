@@ -9777,12 +9777,13 @@
     },
     "checkDetails": {
       "add": "Add",
-      "defaultFolder": "Default",
       "description": "Description",
       "descriptionPlaceholder": "Optional description",
       "enabled": "Enabled",
       "folder": "Folder",
       "folderPlaceholder": "Select folder",
+      "foldersLoading": "Loading folders...",
+      "foldersUnavailable": "Couldn't load folders. Refresh the page and try again.",
       "hostTarget": "Host",
       "hostTargetPlaceholder": "example.com or example.com:8443",
       "name": "Name",
@@ -10680,7 +10681,8 @@
       "fixHighlightedFields": "Fix the highlighted fields before saving",
       "retiredAction": "\"{action}\" is no longer supported — remove or replace \"{step}\"",
       "runBudgetExceeded": "This check could take up to {worstCase} per run, over the {limit} limit. Remove a browser/device combo, or lower retries. ({combos} combo(s) × {attempts} attempt(s) × {perAttempt} each.)",
-      "runBudgetRetriesHint": "Lowering retries brings this check back inside the {limit} run limit."
+      "runBudgetRetriesHint": "Lowering retries brings this check back inside the {limit} run limit.",
+      "folderUnavailable": "Folder \"{folder}\" is not available in this organization — saving to the default folder."
     },
     "privateLocations": {
       "searchPlaceholder": "Search locations...",
