@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-1.5"
             >
               <OTooltip
-                :content="anomalyConfig.last_error || ''"
+                :content="raw(anomalyConfig.last_error)"
                 :disabled="anomalyConfig.status !== 'failed' || !anomalyConfig.last_error"
               >
                 <OTag

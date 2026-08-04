@@ -130,7 +130,7 @@ function handleTagKeydown(event: KeyboardEvent) {
         :options="folderOptions"
         :loading="props.foldersLoading"
         :error="!!props.validationErrors?.folder"
-        :error-message="props.validationErrors?.folder"
+        :error-message="raw(props.validationErrors?.folder)"
         :placeholder="t('synthetics.checkDetails.folderPlaceholder')"
         data-test="synthetics-check-details-folder-select"
       >
