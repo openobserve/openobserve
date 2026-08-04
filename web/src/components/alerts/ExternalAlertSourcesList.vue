@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('alert_sources.header')"
     :subtitle="t('alert_sources.subtitle')"
     title-data-test="alert-sources-list-title"
+    icon="webhook"
     scroll
     pad-y
   >

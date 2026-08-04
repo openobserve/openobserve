@@ -5477,7 +5477,7 @@
     "contentCopied": "Content Copied Successfully!"
   },
   "alert_sources": {
-    "header": "Alert Sources",
+    "header": "External Alert Sources",
     "subtitle": "Send alerts from Grafana, Prometheus Alertmanager, or any tool that can call a webhook — they'll show up here and get correlated into Incidents automatically.",
     "defaultSourceName": "default",
     "acceptsAnyFormat": "accepts any webhook format",

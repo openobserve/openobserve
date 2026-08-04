@@ -528,7 +528,7 @@ const useRoutes = () => {
       name: "alertSources",
       component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
       meta: {
-        title: "Alert Sources",
+        title: "External Alert Sources",
       },
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
