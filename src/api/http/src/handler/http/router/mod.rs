@@ -54,7 +54,7 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, annotation_queues, annotations, anomaly_detection, datasets,
+        actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
         domain_management, eval_jobs, gen_ai, keys, license, providers, score_configs, scorers,
         service_streams, synthetics, workflows,
     },
@@ -1066,6 +1066,9 @@ pub fn service_routes() -> Router {
 
                 // On-demand human annotation from Discovery
                 .route("/{org_id}/annotations", post(annotations::annotate_target))
+
+                // LLM score-based Discovery
+                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
 
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
