@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('common.disable')
                     : t('common.enable')
               "
-              @click.stop="requestToggle(row)"
+              @click.stop="toggleEnabled(row.name, !row.enabled)"
             />
           </template>
         </OTable>
@@ -265,31 +265,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("synthetics.tokens.copyCmdBtn") }}
         </OButton>
       </div>
-    </ODialog>
-
-    <!-- Rotate needs no confirm — the old default stays valid until disabled
-         (backend contract), so minting a new one is non-destructive.
-         Disabling revokes the token its live agents pull jobs with, so it gets
-         a confirmation; enabling is safe and stays one click. -->
-    <ODialog
-      data-test="synthetics-token-disable-dialog"
-      v-model:open="confirmDisable"
-      size="xs"
-      :title="t('synthetics.tokens.disableConfirmTitle')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-label="t('common.disable')"
-      primary-button-variant="destructive"
-      @click:secondary="confirmDisable = false"
-      @click:primary="confirmDisableToken"
-    >
-      <p>
-        {{
-          t("synthetics.tokens.disableConfirmMsg", {
-            name: disableTarget?.name ?? "",
-            count: disableTarget?.agents ?? 0,
-          })
-        }}
-      </p>
     </ODialog>
   </OPageLayout>
 </template>
@@ -489,26 +464,6 @@ export default defineComponent({
       }
     };
 
-    // Disable revokes the token out from under its live agents, so it goes
-    // through a confirm dialog. Enable is safe → immediate.
-    const confirmDisable = ref(false);
-    const disableTarget = ref<AgentToken | null>(null);
-
-    const requestToggle = (row: AgentToken) => {
-      if (row.enabled) {
-        disableTarget.value = row;
-        confirmDisable.value = true;
-      } else {
-        toggleEnabled(row.name, true);
-      }
-    };
-
-    const confirmDisableToken = async () => {
-      confirmDisable.value = false;
-      if (disableTarget.value) await toggleEnabled(disableTarget.value.name, false);
-      disableTarget.value = null;
-    };
-
     const rotateDefault = async () => {
       loading.value = true;
       try {
@@ -622,10 +577,7 @@ export default defineComponent({
       createTokenSchema,
       createTokenDefaults,
       rotateDefault,
-      confirmDisable,
-      disableTarget,
-      requestToggle,
-      confirmDisableToken,
+      toggleEnabled,
       copyToken,
     };
   },

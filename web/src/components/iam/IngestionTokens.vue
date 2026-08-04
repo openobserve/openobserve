@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               :title="row.enabled ? t('common.disable') : t('common.enable')"
               :disabled="loading"
-              @click.stop="requestToggle(row)"
+              @click.stop="toggleEnabled(row.name, !row.enabled)"
             />
           </template>
         </OTable>
@@ -214,22 +214,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("ingestion.copyAuthHeaderBtn") }}
         </OButton>
       </div>
-    </ODialog>
-
-    <!-- Disabling stops ingestion for everything using the token, so it gets a
-         confirmation; enabling is safe and stays one click. -->
-    <ODialog
-      data-test="ingestion-token-disable-dialog"
-      v-model:open="confirmDisable"
-      size="xs"
-      :title="t('ingestion.disableTokenTitle')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-label="t('common.disable')"
-      primary-button-variant="destructive"
-      @click:secondary="confirmDisable = false"
-      @click:primary="confirmDisableToken"
-    >
-      <p>{{ t("ingestion.disableTokenMsg", { name: disableTarget?.name ?? "" }) }}</p>
     </ODialog>
   </OPageLayout>
 </template>
@@ -422,25 +406,6 @@ export default defineComponent({
       }
     };
 
-    // Enable is safe → immediate. Disable breaks live ingestion → confirm first.
-    const confirmDisable = ref(false);
-    const disableTarget = ref<Token | null>(null);
-
-    const requestToggle = (row: Token) => {
-      if (row.enabled) {
-        disableTarget.value = row;
-        confirmDisable.value = true;
-      } else {
-        toggleEnabled(row.name, true);
-      }
-    };
-
-    const confirmDisableToken = async () => {
-      confirmDisable.value = false;
-      if (disableTarget.value) await toggleEnabled(disableTarget.value.name, false);
-      disableTarget.value = null;
-    };
-
     const toggleEnabled = async (name: string, enabled: boolean) => {
       loading.value = true;
       try {
@@ -521,10 +486,7 @@ export default defineComponent({
       createToken,
       createTokenSchema,
       createTokenDefaults,
-      confirmDisable,
-      disableTarget,
-      requestToggle,
-      confirmDisableToken,
+      toggleEnabled,
       copyToken,
       toBasicAuth,
     };

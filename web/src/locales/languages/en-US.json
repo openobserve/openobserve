@@ -2839,9 +2839,7 @@
     "tokenDeleteError": "Failed to delete token.",
     "noTokensFound": "No ingestion tokens found.",
     "createdBy": "Created by",
-    "tokenStatus": "Status",
-    "disableTokenTitle": "Disable token?",
-    "disableTokenMsg": "Disabling \"{name}\" immediately stops ingestion for everything sending data with this token. You can re-enable it at any time."
+    "tokenStatus": "Status"
   },
   "dashboard": {
     "autoName": {
@@ -9728,8 +9726,6 @@
       "enabledSuccess": "Token enabled",
       "disabledSuccess": "Token disabled",
       "updateError": "Failed to update token",
-      "disableConfirmTitle": "Disable token?",
-      "disableConfirmMsg": "Disabling \"{name}\" stops its agents ({count} connected) from pulling jobs. You can re-enable it at any time.",
       "empty": {
         "title": "No synthetics tokens",
         "description": "Create a named token to scope a region's agents, or use the org default."
