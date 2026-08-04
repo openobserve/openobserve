@@ -576,8 +576,10 @@ async function refresh() {
   }
 }
 
+// Review (and a row click) open the review Workbench directly — no intermediate
+// item-list page.
 function openDetail(row: LlmQueue) {
-  router.push({ name: "aiQueueDetail", params: { id: row.id }, query: orgQuery.value });
+  router.push({ name: "aiQueueWorkbench", params: { id: row.id }, query: orgQuery.value });
 }
 
 // ── Create drawer (useOForm + Zod — mirrors ScoreConfigDialog) ──
