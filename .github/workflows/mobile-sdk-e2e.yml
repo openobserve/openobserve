@@ -52,8 +52,6 @@ on:
         type: string
         default: ""
   pull_request:
-    # `labeled` so adding the 'mobile-e2e' label re-fires the run and turns the device jobs on.
-    types: [opened, reopened, synchronize, labeled]
     paths:
       - "tests/mobile-testing/**"
       - ".github/workflows/mobile-sdk-e2e.yml"
@@ -138,9 +136,7 @@ jobs:
     if: >-
       github.event_name == 'repository_dispatch' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
-       (inputs.platforms == 'both' || inputs.platforms == 'android')) ||
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
+       (inputs.platforms == 'both' || inputs.platforms == 'android'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -252,9 +248,7 @@ jobs:
     if: >-
       github.event_name == 'repository_dispatch' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
-       (inputs.platforms == 'both' || inputs.platforms == 'ios')) ||
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
+       (inputs.platforms == 'both' || inputs.platforms == 'ios'))
     runs-on: macos-latest
     timeout-minutes: 120
     steps:
