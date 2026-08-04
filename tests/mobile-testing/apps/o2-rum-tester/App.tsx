@@ -33,11 +33,11 @@ import {
 } from '@openobserve/mobile-react-native-session-replay';
 
 const RUM_INTAKE =
-  'https://dev.o2aks1.internal.zinclabs.dev/rum/v1/3GldGL2anfrpTHgdLsuPpnqy4eI';
+  'https://dev.common-dev.internal.zinclabs.dev/rum/v1/3HOStgiihM8H43cMLWY3BUfXV5r';
 
-// --- SDK configuration (same org/endpoint as ShopSphere) ---
+// --- SDK configuration (reactnativeapp org on the migrated cluster) ---
 const config = new OpenObserveProviderConfiguration(
-  'rumz52ErMxBZ8WNOtAC', // clientToken — this org's RUM token
+  'rumtbJXyJcgC8jB9Otu', // clientToken — this org's RUM token
   'testing', // env — distinguishes our data from ShopSphere (dev)
   TrackingConsent.GRANTED,
   {

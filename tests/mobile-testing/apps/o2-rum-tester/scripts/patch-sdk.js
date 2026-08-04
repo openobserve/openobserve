@@ -48,3 +48,27 @@ if (fs.existsSync(rrr)) {
     console.log('[patch-sdk] replace-react-require skipped:', e.message);
   }
 }
+
+// iOS build-blocker (o2-enterprise#2289): the session-replay package's Swift code
+// calls the un-rebranded Datadog method Int64.ddWithNoOverflow; the OpenObserve iOS
+// SDK renamed it to ooWithNoOverflow. Fix it so `pod install` + xcodebuild succeed.
+const iosRecorder = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  '@openobserve',
+  'mobile-react-native-session-replay',
+  'ios',
+  'Sources',
+  'RCTTextViewRecorder.swift',
+);
+if (fs.existsSync(iosRecorder)) {
+  const s = fs.readFileSync(iosRecorder, 'utf8');
+  const fixed = s.replace(/ddWithNoOverflow/g, 'ooWithNoOverflow');
+  if (fixed !== s) {
+    fs.writeFileSync(iosRecorder, fixed);
+    console.log('[patch-sdk] fixed iOS session-replay ddWithNoOverflow (o2-enterprise#2289)');
+  } else {
+    console.log('[patch-sdk] iOS session-replay already correct');
+  }
+}
