@@ -42,6 +42,7 @@ const props = defineProps<{
   devices?: SyntheticsDevice[];
   destinations?: string[];
   folders?: SyntheticsFolder[];
+  foldersLoading?: boolean;
   validationErrors?: Record<string, string>;
   /** Protocol checks show the private-locations subsection + setup CTA. */
   allowPrivateLocations?: boolean;
@@ -86,6 +87,7 @@ function handleUpdate(value: BrowserCheck) {
       <CheckDetails
         :check="check"
         :folders="folders ?? []"
+        :folders-loading="foldersLoading"
         :validation-errors="props.validationErrors ?? {}"
         :target-label="targetLabel"
         :target-placeholder="targetPlaceholder"

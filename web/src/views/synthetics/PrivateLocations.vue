@@ -163,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -173,6 +174,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { SyntheticLocation } from "@/types/synthetics";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
+import { syntheticsPrivateLocationRoute } from "@/utils/synthetics/routes";
 
 const props = defineProps<{
   locations: SyntheticLocation[];
@@ -186,6 +188,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const router = useRouter();
+const store = useStore();
 const search = ref("");
 
 const filteredLocations = computed(() => {
@@ -308,6 +311,11 @@ const columns = computed<OTableColumnDef[]>(() => [
 ]);
 
 const openDetail = (row: SyntheticLocation) => {
-  router.push({ name: "synthetic-private-location", params: { id: row.id } });
+  router.push(
+    syntheticsPrivateLocationRoute(
+      { orgIdentifier: store.state.selectedOrganization?.identifier },
+      row.id,
+    ),
+  );
 };
 </script>
