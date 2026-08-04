@@ -118,11 +118,15 @@ async function refreshCloudConfig(page) {
  * @param {import('@playwright/test').Page} page
  * @param {'get'|'post'|'put'|'delete'|'patch'} method
  * @param {string} url
- * @param {object} [options] extra page.request options (data, params, ...)
+ * @param {object} [options] extra page.request options (data, params, ...). Any options.headers
+ *   are MERGED over — not replaced with — the auth headers, so callers can add headers without
+ *   clobbering the Authorization header (which would defeat the 401 self-heal).
  * @param {number} [retries] max recovery attempts on 401/403
  */
 async function authedRequest(page, method, url, options = {}, retries = 1) {
-    let resp = await page.request[method](url, { headers: getAuthHeaders(), ...options });
+    const { headers: extraHeaders, ...rest } = options;
+    const buildOpts = () => ({ headers: { ...getAuthHeaders(), ...(extraHeaders || {}) }, ...rest });
+    let resp = await page.request[method](url, buildOpts());
     for (let i = 0; i < retries && (resp.status() === 401 || resp.status() === 403); i++) {
         let recovered = await refreshCloudConfig(page);
         if (!recovered) {
@@ -131,7 +135,8 @@ async function authedRequest(page, method, url, options = {}, retries = 1) {
             catch (e) { recovered = false; }
         }
         if (!recovered) break;
-        resp = await page.request[method](url, { headers: getAuthHeaders(), ...options });
+        // Rebuild opts so the refreshed passcode (getAuthHeaders) is picked up on retry.
+        resp = await page.request[method](url, buildOpts());
     }
     return resp;
 }

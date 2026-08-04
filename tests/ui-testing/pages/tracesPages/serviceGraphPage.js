@@ -77,6 +77,9 @@ export class ServiceGraphPage {
    * Navigate directly to service graph via URL (more reliable than click-based navigation).
    * Sets the stream filter in localStorage before navigating to ensure the correct stream is shown.
    * @param {string} streamName - Stream to filter by (default: 'default')
+   * @param {string} [period='6h'] - Relative time window passed via the `period` URL param.
+   *   Defaults to a WIDE 6h window (not the page default "Past 15 Minutes") so the
+   *   daemon-processed topology reliably falls inside the query window and the chart renders.
    */
   async navigateToServiceGraphUrl(streamName = 'default', period = '6h') {
     // Set stream filter in localStorage before navigation — the Vue component reads from here
