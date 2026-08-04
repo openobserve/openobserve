@@ -656,6 +656,29 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── IAM — Synthetics Tokens ─────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.syntheticsTokens",
+    scope: "synthetics-tokens",
+    shortcuts: [
+      {
+        id: "syntheticsTokensAdd",
+        key: "n",
+        descriptionKey: "shortcuts.actions.syntheticsTokensAdd",
+      },
+      {
+        id: "syntheticsTokensRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.syntheticsTokensRefresh",
+      },
+      {
+        id: "syntheticsTokensFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+    ],
+  },
+
   // ── Running Queries ─────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.runningQueries",

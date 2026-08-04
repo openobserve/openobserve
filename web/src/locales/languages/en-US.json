@@ -2848,7 +2848,8 @@
     "tokenRotateError": "Failed to rotate token.",
     "tokenDeleteError": "Failed to delete token.",
     "noTokensFound": "No ingestion tokens found.",
-    "createdBy": "Created by"
+    "createdBy": "Created by",
+    "tokenStatus": "Status"
   },
   "dashboard": {
     "autoName": {
@@ -10827,6 +10828,7 @@
       "traceDetail": "Trace Detail",
       "runningQueries": "Running Queries",
       "ingestionTokens": "IAM — Ingestion Tokens",
+      "syntheticsTokens": "IAM — Synthetics Tokens",
       "alertIncidents": "Alerts — Incidents",
       "pipelineDestinations": "Pipelines — Destinations",
       "enrichmentTables": "Enrichment Tables",
@@ -10924,6 +10926,8 @@
       "runningQueriesRefresh": "Refresh query list",
       "ingestionTokensAdd": "Create new token",
       "ingestionTokensRefresh": "Refresh token list",
+      "syntheticsTokensAdd": "Create new token",
+      "syntheticsTokensRefresh": "Refresh token list",
       "aiChatToggle": "Toggle AI chat",
       "dashboardEdit": "Enter / exit edit mode",
       "logsSaveView": "Save as saved view",
