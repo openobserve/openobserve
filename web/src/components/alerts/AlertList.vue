@@ -1110,8 +1110,7 @@ export default defineComponent({
         return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
       if (f === "failed")
         return rows.filter(
-          (r: any) =>
-            r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
+          (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
         );
       // active = unpaused (enabled); paused = disabled — matching the summary
       // counts. A failed anomaly is still active here (failed is an overlay).
