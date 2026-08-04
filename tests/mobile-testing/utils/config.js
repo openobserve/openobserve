@@ -12,8 +12,21 @@ module.exports = {
   OO_ORG: need('OO_ORG'),
   OO_USER: need('OO_USER'),
   OO_PASS: need('OO_PASS'),
-  RN_ANDROID_APP_ID: process.env.RN_ANDROID_APP_ID || 'com.o2rumtester',
-  RN_SERVICE: process.env.RN_SERVICE || 'o2-rum-tester',
   RN_ENV: process.env.RN_ENV || 'testing',
   RUM_STREAM: '_rumdata',
+
+  // Per-platform app ids + service names (the RN app is one service across both platforms;
+  // distinguish RN-iOS vs RN-Android by `source`/`os`, natives have their own service).
+  RN_SERVICE: process.env.RN_SERVICE || 'o2-rum-tester',
+  RN_ANDROID_APP_ID: process.env.RN_ANDROID_APP_ID || 'com.o2rumtester',
+  RN_IOS_APP_ID: process.env.RN_IOS_APP_ID || 'org.reactjs.native.example.O2RumTester',
+
+  NATIVE_ANDROID_SERVICE: process.env.NATIVE_ANDROID_SERVICE || 'o2-native-android',
+  NATIVE_ANDROID_APP_ID: process.env.NATIVE_ANDROID_APP_ID || 'com.o2native',
+
+  NATIVE_IOS_SERVICE: process.env.NATIVE_IOS_SERVICE || 'o2-native-ios',
+  NATIVE_IOS_APP_ID: process.env.NATIVE_IOS_APP_ID || 'com.o2native.ios',
+
+  // Maestro needs a device id for iOS; Android uses the single attached emulator.
+  IOS_SIM_UDID: process.env.IOS_SIM_UDID || '',
 };

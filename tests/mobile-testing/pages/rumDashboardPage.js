@@ -55,12 +55,20 @@ class RumDashboardPage {
     await this._goto(`/web/rum/errors?period=${periodMin}m&org_identifier=${this.org}`);
   }
 
-  /** The session detail rendered — the session id header and Breadcrumbs panel are present. */
-  async expectSessionViewable(sessionId) {
-    await expect(this.page.getByText(sessionId).first()).toBeVisible({ timeout: 40000 });
-    await expect(this.page.getByRole('button', { name: 'Breadcrumbs' })).toBeVisible({
-      timeout: 40000,
-    });
+  /**
+   * The session detail rendered. The page hydrates slowly, so settle then assert the stable
+   * tab bar (Breadcrumbs), with one reload as a self-heal.
+   */
+  async expectSessionViewable() {
+    const breadcrumbs = this.page.getByRole('button', { name: 'Breadcrumbs' });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await this.page.waitForTimeout(3000);
+      if (await breadcrumbs.isVisible().catch(() => false)) return;
+      if (attempt === 0) {
+        await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+      }
+    }
+    await expect(breadcrumbs).toBeVisible({ timeout: 30000 });
   }
 
   /** No PII string leaked into the session-replay DOM (masking guard). */

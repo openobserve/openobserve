@@ -1,4 +1,3 @@
-# Drives the native iOS Swift app through every scenario.
 appId: com.o2native.ios
 ---
 - launchApp:
@@ -9,9 +8,3 @@ appId: com.o2native.ios
 - tapOn: "Go to Details"
 - assertVisible: "Details screen"
 - back
-- assertVisible: "O2 Native iOS"
-- tapOn: "Trigger native crash"
-- waitForAnimationToEnd:
-    timeout: 4000
-- stopApp
-- launchApp

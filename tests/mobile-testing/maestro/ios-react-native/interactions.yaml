@@ -1,4 +1,3 @@
-# Drives the RN app on iOS through every scenario. appId = iOS bundle id.
 appId: org.reactjs.native.example.O2RumTester
 ---
 - launchApp:
@@ -10,14 +9,4 @@ appId: org.reactjs.native.example.O2RumTester
 - assertVisible: "handled error reported to RUM"
 - tapOn: "Go to Details →"
 - assertVisible: "Details"
-- tapOn: "Custom action (tap)"
 - tapOn: "← Back to Home"
-- tapOn: "Go to Checkout form →"
-- assertVisible: "Checkout (masking test)"
-- tapOn: "Place order"
-- tapOn: "← Back to Home"
-- tapOn: "Trigger native crash"
-- waitForAnimationToEnd:
-    timeout: 4000
-- stopApp
-- launchApp

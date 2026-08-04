@@ -18,5 +18,11 @@ module.exports = defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'rn-android', testMatch: /rn-android\..*\.spec\.js/ }],
+  projects: [
+    { name: 'rn-android', testMatch: /rn-android\..*\.spec\.js/ },
+    { name: 'android-native', testMatch: /android-native\..*\.spec\.js/ },
+    { name: 'rn-ios', testMatch: /rn-ios\..*\.spec\.js/ },
+    { name: 'ios-native', testMatch: /ios-native\..*\.spec\.js/ },
+    { name: 'known-bugs', testMatch: /known-bugs\..*\.spec\.js/ },
+  ],
 });

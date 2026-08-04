@@ -1,0 +1,10 @@
+appId: com.o2native
+---
+- launchApp:
+    clearState: false
+- assertVisible: "Trigger handled error"
+- tapOn: "Trigger handled error"
+- tapOn: "Custom action"
+- tapOn: "Go to Details"
+- assertVisible: "Details screen"
+- back

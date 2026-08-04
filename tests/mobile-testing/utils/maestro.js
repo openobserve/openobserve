@@ -23,11 +23,29 @@ function maestroEnv() {
   };
 }
 
-/** Run a flow file under maestro/. Returns { ok }. Throws on non-zero unless throwOnFail=false. */
-function runFlow(relativeFlowPath, { throwOnFail = true } = {}) {
-  const flow = path.join(__dirname, '..', 'maestro', relativeFlowPath);
+/** First attached Android emulator (e.g. "emulator-5554"), or '' if none. */
+function androidEmulator() {
+  const androidHome = process.env.ANDROID_HOME || '/opt/homebrew/share/android-commandlinetools';
   try {
-    execFileSync(MAESTRO_BIN, ['test', flow], {
+    const out = execFileSync(path.join(androidHome, 'platform-tools', 'adb'), ['devices'], {
+      encoding: 'utf8',
+    });
+    const line = out.split('\n').find((l) => /^emulator-\d+\s+device/.test(l));
+    return line ? line.split(/\s+/)[0] : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/** Run a flow file under maestro/. Returns { ok }. Throws on non-zero unless throwOnFail=false. */
+function runFlow(relativeFlowPath, { throwOnFail = true, device = '' } = {}) {
+  const flow = path.join(__dirname, '..', 'maestro', relativeFlowPath);
+  // iOS passes the simulator udid explicitly; Android flows default to the attached emulator
+  // (needed because Maestro is ambiguous when a sim AND an emulator are both booted).
+  const target = device || androidEmulator();
+  const args = target ? ['--device', target, 'test', flow] : ['test', flow];
+  try {
+    execFileSync(MAESTRO_BIN, args, {
       env: maestroEnv(),
       stdio: 'inherit',
       timeout: 5 * 60 * 1000,

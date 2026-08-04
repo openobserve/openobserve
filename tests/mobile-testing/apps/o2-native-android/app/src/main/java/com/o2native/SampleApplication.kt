@@ -15,16 +15,16 @@ import com.openobserve.android.sessionreplay.SessionReplayConfiguration
 import com.openobserve.android.sessionreplay.TextAndInputPrivacy
 import com.openobserve.android.sessionreplay.TouchPrivacy
 
-// Same org/endpoint as the RN app so all mobile data lands together.
-private const val ORG = "3GldGL2anfrpTHgdLsuPpnqy4eI"
-private const val BASE = "https://dev.o2aks1.internal.zinclabs.dev/rum/v1/$ORG"
+// reactnativeapp org on the migrated cluster (same org as the RN app).
+private const val ORG = "3HOStgiihM8H43cMLWY3BUfXV5r"
+private const val BASE = "https://dev.common-dev.internal.zinclabs.dev/rum/v1/$ORG"
 
 class SampleApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
         val configuration = Configuration.Builder(
-            clientToken = "rumz52ErMxBZ8WNOtAC",
+            clientToken = "rumtbJXyJcgC8jB9Otu",
             env = "testing",
             service = "o2-native-android",
         ).build()

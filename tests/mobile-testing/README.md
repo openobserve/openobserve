@@ -61,16 +61,32 @@ npx playwright install chromium
 ## Run
 
 ```bash
-# whole RN-Android suite
-npm run test:rn-android
-
-# a single scenario
-npx playwright test specs/rn-android.crash.spec.js
+# one platform (Playwright projects)
+npx playwright test --project=rn-android
+npx playwright test --project=android-native
+npx playwright test --project=rn-ios          # needs a booted iOS simulator
+npx playwright test --project=ios-native      # needs a booted iOS simulator
 
 # by tag
 npx playwright test --grep @crash
 npx playwright test --grep @masking
+npx playwright test --grep @known-bug         # skipped/xfail bug trackers (o2-enterprise#2289)
 ```
+
+### Coverage (all four mobile tracks + known bugs)
+Each platform has a **core RUM** suite (shared factory `utils/coreRumSpec.js`) asserting telemetry
+in `_rumdata` (API) **and** that the crashed session renders in the dashboard (UI):
+
+| Project | App | Service | source |
+|---|---|---|---|
+| `rn-android` | `apps/o2-rum-tester` (Android) | `o2-rum-tester` | `react-native`/`android` |
+| `android-native` | `apps/o2-native-android` | `o2-native-android` | `android` |
+| `rn-ios` | `apps/o2-rum-tester` (iOS) | `o2-rum-tester` | `react-native` |
+| `ios-native` | `apps/o2-native-ios` | `o2-native-ios` | `ios` |
+| `known-bugs` | — | — | `test.fixme` trackers for #2289 (flip green when fixed) |
+
+Prereqs: Android emulator booted for the Android projects; an iOS simulator booted (udid in
+`.env` `IOS_SIM_UDID`) for the iOS projects; the fixture apps built + installed (see `apps/`).
 
 Tags: `@mobile @rn-android @P0 @P1 @crash @network @errors @views @replay @masking @known-bug`.
 
