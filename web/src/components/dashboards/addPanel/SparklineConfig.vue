@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <ColorSwatchPicker
           :model-value="model.color"
-          :swatches="TEXT_SWATCHES"
+          :swatches="seriesSwatches"
           data-test="dashboard-config-sparkline-color"
           @update:model-value="(v) => patch({ color: v })"
         />
@@ -91,8 +91,9 @@ import OSlider from "@/lib/forms/Slider/OSlider.vue";
 import SparklineLayoutIcon from "./SparklineLayoutIcon.vue";
 import SparklineTypeIcon from "./SparklineTypeIcon.vue";
 import ColorSwatchPicker from "../ColorSwatchPicker.vue";
-import { TEXT_SWATCHES } from "@/composables/dashboard/useColumnFormatting";
+import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { METRIC_SPARKLINE } from "@/utils/dashboard/sql/charts/convertSQLMetricChart";
+import { useStore } from "vuex";
 
 // Default sparkline shape; `config.sparkline` stays null until the user interacts.
 const DEFAULTS = {
@@ -111,6 +112,13 @@ export default defineComponent({
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18n();
+    const store = useStore();
+
+    const seriesSwatches = computed(() => {
+      void store.state.theme;
+      // Trimmed to 8 so the row (None + 8 + custom = 10 items) stays on one line.
+      return getColorPalette().slice(0, 8);
+    });
 
     const model = computed(() => dashboardPanelData.data.config.sparkline ?? DEFAULTS);
     const patch = (p: Record<string, any>) => {
@@ -170,7 +178,7 @@ export default defineComponent({
       typeOptions,
       layoutOptions,
       METRIC_SPARKLINE,
-      TEXT_SWATCHES,
+      seriesSwatches,
       formatOpacity,
       onLineWidthInput,
       normalizeLineWidth,
