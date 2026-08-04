@@ -2203,7 +2203,7 @@
       "inputLabel": "Sample Input",
       "invalidJson": "Enter a valid JSON array of records.",
       "resultHint": "After running, each step shows a check or an error icon on the canvas.",
-      "notVerified": "Not verified — an earlier step errored, so records may not have reached this one.",
+      "notVerified": "No records reached this step — an upstream condition filtered them out, or an earlier step errored.",
       "run": "Run Test",
       "allPassed": "All steps passed.",
       "nErrored": "{count} step(s) errored.",
@@ -2212,15 +2212,24 @@
       "errorsN": "{count} error(s)",
       "runError": "Unable to run the test.",
       "stepResult": {
-        "viewHint": "Click To View Input / Output",
+        "viewHint": "Click to view input / output",
         "input": "Input",
         "output": "Output",
-        "noInput": "No Input Captured For This Step.",
-        "noOutput": "No Output Captured For This Step.",
+        "noInput": "This step received no records on the last run.",
+        "noOutput": "No output captured for this step.",
+        "sentExternally": "Sent to the external destination",
+        "destinationNoRecords": "No records reached this destination — nothing was sent.",
+        "branchFiltered": "0 records — nothing passed to this branch.",
+        "conditionNoMatch": "No records matched this condition — nothing continued downstream.",
+        "errorHeading": "Error",
+        "forwardedHeading": "Passed Downstream",
+        "useAsTestInput": "Use these records as the test input",
+        "useAsTestInputNoInput": "No input records to use as the test input.",
+        "useAsTestInputNoOutput": "This step produced no output to use as the test input.",
         "copyInput": "Copy Input",
         "copyOutput": "Copy Output",
-        "copiedInput": "Input Copied To Clipboard",
-        "copiedOutput": "Output Copied To Clipboard",
+        "copiedInput": "Input copied to clipboard",
+        "copiedOutput": "Output copied to clipboard",
         "enterFullscreen": "Enter Fullscreen",
         "exitFullscreen": "Exit Fullscreen",
         "replay": "Replay",
@@ -2228,7 +2237,7 @@
         "status": {
           "ok": "Passed",
           "error": "Errored",
-          "skipped": "Not Verified"
+          "skipped": "No Records"
         }
       }
     },
@@ -2253,6 +2262,7 @@
       "linkError": "Unable To Link Alerts."
     },
     "chooseTrigger": "Choose a Trigger",
+    "edgeDeleteHint": "Press Backspace / Delete To Remove The Edge",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",

@@ -530,11 +530,35 @@ describe("WorkflowNode", () => {
     });
 
     it("renders the grey not-verified badge for a blocked (downstream-of-error) node", () => {
+      // No `inputs` map (history-run fallback) → blocked-downstream drives grey.
       setResult({ errors: {}, ranNodeIds: ["c1"], blockedNodeIds: ["c1"] });
       wrapper = mountNode("c1", CONDITION.data);
       const badge = wrapper.find('[data-test="workflow-node-condition-test-skipped"]');
       expect(badge.exists()).toBe(true);
-      expect(wrapper.text()).toContain("Not verified");
+      expect(wrapper.text()).toContain("No records reached this step");
+    });
+
+    // Live Test run carries a per-node `inputs` map — the badge reflects whether
+    // records ACTUALLY reached the node, not just graph reachability.
+    it("green tick when the node received records (in the inputs map)", () => {
+      setResult({
+        errors: {},
+        inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["c1"],
+        blockedNodeIds: [],
+      });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(true);
+    });
+
+    it("grey badge when the node was reached but got 0 records (filtered upstream)", () => {
+      // c1 is reachable (ranNodeIds) but absent from `inputs` → not a false pass.
+      setResult({ errors: {}, inputs: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-skipped"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(false);
     });
 
     it("renders the red error badge with its messages in the tooltip", () => {
@@ -628,11 +652,23 @@ describe("WorkflowNode", () => {
       });
     });
 
-    it("the ok badge is not clickable (no drawer)", async () => {
-      setResult({ errors: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
+    it("opens the drawer when the ok badge is clicked (every ran node is inspectable)", async () => {
+      setResult({
+        errors: {},
+        inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["c1"],
+        blockedNodeIds: [],
+      });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-ok"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer.show).toBe(false);
+      expect(workflowObj.testRun.resultDrawer).toEqual({ show: true, nodeId: "c1" });
+    });
+
+    it("opens the drawer when the grey (skipped) badge is clicked", async () => {
+      setResult({ errors: {}, inputs: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
+      wrapper = mountNode("c1", CONDITION.data);
+      await wrapper.find('[data-test="workflow-node-condition-test-skipped"]').trigger("click");
+      expect(workflowObj.testRun.resultDrawer).toEqual({ show: true, nodeId: "c1" });
     });
 
     it("reacts to a test result arriving after mount", async () => {
