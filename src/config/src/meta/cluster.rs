@@ -321,10 +321,12 @@ mod tests {
 
     #[test]
     fn test_node_is_ingester() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::All],
+            ..Default::default()
+        };
 
         // Test with All role
-        node.role = vec![Role::All];
         assert!(node.is_ingester());
 
         // Test with Ingester role
@@ -338,10 +340,12 @@ mod tests {
 
     #[test]
     fn test_node_is_querier() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::All],
+            ..Default::default()
+        };
 
         // Test with All role
-        node.role = vec![Role::All];
         assert!(node.is_querier());
 
         // Test with Querier role
@@ -355,10 +359,12 @@ mod tests {
 
     #[test]
     fn test_node_role_checks() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::Router],
+            ..Default::default()
+        };
 
         // Test router
-        node.role = vec![Role::Router];
         assert!(node.is_router());
         assert!(!node.is_compactor());
 
@@ -390,9 +396,11 @@ mod tests {
 
     #[test]
     fn test_node_is_single_role() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::Ingester],
+            ..Default::default()
+        };
 
-        node.role = vec![Role::Ingester];
         assert!(node.is_single_role());
 
         node.role = vec![Role::All];
@@ -407,11 +415,13 @@ mod tests {
 
     #[test]
     fn test_node_is_interactive_querier() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::Querier],
+            role_group: RoleGroup::None,
+            ..Default::default()
+        };
 
         // querier + no role group → interactive
-        node.role = vec![Role::Querier];
-        node.role_group = RoleGroup::None;
         assert!(node.is_interactive_querier());
 
         // querier + Interactive → interactive
@@ -430,11 +440,13 @@ mod tests {
 
     #[test]
     fn test_node_is_background_querier() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::Querier],
+            role_group: RoleGroup::None,
+            ..Default::default()
+        };
 
         // querier + no role group → background
-        node.role = vec![Role::Querier];
-        node.role_group = RoleGroup::None;
         assert!(node.is_background_querier());
 
         // querier + Background → background
@@ -453,10 +465,12 @@ mod tests {
 
     #[test]
     fn test_node_is_standalone() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::ActionServer],
+            ..Default::default()
+        };
 
         // ActionServer alone → standalone
-        node.role = vec![Role::ActionServer];
         assert!(node.is_standalone());
 
         // All role → NOT standalone (has external deps)
@@ -474,17 +488,19 @@ mod tests {
 
     #[test]
     fn test_node_is_same() {
-        let mut a = Node::default();
-        a.id = 1;
-        a.uuid = "uuid-1".to_string();
-        a.name = "node-1".to_string();
-        a.http_addr = "http://localhost:5080".to_string();
-        a.grpc_addr = "localhost:5081".to_string();
-        a.role = vec![Role::Ingester];
-        a.role_group = RoleGroup::None;
-        a.scheduled = true;
-        a.broadcasted = false;
-        a.status = NodeStatus::Online;
+        let a = Node {
+            id: 1,
+            uuid: "uuid-1".to_string(),
+            name: "node-1".to_string(),
+            http_addr: "http://localhost:5080".to_string(),
+            grpc_addr: "localhost:5081".to_string(),
+            role: vec![Role::Ingester],
+            role_group: RoleGroup::None,
+            scheduled: true,
+            broadcasted: false,
+            status: NodeStatus::Online,
+            ..Default::default()
+        };
 
         let b = a.clone();
         assert!(a.is_same(&b));

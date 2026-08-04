@@ -1074,7 +1074,7 @@ mod tests {
     }
 
     #[test]
-    fn catalog_functions_documents_what_only_the_SERVER_can_supply() {
+    fn catalog_functions_documents_what_only_the_server_can_supply() {
         // Deliberately NOT asserting docs for the O2 UDFs. The frontend catalog
         // carries its own prose for those and wins on merge (it also owns which
         // arguments are columns), so a server-side doc for `match_all` would
