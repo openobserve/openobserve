@@ -879,7 +879,8 @@
     "traceIdLabel": "Trace ID:",
     "enterTraceIdPlaceholder": "Enter trace ID",
     "changeQueryModeTitle": "Change Query Mode",
-    "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
+    "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
+    "menuGroupAlerts": "Alerts"
   },
   "menu": {
     "home": "Home",
@@ -5462,6 +5463,59 @@
       "eventCount": "Events",
       "notFoundTitle": "Alert not found",
       "notFoundDescription": "This alert no longer exists, or you do not have access to it. It may have been deleted."
+    },
+    "prefill": {
+      "dialog": {
+        "title": "Create alert from this query",
+        "continue": "Continue to alert",
+        "streamLabel": "Stream",
+        "thresholdLabel": "Alert on",
+        "thresholdMatchingRows": "Matching rows",
+        "thresholdCount": "Count of rows",
+        "windowLabel": "Window",
+        "windowValue": "Last {minutes} minutes (from your time range)",
+        "queryLabel": "Query",
+        "queryCopied": "Query copied to clipboard"
+      },
+      "sources": {
+        "default": {
+          "label": "Create Alert",
+          "toast": "Query imported into the alert form"
+        },
+        "logs": {
+          "label": "Create Alert",
+          "toast": "Query imported from your logs search"
+        },
+        "patterns": {
+          "label": "Create alert",
+          "toast": "Query imported from the selected patterns"
+        },
+        "panel": {
+          "label": "Create Alert",
+          "toast": "Query imported from dashboard panel: \"{sourceLabel}\""
+        }
+      },
+      "warnings": {
+        "absoluteToRolling": "Your absolute time range became a {minutes}-minute rolling window — alerts always evaluate the most recent window.",
+        "periodClamped": "The time range was shortened to {minutes} minutes; alerts cannot evaluate a window that long.",
+        "limitStripped": "LIMIT was removed — alerts evaluate every matching row in the window.",
+        "orderByStripped": "ORDER BY was removed — ordering has no effect on alert evaluation.",
+        "histogramNotSupported": "This query buckets results over time, which an alert cannot evaluate. Create the alert from a dashboard panel instead.",
+        "convertedToSql": "Your filter was converted to SQL because it uses expressions the condition builder cannot represent.",
+        "actionsDropped": "The selected action was not carried over — alerts support VRL functions only.",
+        "joinSingleStream": "This query reads more than one stream; the alert will be attached to \"{stream}\".",
+        "broadMatch": "This alert matches every record in the stream. Add a filter unless that is what you want.",
+        "noResults": "Your query returned no results — the alert will only fire once matching data appears.",
+        "savedFunctionCopied": "The function body was copied into the alert. Later edits to the saved function will not apply to it.",
+        "unsupportedPanelType": "The \"{type}\" panel type has no row count to alert on; check the query before saving.",
+        "unresolvedQuery": "The query could not be resolved into something an alert can run.",
+        "noStream": "No stream is selected, so there is nothing to alert on.",
+        "emptyQuery": "There is no query to create an alert from.",
+        "noQueries": "This panel has no query to create an alert from.",
+        "noConstants": "The selected patterns have no distinctive text to match on.",
+        "patternLimit": "Only the first {max} patterns were used.",
+        "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns."
+      }
     }
   },
   "alert_templates": {
@@ -9653,7 +9707,14 @@
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
       "noStreamSelected": "No stream selected. Please select a stream before creating an alert.",
-      "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters."
+      "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters.",
+      "alertPatternLimit": "You can build an alert from at most {max} patterns.",
+      "alertSelectionCleared": "Pattern selection cleared — the patterns were rebuilt for the new search.",
+      "alertNoSelection": "Select at least one pattern to alert on or ignore.",
+      "alertOn": "Alert on",
+      "ignoreInAlert": "Ignore in alert",
+      "alertSelectionSummary": "{included} included · {excluded} ignored",
+      "clearSelection": "Clear"
     },
     "patternDetailsDialog": {
       "token": "token",
@@ -10039,7 +10100,7 @@
       "shotHeader": "Shot",
       "timeHeader": "Time",
       "timelineHeader": "Timeline",
-      "timelineHeaderWindow": "Timeline \u00b7 0 \u2013 {end}",
+      "timelineHeaderWindow": "Timeline · 0 – {end}",
       "stepNameLabel": "Step name",
       "stepNamePlaceholder": "Enter a descriptive name",
       "stepNamePurposePlaceholder": "Sign in with valid credentials",
