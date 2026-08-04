@@ -138,6 +138,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-queues": {
+    illustration: "data-scene",
+    variant: "create",
+    titleKey: "emptyState.noQueues.title",
+    descriptionKey: "emptyState.noQueues.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noQueues.action",
+        descriptionKey: "emptyState.noQueues.actionDesc",
+      },
+    ],
+  },
   "no-datasets": {
     illustration: "data-scene",
     variant: "create",
