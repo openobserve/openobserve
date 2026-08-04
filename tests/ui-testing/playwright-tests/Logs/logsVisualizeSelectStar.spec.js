@@ -143,4 +143,69 @@ test.describe("Logs Visualize SELECT * handling testcases", () => {
 
     testLogger.info('SELECT * rendered on a line chart with no toast');
   });
+
+  test("should keep a SELECT * line chart rendered after a browser refresh without the SELECT * toast", {
+    tag: ['@logs-visualize-selectstar', '@all', '@logs', '@P0']
+  }, async ({ page }) => {
+    testLogger.info('Testing SELECT * + histogram chart survives a URL refresh');
+
+    // 1. SELECT * in SQL mode, same as the tests above.
+    await pm.logsPage.enableSQLMode();
+    await pm.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
+    await pm.logsPage.applyQueryAndWaitForSearchResponse();
+
+    // Precondition gate — the post-refresh "no toast" assertion below is a negative,
+    // so it would pass trivially if this were never a select-all query.
+    await pm.logsPage.expectQueryEditorContainsText('SELECT * FROM');
+
+    // 2. Render a histogram-based chart (allowed for SELECT * by the fix).
+    await pm.logsPage.clickVisualizeToggle();
+    await pm.logsPage.expectVisualizeTabContentVisible();
+    await pm.logsPage.expectVisualizeChartRendered();
+    await pm.logsPage.selectChartType('line');
+    await pm.logsPage.verifyChartTypeSelected('line');
+    await pm.logsPage.expectVisualizeChartRendered();
+
+    // 3. Gate on the URL sync so the reload actually exercises URL restoration,
+    //    and capture the payload to compare against the restored state.
+    await pm.logsPage.waitForVisualizeUrlState();
+    const configBeforeRefresh = await pm.logsPage.getVisualizationDataFromUrl();
+    expect(configBeforeRefresh, 'visualization_data should be present before refresh').toBeTruthy();
+    expect(configBeforeRefresh.type).toBe('line');
+
+    // 4. Refresh with the recorder armed — the restore path re-runs the
+    //    visualization, which is where a spurious SELECT * toast would surface.
+    await pm.logsPage.startToastRecorder();
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+
+    // 5. The chart comes back: same type, actually painted, not the No Data state.
+    await pm.logsPage.expectVisualizeTabContentVisible();
+    await pm.logsPage.verifyChartTypeSelected('line');
+    await pm.logsPage.expectVisualizeChartRendered();
+
+    // 6. The SELECT * query itself survived the refresh.
+    await pm.logsPage.expectQueryEditorContainsText('SELECT * FROM');
+
+    // 7. The core assertion: the visualization already rendered successfully, so the
+    //    restore must NOT re-emit the SELECT * message. Only the table chart is
+    //    guarded, and the restored type is line.
+    await pm.logsPage.expectNoSelectStarVisualizationToast();
+    await pm.logsPage.expectNoRequiredFieldsError();
+    await pm.logsPage.expectNoDashboardErrors();
+
+    // 8. Panel config survived too — after load the app rewrites visualization_data
+    //    from its restored in-memory panel, so an equal payload proves the restore
+    //    repopulated state rather than the query string merely surviving.
+    await expect
+      .poll(async () => (await pm.logsPage.getVisualizationDataFromUrl())?.type, {
+        timeout: 20000,
+        message: 'visualization_data was not rewritten after refresh',
+      })
+      .toBe('line');
+    const configAfterRefresh = await pm.logsPage.getVisualizationDataFromUrl();
+    expect(configAfterRefresh.config).toEqual(configBeforeRefresh.config);
+
+    testLogger.info('SELECT * line chart restored after refresh with no toast');
+  });
 });
