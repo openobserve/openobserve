@@ -145,46 +145,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="createOpen"
       :title="t('aiObservability.datasets.create.title')"
-      :primary-button-label="t('common.create')"
+      form-id="new-dataset-form"
+      :primary-button-label="t('common.save')"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-disabled="!canSubmit"
-      :primary-button-loading="creating"
+      :primary-button-loading="isSubmitting"
       data-test="ai-datasets-create-dialog"
-      @click:primary="submitCreate"
       @click:secondary="createOpen = false"
     >
-      <div class="flex flex-col gap-4 p-1">
-        <OInput
-          v-model="form.name"
-          :label="t('aiObservability.datasets.create.nameLabel')"
-          :placeholder="t('aiObservability.datasets.create.namePlaceholder')"
-          required
-          data-test="ai-datasets-create-name"
-        />
-        <OTextarea
-          v-model="form.description"
-          :label="t('aiObservability.datasets.create.descriptionLabel')"
-          :placeholder="t('aiObservability.datasets.create.descriptionPlaceholder')"
-          :rows="3"
-          data-test="ai-datasets-create-description"
-        />
-        <div class="flex flex-col gap-1.5">
-          <span class="text-input-label-text text-sm font-medium">
-            {{ t("aiObservability.datasets.create.tagsLabel") }}
-          </span>
-          <OTagInput
-            v-model="form.tags"
-            :placeholder="t('aiObservability.datasets.create.tagsPlaceholder')"
-            data-test="ai-datasets-create-tags"
+      <OForm id="new-dataset-form" :form="form">
+        <div class="flex flex-col gap-4 p-1">
+          <OFormInput
+            name="name"
+            :label="t('aiObservability.datasets.create.nameLabel')"
+            :placeholder="t('aiObservability.datasets.create.namePlaceholder')"
+            required
+            data-test="ai-datasets-create-name"
           />
+          <div class="flex flex-col gap-1.5">
+            <span class="inline-flex items-center gap-1">
+              <span
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+              >
+                {{ t("aiObservability.datasets.create.descriptionLabel") }}
+              </span>
+              <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
+            </span>
+            <OFormTextarea
+              name="description"
+              :placeholder="t('aiObservability.datasets.create.descriptionPlaceholder')"
+              :rows="3"
+              data-test="ai-datasets-create-description"
+            />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="inline-flex items-center gap-1">
+              <span
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+              >
+                {{ t("aiObservability.datasets.create.tagsLabel") }}
+              </span>
+              <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
+            </span>
+            <OFormTagInput
+              name="tags"
+              :placeholder="t('aiObservability.datasets.create.tagsPlaceholder')"
+              data-test="ai-datasets-create-tags"
+            />
+          </div>
         </div>
-      </div>
+      </OForm>
     </ODialog>
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -195,9 +210,12 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
+import { makeDatasetFormSchema, type DatasetForm } from "./DatasetForm.schema";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -298,36 +316,36 @@ async function refresh() {
   }
 }
 
-// ── Create dialog ──
+// ── Create dialog (useOForm + Zod — mirrors ScoreConfigDialog / QueuesPage) ──
+// Every field is a name-bound OForm* input, so no setFieldValue bridge is needed.
 const createOpen = ref(false);
-const creating = ref(false);
-const form = reactive({ name: "", description: "", tags: [] as string[] });
 
-const canSubmit = computed(() => form.name.trim().length > 0);
+const form = useOForm<DatasetForm>({
+  defaultValues: { name: "", description: "", tags: [] },
+  schema: makeDatasetFormSchema(t),
+  onSubmit: save,
+});
+const isSubmitting = form.useStore((s: any) => s.isSubmitting as boolean);
 
 function openCreate() {
-  form.name = "";
-  form.description = "";
-  form.tags = [];
+  form.reset();
   createOpen.value = true;
 }
 
-async function submitCreate() {
-  if (!canSubmit.value || !orgId.value) return;
-  creating.value = true;
+// Runs only after the Zod schema passes (name required).
+async function save(values: DatasetForm) {
+  if (!orgId.value) return;
   try {
     await llmDatasetsService.create(orgId.value, {
-      name: form.name.trim(),
-      description: form.description.trim() || null,
-      tags: form.tags,
+      name: values.name.trim(),
+      description: values.description.trim() || null,
+      tags: values.tags,
     });
     toast({ variant: "success", message: t("aiObservability.datasets.create.success") });
     createOpen.value = false;
     await refresh();
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.create.error") });
-  } finally {
-    creating.value = false;
   }
 }
 
