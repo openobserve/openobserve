@@ -2838,7 +2838,10 @@
     "tokenRotateError": "Failed to rotate token.",
     "tokenDeleteError": "Failed to delete token.",
     "noTokensFound": "No ingestion tokens found.",
-    "createdBy": "Created by"
+    "createdBy": "Created by",
+    "tokenStatus": "Status",
+    "disableTokenTitle": "Disable token?",
+    "disableTokenMsg": "Disabling \"{name}\" immediately stops ingestion for everything sending data with this token. You can re-enable it at any time."
   },
   "dashboard": {
     "autoName": {
@@ -9725,6 +9728,8 @@
       "enabledSuccess": "Token enabled",
       "disabledSuccess": "Token disabled",
       "updateError": "Failed to update token",
+      "disableConfirmTitle": "Disable token?",
+      "disableConfirmMsg": "Disabling \"{name}\" stops its agents ({count} connected) from pulling jobs. You can re-enable it at any time.",
       "empty": {
         "title": "No synthetics tokens",
         "description": "Create a named token to scope a region's agents, or use the org default."
@@ -10813,6 +10818,7 @@
       "traceDetail": "Trace Detail",
       "runningQueries": "Running Queries",
       "ingestionTokens": "IAM — Ingestion Tokens",
+      "syntheticsTokens": "IAM — Synthetics Tokens",
       "alertIncidents": "Alerts — Incidents",
       "pipelineDestinations": "Pipelines — Destinations",
       "enrichmentTables": "Enrichment Tables",
@@ -10910,6 +10916,8 @@
       "runningQueriesRefresh": "Refresh query list",
       "ingestionTokensAdd": "Create new token",
       "ingestionTokensRefresh": "Refresh token list",
+      "syntheticsTokensAdd": "Create new token",
+      "syntheticsTokensRefresh": "Refresh token list",
       "aiChatToggle": "Toggle AI chat",
       "dashboardEdit": "Enter / exit edit mode",
       "logsSaveView": "Save as saved view",

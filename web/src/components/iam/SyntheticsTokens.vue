@@ -65,10 +65,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
+          :default-columns="false"
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-synthetics-tokens"
           filter-mode="client"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          sorting="client"
+          show-index
+          :footer-title="t('synthetics.tokens.title')"
         >
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
@@ -86,10 +93,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               icon-left="refresh"
               :loading="loading"
-              :title="t('common.refresh')"
               data-test="synthetics-tokens-refresh-btn"
               @click="fetchTokens"
-            />
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="syntheticsTokensRefresh"
+              />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -126,9 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-status="{ row }">
-            <OBadge :variant="row.enabled ? 'success' : 'default'" :dot="true" size="sm">
-              {{ row.enabled ? t("common.enable") : t("common.disable") }}
-            </OBadge>
+            <OTag type="featureStatus" :value="row.enabled ? 'enabled' : 'disabled'" />
           </template>
 
           <template #cell-created_by="{ row }">
@@ -149,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('common.disable')
                     : t('common.enable')
               "
-              @click.stop="toggleEnabled(row.name, !row.enabled)"
+              @click.stop="requestToggle(row)"
             />
           </template>
         </OTable>
@@ -256,6 +266,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </ODialog>
+
+    <!-- Rotate needs no confirm — the old default stays valid until disabled
+         (backend contract), so minting a new one is non-destructive.
+         Disabling revokes the token its live agents pull jobs with, so it gets
+         a confirmation; enabling is safe and stays one click. -->
+    <ODialog
+      data-test="synthetics-token-disable-dialog"
+      v-model:open="confirmDisable"
+      size="xs"
+      :title="t('synthetics.tokens.disableConfirmTitle')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="t('common.disable')"
+      primary-button-variant="destructive"
+      @click:secondary="confirmDisable = false"
+      @click:primary="confirmDisableToken"
+    >
+      <p>
+        {{
+          t("synthetics.tokens.disableConfirmMsg", {
+            name: disableTarget?.name ?? "",
+            count: disableTarget?.agents ?? 0,
+          })
+        }}
+      </p>
+    </ODialog>
   </OPageLayout>
 </template>
 
@@ -272,7 +307,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -284,6 +318,8 @@ import {
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import syntheticsService from "@/services/synthetics";
 import type { AgentSetup } from "@/types/synthetics";
 
@@ -310,7 +346,6 @@ export default defineComponent({
     OForm,
     OFormInput,
     OTable,
-    OBadge,
     OTag,
     OUserCell,
   },
@@ -454,6 +489,26 @@ export default defineComponent({
       }
     };
 
+    // Disable revokes the token out from under its live agents, so it goes
+    // through a confirm dialog. Enable is safe → immediate.
+    const confirmDisable = ref(false);
+    const disableTarget = ref<AgentToken | null>(null);
+
+    const requestToggle = (row: AgentToken) => {
+      if (row.enabled) {
+        disableTarget.value = row;
+        confirmDisable.value = true;
+      } else {
+        toggleEnabled(row.name, true);
+      }
+    };
+
+    const confirmDisableToken = async () => {
+      confirmDisable.value = false;
+      if (disableTarget.value) await toggleEnabled(disableTarget.value.name, false);
+      disableTarget.value = null;
+    };
+
     const rotateDefault = async () => {
       loading.value = true;
       try {
@@ -529,6 +584,28 @@ export default defineComponent({
       fetchAgentSetup();
     });
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "syntheticsTokensAdd",
+        handler: () => {
+          if (!isInputFocused()) showCreateForm.value = true;
+        },
+      },
+      {
+        id: "syntheticsTokensRefresh",
+        handler: () => {
+          if (!isInputFocused()) fetchTokens();
+        },
+      },
+      {
+        id: "syntheticsTokensFocusSearch",
+        handler: () => {
+          focusSearchInput("synthetics-tokens-search-input");
+        },
+      },
+    ]);
+
     return {
       t,
       tokens,
@@ -545,7 +622,10 @@ export default defineComponent({
       createTokenSchema,
       createTokenDefaults,
       rotateDefault,
-      toggleEnabled,
+      confirmDisable,
+      disableTarget,
+      requestToggle,
+      confirmDisableToken,
       copyToken,
     };
   },
