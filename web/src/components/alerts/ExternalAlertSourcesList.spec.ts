@@ -14,8 +14,7 @@ vi.mock("@/services/alert_sources", () => ({
     rotate: vi.fn(),
     create: vi.fn(),
     delete: vi.fn(),
-    setDestinations: vi.fn(),
-    setName: vi.fn(),
+    update: vi.fn(),
   },
 }));
 

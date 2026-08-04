@@ -8,7 +8,7 @@ import alertSources from "@/services/alert_sources";
 import destinationService from "@/services/alert_destination";
 
 vi.mock("@/services/alert_sources", () => ({
-  default: { create: vi.fn(), listSenders: vi.fn(), setName: vi.fn(), setDestinations: vi.fn() },
+  default: { create: vi.fn(), listSenders: vi.fn(), update: vi.fn() },
 }));
 
 vi.mock("@/services/alert_destination", () => ({
@@ -319,29 +319,26 @@ describe("AddExternalAlertSource", () => {
       expect((wrapper.vm as any).form.destinations).toEqual(["sre-pages"]);
     });
 
-    it("submitEdit calls setName and setDestinations only for changed fields, then emits updated and closes", async () => {
-      (alertSources.setName as any).mockResolvedValue({ data: {} });
+    it("submitEdit calls update with only the changed fields, then emits updated and closes", async () => {
+      (alertSources.update as any).mockResolvedValue({ data: {} });
       const wrapper = buildWrapper(false, EXISTING_INTEGRATION);
       await wrapper.setProps({ open: true });
       (wrapper.vm as any).form.name = "renamed";
       await (wrapper.vm as any).submitEdit();
-      expect(alertSources.setName).toHaveBeenCalledWith("myorg", "int-1", "renamed");
-      expect(alertSources.setDestinations).not.toHaveBeenCalled();
+      expect(alertSources.update).toHaveBeenCalledWith("myorg", "int-1", { name: "renamed" });
       expect(wrapper.emitted("updated")).toBeTruthy();
       expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
     });
 
-    it("submitEdit calls setDestinations when only destinations changed", async () => {
-      (alertSources.setDestinations as any).mockResolvedValue({ data: {} });
+    it("submitEdit calls update with only destinations when only destinations changed", async () => {
+      (alertSources.update as any).mockResolvedValue({ data: {} });
       const wrapper = buildWrapper(false, EXISTING_INTEGRATION);
       await wrapper.setProps({ open: true });
       (wrapper.vm as any).form.destinations = ["sre-pages", "email-oncall"];
       await (wrapper.vm as any).submitEdit();
-      expect(alertSources.setName).not.toHaveBeenCalled();
-      expect(alertSources.setDestinations).toHaveBeenCalledWith("myorg", "int-1", [
-        "sre-pages",
-        "email-oncall",
-      ]);
+      expect(alertSources.update).toHaveBeenCalledWith("myorg", "int-1", {
+        destinations: ["sre-pages", "email-oncall"],
+      });
     });
 
     it("submitEdit does nothing when the name is blank", async () => {
@@ -349,18 +346,17 @@ describe("AddExternalAlertSource", () => {
       await wrapper.setProps({ open: true });
       (wrapper.vm as any).form.name = "   ";
       await (wrapper.vm as any).submitEdit();
-      expect(alertSources.setName).not.toHaveBeenCalled();
-      expect(alertSources.setDestinations).not.toHaveBeenCalled();
+      expect(alertSources.update).not.toHaveBeenCalled();
     });
 
     it("onPrimaryClick routes to submitEdit instead of create when in edit mode", async () => {
-      (alertSources.setName as any).mockResolvedValue({ data: {} });
+      (alertSources.update as any).mockResolvedValue({ data: {} });
       const wrapper = buildWrapper(false, EXISTING_INTEGRATION);
       await wrapper.setProps({ open: true });
       (wrapper.vm as any).form.name = "renamed";
       await (wrapper.vm as any).onPrimaryClick();
       expect(alertSources.create).not.toHaveBeenCalled();
-      expect(alertSources.setName).toHaveBeenCalledWith("myorg", "int-1", "renamed");
+      expect(alertSources.update).toHaveBeenCalledWith("myorg", "int-1", { name: "renamed" });
     });
   });
 });

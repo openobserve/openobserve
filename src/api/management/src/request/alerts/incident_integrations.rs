@@ -49,17 +49,13 @@ pub struct SetEnabledPayload {
     pub enabled: bool,
 }
 
+/// PATCH payload for updating an integration's name and/or destinations.
+/// Both fields are optional — only the fields present are updated.
 #[derive(Debug, Deserialize)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
-pub struct SetDestinationsPayload {
-    #[serde(default)]
-    pub destinations: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
-pub struct SetNamePayload {
-    pub name: String,
+pub struct UpdateIntegrationPayload {
+    pub name: Option<String>,
+    pub destinations: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -266,44 +262,37 @@ pub async fn set_integration_enabled(
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn set_integration_destinations(
+pub async fn update_integration(
     Path((org_id, integration_id)): Path<(String, String)>,
-    Json(payload): Json<SetDestinationsPayload>,
+    Json(payload): Json<UpdateIntegrationPayload>,
 ) -> Response {
     if let Some(resp) = gate_enabled() {
         return resp;
     }
 
-    match infra::table::incident_integrations::set_destinations(
-        &org_id,
-        &integration_id,
-        &payload.destinations,
-    )
-    .await
-    {
-        Ok(()) => MetaHttpResponse::ok("updated"),
-        Err(e) => MetaHttpResponse::internal_error(e),
-    }
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn set_integration_name(
-    Path((org_id, integration_id)): Path<(String, String)>,
-    Json(payload): Json<SetNamePayload>,
-) -> Response {
-    if let Some(resp) = gate_enabled() {
-        return resp;
-    }
-    if let Err(e) = validate_name(&payload.name) {
-        return MetaHttpResponse::bad_request(e);
+    if let Some(name) = &payload.name {
+        if let Err(e) = validate_name(name) {
+            return MetaHttpResponse::bad_request(e);
+        }
+        if let Err(e) =
+            infra::table::incident_integrations::set_name(&org_id, &integration_id, name).await
+        {
+            return MetaHttpResponse::internal_error(e);
+        }
     }
 
-    match infra::table::incident_integrations::set_name(&org_id, &integration_id, &payload.name)
+    if let Some(destinations) = &payload.destinations
+        && let Err(e) = infra::table::incident_integrations::set_destinations(
+            &org_id,
+            &integration_id,
+            destinations,
+        )
         .await
     {
-        Ok(()) => MetaHttpResponse::ok("updated"),
-        Err(e) => MetaHttpResponse::internal_error(e),
+        return MetaHttpResponse::internal_error(e);
     }
+
+    MetaHttpResponse::ok("updated")
 }
 
 #[cfg(feature = "enterprise")]
@@ -402,17 +391,9 @@ pub async fn rotate_integration_token(_path: Path<(String, String)>) -> Response
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub async fn set_integration_name(
+pub async fn update_integration(
     _path: Path<(String, String)>,
-    _body: Json<SetNamePayload>,
-) -> Response {
-    MetaHttpResponse::forbidden("Not Supported")
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn set_integration_destinations(
-    _path: Path<(String, String)>,
-    _body: Json<SetDestinationsPayload>,
+    _body: Json<UpdateIntegrationPayload>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -511,17 +492,19 @@ mod tests {
     }
 
     #[test]
-    fn test_set_destinations_payload_round_trip() {
+    fn test_update_integration_payload_round_trip() {
         let json = r#"{"destinations":["sre-pages"]}"#;
-        let p: SetDestinationsPayload = serde_json::from_str(json).unwrap();
-        assert_eq!(p.destinations, vec!["sre-pages"]);
+        let p: UpdateIntegrationPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(p.destinations, Some(vec!["sre-pages".to_string()]));
+        assert_eq!(p.name, None);
     }
 
     #[test]
-    fn test_set_destinations_payload_defaults_empty() {
+    fn test_update_integration_payload_defaults_absent() {
         let json = r#"{}"#;
-        let p: SetDestinationsPayload = serde_json::from_str(json).unwrap();
-        assert!(p.destinations.is_empty());
+        let p: UpdateIntegrationPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(p.name, None);
+        assert_eq!(p.destinations, None);
     }
 
     #[test]

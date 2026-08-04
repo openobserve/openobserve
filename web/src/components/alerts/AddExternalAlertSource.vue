@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            ingestion setup cards' OStepper `expanded` checklist pattern) —
            steps 2/3 just show a "save first" placeholder until the source
            exists, instead of being hidden entirely. -->
-      <OStepper v-if="!isEditMode" expanded orientation="vertical">
+      <OStepper v-if="!isEditMode" :model-value="activeStep" expanded orientation="vertical">
         <OStep :name="1" :title="t('alert_sources.setupStep1Title')" :done="created">
           <p class="text-text-secondary text-sm">{{ t("alert_sources.setupStep1Body") }}</p>
         </OStep>
@@ -203,6 +203,14 @@ export default defineComponent({
     },
     isEditMode(): boolean {
       return !!this.editingIntegration;
+    },
+    // Drives OStepper's required modelValue: highlights step 1 until the
+    // source is created, step 2 while waiting for the first event, step 3
+    // once connected. Steps are still shown together (expanded mode) — this
+    // only controls which one reads as "active".
+    activeStep(): number {
+      if (!this.created) return 1;
+      return this.waitingForEvent ? 2 : 3;
     },
     createdUrlSnippet(): string {
       if (!this.createdIntegration) return "";
@@ -333,15 +341,11 @@ export default defineComponent({
         const destinationsChanged =
           JSON.stringify([...this.form.destinations].sort()) !==
           JSON.stringify([...this.editingIntegration.destinations].sort());
-        if (nameChanged) {
-          await alertSources.setName(this.orgIdentifier, this.editingIntegration.id, name);
-        }
-        if (destinationsChanged) {
-          await alertSources.setDestinations(
-            this.orgIdentifier,
-            this.editingIntegration.id,
-            this.form.destinations,
-          );
+        if (nameChanged || destinationsChanged) {
+          await alertSources.update(this.orgIdentifier, this.editingIntegration.id, {
+            ...(nameChanged ? { name } : {}),
+            ...(destinationsChanged ? { destinations: this.form.destinations } : {}),
+          });
         }
         toast({ variant: "success", message: this.t("alert_sources.updatedSuccess") });
         this.$emit("updated");
