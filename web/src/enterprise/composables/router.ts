@@ -30,8 +30,11 @@ const AIAgentGraphPage = () => import("@/enterprise/views/AIObservability/AgentG
 const AIAgentBehaviorPage = () =>
   import("@/enterprise/views/AIObservability/AgentBehaviorPage.vue");
 const AIDatasetsPage = () => import("@/enterprise/views/AIObservability/DatasetsPage.vue");
+const AIDatasetDetailPage = () =>
+  import("@/enterprise/views/AIObservability/DatasetDetailPage.vue");
 const AIQueuesPage = () => import("@/enterprise/views/AIObservability/QueuesPage.vue");
-const AIQueueDetailPage = () => import("@/enterprise/views/AIObservability/QueueDetailPage.vue");
+const AIQueueWorkbenchPage = () =>
+  import("@/enterprise/views/AIObservability/QueueWorkbenchPage.vue");
 // Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
 // AI menu item active) instead of the Traces session-details route.
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
@@ -115,15 +118,21 @@ const useEnvRoutes = () => {
         },
         {
           path: "queues/:id",
-          name: "aiQueueDetail",
-          component: AIQueueDetailPage,
-          meta: { title: "Queue", keepAlive: false },
+          name: "aiQueueWorkbench",
+          component: AIQueueWorkbenchPage,
+          meta: { title: "Queue Review", keepAlive: false },
         },
         {
           path: "datasets",
           name: "aiDatasets",
           component: AIDatasetsPage,
           meta: { title: "Datasets", keepAlive: false },
+        },
+        {
+          path: "datasets/:id",
+          name: "aiDatasetDetail",
+          component: AIDatasetDetailPage,
+          meta: { title: "Dataset", keepAlive: false },
         },
         {
           path: "evaluations",

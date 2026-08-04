@@ -55,6 +55,35 @@ export interface LlmDatasetPayload {
   tags?: string[];
 }
 
+/** Where a golden item came from. Mirrors `llm_dataset_items.source`. */
+export type LlmDatasetItemSource = "trace" | "annotation" | "manual";
+
+/** One golden item (input → expected_output), normalized. MVCC: editing an
+ *  item's expected_output appends a new version rather than mutating in place. */
+export interface LlmDatasetItem {
+  id: string;
+  datasetId: string;
+  /** Sanitized input (model_name/tokens/logprobs stripped) — "purified". */
+  input: string;
+  /** The golden answer. Required and never empty. */
+  expectedOutput: string;
+  source: LlmDatasetItemSource;
+  tags: string[];
+  /** Per-item MVCC version — bumped when expected_output is edited. */
+  version: number;
+  /** Lineage pointer to the review/trace this golden was distilled from. */
+  distilledFrom?: string | null;
+  updatedAt?: number;
+}
+
+/** Add/edit-item payload. Only user-authored fields; version is server-owned. */
+export interface LlmDatasetItemPayload {
+  input: string;
+  expectedOutput: string;
+  source?: LlmDatasetItemSource;
+  tags?: string[];
+}
+
 // Frontend-first: the `llm_datasets` schema exists but the HTTP API does not yet.
 // Until it ships, VITE_LLM_ANNOTATION_MOCK (default ON) serves in-memory
 // fixtures. Set it to "false" — a one-line swap — the moment the API lands; the
@@ -140,6 +169,113 @@ const mockDatasets: LlmDataset[] = [
   },
 ];
 
+/** Fold an API item row into the normalized shape. */
+function normalizeItem(d: any): LlmDatasetItem {
+  return {
+    id: d.id,
+    datasetId: d.dataset_id ?? d.datasetId,
+    input: d.input ?? "",
+    expectedOutput: d.expected_output ?? d.expectedOutput ?? "",
+    source: (d.source ?? "manual") as LlmDatasetItemSource,
+    tags: Array.isArray(d.tags) ? d.tags : [],
+    version: d.version ?? 1,
+    distilledFrom: d.distilled_from ?? d.distilledFrom ?? null,
+    updatedAt: d.updated_at ?? d.updatedAt,
+  };
+}
+
+// Mock golden items, keyed by dataset. Faithful to the "input (purified) →
+// expected_output, source, tags, version" shape the detail view renders.
+let mockItemSeq = 100;
+const mockItems: Record<string, LlmDatasetItem[]> = {
+  ds_mock_1: [
+    {
+      id: "it_1",
+      datasetId: "ds_mock_1",
+      input: "Customer wants to return a red T-shirt bought yesterday — is it eligible?",
+      expectedOutput:
+        "Hello! Order SH202604280912 is within the 7-day no-questions-asked window, so the red T-shirt is eligible for a full refund.",
+      source: "annotation",
+      tags: ["refund"],
+      version: 2,
+      distilledFrom: "queue:hallucination/trace-000021",
+      updatedAt: Date.now() - 1000 * 60 * 60 * 2,
+    },
+    {
+      id: "it_2",
+      datasetId: "ds_mock_1",
+      input: "What is the capital of France according to the retrieved records?",
+      expectedOutput:
+        "Based on the retrieved records, the relevant administrative capital is Paris.",
+      source: "trace",
+      tags: ["faithfulness", "rag"],
+      version: 3,
+      updatedAt: Date.now() - 1000 * 60 * 60 * 6,
+    },
+    {
+      id: "it_3",
+      datasetId: "ds_mock_1",
+      input: "Summarize the key recommendations from the attached compliance report.",
+      expectedOutput:
+        "The report's key recommendations are: (1) enforce mandatory review gates, (2) rotate access keys quarterly, and (3) log all privileged actions.",
+      source: "trace",
+      tags: ["summarization", "compliance"],
+      version: 3,
+      updatedAt: Date.now() - 1000 * 60 * 60 * 24,
+    },
+    {
+      id: "it_4",
+      datasetId: "ds_mock_1",
+      input: "Can I still get a refund after 30 days?",
+      expectedOutput:
+        "Beyond 30 days is normally outside the standard refund window and requires manual review — it is not auto-approved.",
+      source: "annotation",
+      tags: ["refund", "policy"],
+      version: 1,
+      distilledFrom: "queue:refund-policy/trace-000048",
+      updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
+    },
+    {
+      id: "it_5",
+      datasetId: "ds_mock_1",
+      input: "Retrieve and ground: which clauses cover liability caps?",
+      expectedOutput:
+        "Liability caps are governed by Section 9.2 (Limitation of Liability) of the master agreement.",
+      source: "trace",
+      tags: ["rag", "legal"],
+      version: 1,
+      updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
+    },
+    {
+      id: "it_6",
+      datasetId: "ds_mock_1",
+      input: "Can I use points to offset the shipping fee?",
+      expectedOutput:
+        "Yes. Points can offset shipping at 100 points = $1; check your balance at checkout.",
+      source: "manual",
+      tags: ["points"],
+      version: 1,
+      updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
+    },
+  ],
+};
+
+// Datasets without hand-authored fixtures get a small generated pool so the
+// detail view is populated for every row.
+function generatedItems(datasetId: string, count: number): LlmDatasetItem[] {
+  const sources: LlmDatasetItemSource[] = ["trace", "annotation", "manual"];
+  return Array.from({ length: Math.min(count, 8) }, (_, i) => ({
+    id: `${datasetId}_gen_${i + 1}`,
+    datasetId,
+    input: `Sample input ${i + 1} for this dataset.`,
+    expectedOutput: `Expected golden answer ${i + 1}.`,
+    source: sources[i % sources.length],
+    tags: i % 2 === 0 ? ["sample"] : [],
+    version: 1,
+    updatedAt: Date.now() - 1000 * 60 * 60 * (i + 1),
+  }));
+}
+
 const withLatency = <T>(value: T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), 250));
 
@@ -149,6 +285,127 @@ const llmDatasetsService = {
     const res = await http().get(base(orgId));
     const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
     return rows.map(normalize);
+  },
+
+  async get(orgId: string, id: string): Promise<LlmDataset> {
+    if (USE_MOCK) {
+      const row = mockDatasets.find((d) => d.id === id);
+      if (!row) throw new Error("dataset not found");
+      return withLatency(normalize(row));
+    }
+    const res = await http().get(`${base(orgId)}/${id}`);
+    return normalize(res.data);
+  },
+
+  async listItems(orgId: string, datasetId: string): Promise<LlmDatasetItem[]> {
+    if (USE_MOCK) {
+      const ds = mockDatasets.find((d) => d.id === datasetId);
+      const items = mockItems[datasetId] ?? generatedItems(datasetId, ds?.itemCount ?? 0);
+      return withLatency(items.map(normalizeItem));
+    }
+    const res = await http().get(`${base(orgId)}/${datasetId}/items`);
+    const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    return rows.map(normalizeItem);
+  },
+
+  async update(orgId: string, id: string, payload: LlmDatasetPayload): Promise<LlmDataset> {
+    if (USE_MOCK) {
+      const row = mockDatasets.find((d) => d.id === id);
+      if (!row) throw new Error("dataset not found");
+      row.name = payload.name;
+      row.description = payload.description?.trim() ? payload.description.trim() : null;
+      row.tags = payload.tags ?? [];
+      row.updatedAt = Date.now();
+      return withLatency(normalize(row));
+    }
+    const res = await http().put(`${base(orgId)}/${id}`, payload);
+    return normalize(res.data);
+  },
+
+  async remove(orgId: string, id: string): Promise<void> {
+    if (USE_MOCK) {
+      const idx = mockDatasets.findIndex((d) => d.id === id);
+      if (idx >= 0) mockDatasets.splice(idx, 1);
+      delete mockItems[id];
+      return withLatency(undefined);
+    }
+    await http().delete(`${base(orgId)}/${id}`);
+  },
+
+  async addItem(
+    orgId: string,
+    datasetId: string,
+    payload: LlmDatasetItemPayload,
+  ): Promise<LlmDatasetItem> {
+    if (USE_MOCK) {
+      const row: LlmDatasetItem = {
+        id: `it_mock_${++mockItemSeq}`,
+        datasetId,
+        input: payload.input.trim(),
+        expectedOutput: payload.expectedOutput.trim(),
+        source: payload.source ?? "manual",
+        tags: payload.tags ?? [],
+        version: 1,
+        distilledFrom: null,
+        updatedAt: Date.now(),
+      };
+      (mockItems[datasetId] ??= []).unshift(row);
+      const ds = mockDatasets.find((d) => d.id === datasetId);
+      if (ds) {
+        ds.itemCount += 1;
+        ds.globalVersion += 1;
+        ds.updatedAt = Date.now();
+      }
+      return withLatency(normalizeItem(row));
+    }
+    const res = await http().post(`${base(orgId)}/${datasetId}/items`, payload);
+    return normalizeItem(res.data);
+  },
+
+  /** Edit an item. MVCC: changing expected_output appends a new version. */
+  async updateItem(
+    orgId: string,
+    datasetId: string,
+    itemId: string,
+    payload: LlmDatasetItemPayload,
+  ): Promise<LlmDatasetItem> {
+    if (USE_MOCK) {
+      const pool = mockItems[datasetId] ?? [];
+      const row = pool.find((it) => it.id === itemId);
+      if (!row) throw new Error("item not found");
+      const answerChanged = row.expectedOutput !== payload.expectedOutput.trim();
+      row.input = payload.input.trim();
+      row.expectedOutput = payload.expectedOutput.trim();
+      if (payload.tags) row.tags = payload.tags;
+      if (answerChanged) row.version += 1;
+      row.updatedAt = Date.now();
+      const ds = mockDatasets.find((d) => d.id === datasetId);
+      if (ds) {
+        ds.globalVersion += 1;
+        ds.updatedAt = Date.now();
+      }
+      return withLatency(normalizeItem(row));
+    }
+    const res = await http().put(`${base(orgId)}/${datasetId}/items/${itemId}`, payload);
+    return normalizeItem(res.data);
+  },
+
+  async removeItem(orgId: string, datasetId: string, itemId: string): Promise<void> {
+    if (USE_MOCK) {
+      const pool = mockItems[datasetId];
+      if (pool) {
+        const idx = pool.findIndex((it) => it.id === itemId);
+        if (idx >= 0) pool.splice(idx, 1);
+      }
+      const ds = mockDatasets.find((d) => d.id === datasetId);
+      if (ds) {
+        ds.itemCount = Math.max(0, ds.itemCount - 1);
+        ds.globalVersion += 1;
+        ds.updatedAt = Date.now();
+      }
+      return withLatency(undefined);
+    }
+    await http().delete(`${base(orgId)}/${datasetId}/items/${itemId}`);
   },
 
   async create(orgId: string, payload: LlmDatasetPayload): Promise<LlmDataset> {

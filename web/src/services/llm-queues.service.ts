@@ -89,6 +89,25 @@ export interface LlmScoreConfigOption {
   latestVersion: number;
 }
 
+/** A single item in a queue's review pool. Mirrors `llm_annotation_queue_items`.
+ *  Per the Phase-2.5 spec, status is `pending` | `reviewed` ONLY — there is no
+ *  "in review" state (the all-or-nothing submit rule eliminates it); `archived`
+ *  is orthogonal (via `archivedAt`). */
+export type LlmQueueItemStatus = "pending" | "reviewed";
+export type QueueRefType = "session" | "trace" | "span";
+
+export interface LlmQueueItem {
+  id: string;
+  queueId: string;
+  refType: QueueRefType;
+  refId: string;
+  refTraceId: string | null;
+  status: LlmQueueItemStatus;
+  reviewedAt: number | null;
+  archivedAt: number | null;
+  createdAt: number;
+}
+
 /** Create/update payload. Only user-authored fields; the rest are server-owned. */
 export interface LlmQueuePayload {
   name: string;
@@ -274,6 +293,45 @@ const llmQueuesService = {
     }
     const res = await http().get(`${base(orgId)}/${queueId}`);
     return res.data ? normalize(res.data) : null;
+  },
+
+  /** The queue's review pool. Pending items are ordered first (the to-do). */
+  async listItems(orgId: string, queueId: string): Promise<LlmQueueItem[]> {
+    if (USE_MOCK) {
+      const q = mockQueues.find((x) => x.id === queueId);
+      if (!q) return withLatency([]);
+      const refType = (q.allowedRefTypes[0] as QueueRefType) ?? "trace";
+      const pendingCount = q.totalCount - q.reviewedCount;
+      const hex = (n: number, len: number) => n.toString(16).padStart(len, "0");
+      const items: LlmQueueItem[] = Array.from({ length: q.totalCount }, (_, i) => {
+        const reviewed = i >= pendingCount; // last `reviewedCount` are reviewed
+        return {
+          id: `${queueId}_item_${i + 1}`,
+          queueId,
+          refType,
+          refId: `${refType}-${hex(i + 1, 6)}`,
+          refTraceId: `trace-${hex(i + 1, 8)}`,
+          status: reviewed ? "reviewed" : "pending",
+          reviewedAt: reviewed ? Date.now() - (q.totalCount - i) * 3_600_000 : null,
+          archivedAt: null,
+          createdAt: Date.now() - (q.totalCount - i) * 7_200_000,
+        };
+      });
+      return withLatency(items);
+    }
+    const res = await http().get(`${base(orgId)}/${queueId}/items`);
+    const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    return rows.map((r: any) => ({
+      id: r.id,
+      queueId: r.queue_id ?? r.queueId ?? queueId,
+      refType: r.ref_type ?? r.refType,
+      refId: r.ref_id ?? r.refId,
+      refTraceId: r.ref_trace_id ?? r.refTraceId ?? null,
+      status: r.status,
+      reviewedAt: r.reviewed_at ?? r.reviewedAt ?? null,
+      archivedAt: r.archived_at ?? r.archivedAt ?? null,
+      createdAt: r.created_at ?? r.createdAt ?? 0,
+    }));
   },
 
   async create(orgId: string, payload: LlmQueuePayload): Promise<LlmQueue> {
