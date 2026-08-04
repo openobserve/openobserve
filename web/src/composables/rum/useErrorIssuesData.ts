@@ -368,6 +368,14 @@ const useErrorIssuesData = () => {
       if (currentRun !== runId) return;
 
       lastQueryError.value = null;
+      // Drop rows that describe no events. `buildIssuesSql` omits GROUP BY when the stream
+      // carries none of the error-signature columns, and a bare aggregate SELECT returns
+      // exactly ONE row over an empty match set — COUNT(*) = 0 with every other column
+      // NULL. That row rendered as a phantom issue: blank title, "0 events", "Ongoing",
+      // and no error_id, so clicking it did nothing. An issue with no events is not an
+      // issue, whichever query shape produced it.
+      issuesHits = issuesHits.filter((hit: any) => Number(hit.events) > 0);
+
       // Render the list immediately with a provisional status (no deploy ts yet); stage 2
       // refines "new vs ongoing" once the deploy query lands.
       issues.value = issuesHits.map((hit: any) => mapIssue(hit, null, params));
