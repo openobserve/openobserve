@@ -1392,7 +1392,7 @@ mod tests {
     #[test]
     fn test_sparkline_default_and_roundtrip() {
         // Default (disabled) sparkline: enabled=false, all optionals absent.
-        let json = serde_json::to_value(&Sparkline::default()).unwrap();
+        let json = serde_json::to_value(Sparkline::default()).unwrap();
         assert_eq!(json["enabled"], false);
         assert!(json.get("type").is_none());
         assert!(json.get("layout").is_none());
