@@ -92,14 +92,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :display-content="createdUrlSnippet"
               data-test="add-alert-source-created-snippet"
             />
-            <p class="text-text-secondary text-xs font-medium">{{ t("alert_sources.curlLabel") }}</p>
+            <p class="text-text-secondary text-xs font-medium">
+              {{ t("alert_sources.curlLabel") }}
+            </p>
             <CopyContent
               :content="createdCurlSnippet"
               :display-content="createdCurlSnippet"
               data-test="add-alert-source-created-curl"
             />
           </div>
-          <p v-else class="text-text-secondary text-sm" data-test="add-alert-source-step2-placeholder">
+          <p
+            v-else
+            class="text-text-secondary text-sm"
+            data-test="add-alert-source-step2-placeholder"
+          >
             {{ t("alert_sources.setupRemainingStepsHint") }}
           </p>
         </OStep>
@@ -203,8 +209,11 @@ export default defineComponent({
       const ingestionURL = getIngestionURL();
       const base = getEndPoint(ingestionURL).url;
       return [
-        "# URL", `${base}/api/v2/${this.orgIdentifier}/incidents/events`, "",
-        "# Authorization header", `Bearer ${this.createdIntegration.token}`,
+        "# URL",
+        `${base}/api/v2/${this.orgIdentifier}/incidents/events`,
+        "",
+        "# Authorization header",
+        `Bearer ${this.createdIntegration.token}`,
       ].join("\n");
     },
     createdCurlSnippet(): string {
@@ -251,7 +260,10 @@ export default defineComponent({
   methods: {
     resetForm() {
       this.form = this.editingIntegration
-        ? { name: this.editingIntegration.name, destinations: [...this.editingIntegration.destinations] }
+        ? {
+            name: this.editingIntegration.name,
+            destinations: [...this.editingIntegration.destinations],
+          }
         : { name: "", destinations: [] };
       this.created = false;
       this.createdIntegration = undefined;

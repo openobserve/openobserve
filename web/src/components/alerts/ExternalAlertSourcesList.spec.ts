@@ -466,7 +466,9 @@ describe("ExternalAlertSourcesList", () => {
     expect(wrapper.find('[data-test="alert-sources-never-resolves-icon"]').exists()).toBe(true);
     // No page-level banner — the explanation lives in the icon's tooltip, so
     // there's no unbounded banner list even with many misconfigured sources.
-    expect(wrapper.find('[data-test^="alert-sources-resolve-wiring-banner-"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test^="alert-sources-resolve-wiring-banner-"]').exists()).toBe(
+      false,
+    );
   });
 
   it("does not show a 'never resolves' indicator when resolves have been seen", async () => {

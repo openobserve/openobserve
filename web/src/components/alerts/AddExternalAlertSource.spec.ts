@@ -189,7 +189,9 @@ describe("AddExternalAlertSource", () => {
     // ...` mutation doesn't reliably resync the rendered tree with fake timers
     // active, leaving `wrapper.find()`/`wrapper.html()` reading a stale
     // snapshot even though component state is already correct.
-    await wrapper.find('[data-test="add-alert-source-name-input"] input').setValue("grafana-staging");
+    await wrapper
+      .find('[data-test="add-alert-source-name-input"] input')
+      .setValue("grafana-staging");
     await (wrapper.vm as any).submit();
     await flushPromises();
     await vi.runOnlyPendingTimersAsync();
@@ -258,7 +260,9 @@ describe("AddExternalAlertSource", () => {
       data: { senders: [{ detected_source: "grafana" }] },
     });
     const wrapper = buildWrapper();
-    await wrapper.find('[data-test="add-alert-source-name-input"] input').setValue("grafana-staging");
+    await wrapper
+      .find('[data-test="add-alert-source-name-input"] input')
+      .setValue("grafana-staging");
     await (wrapper.vm as any).submit();
     await flushPromises();
     await vi.runOnlyPendingTimersAsync();

@@ -163,11 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-sources-copy-token-${row.integration.id}`"
                 @click="copyTokenFor(row.integration)"
               />
-              <span
-                class="truncate font-mono text-xs"
-                :title="displayedUrlFor(row.integration)"
-                >{{ displayedUrlFor(row.integration) }}</span
-              >
+              <span class="truncate font-mono text-xs" :title="displayedUrlFor(row.integration)">{{
+                displayedUrlFor(row.integration)
+              }}</span>
             </div>
             <span v-else class="text-text-secondary">—</span>
           </template>
@@ -524,9 +522,7 @@ export default defineComponent({
         this.additionalLastReceivedAtById = {
           ...this.additionalLastReceivedAtById,
           [integrationId]:
-            senders.length > 0
-              ? Math.max(...senders.map((s) => s.last_received_at))
-              : undefined,
+            senders.length > 0 ? Math.max(...senders.map((s) => s.last_received_at)) : undefined,
         };
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.senderError") });
@@ -615,7 +611,10 @@ export default defineComponent({
     },
     // Highlights a row with no incident destination configured — matches the
     // mockup's tinted row for "impossible to miss" (tag 02 review finding).
-    noDestinationRowClass(row: { destinations: string[]; integration: AlertSourceIntegration | undefined }): string {
+    noDestinationRowClass(row: {
+      destinations: string[];
+      integration: AlertSourceIntegration | undefined;
+    }): string {
       return row.integration && row.destinations.length === 0 ? "bg-banner-error-soft-bg" : "";
     },
   },

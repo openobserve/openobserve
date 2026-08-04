@@ -38,10 +38,9 @@ const alertSources = {
     );
   },
   setName: (org_identifier: string, integration_id: string, name: string) => {
-    return http().patch(
-      `/api/v2/${org_identifier}/incidents/integrations/${integration_id}/name`,
-      { name },
-    );
+    return http().patch(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}/name`, {
+      name,
+    });
   },
   listSenders: (org_identifier: string, integration_id: string) => {
     return http().get(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}/senders`);
