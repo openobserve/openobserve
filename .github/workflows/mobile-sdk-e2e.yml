@@ -72,6 +72,9 @@ env:
   OO_USER: root@example.com
   OO_PASS: "Complexpass#123"
   OO_ORG: default
+  # Placeholder so config.js (which requires OO_URL) loads during preflight `--list`; the device
+  # jobs override this via $GITHUB_ENV with their own on-runner instance.
+  OO_URL: http://localhost:5080
   # OpenObserve to run on the runner. Pin these once the first run is green.
   OO_IMAGE: public.ecr.aws/zinclabs/openobserve:latest
 
