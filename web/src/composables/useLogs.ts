@@ -47,7 +47,7 @@ const useLogs = (t: TranslateFn) => {
 
   let { searchObj, initialQueryPayload, resetFunctions, notificationMsg } = searchState();
 
-  const { getHistogramTitle } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts } = useHistogram();
 
   const { getPaginatedData } = usePagination();
 
@@ -146,6 +146,7 @@ const useLogs = (t: TranslateFn) => {
       }
       if (searchObj.meta.jobId == "") {
         searchObj.data.histogram.chartParams.title = getHistogramTitle();
+        searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
       }
     } catch (e: any) {
       searchObj.loading = false;
@@ -170,6 +171,7 @@ const useLogs = (t: TranslateFn) => {
 
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const routeToSearchSchedule = () => {
@@ -762,6 +764,7 @@ const useLogs = (t: TranslateFn) => {
     loadVisualizeData,
     loadPatternsData,
     getHistogramTitle,
+    getHistogramTitleParts,
   };
 };
 

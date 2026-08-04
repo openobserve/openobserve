@@ -227,6 +227,7 @@ export const DEFAULT_LOGS_CONFIG = {
       breakdownSeries: null,
       chartParams: {
         title: "",
+        titleParts: null,
         unparsed_x_data: [],
         timezone: "",
       },

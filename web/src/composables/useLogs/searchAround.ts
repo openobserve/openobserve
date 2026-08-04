@@ -164,6 +164,7 @@ export const useSearchAround = () => {
         .then(async (res: { data: SearchAroundResponse }) => {
           searchObj.loading = false;
           searchObj.data.histogram.chartParams.title = raw("");
+          searchObj.data.histogram.chartParams.titleParts = null;
           if (res.data.from > 0) {
             searchObj.data.queryResults.from = res.data.from;
             searchObj.data.queryResults.scan_size += res.data.scan_size;
@@ -184,6 +185,7 @@ export const useSearchAround = () => {
           }
 
           searchObj.data.histogram.chartParams.title = raw("");
+          searchObj.data.histogram.chartParams.titleParts = null;
         })
         .catch((error: SearchAroundError) => {
           let traceId = "";

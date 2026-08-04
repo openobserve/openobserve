@@ -1174,22 +1174,20 @@ export default defineComponent({
     // Parses the histogram title string into structured chip data for logs mode.
     // Format: "Showing X to Y out of Z events in T ms. (Scan Size: S MB)"
     const recordsChips = computed(() => {
-      const title = noOfRecordsTitle.value;
-      if (!title) return null;
+      const parts = searchObj.data.histogram.chartParams.titleParts;
+      if (!parts) return null;
 
-      const eventsInIdx = title.indexOf(" events in ");
-      if (eventsInIdx === -1) return null;
-
-      const records = title.substring("Showing ".length, eventsInIdx + " events".length);
-      const afterEvents = title.substring(eventsInIdx + " events in ".length);
-
-      const msIdx = afterEvents.indexOf(" ms.");
-      const time = msIdx !== -1 ? afterEvents.substring(0, msIdx) + " ms" : afterEvents;
-
-      const parenMatch = afterEvents.match(/\((.+?)\)/);
-      const scan = parenMatch ? parenMatch[1] : null;
-
-      return { records, time, scan };
+      return {
+        records: t("search.recordsChip", {
+          start: parts.start,
+          end: parts.end,
+          total: parts.total,
+        }),
+        time: t("search.tookChip", { took: parts.took }),
+        // Label is already translated; the size is data. Joined here rather than
+        // keyed so the pair reads the same as it does inside the title sentence.
+        scan: parts.scanLabel != null ? raw(`${parts.scanLabel}: ${parts.scanSize}`) : null,
+      };
     });
 
     // Derives structured chip data for patterns mode from raw stats.

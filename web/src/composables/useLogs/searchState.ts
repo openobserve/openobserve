@@ -73,6 +73,26 @@ export interface SearchConfig {
   refreshTimes: RefreshTimeItem[][];
 }
 
+/**
+ * The values the histogram summary is built from, kept alongside the rendered
+ * sentence so a second view can present them differently.
+ *
+ * SearchResult's result chips read THESE, never `chartParams.title`. Parsing the
+ * title back apart only worked while it was hardcoded English; now that it is
+ * translated, any such parser breaks in every non-English locale.
+ */
+export interface HistogramTitleParts {
+  start: number;
+  end: number;
+  /** Formatted, may carry a "+" suffix when the total is a lower bound. */
+  total: string;
+  took: number;
+  /** Logs mode only — "Scan Size" or its delta variant, already translated. */
+  scanLabel?: I18nText;
+  /** Logs mode only — formatted size, may carry the same "+" suffix. */
+  scanSize?: string;
+}
+
 export interface HistogramData {
   xData: number[];
   yData: number[];
@@ -80,6 +100,8 @@ export interface HistogramData {
   breakdownSeries: Map<string, number[]> | null;
   chartParams: {
     title: I18nText;
+    /** Structured source of `title`; null when there is nothing to summarise. */
+    titleParts: HistogramTitleParts | null;
     unparsed_x_data: unknown[];
     timezone: string;
   };
@@ -311,6 +333,7 @@ export const searchState = () => {
             breakdownSeries: null,
             chartParams: {
               title: "",
+              titleParts: null,
               unparsed_x_data: [],
               timezone: "",
             },
@@ -373,6 +396,7 @@ export const searchState = () => {
       breakdownSeries: null,
       chartParams: {
         title: raw(""),
+        titleParts: null,
         unparsed_x_data: [],
         timezone: "",
       },

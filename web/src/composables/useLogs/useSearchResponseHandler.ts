@@ -42,7 +42,7 @@ export const useSearchResponseHandler = () => {
     showCancelSearchNotification,
   } = logsUtils();
 
-  const { getHistogramTitle, generateHistogramData } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts, generateHistogramData } = useHistogram();
 
   const { refreshPagination, sortResponse } = useSearchPagination();
 
@@ -215,6 +215,7 @@ export const useSearchResponseHandler = () => {
     updateGridColumns();
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const handleStreamingMetadata = (
@@ -403,6 +404,7 @@ export const useSearchResponseHandler = () => {
 
     if (!payload.meta?.isHistogramOnly)
       searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
 
     searchObjDebug["histogramProcessingEndTime"] = performance.now();
     searchObjDebug["histogramEndTime"] = performance.now();
@@ -456,6 +458,7 @@ export const useSearchResponseHandler = () => {
 
     refreshPagination(regeratePaginationFlag);
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const handlePageCountStreamingMetadata = (

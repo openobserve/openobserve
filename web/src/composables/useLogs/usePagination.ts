@@ -34,7 +34,7 @@ export const usePagination = () => {
   const { t } = useI18nTyped();
   let { searchObj, searchObjDebug, searchAggData, notificationMsg } = searchState();
 
-  const { getHistogramTitle } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts } = useHistogram();
   const {
     updateFieldValues,
     extractFields,
@@ -464,6 +464,7 @@ export const usePagination = () => {
 
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const refreshPartitionPagination = (

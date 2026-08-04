@@ -15,7 +15,7 @@
 
 import { useStore } from "vuex";
 
-import { searchState } from "@/composables/useLogs/searchState";
+import { searchState, type HistogramTitleParts } from "@/composables/useLogs/searchState";
 
 import { INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
 
@@ -53,7 +53,12 @@ export const useHistogram = () => {
 
   const { fnParsedSQL, hasAggregation } = logsUtils();
 
-  const getHistogramTitle = (): I18nText => {
+  /**
+   * The values behind the histogram summary. Single source for BOTH the title
+   * sentence and SearchResult's result chips — the chips must never be derived
+   * by parsing the rendered title, which breaks in any non-English locale.
+   */
+  const getHistogramTitleParts = (): HistogramTitleParts | null => {
     try {
       const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
       const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
@@ -119,7 +124,7 @@ export const useHistogram = () => {
 
       // `plusSign` is a data suffix ("1.2K+"), not copy, so it rides along with
       // the interpolated values rather than being a separate message part.
-      const titleParams = {
+      const parts: HistogramTitleParts = {
         start: startCount,
         end: endCount,
         total: formatLargeNumber(totalCount) + plusSign,
@@ -127,19 +132,37 @@ export const useHistogram = () => {
       };
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {
-        return t("search.histogramTitleWithScan", {
-          ...titleParams,
-          scanLabel: scanSizeLabel,
-          scanSize: formatSizeFromMB(searchObj.data.queryResults.scan_size) + plusSign,
-        });
+        parts.scanLabel = scanSizeLabel;
+        parts.scanSize = formatSizeFromMB(searchObj.data.queryResults.scan_size) + plusSign;
       }
 
-      return t("search.histogramTitle", titleParams);
+      return parts;
     } catch (e: any) {
       console.error("Error while generating histogram title", e);
+      return null;
+    }
+  };
+
+  /** Renders the summary sentence from {@link getHistogramTitleParts}. */
+  const getHistogramTitle = (): I18nText => {
+    const parts = getHistogramTitleParts();
+    if (!parts) {
       notificationMsg.value = t("search.histogramTitleError");
       return raw("");
     }
+
+    const { start, end, total, took } = parts;
+    if (parts.scanLabel !== undefined) {
+      return t("search.histogramTitleWithScan", {
+        start,
+        end,
+        total,
+        took,
+        scanLabel: parts.scanLabel,
+        scanSize: parts.scanSize,
+      });
+    }
+    return t("search.histogramTitle", { start, end, total, took });
   };
 
   const generateHistogramData = () => {
@@ -270,6 +293,7 @@ export const useHistogram = () => {
             breakdownSeries: seriesMap, // Map<category, counts[]> for stacked chart
             chartParams: {
               title: getHistogramTitle(),
+              titleParts: getHistogramTitleParts(),
               unparsed_x_data,
               timezone: store.state.timezone,
             },
@@ -314,6 +338,7 @@ export const useHistogram = () => {
             breakdownSeries: null, // no breakdown — plain bar chart
             chartParams: {
               title: getHistogramTitle(),
+              titleParts: getHistogramTitleParts(),
               unparsed_x_data,
               timezone: store.state.timezone,
             },
@@ -337,6 +362,7 @@ export const useHistogram = () => {
       breakdownSeries: null,
       chartParams: {
         title: getHistogramTitle(),
+        titleParts: getHistogramTitleParts(),
         unparsed_x_data: [],
         timezone: "",
       },
@@ -691,6 +717,7 @@ export const useHistogram = () => {
 
   return {
     getHistogramTitle,
+    getHistogramTitleParts,
     generateHistogramData,
     resetHistogramWithError,
     generateHistogramSkeleton,

@@ -990,6 +990,8 @@
     "pattern_summary": "Showing 1 to 50 out of {totalEvents} events & {patternsFound} patterns found in {logsAnalyzed} events in {totalTime} ms.",
     "histogramTitle": "Showing {start} to {end} out of {total} events in {took} ms.",
     "histogramTitleWithScan": "Showing {start} to {end} out of {total} events in {took} ms. ({scanLabel}: {scanSize})",
+    "recordsChip": "{start} to {end} out of {total} events",
+    "tookChip": "{took} ms",
     "scanSize": "Scan Size",
     "deltaScanSize": "Delta Scan Size",
     "histogramTitleError": "Error while generating histogram title.",

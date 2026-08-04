@@ -2235,8 +2235,14 @@ export default defineComponent({
     const { loadStreamLists, extractFields } = useStreamFields();
     const { cancelPatterns } = usePatterns();
 
-    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule, getHistogramTitle } =
-      useLogs(t);
+    const {
+      refreshData,
+      handleRunQuery,
+      getJobData,
+      routeToSearchSchedule,
+      getHistogramTitle,
+      getHistogramTitleParts,
+    } = useLogs(t);
 
     const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams(t);
     const queryEditorRef = ref(null);
@@ -4617,7 +4623,8 @@ export default defineComponent({
           searchObj.data?.queryResults?.hits && searchObj.data.queryResults.hits.length > 0;
 
         if (hasLogs) {
-          searchObj.data.histogram.chartParams.title = getHistogramTitle(false);
+          searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
         }
       }
 

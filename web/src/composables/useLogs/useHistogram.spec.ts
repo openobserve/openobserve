@@ -173,9 +173,10 @@ describe("useHistogram Composable", () => {
   });
 
   // --------------------------------------------------------------------------
-  // getHistogramTitle — exact wording is parsed back by SearchResult.vue
-  // (recordsChips splits on "Showing ", " events in ", " ms." and "(…)"),
-  // so these assertions pin the rendered English string, not just the shape.
+  // getHistogramTitle — pins the rendered en-US sentence. SearchResult.vue does
+  // NOT parse this string: its result chips read the structured
+  // chartParams.titleParts (see the describe below), so the title is free to
+  // localize without the chips breaking.
   // --------------------------------------------------------------------------
   describe("getHistogramTitle", () => {
     beforeEach(() => {
@@ -212,6 +213,48 @@ describe("useHistogram Composable", () => {
 
       expect(wrapper.vm.getHistogramTitle()).toBe("");
       expect(mockState.notificationMsg.value).toBe("Error while generating histogram title.");
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // getHistogramTitleParts — the structured contract SearchResult's chips
+  // consume. Chips MUST build from these values; deriving them by parsing the
+  // rendered title breaks in every non-English locale.
+  // --------------------------------------------------------------------------
+  describe("getHistogramTitleParts", () => {
+    beforeEach(() => {
+      mockState.searchObj.data.queryResults.total = 250;
+      mockState.searchObj.data.queryResults.took = 42;
+    });
+
+    it("includes the resolved scan label and size in logs mode", () => {
+      mockState.searchObj.meta.logsVisualizeToggle = "logs";
+
+      expect(wrapper.vm.getHistogramTitleParts()).toEqual({
+        start: 1,
+        end: 100,
+        total: "250",
+        took: 42,
+        scanLabel: "Scan Size",
+        scanSize: "0 MB",
+      });
+    });
+
+    it("omits the scan fields outside logs mode", () => {
+      mockState.searchObj.meta.logsVisualizeToggle = "visualize";
+
+      expect(wrapper.vm.getHistogramTitleParts()).toEqual({
+        start: 1,
+        end: 100,
+        total: "250",
+        took: 42,
+      });
+    });
+
+    it("returns null when the computation throws, so the chips hide", () => {
+      mockState.searchObj.data.resultGrid = undefined as any;
+
+      expect(wrapper.vm.getHistogramTitleParts()).toBeNull();
     });
   });
 
