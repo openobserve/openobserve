@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { reactive } from "vue";
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -67,6 +68,7 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
 }));
 
 import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQueryEditor.vue";
+import useSqlSuggestions from "@/composables/useSuggestions";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -114,7 +116,11 @@ const createMockDashboardPanelData = () => {
   };
 
   return {
-    dashboardPanelData: mockData,
+    // reactive() because the real composable's state is: the component watches
+    // the active query's stream, and a plain object would never fire the
+    // watcher — the test would pass or fail for reasons unrelated to the
+    // component.
+    dashboardPanelData: reactive(mockData),
     promqlMode: false, // Make this a direct boolean instead of ref
     addQuery: vi.fn(() => {
       mockData.data.queries.push({
@@ -155,6 +161,20 @@ vi.mock("@/composables/usePromqlSuggestions", () => ({
 
 vi.mock("@/composables/useSuggestions", () => ({
   default: vi.fn(() => ({
+    // Mirrors the real composable's shape. autoCompleteData carries the stream
+    // context the field-value resolver looks values up under; omitting it here
+    // made every mount throw once the component started setting it.
+    autoCompleteData: {
+      value: {
+        org: "",
+        streamType: "",
+        streamName: "",
+        query: "",
+        cursorIndex: 0,
+        popup: { open: vi.fn(), close: vi.fn() },
+      },
+    },
+    resolveFieldValues: vi.fn(async () => []),
     autoCompleteKeywords: { value: [] },
     autoCompleteSuggestions: { value: [] },
     effectiveKeywords: { value: [] },
@@ -408,6 +428,52 @@ describe("DashboardQueryEditor", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.dashboardPanelData.layout.currentQueryIndex).toBe(1);
+    });
+
+    // The field-value resolver looks values up under "org|streamType|
+    // streamName|field". This panel never set any of the three, so its
+    // resolver could only ever return [] — a working editor with value
+    // completion silently absent. Per QUERY, not per panel: each tab has its
+    // own stream and a stale context would offer the previous tab's values.
+    const sqlAutoCompleteData = () =>
+      (useSqlSuggestions as any).mock.results.at(-1).value.autoCompleteData.value;
+
+    it("publishes the active query's stream as the field-value lookup context", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.data.queries[0].fields = {
+        stream: "app_logs",
+        stream_type: "logs",
+      };
+      await wrapper.vm.$nextTick();
+
+      expect(sqlAutoCompleteData()).toMatchObject({
+        org: "test-org",
+        streamType: "logs",
+        streamName: "app_logs",
+      });
+    });
+
+    it("follows the stream when the user switches query tabs", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.dashboardPanelData.data.queries[0].fields = {
+        stream: "app_logs",
+        stream_type: "logs",
+      };
+      wrapper.vm.dashboardPanelData.data.queries.push({
+        query: "",
+        queryType: "sql",
+        customQuery: true,
+        fields: { stream: "app_metrics", stream_type: "metrics" },
+      });
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 1;
+      await wrapper.vm.$nextTick();
+
+      expect(sqlAutoCompleteData()).toMatchObject({
+        streamType: "metrics",
+        streamName: "app_metrics",
+      });
     });
 
     it("should handle query editor configuration", () => {

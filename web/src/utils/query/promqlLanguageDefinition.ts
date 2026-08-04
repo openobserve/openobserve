@@ -1,16 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Loads the official monaco-promql grammar verbatim. This wrapper is a test
-// seam (the package imports monaco-editor — unresolvable under jsdom, and
-// mocking the bare package path doesn't intercept it) and keeps the import
-// dynamic so monaco-editor stays out of the initial chunk.
-
-type PromqlMonacoModule = typeof import("monaco-promql/promql/promql");
+// Loads the PromQL grammar, which is vendored in promqlMonarch.ts — see the
+// licence and the reasoning there; the short version is that importing the
+// upstream package pulled ~376 KB of an unrelated editor's runtime into the
+// bundle for a require it never uses.
+//
+// Still a wrapper, and still dynamic: it is the test seam the specs mock, and
+// it keeps the grammar out of the initial chunk.
 
 export const loadPromqlLanguage = async (): Promise<{
-  language: PromqlMonacoModule["language"];
-  languageConfiguration: PromqlMonacoModule["languageConfiguration"];
+  language: any;
+  languageConfiguration: any;
 }> => {
-  const { language, languageConfiguration } = await import("monaco-promql/promql/promql");
+  const { language, languageConfiguration } = await import("./promqlMonarch");
   return { language, languageConfiguration };
 };

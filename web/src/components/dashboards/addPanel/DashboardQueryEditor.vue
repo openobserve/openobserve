@@ -184,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :keywords="currentEditorKeywords"
                 :suggestions="currentEditorSuggestions"
+                :field-value-resolver="resolveFieldValues"
                 @update:query="handleQueryUpdate"
                 @focus="_sqlOnFocus"
                 @blur="_sqlOnBlur"
@@ -364,11 +365,6 @@ export default defineComponent({
         }
 
         store.state.organizationData.functions.map((data: any) => {
-          const args: any = [];
-          for (let i = 0; i < parseInt(data.num_args); i++) {
-            args.push("'${1:value}'");
-          }
-
           functionList.value.push({
             name: data.name,
             function: data.function,
@@ -448,6 +444,7 @@ export default defineComponent({
       getSuggestions: sqlGetSuggestions,
       updateAllKeywords: sqlUpdateAllKeywords,
       updateStreamKeywords: sqlUpdateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     const queryEditorRef = ref<QueryEditorInstance | null>(null);
@@ -647,6 +644,27 @@ export default defineComponent({
         sqlUpdateStreamKeywords((newResults ?? []).map((stream: any) => ({ name: stream.name })));
       },
       { immediate: true },
+    );
+
+    // Field VALUES are looked up under "org|streamType|streamName|field", so the
+    // resolver returns nothing at all until this is set. Tracked per QUERY, not
+    // per panel: each tab has its own stream, and switching tabs must not leave
+    // the previous tab's values on offer. A multi-stream query is keyed on its
+    // primary stream — the same one the Fields panel is built from.
+    watch(
+      [
+        () => dashboardPanelData.layout.currentQueryIndex,
+        () =>
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields,
+      ],
+      () => {
+        const fields =
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
+        sqlAutoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+        sqlAutoCompleteData.value.streamType = String(fields?.stream_type ?? "");
+        sqlAutoCompleteData.value.streamName = String(fields?.stream ?? "");
+      },
+      { immediate: true, deep: true },
     );
 
     const removeTab = async (rawIndex: string | number) => {
@@ -937,6 +955,7 @@ export default defineComponent({
       saveQueryName,
       cancelQueryNameEdit,
       currentEditorKeywords,
+      resolveFieldValues,
       currentEditorSuggestions,
       _sqlOnFocus,
       _sqlOnBlur,

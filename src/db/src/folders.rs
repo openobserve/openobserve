@@ -291,7 +291,7 @@ pub async fn delete_folder(
                     folder_id: Some(folder_pk),
                     ..Default::default()
                 };
-                if table::synthetics_monitors::count(client, org_id, &params).await? > 0 {
+                if table::synthetics_checks::count(client, org_id, &params).await? > 0 {
                     return Err(FolderError::DeleteWithSynthetics);
                 }
             }

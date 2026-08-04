@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // ── Replay state machine ──────────────────────────────────────────────────────
-export type ReplayPhase = "idle" | "running" | "passed" | "failed" | "stopped";
+// `stopping` is the interval between the user pressing Stop and the extension
+// confirming it: the run is no longer advancing but is not yet torn down, so the
+// UI must neither offer Re-run nor claim the journey has stopped.
+export type ReplayPhase = "idle" | "running" | "stopping" | "passed" | "failed" | "stopped";
 
 /** Machine-readable error from the extension's replay pipeline. */
 export interface StructuredError {
@@ -571,7 +574,10 @@ export interface SyntheticLocation {
   /** Name of the most recently seen agent, live or stale. */
   last_agent_name?: string;
   last_seen_at?: number;
-  monitors_count: number;
+  /** Renamed from `monitors_count`; the optional alias keeps a UI bundle
+   *  working against a server on either side of that rename. */
+  checks_count: number;
+  monitors_count?: number;
   checks_per_min: number;
 }
 
