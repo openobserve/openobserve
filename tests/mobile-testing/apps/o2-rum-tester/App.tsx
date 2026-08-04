@@ -32,17 +32,21 @@ import {
   TouchPrivacyLevel,
 } from '@openobserve/mobile-react-native-session-replay';
 
-// Build-time overridable RUM target. The committed rum.config.json holds the default (dev-cluster)
-// values; CI regenerates it (scripts/gen-config.js) to point at a locally-built OpenObserve.
-// See docs/CI-NOTES.md.
-import rumCfg from './rum.config.json';
-
-const RUM_INTAKE = `${rumCfg.host}/rum/v1/${rumCfg.org}`;
+// Build-time RUM target as INLINE constants. CI text-substitutes these literals
+// (scripts/gen-config.js seds them from O2_RUM_* env); the committed values point at the dev
+// cluster so local dev is unchanged. NB: do NOT move these into an imported JSON module — a
+// `import x from './x.json'` here silently breaks RUM upload in the Hermes release build
+// (verified: JSON-import → 0 uploads; inline consts → uploads work). See docs/CI-MORNING-REPORT.md.
+const RUM_HOST = 'https://dev.common-dev.internal.zinclabs.dev'; // @gen:host
+const RUM_ORG = '3HOStgiihM8H43cMLWY3BUfXV5r'; // @gen:org
+const RUM_TOKEN = 'rumtbJXyJcgC8jB9Otu'; // @gen:token
+const RUM_ENV = 'testing'; // @gen:env
+const RUM_INTAKE = `${RUM_HOST}/rum/v1/${RUM_ORG}`;
 
 // --- SDK configuration ---
 const config = new OpenObserveProviderConfiguration(
-  rumCfg.token, // clientToken
-  rumCfg.env, // env
+  RUM_TOKEN, // clientToken
+  RUM_ENV, // env
   TrackingConsent.GRANTED,
   {
     rumConfiguration: {

@@ -1,18 +1,30 @@
-// Regenerates rum.config.json from environment variables (used by CI to retarget the app at a
-// locally-built OpenObserve). With no env set it rewrites the SAME committed defaults, so running
-// it locally is a no-op. See docs/CI-NOTES.md.
+// Injects the RUM target into App.tsx by TEXT-SUBSTITUTING the inline `@gen:*` constants from
+// environment variables (used by CI to retarget the app at a local/alpha OpenObserve). With no env
+// set it's a no-op, so the committed defaults (dev cluster) stay — running it locally changes nothing.
+//
+// Why sed-the-source instead of importing a JSON config: a `import cfg from './rum.config.json'` in
+// App.tsx silently breaks RUM upload in the Hermes release build. Inline constants work; we just
+// rewrite them at build time. See docs/CI-MORNING-REPORT.md.
 const fs = require('fs');
 const path = require('path');
 
-const out = path.join(__dirname, '..', 'rum.config.json');
-const current = JSON.parse(fs.readFileSync(out, 'utf8'));
-
-const cfg = {
-  host: process.env.O2_RUM_HOST || current.host,
-  org: process.env.O2_RUM_ORG || current.org,
-  token: process.env.O2_RUM_TOKEN || current.token,
-  env: process.env.O2_RUM_ENV || current.env,
+const appTsx = path.join(__dirname, '..', 'App.tsx');
+const map = {
+  host: process.env.O2_RUM_HOST,
+  org: process.env.O2_RUM_ORG,
+  token: process.env.O2_RUM_TOKEN,
+  env: process.env.O2_RUM_ENV,
 };
 
-fs.writeFileSync(out, JSON.stringify(cfg, null, 2) + '\n');
-console.log('rum.config.json ->', cfg.host, cfg.org);
+let src = fs.readFileSync(appTsx, 'utf8');
+let changed = [];
+for (const [key, val] of Object.entries(map)) {
+  if (!val) continue; // unset → leave the committed default
+  const re = new RegExp(`(const RUM_[A-Z]+ = ')[^']*('; // @gen:${key})`);
+  if (re.test(src)) {
+    src = src.replace(re, `$1${val}$2`);
+    changed.push(`${key}=${val}`);
+  }
+}
+fs.writeFileSync(appTsx, src);
+console.log('gen-config:', changed.length ? changed.join(' ') : 'no env override (committed defaults)');
