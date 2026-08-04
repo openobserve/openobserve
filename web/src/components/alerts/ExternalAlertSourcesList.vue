@@ -687,7 +687,8 @@ export default defineComponent({
     noDestinationRowClass(row: SourceTableRow): string {
       return row.integration && row.destinations.length === 0 ? "bg-banner-error-soft-bg" : "";
     },
-    onEmptyAction(id: string) {
+    // `id` is optional: OEmptyState's simple-button mode emits no id.
+    onEmptyAction(id?: string) {
       if (id === "clear-filters") {
         this.filterQuery = "";
         return;
