@@ -585,9 +585,8 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-// Resolved here rather than as `withDefaults` defaults: a default is evaluated
-// once at module scope, which would freeze the copy in whatever locale happened
-// to be active when the module first loaded.
+// Not `withDefaults` defaults: those are evaluated once at module scope, which
+// would freeze the copy in whatever locale was active at first load.
 const resolvedFooterTitle = computed(
   () => props.footerTitle ?? t("synthetics.table.checksFooterTitle"),
 );

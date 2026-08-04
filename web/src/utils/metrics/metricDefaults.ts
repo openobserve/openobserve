@@ -66,13 +66,10 @@ interface VariantQuery {
 /**
  * One variant of a card: an ordered set of queries and its chart shape.
  *
- * This module is deliberately Vue-free (see the file header), so it cannot call
- * `t()` — and it is imported at module load, so any text it resolved would
- * freeze at the boot locale. User-facing variant names are therefore stored as
- * an i18n KEY (`labelKey`) and translated by the one consumer that displays
- * them, `FunctionConfigDialog.vue`, at render time. `label` stays for the cases
- * a key cannot express: a name built from live data (`Top 5 by ${label}`).
- * Exactly one of the pair is set; `labelKey` wins when both are.
+ * Variant names are stored as `labelKey` and translated at render time by
+ * `FunctionConfigDialog.vue` — this module is Vue-free and loads at import, so
+ * resolving text here would freeze it at the boot locale. `label` remains for
+ * names built from live data (`Top 5 by ${label}`); `labelKey` wins if both set.
  */
 interface Variant {
   id: string;

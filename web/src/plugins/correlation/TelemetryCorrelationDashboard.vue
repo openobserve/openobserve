@@ -1699,7 +1699,7 @@ const getSubjectButtonLabel = (semanticId: string): string => {
 
   const spec = specs.find((s) => s.semanticIds.includes(semanticId));
   if (!spec) return semanticId;
-  // labelKey wins: `label` only holds names that stay English (Pod, Cloud Run).
+  // `label` only holds names that stay English (Pod, Cloud Run).
   return spec.labelKey ? t(spec.labelKey) : (spec.label ?? semanticId);
 };
 

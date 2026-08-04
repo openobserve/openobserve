@@ -56,13 +56,11 @@ export interface CredentialField {
   type: "text" | "password" | "email" | "select" | "toggle";
   required: boolean;
   /**
-   * Helper text. These config modules are plain, Vue-less objects evaluated at
-   * import time, so real copy belongs in {@link hintKey} (an i18n KEY resolved
-   * by the consumer at render time, like {@link labelKey}); `hint` is for text
-   * that must read identically in every language — a URL or example value.
+   * Helper text that reads identically in every language — a URL or an example
+   * value. Translatable copy belongs in {@link hintKey} instead.
    */
   hint?: I18nText;
-  /** i18n KEY for the helper text. Wins over {@link hint} when both are set. */
+  /** Wins over {@link hint} when both are set. */
   hintKey?: I18nKey;
   options?: Array<{ label: string; value: string; description?: string }>;
   validator?: (value: string) => CredentialValidatorResult;

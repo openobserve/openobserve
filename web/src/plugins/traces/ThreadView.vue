@@ -140,8 +140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            whitespace between them, dropping the space after "with". The space is
            concatenated into the interpolation so no template-whitespace
            collapsing (or formatter re-wrap) can drop it. -->
-      <!-- The <code> token is a GenAI semantic-convention attribute name/value —
-           a code sample, identical in every locale, hence raw(). -->
       <span>
         {{ t("traces.threadView.noLlmTurns") + " " }}
         <code class="text-text-body font-mono">{{ raw("gen_ai.operation.name = chat") }}</code

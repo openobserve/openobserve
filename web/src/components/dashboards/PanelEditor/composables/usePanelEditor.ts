@@ -39,8 +39,6 @@ import type { TranslateFn } from "@/types/i18n";
 export interface UsePanelEditorOptions {
   /** The page type - determines default behavior */
   pageType: PanelEditorPageType;
-  /** Injected translator — this composable is invoked directly by specs
-   *  outside any component, so it cannot obtain one itself. */
   t: TranslateFn;
   /** Resolved configuration (after merging props with presets) */
   config: PanelEditorConfig;

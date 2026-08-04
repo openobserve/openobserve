@@ -44,10 +44,8 @@ export interface LLMTableColumn {
   /** Hit field used as the value source. May be omitted for "view-link". */
   field?: string;
   /**
-   * i18n KEY for the header label (rendered uppercase). Stored as a key rather
-   * than resolved text because this module is a plain, i18n-less config: the
-   * render site translates it with `t()` so it follows the active locale.
-   * Omit for a column with no header (e.g. the trailing "view" link).
+   * Header label, translated at the render site (this module is a plain config,
+   * so a resolved string would not follow the locale). Omit for no header.
    */
   labelKey?: I18nKey;
   format?: LLMTableColumnFormat;

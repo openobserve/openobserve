@@ -263,9 +263,8 @@ export default defineComponent({
     },
     roles: {
       type: Array as PropType<{ label: I18nText; value: string }[]>,
-      // raw(), not t(): prop defaults are evaluated before setup() runs, so no
-      // translator is in scope. The only caller (User.vue) always passes
-      // `:roles`, so this fallback does not reach the screen today.
+      // raw(), not t(): prop defaults run before setup(), so no translator is in
+      // scope. The only caller (User.vue) always passes `:roles` anyway.
       default: () => [
         {
           label: raw("Admin"),

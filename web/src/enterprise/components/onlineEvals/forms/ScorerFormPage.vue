@@ -859,9 +859,7 @@ function cleanHeaders(headers: CustomHeader[]) {
     .filter((h) => h.key.length > 0);
 }
 
-// Form rows carry a plain-string `description` (it is free text the user types,
-// so it is `raw` — never a translated literal) which this normalizes into the
-// service's `ExtraMetadataField` shape.
+// A row's `description` is free text the user typed, never a translated literal.
 type ExtraMetadataFieldRow = {
   name: string;
   type: ExtraMetadataField["type"];

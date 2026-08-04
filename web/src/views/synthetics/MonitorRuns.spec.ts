@@ -159,12 +159,6 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
     };
     return map[v] || "devices";
   });
-  const deviceLabel = vi.fn((v: string) => {
-    const map: Record<string, string> = { Desktop: "Desktop", Tablet: "Tablet", Mobile: "Mobile" };
-    return map[v] || v;
-  });
-  // Mirrors the real module: known ids map to browserDevices keys (resolved via
-  // t() in the component), unknown ids return undefined → shown verbatim.
   const deviceLabelKey = vi.fn((v: string) => {
     const map: Record<string, string> = {
       desktop: "synthetics.browserDevices.desktop",
@@ -175,7 +169,6 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   });
   return {
     deviceIconName,
-    deviceLabel,
     deviceLabelKey,
     // Real implementation: the tiles read its output, and a stub returning []
     // would make "no unstable slices" untestable from here.

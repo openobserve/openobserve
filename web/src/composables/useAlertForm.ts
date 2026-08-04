@@ -1496,8 +1496,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       streams,
       getStreams,
       getParser,
-      // Bind the injected translator here so the validation module keeps its
-      // 1-arg callback contract.
+      // Bound here so the validation module keeps its 1-arg buildQueryPayload contract.
       buildQueryPayload: (options: any) => buildQueryPayload(options, t),
       prepareAndSaveAlert: prepareAndSaveAlertFunction,
     };

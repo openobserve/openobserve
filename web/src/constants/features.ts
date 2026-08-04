@@ -30,13 +30,9 @@ import type { I18nKey } from "@/types/i18n";
 
 export type EditionType = "opensource" | "enterprise" | "cloud";
 
-/**
- * `true`/`false` mark plain availability; a string is an i18n key for a
- * qualifying note (e.g. "Requires HA mode"). Typing the string arm as
- * `I18nKey` is what makes features.json participate in key checking — it is a
- * data file, so a bare `string` here leaves these keys invisible to every
- * static check and they read as dead.
- */
+/** The string arm is an i18n key for a qualifying note (e.g. "Requires HA mode").
+ *  Keep it `I18nKey`, not `string`, or features.json's keys stay invisible to
+ *  every static check and read as dead. */
 export interface FeatureAvailability {
   opensource: boolean | I18nKey;
   enterprise: boolean | I18nKey;

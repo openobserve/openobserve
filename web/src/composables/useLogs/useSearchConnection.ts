@@ -30,7 +30,6 @@ import {
 import { generateTraceContext } from "@/utils/zincutils";
 import { raw } from "@/types/i18n";
 
-// `t` injected: reached from other composables, never a setup context.
 export const useSearchConnection = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
   const { addTraceId, removeTraceId, fnParsedSQL, isLimitQuery, isDistinctQuery, isWithQuery } =

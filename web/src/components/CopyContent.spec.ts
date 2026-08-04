@@ -31,8 +31,7 @@ const mockStore = createStore({
 const mockI18n = createI18n({
   locale: "en",
   messages: {
-    // The component passes t("common.*") messages to copyToClipboard, so
-    // mounts using this mock need the keys or t() echoes the key path.
+    // Without these keys t() echoes the key path instead of the message.
     en: {
       common: {
         contentCopiedSuccessfully: "Content Copied Successfully!",

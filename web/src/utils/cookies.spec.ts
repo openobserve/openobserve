@@ -29,10 +29,8 @@ import {
 import Cookies from "js-cookie";
 import Keys from "../constants/key";
 
-// js-cookie cannot be vi.mock()ed here: setupTests.ts imports @/locales, whose
-// graph loads utils/cookies (and js-cookie) before this spec runs, so the cached
-// module keeps its real bindings. Spying on the shared Cookies singleton works
-// regardless of that cache.
+// vi.mock("js-cookie") does not work here: setupTests.ts loads js-cookie before
+// this spec runs, so the cached module keeps its real bindings. Spy instead.
 describe("Cookie Utilities", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

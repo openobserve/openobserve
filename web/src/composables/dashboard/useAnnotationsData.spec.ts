@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import i18nInstance from "@/locales";
 
-// Injected translator — this spec runs outside a component.
 const t = (i18nInstance.global as any).t;
 import { nextTick } from "vue";
 import { useAnnotationsData } from "./useAnnotationsData";

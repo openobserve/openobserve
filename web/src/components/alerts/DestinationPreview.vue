@@ -21,8 +21,7 @@ limitations under the License.
     data-test="destination-preview-dialog"
   >
     <div data-test="destination-preview-card" class="w-full">
-      <!-- Mock notification preview: mirrors the server-rendered alert message, which is
-           NOT localised — every string here is deliberately untranslated (raw). -->
+      <!-- Mock preview of the server-rendered alert, which is not localised: every string here is deliberately raw. -->
       <!-- Slack Preview -->
       <div
         v-if="type === 'slack'"

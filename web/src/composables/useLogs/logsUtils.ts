@@ -390,8 +390,6 @@ export const logsUtils = () => {
     return max;
   };
 
-  // `t` is injected: logsUtils() is called directly by its own spec outside any
-  // component, so it cannot obtain a translator itself.
   const showCancelSearchNotification = (t: TranslateFn) => {
     toast({
       variant: "info",

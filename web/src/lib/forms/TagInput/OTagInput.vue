@@ -83,9 +83,8 @@ interface Props {
   label?: I18nText;
 }
 
-// `placeholder` has no default here on purpose: a `t()` call in `withDefaults`
-// would freeze the locale at module-evaluation time. The fallback
-// (`common.typeAndPressEnterOrComma`) is resolved in the template instead.
+// No `placeholder` default: `t()` in `withDefaults` would freeze the locale at
+// module-evaluation time, so the fallback is resolved in the template instead.
 const props = withDefaults(defineProps<Props>(), {
   label: raw(""),
 });

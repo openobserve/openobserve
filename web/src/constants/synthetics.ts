@@ -17,7 +17,7 @@ import type { AssertionKind, StepAction, SyntheticCheckType } from "@/types/synt
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nKey, TranslateFn } from "@/types/i18n";
 
-// ── Action labels — i18n keys, resolved with t() by the consumer ─────────
+// ── Action labels ────────────────────────────────────────────────────────
 export const ACTION_LABEL_KEYS: Record<StepAction, I18nKey> = {
   navigate: "synthetics.journey.actionLabels.navigate",
   click: "synthetics.journey.actionLabels.click",
@@ -150,8 +150,7 @@ export function isPageLevelAssertion(kind: AssertionKind): boolean {
 }
 
 // ── Action dropdown options ──────────────────────────────────────────────
-// Takes t so the labels resolve in the caller's (reactive) locale — call it
-// inside a computed.
+// Takes t so labels follow the active locale — call it inside a computed.
 export const actionOptions = (t: TranslateFn) =>
   (Object.keys(ACTION_LABEL_KEYS) as StepAction[])
     .filter((a) => !isRetiredAction(a))

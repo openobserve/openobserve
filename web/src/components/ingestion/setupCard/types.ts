@@ -25,20 +25,10 @@ import type { I18nKey, I18nText } from "@/types/i18n";
 import type { FieldWidth } from "@/lib/forms/Input/OInput.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
-// ── Translating card copy ────────────────────────────────────────────────────
-// The in-repo builders (setupCard/content/*) are plain modules with no component
-// context, so they must NOT call `t()` — it would resolve once and freeze the
-// copy at whatever locale was active when the module first ran. Instead the
-// user-facing text fields below come in pairs:
-//
-//   • `title` / `label` / `description` — already-resolved text (`I18nText`).
-//     Used by content that is not translatable data (markdown-authored AI cards)
-//     or is a code token / product name (wrapped in `raw()`).
-//   • `titleKey` / `labelKey` / `descriptionKey` — an i18n KEY stored as data,
-//     translated by SetupCardRenderer at RENDER time so it follows the locale.
-//
-// Exactly one of each pair should be set; the `*Key` half wins when both are.
-// Same shape as `BadgeValueConfig.labelKey` (lib/core/Badge/badgeGroups.ts).
+// Card copy comes in pairs: `title` (resolved I18nText, for raw() tokens and
+// markdown-authored content) and `titleKey` (an I18nKey the renderer translates).
+// Set one; `*Key` wins if both. The builders in content/* are plain modules, so
+// calling t() there would freeze the copy at the boot locale.
 
 /**
  * Per-org values substituted into a card's code blocks. `token` is the

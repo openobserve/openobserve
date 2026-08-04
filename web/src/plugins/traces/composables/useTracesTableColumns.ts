@@ -48,9 +48,8 @@ export const LLM_COLUMN_IDS = new Set(["input_tokens", "output_tokens", "cost"])
  * Known column metadata. Any field name NOT in this map gets a generic
  * prettified header and default width.
  *
- * `headerKey` is an i18n KEY, not resolved text: this map lives at MODULE scope,
- * where `t()` would resolve once at import and freeze the copy at whatever
- * locale was active on page load. `toColumnDef` translates it per build instead.
+ * `headerKey` stays an i18n key, not resolved text: this map is at module scope,
+ * so `t()` here would freeze the copy at the locale active on import.
  */
 const KNOWN_COLUMN_META: Record<
   string,

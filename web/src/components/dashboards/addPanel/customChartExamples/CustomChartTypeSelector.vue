@@ -218,8 +218,7 @@ export default defineComponent({
       const filtered: ChartCategory[] = [];
 
       chartCategories.value.forEach((category) => {
-        // Search the RESOLVED name, not the key — otherwise typing "line" would
-        // match the dotted path rather than what the user can actually see.
+        // Match the resolved name, not the key — users search what they can see.
         const filteredCharts = category.type.filter((chart) =>
           t(chart.labelKey).toLowerCase().includes(query),
         );

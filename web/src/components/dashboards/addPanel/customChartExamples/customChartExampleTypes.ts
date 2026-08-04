@@ -3,12 +3,7 @@ import type { I18nKey } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 
 export interface ChartType {
-  /**
-   * i18n KEY for the example's display name, not the English text — this module
-   * is a plain, module-scope constant with no `t()` in reach, so resolving here
-   * would freeze the copy at whatever locale was active on import. The consumer
-   * (CustomChartTypeSelector.vue) calls `t(labelKey)` at render time instead.
-   */
+  /** Resolved by the consumer at render time — a module constant has no `t()` in reach. */
   labelKey: I18nKey;
   value: string;
   asset: string;

@@ -27,9 +27,8 @@ export function useGreeting(email: () => string | undefined) {
   });
 
   const greeting = computed(() => {
-    // Annotated so the built key is checked against I18nKey: `period` is a
-    // literal union, so TS expands this to the four real keys and a rename or
-    // deletion of any of them fails the build instead of rendering the path.
+    // Annotated so TS checks the built key against I18nKey: `period` is a literal
+    // union, so renaming or dropping any of the four keys fails the build.
     const key: I18nKey = `aiAssistant.greeting.${period.value}`;
     const phrase = t(key);
     return displayName.value ? `${phrase}, ${displayName.value}` : phrase;

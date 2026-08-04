@@ -371,7 +371,6 @@ export default defineComponent({
         );
         const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
         workflowOptions.value = list.map((wf: any) => ({
-          // Workflow names come from the server — never translated copy.
           label: raw(wf.name),
           value: wf.id,
         }));

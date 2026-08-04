@@ -249,9 +249,8 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
       // `kubectl wait` on the webhook makes that deterministic.
       advanced: {
         labelKey: "ingestion.setupCard.advancedInstallLabel",
-        // The self-hosted variant interpolates the in-cluster URL, which
-        // descriptionKey (resolved without params) can't express — so both
-        // branches translate here, at card-build time.
+        // Not `descriptionKey`: the self-hosted copy interpolates the in-cluster
+        // URL, which key-only resolution (no params) can't express.
         description: isCloud
           ? gt("ingestion.setupCard.advancedInstallDescCloud")
           : gt("ingestion.setupCard.advancedInstallDescSelfHosted", { url: IN_CLUSTER_URL }),

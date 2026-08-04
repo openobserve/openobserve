@@ -2150,9 +2150,8 @@ export default defineComponent({
         value: "center",
       },
     ];
-    // Single source of truth — shared with the column-formatting dialog. Its
-    // labels are already translated (it is handed `t`), but the helper's
-    // signature widens them back to `string`, so re-brand them for OSelect.
+    // Single source of truth — shared with the column-formatting dialog. Labels are
+    // already translated; raw() only re-brands the `string` the helper widens to.
     const unitOptions = getUnitOptions(t).map((o) => ({ ...o, label: raw(o.label) }));
 
     const labelPositionOptions = [

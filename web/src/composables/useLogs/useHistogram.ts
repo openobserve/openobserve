@@ -122,8 +122,7 @@ export const useHistogram = () => {
           ? t("search.deltaScanSize")
           : t("search.scanSize");
 
-      // `plusSign` is a data suffix ("1.2K+"), not copy, so it rides along with
-      // the interpolated values rather than being a separate message part.
+      // `plusSign` is a data suffix ("1.2K+"), not copy, so it rides with the value.
       const parts: HistogramTitleParts = {
         start: startCount,
         end: endCount,
@@ -143,7 +142,6 @@ export const useHistogram = () => {
     }
   };
 
-  /** Renders the summary sentence from {@link getHistogramTitleParts}. */
   const getHistogramTitle = (): I18nText => {
     const parts = getHistogramTitleParts();
     if (!parts) {

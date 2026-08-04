@@ -696,11 +696,10 @@ export interface ResourceTabConfig {
 export interface InferredServiceTab {
   /** Unique tab identifier, e.g. "hosts", "databases", "queries" */
   id: string;
-  /** Already-resolved tab label. Holds only names that read the same in every
-   *  language (e.g. "URLs", "RPC Services"); omit when `labelKey` is set. */
+  /** Pre-resolved label — only for names that read the same in every language. */
   label?: I18nText;
-  /** i18n KEY for the tab label — this registry is module-scope, so it cannot
-   *  call t(); the mapper in setup() resolves it. `labelKey` wins when both set. */
+  /** Preferred over `label`. This registry is module-scope so it cannot call
+   *  t(); the mapper in setup() resolves the key. */
   labelKey?: I18nKey;
   /** Column header shown in the resource table, e.g. "Host", "Database", "DB Operation" */
   colLabel: string;

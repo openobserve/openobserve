@@ -16,8 +16,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import i18nInstance from "@/locales";
 
-// buildQueryPayload takes an injected translator; this spec runs outside a
-// component, so it supplies the shared instance's t.
 const t = (i18nInstance.global as any).t;
 
 // ─────────────────────────────────────────────────────────────────────────────

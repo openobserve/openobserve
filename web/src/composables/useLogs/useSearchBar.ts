@@ -38,7 +38,6 @@ import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
 
-// `t` injected: invoked directly by specs outside any component.
 export const useSearchBar = (t: TranslateFn) => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams(t);
 

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OUserCell — person column (owner / author / created-by / user). For now it
@@ -8,6 +7,8 @@ import { raw, type I18nText } from "@/types/i18n";
 // single place to enhance later, and every person column will upgrade at once.
 
 import { computed } from "vue";
+
+import { raw, type I18nText } from "@/types/i18n";
 
 const props = withDefaults(
   defineProps<{

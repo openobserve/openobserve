@@ -361,8 +361,6 @@ export default defineComponent({
 
       return rows;
     },
-    // Config and curl the user copies verbatim — YAML keys, flags and JSON
-    // field names are the machine's vocabulary, identical in every locale.
     alertmanagerSnippet(): I18nText {
       return raw(
         [

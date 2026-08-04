@@ -1117,7 +1117,6 @@ defineOptions({ name: "SyntheticMonitorRuns" });
 
 const { t } = useI18nTyped();
 
-// Known device IDs translate; unknown ones display verbatim.
 const deviceDisplay = (id: string): I18nText => {
   const key = deviceLabelKey(id);
   return key ? t(key) : raw(id);

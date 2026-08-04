@@ -123,10 +123,8 @@ import { useI18nTyped, raw } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
-// The component name, shown as code — not prose, so it stays literal in every
-// locale. It lives here rather than inline as `{{ raw("<OEmptyState>") }}`
-// because Prettier's HTML parser reads the `<` inside an interpolation as a tag
-// open and fails to parse the file.
+// Hoisted, not inline as `{{ raw("<OEmptyState>") }}`: Prettier's HTML parser
+// reads the `<` inside an interpolation as a tag open and fails to parse.
 const emptyStateTag = raw("<OEmptyState>");
 
 // local dark-mode preview wrapper so reviewers can flip themes without changing

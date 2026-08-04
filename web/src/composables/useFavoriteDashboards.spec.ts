@@ -16,8 +16,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import i18nInstance from "@/locales";
 
-// toggleFavorite takes an injected translator; this spec runs outside a
-// component, so it supplies the shared instance's t.
 const t = (i18nInstance.global as any).t;
 
 vi.mock("@/services/settings", () => ({

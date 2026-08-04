@@ -981,8 +981,7 @@ export default defineComponent({
     // evaluation, so it is always qualified with when that ran.
     const runOutcomeTooltip = (row: any) => {
       const at = row?.last_outcome_at ? convertUnixToDateFormat(row.last_outcome_at) : null;
-      // Every label is passed in so the tooltip follows the active locale —
-      // outcomeLabel's own defaults are English.
+      // Pass every label: outcomeLabel's own defaults are English.
       const label = outcomeLabel(
         row?.last_outcome,
         t("alerts.historyTimeline.firing"),

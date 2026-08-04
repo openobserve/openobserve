@@ -5,7 +5,6 @@ import { useStore } from "vuex";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
 import type { TranslateFn } from "@/types/i18n";
 
-// `t` injected: invoked directly by specs outside any component.
 export const useAnnotationsData = (
   organization: string,
   dashboardId: string,

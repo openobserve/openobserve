@@ -17,9 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import i18nInstance from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 
-// copyTracesUrl takes an injected translator. These tests run outside a
-// component, so they supply the shared instance's t — the real messages, so
-// assertions below check the text a user actually sees.
 const t = (i18nInstance.global as any).t as TranslateFn;
 
 // ---------------------------------------------------------------------------

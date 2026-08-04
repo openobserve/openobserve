@@ -558,7 +558,6 @@ const allKeys = computed((): { label: I18nText; value: string }[] => {
   for (const s of services.value) {
     for (const k of Object.keys(s.disambiguation)) keys.add(k);
   }
-  // Keys without an override are backend field identifiers, shown verbatim.
   return [...keys].sort().map((k) => ({ label: KEY_DISPLAY_LABELS[k] ?? raw(k), value: k }));
 });
 

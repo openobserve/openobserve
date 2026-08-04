@@ -160,9 +160,8 @@ const props = defineProps<{
   errorLabel?: I18nText;
 }>();
 
-// Resolved here rather than as `withDefaults` defaults: a default is evaluated
-// once at module scope, which would freeze the wording in whatever locale
-// happened to be active when the module first loaded.
+// Not `withDefaults`: a default is evaluated once at module scope, which would
+// freeze the wording in whatever locale was active when the module loaded.
 const firingLabel = computed(() => props.firingLabel ?? t("alerts.historyTimeline.firing"));
 const okLabel = computed(() => props.okLabel ?? t("alerts.historyTimeline.ok"));
 const errorLabel = computed(() => props.errorLabel ?? t("alerts.historyTimeline.error"));

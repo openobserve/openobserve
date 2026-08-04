@@ -24,8 +24,7 @@ import {
   isRetiredAction,
 } from "./synthetics";
 
-// The picker's labels are i18n keys resolved by the caller's `t`; the identity
-// stub keeps these assertions about the vocabulary, not about the wording.
+// Identity stub: these assertions are about the action vocabulary, not the wording.
 const tStub = ((key: I18nKey) => key) as unknown as TranslateFn;
 
 describe("synthetics action vocabulary", () => {

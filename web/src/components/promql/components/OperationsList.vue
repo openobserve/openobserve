@@ -262,10 +262,8 @@ const getStepSpec = (id: string): PromqlStepSpec | undefined => {
   return promqlRenderer.getStepSpec(id);
 };
 
-// The step catalog is built once by a module-level singleton, so it stores an
-// i18n KEY (`placeholderKey`) for prose placeholders rather than resolved text.
-// Translate it HERE, on every render, so it follows the active locale. Example
-// values ("5m", "0.95") stay in `placeholder` — they are code tokens.
+// The step catalog is a module-level singleton, so prose placeholders are stored
+// as i18n keys and resolved here per render; code tokens ("5m") stay in `placeholder`.
 const paramPlaceholder = (param: PromqlStepArgSpec): I18nText | undefined =>
   param.placeholderKey ? t(param.placeholderKey) : param.placeholder;
 

@@ -56,8 +56,6 @@ export function useFavoriteDashboards() {
     }
   };
 
-  // `t` injected: useFavoriteDashboards() is called directly by its own spec
-  // outside any component, so it cannot obtain a translator itself.
   const toggleFavorite = async (
     org: string,
     userId: string,

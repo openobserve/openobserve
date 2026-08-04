@@ -1,5 +1,3 @@
-// The caller's `t` is threaded in via ctx — this validator is a plain util, so
-// it can't call useI18nTyped() itself.
 import { type I18nText, type TranslateFn } from "@/types/i18n";
 
 import type { ScoreConfig, ScoreDataType } from "@/services/online-evals.service";

@@ -22,9 +22,8 @@ const wrapperAttrs = computed(() => {
 
 const props = withDefaults(defineProps<SearchInputProps>(), {
   modelValue: "",
-  // No default here: a literal would ship untranslated, and calling t() at module
-  // scope would freeze the copy at whatever locale was active on page load.
-  // Resolved per-render below instead.
+  // No default here: a literal ships untranslated and `t()` at module scope would
+  // freeze the locale at page load. Resolved per-render below instead.
   placeholder: undefined,
   size: "sm",
   clearable: true,

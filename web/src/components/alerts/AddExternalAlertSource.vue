@@ -64,9 +64,8 @@ export default defineComponent({
     };
   },
   computed: {
-    // Computed, not data, so the wording follows the active locale. Same keys
-    // the setup tabs in ExternalAlertSourcesList render, so the picker and the
-    // tabs cannot drift apart.
+    // Computed, not data, so the wording follows the active locale. Shares keys
+    // with ExternalAlertSourcesList's setup tabs so the two cannot drift apart.
     sourceTypeOptions() {
       return [
         { label: this.t("alert_sources.sourceTypes.grafana"), value: "grafana" },

@@ -18,12 +18,8 @@ import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 
-// ── Friendly name overrides ──────────────────────────────────────────────────
-//
-// Keys, not resolved text: this map lives at module scope, so resolving here
-// would freeze the labels to whatever locale was active at import time. They are
-// translated at display time in extractResourceInfo(). `I18nKey` makes a typo or
-// a deleted key a compile error.
+// Friendly name overrides. Keys, not text — this map is module scope, so it is
+// translated at display time in extractResourceInfo().
 
 const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
   dashboards: "toastMessages.composables.resources.dashboards",

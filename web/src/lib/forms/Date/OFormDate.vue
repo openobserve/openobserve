@@ -10,8 +10,6 @@ import type { FormDateProps } from "./OFormDate.types";
 
 defineOptions({ inheritAttrs: false });
 
-// Validation messages come from the form schema (already translated there); this
-// only re-brands them, keeping `undefined` when there is nothing to show.
 const errorText = (errors: readonly unknown[] | undefined): I18nText | undefined => {
   const message = firstFieldError(errors);
   return message ? raw(message) : undefined;

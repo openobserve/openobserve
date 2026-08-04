@@ -108,8 +108,8 @@ export function deviceIconName(deviceId: string): string {
 }
 
 /**
- * Resolve a device ID to its label's i18n key; undefined for unknown IDs (the
- * caller shows the raw ID). Key-only so this module stays pure (no vue-i18n).
+ * Resolve a device ID to its label's i18n key; undefined for unknown IDs.
+ * Key-only so this module stays pure — no vue-i18n import here.
  */
 export function deviceLabelKey(deviceId: string): I18nKey | undefined {
   return KNOWN_DEVICES[deviceId]?.labelKey;

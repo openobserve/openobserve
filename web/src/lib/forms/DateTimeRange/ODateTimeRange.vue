@@ -183,8 +183,6 @@ function selectTimezone(tz: string) {
 }
 
 // ── Trigger label ──────────────────────────────────────────────
-// Caller-supplied placeholder wins; otherwise fall back to the translated
-// default (resolved here, not in withDefaults, so it follows the locale).
 const placeholderText = computed((): string => props.placeholder ?? t("common.selectDateRange"));
 
 const triggerLabel = computed((): string => {

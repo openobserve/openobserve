@@ -1278,11 +1278,8 @@ export const BADGE_GROUPS = {
       },
 
       // ── non-firing states ──
-      // `normal` carries an explicit key rather than relying on the humanised
-      // fallback: `conditionnotsatisfied` below is the same state and resolves
-      // the same key, and humanisation is English-only — without this the two
-      // would read differently in every non-English locale, which is exactly
-      // the drift the shared key exists to prevent.
+      // Explicit key, not the humanised (English-only) fallback: `conditionnotsatisfied`
+      // below is the same state and must resolve the same key in every locale.
       normal: {
         variant: "success-soft",
         icon: "check-circle-outline",

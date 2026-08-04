@@ -88,9 +88,7 @@ const props = defineProps<Props>();
 
 const { t } = useI18nTyped();
 
-// Title/subtitle are i18n KEYS stored on the panel definition (a plain config
-// module with no i18n context) — resolved here, on every render, so they follow
-// the active locale.
+// Panel defs are a plain config module with no i18n context, so they carry keys.
 const displayTitle = computed(() => t(props.panel.titleKey));
 const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.subtitleKey) : ""));
 

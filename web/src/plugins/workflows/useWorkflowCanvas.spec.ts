@@ -21,8 +21,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import i18nInstance from "@/locales";
 
-// useWorkflowCanvas takes an injected translator; supplied here from the shared
-// instance since this spec runs outside a component.
 const t = (i18nInstance.global as any).t;
 
 vi.mock("@/services/workflows", () => ({

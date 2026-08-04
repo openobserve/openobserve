@@ -10,8 +10,6 @@ const useNotifications = () => {
     return toast({ variant: "error", message, ...options });
   };
 
-  // `t` injected: useNotifications() is called directly by specs outside any
-  // component, so it cannot obtain a translator itself.
   const showConfictErrorNotificationWithRefreshBtn = (
     message: I18nText,
     t: TranslateFn,

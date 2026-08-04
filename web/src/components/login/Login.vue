@@ -441,8 +441,6 @@ export default defineComponent({
   },
   methods: {
     selected(item: any) {
-      // `this.t` — methods are a sibling of setup(), so setup's local `t` is not
-      // in scope here; it is exposed via setup's return.
       toast({
         message: this.t("toastMessages.login.selectedSuggestion", { suggestion: item.label }),
       });

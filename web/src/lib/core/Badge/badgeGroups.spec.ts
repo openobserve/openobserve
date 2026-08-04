@@ -82,8 +82,6 @@ describe("badgeGroups", () => {
     expect(t.labelKey).toBe("components.badge.normalizeState.true");
     const f = resolveBadge("normalizeState", false);
     expect(f.variant).toBe("default");
-    // "Not Normalized" moved from a hardcoded `label` to a translatable `labelKey`,
-    // which OTag resolves via t() (label precedence: prop → labelKey → label).
     expect(f.labelKey).toBe("components.badge.normalizeState.false");
   });
 

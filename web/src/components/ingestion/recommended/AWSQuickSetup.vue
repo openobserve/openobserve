@@ -368,8 +368,7 @@ export default defineComponent({
     const showTargetRegions = ref(false);
     const showServices = ref(false);
 
-    // AWS region names are AWS's own proper nouns ("US East (N. Virginia)") —
-    // they read identically in every language, so they are never translated.
+    // AWS region names are AWS's own proper nouns, so they are never translated.
     const regionOptions = AWS_REGIONS.map((region) => ({
       value: region.value,
       label: raw(region.label),

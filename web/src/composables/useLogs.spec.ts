@@ -33,8 +33,6 @@ import useNotifications from "../composables/useNotifications";
 
 import store from "../test/unit/helpers/store";
 import i18nInstance from "@/locales";
-// Converted composables take an injected translator; this spec runs outside a
-// component, so it supplies the shared instance's t.
 const t = (i18nInstance.global as any).t;
 
 // Mock toast

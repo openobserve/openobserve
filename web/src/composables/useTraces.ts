@@ -303,9 +303,6 @@ const useTraces = () => {
     return query;
   }
 
-  // `t` is injected per call rather than obtained in useTraces(): this is a
-  // module-level singleton composable that its own spec invokes outside any
-  // component, so it cannot call useI18nTyped() itself.
   const copyTracesUrl = (
     t: TranslateFn,
     customTimeRange: { from: string; to: string } | null = null,

@@ -36,11 +36,8 @@ export default defineComponent({
   name: "GroupHeader",
   components: { OSeparator },
   props: {
-    // User-facing text: typed I18nText so a bare literal at the call site is a
-    // compile error. The double cast is required because `StringConstructor`
-    // returns plain `string`, which does not overlap the branded `I18nText` —
-    // `<script setup>` components can use `defineProps<{ title: I18nText }>()`
-    // directly and avoid this.
+    // Double cast is required: `StringConstructor` yields plain `string`, which
+    // does not overlap the branded `I18nText`. (`<script setup>` needs no cast.)
     title: {
       type: String as unknown as PropType<I18nText>,
       default: raw(""),

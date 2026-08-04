@@ -31,8 +31,7 @@ import {
 } from "@/ts/interfaces";
 
 export const useSearchAround = () => {
-  // Safe to obtain here: useSearchAround() is only ever called from a component
-  // setup (SearchResult.vue), never from a spec or a plain function.
+  // Safe only because useSearchAround() runs inside component setup (SearchResult.vue).
   const { t } = useI18nTyped();
   const { searchObj, notificationMsg } = searchState();
   const { showErrorNotification } = useNotifications();

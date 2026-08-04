@@ -300,10 +300,8 @@ export default defineComponent({
     const variants = computed<any[]>(() => props.defaults?.variants ?? []);
     const variantById = (id: string) => variants.value.find((v) => v.id === id) ?? null;
 
-    // `metricDefaults` is a Vue-free module evaluated at import time, so it
-    // stores an i18n KEY (`labelKey`) instead of resolved text. Translate it
-    // HERE, on every render, so the variant names follow the active locale.
-    // `label` remains for names built from live data ("Top 5 by pod").
+    // `metricDefaults` is evaluated at import time, so it stores an i18n key;
+    // resolve it here per render. `label` stays for names built from live data.
     const variantLabel = (variant: any): I18nText =>
       variant?.labelKey ? t(variant.labelKey) : (variant?.label ?? raw(""));
 

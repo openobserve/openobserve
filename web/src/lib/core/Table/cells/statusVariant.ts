@@ -176,7 +176,6 @@ export function statusVariant(value: unknown, domain?: string): StatusVariantRes
   return {
     variant: TONE_VARIANT[tone],
     tone,
-    // A humanized status token, or an em-dash placeholder — neither is prose.
     label: raw(rawValue ? humanizeStatus(rawValue) : "—"),
     dot: true,
   };

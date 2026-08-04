@@ -77,9 +77,8 @@ export interface SearchConfig {
  * The values the histogram summary is built from, kept alongside the rendered
  * sentence so a second view can present them differently.
  *
- * SearchResult's result chips read THESE, never `chartParams.title`. Parsing the
- * title back apart only worked while it was hardcoded English; now that it is
- * translated, any such parser breaks in every non-English locale.
+ * SearchResult's chips read THESE, never `chartParams.title` — parsing the title
+ * apart only worked while it was hardcoded English.
  */
 export interface HistogramTitleParts {
   start: number;

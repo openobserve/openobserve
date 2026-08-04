@@ -52,8 +52,7 @@ function makeAlerts(count = 3, overrides: Record<string, any> = {}) {
   );
 }
 
-// No local i18n: setupTests.ts installs the real en-US messages globally, so the
-// assertions below read the same wording the app ships.
+// No local i18n: setupTests.ts installs the real en-US messages globally.
 function mountComp(props: Record<string, any> = {}) {
   const store = createStore({
     state: { selectedOrganization: { identifier: "myorg" } },

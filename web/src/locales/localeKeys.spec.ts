@@ -132,11 +132,8 @@ describe("en-US locale file", () => {
     }
   });
 
-  // features.json stores i18n keys as plain JSON strings. TypeScript widens
-  // imported JSON values to `string`, so those keys cannot be checked against
-  // I18nKey and are invisible to any static scan — a dead-key sweep reads them
-  // as unreferenced and deletes them, and the About page then renders the raw
-  // key path. This is the only guard that catches that.
+  // features.json holds its i18n keys as plain JSON strings, invisible to any
+  // static scan — a dead-key sweep would delete them. This is the only guard.
   it("keeps every i18n key referenced by features.json", () => {
     const locale = JSON.parse(raw);
     const lookup = (key: string) =>
@@ -154,7 +151,6 @@ describe("en-US locale file", () => {
         ...Object.values(feature.availability ?? {}),
       ];
       for (const value of candidates) {
-        // booleans mean plain availability; only strings are translation keys
         if (typeof value !== "string" || !value.includes(".")) continue;
         if (typeof lookup(value) !== "string") missing.push(value);
       }

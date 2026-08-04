@@ -16,8 +16,6 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import i18nInstance from "@/locales";
 
-// The refresh-button notification takes an injected translator; this spec runs
-// outside a component, so it supplies the shared instance's t.
 const t = (i18nInstance.global as any).t;
 import useNotifications from "@/composables/useNotifications";
 import { toastRecords } from "@/lib/feedback/Toast/useToast";

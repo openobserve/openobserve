@@ -479,9 +479,8 @@ describe("JourneySteps", () => {
       const table = wrapper.findComponent({ name: "OTable" });
       expect(table.props("showHeader")).toBe(true);
       // The window is what makes a bar's position mean anything. Read from the
-      // column definition, not the rendered text. setupTests installs the real
-      // en-US catalogue, so `t()` resolves and interpolates — assert on the
-      // interpolated window rather than the key.
+      // column definition, not the rendered text; setupTests installs the real
+      // en-US catalogue, so `t()` interpolates the window instead of echoing the key.
       const cols = table.props("columns") as Array<{ id: string; header: string }>;
       expect(cols.map((c) => c.id)).toEqual([
         "step",

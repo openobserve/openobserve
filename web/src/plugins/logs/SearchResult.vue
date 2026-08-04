@@ -1171,8 +1171,9 @@ export default defineComponent({
       });
     });
 
-    // Parses the histogram title string into structured chip data for logs mode.
-    // Format: "Showing X to Y out of Z events in T ms. (Scan Size: S MB)"
+    // Builds the logs-mode chips from the histogram's structured values. Read
+    // `titleParts`, never the rendered title — parsing that back apart only worked
+    // while it was hardcoded English and breaks in every other locale.
     const recordsChips = computed(() => {
       const parts = searchObj.data.histogram.chartParams.titleParts;
       if (!parts) return null;
@@ -1184,8 +1185,7 @@ export default defineComponent({
           total: parts.total,
         }),
         time: t("search.tookChip", { took: parts.took }),
-        // Label is already translated; the size is data. Joined here rather than
-        // keyed so the pair reads the same as it does inside the title sentence.
+        // Label is already translated, the size is data — joined so the pair reads like the title.
         scan: parts.scanLabel != null ? raw(`${parts.scanLabel}: ${parts.scanSize}`) : null,
       };
     });

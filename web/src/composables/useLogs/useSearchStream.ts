@@ -34,7 +34,6 @@ import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramM
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
 import { raw, type TranslateFn } from "@/types/i18n";
 
-// `t` injected: reached from other composables, never a setup context.
 export const useSearchStream = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
   const { addTraceId } = logsUtils();

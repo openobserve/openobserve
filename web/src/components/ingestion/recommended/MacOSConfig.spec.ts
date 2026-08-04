@@ -103,8 +103,6 @@ describe("macosCard builder", () => {
     expect(uninstall?.code.lang).toBe("bash");
     // Takes no arguments, so there is no token to mask.
     expect(uninstall?.code.masked).toBeUndefined();
-    // The prose moved to a locale key, so the card carries the key and the
-    // renderer resolves it — assert against the catalogue, not a literal.
     expect(uninstall?.descriptionKey).toBe("ingestion.setupCard.uninstallAgentDescMac");
     expect(enUS.ingestion.setupCard.uninstallAgentDescMac).toContain("launchd");
   });

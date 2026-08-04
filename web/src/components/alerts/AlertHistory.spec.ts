@@ -433,8 +433,8 @@ describe("AlertHistory.vue", () => {
         expect(r.variant, s).toBe("success-soft");
         expect(r.icon, s).toBe("check-circle-outline");
       }
-      // "Ok" moved from a hardcoded `label` to a translatable `labelKey`,
-      // which OTag resolves via t() (label precedence: prop → labelKey → label).
+      // Wording is a `labelKey` now, resolved by OTag via t() (precedence:
+      // prop → labelKey → label), so the registry asserts on the key.
       expect(resolveBadge("alertState", "ok").labelKey).toBe("components.badge.alertState.ok");
     });
 
@@ -443,8 +443,6 @@ describe("AlertHistory.vue", () => {
     it("condition_not_satisfied → green 'Normal' (same as the current `normal`)", () => {
       const r = resolveBadge("alertState", "condition_not_satisfied");
       expect(r.variant).toBe("success-soft");
-      // "Normal" moved from a hardcoded `label` to a translatable `labelKey`,
-      // which OTag resolves via t() (label precedence: prop → labelKey → label).
       expect(r.labelKey).toBe("components.badge.alertState.normal");
       expect(r.icon).toBe("check-circle-outline");
       expect(resolveBadge("alertState", "normal").variant).toBe("success-soft");
@@ -491,8 +489,6 @@ describe("AlertHistory.vue", () => {
     // `completed` was the legacy spelling of "the alert fired" for
     // condition-bearing modules. Rendering it green contradicted the backend
     // AND the timeline, which already aggregated it under firing.
-    // The wording moved from a hardcoded `label` to a translatable `labelKey`,
-    // which OTag resolves via t() (label precedence: prop → labelKey → label).
     it("completed → red error-soft, labelled Firing (it is a firing state)", () => {
       const r = resolveBadge("alertState", "completed");
       expect(r.variant).toBe("error-soft");

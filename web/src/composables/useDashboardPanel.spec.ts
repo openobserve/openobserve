@@ -4535,7 +4535,7 @@ describe("useDashboardPanel", () => {
 
     beforeEach(() => {
       panel = useDashboardPanelData("dashboard", t);
-      // useDashboardPanelData("dashboard", t) returns shared singleton state, so reset the
+      // useDashboardPanelData() returns shared singleton state, so reset the
       // active query index between tests — otherwise a test that selects a
       // non-zero query tab (e.g. the resetAggregationFunction multi-query
       // cases) leaks currentQueryIndex into later tests that assume index 0.

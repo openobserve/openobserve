@@ -91,9 +91,8 @@ const dataNoun = computed(() =>
   isMetricsStream.value ? "metrics" : isLogsStream.value ? "logs" : "spans",
 );
 // Singular unit for the connected count ("3 metric streams" / "5 spans").
-// The count and its unit are ONE message: English appends "s", other languages
-// inflect differently, so the number must live inside the translated string.
-// Each unit needs its own key because vue-i18n selects the plural branch per key.
+// The count must live inside the translated string, and vue-i18n picks the
+// plural branch per key — hence one key per unit rather than a shared suffix.
 const countUnitKey = computed<I18nKey>(() =>
   isMetricsStream.value
     ? "ingestion.setupCard.countMetricStreams"
@@ -262,25 +261,20 @@ const displayCode = (step: RichCardStep) =>
 const currentVariantNote = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.note : undefined;
 
-// ── copy resolution ─────────────────────────────────────────────────────────
-// Content modules carry either resolved text (`title`) or an i18n KEY stored as
-// data (`titleKey`) — they are plain modules with no i18n context, so the key is
-// translated HERE, on every render, and therefore follows the active locale.
-// The `*Key` half wins when a step sets both. See types.ts.
+// Content modules are plain data with no i18n context, so their `*Key` fields
+// are translated here, on render, and win over the resolved-text counterpart.
 const stepTitle = (step: RichCardStep): I18nText =>
   step.titleKey ? t(step.titleKey) : (step.title ?? raw(""));
 const stepDescription = (step: RichCardStep): I18nText =>
   step.descriptionKey ? t(step.descriptionKey) : (step.description ?? raw(""));
 const variantLabel = (variant: RichCardStepVariant): I18nText =>
   variant.labelKey ? t(variant.labelKey) : (variant.label ?? raw(""));
-// AI-markdown cards carry literal help prose; hand-written content uses a key.
 const streamInputHelp = (input: RichCardStreamInput): I18nText | undefined =>
   input.helpKey ? t(input.helpKey) : input.help;
 const inputLabel = (input: RichCardInput | RichCardStreamInput): I18nText =>
   input.labelKey ? t(input.labelKey) : (input.label ?? raw(""));
 const chipLabel = (chip: { label?: I18nText; labelKey?: I18nKey }): I18nText =>
   chip.labelKey ? t(chip.labelKey) : (chip.label ?? raw(""));
-// Same pair for the two collapsed extras sections (advanced install, uninstall).
 const sectionLabel = (section: { label?: I18nText; labelKey?: I18nKey }): I18nText =>
   section.labelKey ? t(section.labelKey) : (section.label ?? raw(""));
 // Empty string (not undefined) when a section has no paragraph, so the same

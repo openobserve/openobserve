@@ -714,9 +714,7 @@ export const saveAlertJson = async (
       }
 
       // Set up query for validation
-      // No `t` here: JsonValidationContext supplies an already-bound
-      // buildQueryPayload (see useAlertForm), unlike ValidationContext above
-      // which passes the raw util.
+      // No `t` here: JsonValidationContext's buildQueryPayload is already bound (see useAlertForm).
       const query = buildQueryPayload({
         sqlMode: true,
         streamName: jsonPayload.stream_name,

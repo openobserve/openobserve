@@ -73,69 +73,38 @@ const noLegacyO2Tokens = {
   },
 };
 
-// Non-translatable literal tokens, fed to BOTH i18n rules so they pass without a
-// scattered inline eslint-disable comment.
+// Non-translatable tokens, fed to both i18n rules.
 //
-// SCOPE — read before adding anything. An entry here is a GLOBAL, PERMANENT,
-// CONTEXT-FREE exemption: it silences that token in every file forever, and
-// nothing at the call site explains why. It is therefore only for strings that are
-// genuinely global AND unreachable by any other mechanism:
+// An entry is a GLOBAL, PERMANENT exemption with no explanation at the call site,
+// so it is a last resort — only for a token that recurs AND sits in a bare text
+// node, where there is no declaration to annotate. Everything else has a better
+// home: a union type if code branches on it, otherwise `raw("…")` at the call
+// site. Never add real UI text. See I18N_ENFORCEMENT_GUIDE.md §2.
 //
-//   • the string is BEHAVIOURAL (code branches on it) → use a union type; it is
-//     not text at all (see OSplitter.types.ts).
-//   • the string is DISPLAYED from script data or a typed prop → use `raw("…")`.
-//   • the string is DISPLAYED in a bound template expression `{{ a ? "X" : "Y" }}`
-//     → use `raw()`; the custom rule skips call expressions, so it silences at the
-//     call site, and `grep -rn "raw(" src` enumerates every exemption.
-//   • the string is DISPLAYED in a bare TEXT NODE `<span>●</span>` → THIS list is
-//     the only option, because there is no declaration to annotate.
-//
-// NEVER add real UI text here. Prefer `raw()` for anything that fires once or twice.
-
-/**
- * Units and glyphs — language-agnostic, appended to interpolated numbers or used
- * as bare symbols. (The rule matches the WHOLE text, so "s" allows a bare `s`
- * node, not the "s" inside "settings".)
- */
+// Matching is whole-text, so "s" allows a bare `s` node, not the "s" in "settings".
 const GLYPHS_AND_UNITS = [
   "px",
-  "s", // SECONDS — never a plural suffix; manual pluralisation is i18n debt, use a pipe plural
+  "s", // SECONDS, not a plural suffix — manual pluralisation is debt, use a pipe plural
   "ms",
-  "min", // minutes, appended to a number
-  "~", // "approximately" prefix on a numeric rate (e.g. ~12 checks/min)
+  "min",
+  "~",
   "×",
   "→",
   "≠",
   "$",
   "fx",
-  "x", // "times" multiplier suffix on a number
-  // Decorative glyphs / emoji — visual only, no language content.
+  "x",
   "●",
-  "…", // ellipsis marking a truncated list
+  "…",
   "🕑",
   "$_",
 ];
 
-/** Protocol / standard identifiers — defined by an external spec, identical in every locale. */
-const SPEC_IDENTIFIERS = [
-  "GET", // HTTP method, shown as the default when a request has none
-  "UTC", // timezone designator
-  "SQL", // query language name (proper noun)
-  "PromQL", // query language name (proper noun)
-  "OK", // OpenTelemetry span status code
-  "ERROR", // OpenTelemetry span status code
-];
+/** Defined by an external spec — identical in every locale. */
+const SPEC_IDENTIFIERS = ["GET", "UTC", "SQL", "PromQL", "OK", "ERROR"];
 
-/**
- * Literal tokens rendered as bare TEXT NODES (documentation / code shown to the
- * user), where `raw()` has no expression to wrap. Convert the surrounding markup
- * to an interpolated value and these can go too.
- */
-const TEXT_NODE_LITERALS = [
-  "1000", // hardcoded record-limit value
-  "./.env", // relative config-file path shown in setup steps
-  "trace.zip", // fixed download-artifact filename
-];
+/** Bare text nodes, where `raw()` has no expression to wrap. */
+const TEXT_NODE_LITERALS = ["1000", "./.env", "trace.zip"];
 
 const NON_TRANSLATABLE = [...GLYPHS_AND_UNITS, ...SPEC_IDENTIFIERS, ...TEXT_NODE_LITERALS];
 const NON_TRANSLATABLE_SET = new Set(NON_TRANSLATABLE);
@@ -173,42 +142,28 @@ const BARE_STRING_DEFAULT_ALLOWLIST = [
   "|",
 ];
 
-// Bans hardcoded text left directly in a <template> that the built-in
-// `vue/no-bare-strings-in-template` (STATIC attrs + text nodes only) can't see:
-//   • a v-text / v-html literal — v-text="'Save'"
-//   • a text interpolation      — {{ 'Save' }}
-// so a dev can't dodge the check with a v-text or mustaches. (Bound text PROPS are
-// no longer checked here — every text prop is declared I18nText, which rejects a
-// bare literal, a composed expression, AND a plain string variable at type-check.)
-// t()-bound
-// and variable-bound values are expressions (not bare literals) so they correctly
-// pass; a literal with no letters (punctuation like '—') is skipped. Only BARE
-// literals are caught — composed expressions (:label="'a'+b", ternaries, `${x} y`)
-// remain a separate, not-yet-enforced gap. Non-<template> files are a no-op.
+// Catches hardcoded template text the built-in `vue/no-bare-strings-in-template`
+// (static attrs + text nodes only) can't see: `{{ 'Save' }}` and v-text/v-html —
+// otherwise the check is dodged by adding two braces. Bound PROPS are not checked
+// here; `I18nText` covers them, and rejects even a plain string variable.
+// Non-<template> files are a no-op.
 noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
   meta: {
     type: "problem",
     docs: {
-      description: "Ban hardcoded text in bound text props, v-text/v-html, and {{ }} literals",
+      description: "Ban hardcoded text in v-text/v-html and {{ }} literals",
     },
   },
   create(context) {
     const sourceCode = context.sourceCode ?? context.getSourceCode();
     const ps = sourceCode.parserServices ?? context.parserServices;
     if (!ps || !ps.defineTemplateBodyVisitor) return {};
-    // Collect every hardcoded text fragment reachable inside an expression.
+    // Collects hardcoded text from an expression, recursing through the composed
+    // shapes (concatenation, ternary, ||-fallback, template literal) — vue-i18n
+    // handles all of them via named interpolation, so none needs an exemption.
     //
-    // A bare literal is the simple case (:label="'Save'"). The recursion covers the
-    // COMPOSED shapes a dev reaches for naturally, which are just as untranslatable:
-    //   'Deleted ' + n + ' rows'      concatenation
-    //   cond ? 'Yes' : 'No'           ternary  (very common on toggle labels)
-    //   name || 'Unknown'             fallback
-    //   `Deleted ${n} rows`           interpolation (the literal parts / quasis)
-    // vue-i18n already handles all of these via named interpolation —
-    // t('key', { n }) with "Deleted {n} rows" in en-US.json — so there is no reason
-    // to exempt them. Variables and t() calls contribute no literal text and so
-    // still pass. Uses the SAME letter test + NON_TRANSLATABLE allowlist as before,
-    // so this adds no new vocabulary to maintain.
+    // CallExpression is deliberately absent: that is what makes t() and raw() pass.
+    // MemberExpression too, so `row["exception.type"]` isn't read as display text.
     const collect = (expr, out) => {
       if (!expr) return out;
       switch (expr.type) {
@@ -236,8 +191,7 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
       }
       return out;
     };
-    // → the offending text (joined when composed), or null when the expression
-    // carries no translatable literal.
+    // → offending text (joined when composed), or null if there is none.
     const bareText = (expr) => {
       const parts = collect(expr, []).filter(
         (t) => t != null && /\p{L}/u.test(t) && !NON_TRANSLATABLE_SET.has(t.trim()),
@@ -251,10 +205,7 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
         const text = bareText(node.value && node.value.expression);
         if (text == null) return;
         if (dir === "bind") {
-          // Bound text props are now guarded by the TYPE, not by a name list: a
-          // prop declared `I18nText` rejects a bare literal (and a plain string
-          // variable) at type-check. See src/types/i18n.ts.
-          return;
+          return; // guarded by the I18nText type instead — see src/types/i18n.ts
         } else if (dir === "text" || dir === "html") {
           context.report({
             node,
@@ -263,8 +214,8 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
         }
       },
       VExpressionContainer(node) {
-        // Only text-position interpolation {{ '...' }}. A directive value's container
-        // has a VAttribute parent and is handled above; here the parent is the element.
+        // Text-position {{ }} only — a directive value's container has a VAttribute
+        // parent and is handled above.
         const p = node.parent;
         if (!p || (p.type !== "VElement" && p.type !== "VDocumentFragment")) return;
         const text = bareText(node.expression);
@@ -331,9 +282,8 @@ export default [
       local: noLegacyO2Tokens,
       "@intlify/vue-i18n": vueI18n,
     },
-    // i18n key resolution points at the English source of truth ONLY. The other
-    // locales are generated from en-US.json (scripts/translations) and lag behind,
-    // so validating against them would flag every not-yet-translated key.
+    // en-US only. The other locales are generated from it and lag behind, so
+    // validating against the whole folder would flag every untranslated key.
     settings: {
       "vue-i18n": {
         localeDir: "./src/locales/languages/en-US.json",
@@ -343,22 +293,16 @@ export default [
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
 
-      // i18n hygiene. `no-missing-keys` (ERROR): every static t('x.y') must exist
-      // in en-US.json, else vue-i18n renders the raw key at runtime. Backlog is
-      // small (~27 real bugs), so it gates the build outright. A dynamically-built
-      // key is ignored by the rule; test fixtures are exempted below.
+      // A missing key is invisible at build time — vue-i18n renders the raw key to
+      // the user. Dynamic keys are skipped by the rule; specs are exempted below.
       "@intlify/vue-i18n/no-missing-keys": "error",
       //
-      // `no-bare-strings-in-template` (ERROR): no user-facing string typed straight
-      // into a <template> TEXT NODE. (@intlify's own `no-raw-text` is NOT used —
-      // it flags ~1800 literals/punctuation and is too noisy to gate.)
-      //
-      // Props are NOT listed here any more. Every text-carrying prop is declared
-      // `I18nText` (src/types/i18n.ts), so `label="Save"`, `:label="'Save'"`,
-      // composed expressions, and even a plain `string` variable are all rejected
-      // by `type-check:app` — strictly more than the old hand-maintained name list
-      // could catch, and with nothing to keep in sync. A text NODE has no prop to
-      // annotate, which is why this rule still runs.
+      // Text nodes only. `attributes: {}` is deliberate: props are guarded by the
+      // `I18nText` type (src/types/i18n.ts), which also rejects a plain string
+      // variable — something no lint rule can see. A text node has no prop to
+      // annotate, so this rule still runs for those.
+      // (@intlify's own `no-raw-text` is not used — it counts punctuation and code
+      // tokens, so it stays in the hundreds even fully migrated.)
       "vue/no-bare-strings-in-template": [
         "error",
         {
@@ -366,15 +310,11 @@ export default [
           allowlist: [...BARE_STRING_DEFAULT_ALLOWLIST, ...NON_TRANSLATABLE],
         },
       ],
-      // Text-position interpolation `{{ 'Save' }}` and v-text/v-html only; the
-      // bound-prop half retired with TEXT_ATTRS (the type covers it).
       "local/no-bare-bound-text-props": "error",
       //
-      // `t` must come from the typed wrapper, otherwise it returns an unbranded
-      // `string` and the I18nText checks in <script> silently pass for hardcoded
-      // copy. useI18nTyped() returns the very same composer — it is a type-level
-      // cast, so there is no runtime cost or behaviour change.
-      // (src/types/i18n.ts is the one file allowed to import it — see below.)
+      // Vanilla useI18n().t() returns an unbranded `string`, which would silently
+      // void every I18nText check in the file. useI18nTyped() is the same composer
+      // with a type-level cast — no runtime cost.
       "no-restricted-imports": [
         "error",
         {
@@ -515,10 +455,8 @@ export default [
     },
   },
   {
-    // Query-syntax cheat-sheets — the "text" here is SQL / PromQL / operator
-    // examples and code snippets, not translatable prose. Exempt only these from
-    // the bare-string rule; add a file here only when it is genuinely code, with
-    // a one-line reason.
+    // Query-syntax cheat-sheets — the "text" is SQL/PromQL, not prose. Add a file
+    // here only when it is genuinely code, with a one-line reason.
     files: [
       "src/plugins/logs/SyntaxGuide.vue",
       "src/plugins/traces/SyntaxGuide.vue",
@@ -530,8 +468,8 @@ export default [
     },
   },
   {
-    // The typed wrapper itself, and the i18n bootstrap, are the only places that
-    // may reach vue-i18n directly — everything else goes through @/types/i18n.
+    // The ban can't forbid its own implementation: the wrapper has to import
+    // useI18n to wrap it, and the bootstrap has to call createI18n.
     files: ["src/types/i18n.ts", "src/locales/**"],
     rules: {
       "no-restricted-imports": "off",

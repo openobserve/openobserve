@@ -108,8 +108,6 @@ const defaultObject = {
 const pipelineObj = reactive(Object.assign({}, defaultObject));
 
 export { pipelineObj };
-// `t` injected: this composable is invoked directly by its own spec outside any
-// component, so it cannot obtain a translator itself.
 export default function useDragAndDrop(t: TranslateFn) {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 

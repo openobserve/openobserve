@@ -2245,7 +2245,6 @@ const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
   if (!activeEnvironment.value) return null;
 
   const env = activeEnvironment.value;
-  // `envType` is a platform name (never translated); the sentence around it is.
   let envType = "General";
   let evidenceGroups: string[] = [];
 

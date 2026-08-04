@@ -310,8 +310,6 @@ const store = useStore();
 
 const isHelpOpen = ref(false);
 
-// Literal JSON code sample shown in the quick-reference help panel. Rendered
-// verbatim through raw() — it is code, identical in every locale.
 const jsonPermissionSample = `{
   "object": "MainResource:ChildResource",
   "permission": "AccessType"

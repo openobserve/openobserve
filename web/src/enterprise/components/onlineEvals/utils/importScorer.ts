@@ -1,5 +1,3 @@
-// The caller's `t` is threaded in via ctx — this module is plain TS, so it
-// can't call useI18nTyped() itself.
 import { type I18nText, type TranslateFn } from "@/types/i18n";
 
 import type { Provider, ScoreConfig, ScorerType } from "@/services/online-evals.service";

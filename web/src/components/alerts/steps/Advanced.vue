@@ -367,7 +367,6 @@ export default defineComponent({
 
     // Priority options (PT-1). Value is the INTEGER storage id so the form
     // holds exactly what the API serializes — the `P3` form is display only.
-    // P1–P5 are code tokens, identical in every locale.
     const priorityOptions = [1, 2, 3, 4, 5].map((value) => ({
       label: raw(`P${value}`),
       value,

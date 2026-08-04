@@ -217,7 +217,6 @@ const hasPendingDraft = computed(() => !!draft.value.trim());
  * hint that sits alongside a contradictory error.
  */
 const inputErrorMessage = computed(() => {
-  // `errorMessage` arrives already-resolved from the host's validator.
   if (!props.errorMessage) return raw("");
   return hasPendingDraft.value
     ? t("synthetics.journey.locatorDraftPending")

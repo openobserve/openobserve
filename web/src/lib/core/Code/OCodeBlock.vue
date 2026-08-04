@@ -39,8 +39,8 @@ const props = withDefaults(defineProps<CodeBlockProps>(), {
   dataTest: "code-block",
 });
 
-// Resolved here rather than as `withDefaults` defaults: a default is evaluated
-// once at module scope, which would freeze these tooltips in the boot locale.
+// Not `withDefaults` defaults: those are evaluated once at module scope, which
+// would freeze these tooltips in the boot locale.
 const revealTooltipText = computed(() => props.revealTooltip ?? t("common.reveal"));
 const hideTooltipText = computed(() => props.hideTooltip ?? t("common.hide"));
 
@@ -79,7 +79,6 @@ const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
 
 const onCopy = () => {
   copyToClipboard(props.code, t, {
-    // Render-time fallback so the default stays locale-reactive.
     successMessage: props.copyMessage ?? t("common.copySuccess"),
     errorMessage: t("common.copyContentError"),
   });

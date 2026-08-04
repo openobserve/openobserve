@@ -71,8 +71,6 @@ export interface FetchIssuesParams {
   service: string;
 }
 
-// `t` injected: this composable is invoked directly by its own spec outside any
-// component, so it cannot obtain a translator itself.
 const useErrorIssuesData = (t: TranslateFn) => {
   const store = useStore();
   const { getTimeInterval, buildQueryPayload } = useQuery();

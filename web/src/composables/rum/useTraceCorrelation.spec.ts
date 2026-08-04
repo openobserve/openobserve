@@ -18,8 +18,6 @@ import { ref } from "vue";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import searchService from "@/services/search";
 import i18nInstance from "@/locales";
-// Converted composables take an injected translator; this spec runs outside a
-// component, so it supplies the shared instance's t.
 const t = (i18nInstance.global as any).t;
 
 // The composable now asks the stream schema which trace-id namespaces exist (`_o2_` vs

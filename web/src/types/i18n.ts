@@ -13,22 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Type-level i18n enforcement.
+// Type-level i18n enforcement — the half ESLint can't do.
 //
-// The ESLint rules (`vue/no-bare-strings-in-template`, `local/no-bare-bound-text-props`,
-// `@intlify/vue-i18n/no-missing-keys`) guard <template>. They cannot guard a string
-// that lives in <script> — a table column's `label`, a toast `message`, an i18n key
-// stored as data — because deciding "is this string user-facing?" from the string
-// itself is guesswork.
+// Lint guards <template>. It cannot guard a string in <script> (a column `label`,
+// a toast `message`), because deciding "is this user-facing?" from the string alone
+// is guesswork. Declaring the field `I18nText` moves that decision to the author.
+// Nothing here is hand-maintained: `I18nKey` derives from en-US.json at compile time.
 //
-// This module moves that decision to the type declaration, where the author already
-// knows the answer. It follows the same pattern the library already uses for icons
-// (`iconLeft?: IconName`, where `IconName = keyof typeof iconRegistry`): a constrained
-// type, derived from a source of truth, enforced by `npm run type-check:app`.
-//
-// Nothing here needs a maintained list — `I18nKey` is derived from en-US.json at
-// compile time, so adding a key makes it instantly valid and deleting one turns every
-// reference into a type error.
+// See I18N_ENFORCEMENT_GUIDE.md for the full design.
 
 import type { JsonPaths } from "@intlify/core-base";
 import { useI18n } from "vue-i18n";
@@ -38,48 +30,30 @@ import i18nInstance from "@/locales";
 import type enLocale from "@/locales/languages/en-US.json";
 
 /**
- * Every dotted leaf path in en-US.json, e.g. `"common.save"`.
+ * Every dotted leaf path in en-US.json, e.g. `"common.save"`. Derived, never
+ * hand-written. Use for fields storing an i18n KEY as data (`titleKey`), not text.
  *
- * Derived, never hand-written. Use for any field that stores an i18n KEY as data
- * (`titleKey`, `labelKey`, …) rather than the resolved text.
- *
- * Uses vue-i18n's own `JsonPaths` (re-exported by `@intlify/core-base`, declared
- * as a devDependency and pinned to the version vue-i18n resolves) rather than a
- * local recursive type, so the key vocabulary is derived exactly the way the
- * library derives it.
- *
- * Known difference from the hand-rolled predecessor: for an array-valued message
- * `JsonPaths` recurses into the array type and also admits JS array members
- * (`…Aliases.length`). The one array key in en-US.json is read via `tm()`, not
- * `t()`, so it never flows through {@link TranslateFn} and nothing real is
- * affected.
+ * `JsonPaths` is vue-i18n's own key-path type, so the vocabulary matches the
+ * library's exactly. Caveat: for the one array-valued message it also admits array
+ * members (`…Aliases.length`); that key is read via `tm()`, so nothing is affected.
  */
 export type I18nKey = JsonPaths<typeof enLocale>;
 
 declare const i18nTextBrand: unique symbol;
 
 /**
- * A string that has passed through translation.
- *
- * A plain string literal is NOT assignable to it, so declaring a field as
- * `I18nText` makes `label: "Save"` a compile error while `label: t("common.save")`
- * passes. Composed forms (`"a" + b`, `cond ? "Yes" : "No"`, `` `a ${b}` ``) are
- * rejected too — they all widen to `string`.
+ * A string that has passed through translation. A plain literal is not assignable,
+ * so `label: "Save"` is a compile error while `label: t("common.save")` passes.
+ * Composed forms (`"a" + b`, ternaries, templates) widen to `string` and fail too.
  */
 export type I18nText = string & { readonly [i18nTextBrand]: true };
 
 /**
- * Marks a string as deliberately untranslated — a code token, unit, identifier or
- * field name that must read identically in every language.
+ * The opt-out: marks a string as deliberately untranslated (code token, unit,
+ * field name). Preferred over an eslint-disable — it is type-checked, survives
+ * refactors, and `grep -rn "raw(" src` lists every exemption in the app.
  *
- * This is the opt-out. Prefer it to an eslint-disable comment: it is type-checked,
- * survives refactors, and `grep -rn "raw(" src` lists every exemption in the app.
- *
- * @example
- * const columns = [
- *   { label: t("logs.timestamp"), field: "ts" },
- *   { label: raw("trace_id"),     field: "trace_id" }, // a field name, not prose
- * ];
+ * @example { label: raw("trace_id"), field: "trace_id" } // a field name, not prose
  */
 export const raw = (value: string | number | null | undefined): I18nText =>
   (value ?? "") as unknown as I18nText;
@@ -87,12 +61,11 @@ export const raw = (value: string | number | null | undefined): I18nText =>
 /**
  * `t()` — branded text out.
  *
- * The key parameter stays permissive (`I18nKey | (string & {})`) on purpose:
- * `I18nKey` gives autocomplete on the ~10k real keys, while the open half keeps
- * the ~190 dynamic call sites (`` t(`about.feature_${id}`) ``) compiling. Literal
- * keys are already validated by `@intlify/vue-i18n/no-missing-keys` at lint time,
- * so nothing is lost; keys stored as *data* use the strict `I18nKey` type, which
- * is the case lint cannot see.
+ * The key stays permissive (`I18nKey | (string & {})`) ON PURPOSE: `I18nKey` gives
+ * autocomplete, while the open half keeps the dynamic call sites
+ * (`` t(`about.feature_${id}`) ``) compiling. Do not tighten it — literal keys are
+ * already validated by `no-missing-keys` at lint time, and keys stored as *data*
+ * use the strict `I18nKey`, which is the case lint cannot see.
  */
 export type TranslateFn = {
   (key: I18nKey | (string & {})): I18nText;
@@ -105,24 +78,17 @@ export type TranslateFn = {
 export type TypedComposer = Omit<ReturnType<typeof useI18n>, "t"> & { t: TranslateFn };
 
 /**
- * `useI18n()` with `t` retyped.
- *
- * This is a pure type-level cast — it returns the exact composer vue-i18n gave us,
- * with no runtime wrapper, so reactivity and every other composer member behave
- * identically. Use it in place of `useI18n()` so the strings a component produces
- * are recognised as translated.
+ * `useI18n()` with `t` retyped. A pure type-level cast — the same composer, no
+ * runtime wrapper, so reactivity is unchanged. Use instead of `useI18n()`.
  */
 export function useI18nTyped(): TypedComposer {
   return useI18n() as unknown as TypedComposer;
 }
 
 /**
- * `t()` for code that runs OUTSIDE a component setup context — composables called
- * from plain functions, utils, service-layer error handling.
- *
- * `useI18n()` may only be called during setup, so those call sites reach the shared
- * i18n instance directly. Same typing as {@link TranslateFn}; prefer `useI18nTyped()`
- * inside components so the locale stays reactive to the component's scope.
+ * `t()` for code OUTSIDE a setup context (utils, service-layer error handling),
+ * where `useI18n()` would throw. Prefer `useI18nTyped()` inside components so the
+ * locale stays reactive to the component's scope.
  */
 export const gt: TranslateFn = ((...args: unknown[]) =>
   (i18nInstance.global as unknown as { t: (...a: unknown[]) => string }).t(

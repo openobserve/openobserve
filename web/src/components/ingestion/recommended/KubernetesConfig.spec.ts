@@ -126,7 +126,6 @@ describe("kubernetesCard builder", () => {
       // A jump link, not prose — it opens the accordion and scrolls to it.
       expect(v.note).toContain("[Advanced Installation (Manual Steps)](#advanced)");
     }
-    // The accordion's own label is an i18n key, resolved by SetupCardRenderer.
     expect(card.extras!.advanced!.labelKey).toBe("ingestion.setupCard.advancedInstallLabel");
   });
 

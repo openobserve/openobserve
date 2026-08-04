@@ -239,10 +239,8 @@ export default defineComponent({
       required: true,
     },
     // Tabs configuration (shape matches AppTabs' Tab interface).
-    // No `default` here on purpose: the fallback tabs carry translated labels and
-    // a prop default factory runs outside the component's i18n context, which
-    // would freeze them at the locale active when the first instance mounted.
-    // `resolvedTabs` in setup() builds them with `t()` instead — see below.
+    // No `default` here on purpose: a prop default factory runs outside the i18n
+    // context and would freeze the labels at one locale — see `resolvedTabs`.
     tabs: {
       type: Array as PropType<
         { label: I18nText; value: string; icon?: string; disabled?: boolean }[]
@@ -347,9 +345,6 @@ export default defineComponent({
       }
     };
 
-    // Tabs the page actually renders: the host's `tabs` prop when given,
-    // otherwise the built-in File-upload / URL pair, translated here (inside
-    // setup) so the labels follow the active locale.
     const resolvedTabs = computed(
       () =>
         props.tabs ?? [

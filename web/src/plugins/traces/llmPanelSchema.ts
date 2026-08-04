@@ -52,8 +52,7 @@ interface AxisField {
   label: I18nText;
 }
 
-// Axis labels here are column aliases and panel-defined series names
-// (`p50`, `errors`, the raw breakdown column) — identifiers, not prose.
+// Axis labels are column aliases and series names (`p50`, `errors`) — identifiers, not prose.
 function axisField(name: string, label: string): AxisField {
   return { alias: name, column: name, color: null, label: raw(label) };
 }

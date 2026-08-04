@@ -141,7 +141,6 @@ const useQuery = () => {
     }
   };
 
-  // `t` injected: useQuery() is called directly by specs outside any component.
   const buildQueryPayload = (data: BuildQueryPayload, t: TranslateFn) => {
     try {
       const req: any = {

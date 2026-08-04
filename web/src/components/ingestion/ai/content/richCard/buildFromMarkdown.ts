@@ -47,8 +47,7 @@ const STREAM_TYPES: Record<string, "logs" | "metrics" | "traces"> = {
 };
 const trimTrailing = (s: string) => s.replace(/\n+$/, "");
 
-// `src` is the raw frontmatter step node (named `src`, not `raw`, so it doesn't
-// shadow the `raw()` i18n helper).
+// Param is named `src`, not `raw`, so it doesn't shadow the `raw()` i18n helper.
 function buildStep(src: any, slug: string, i: number, subs: CardSubstitutions): RichCardStep {
   const code = src?.code
     ? (() => {

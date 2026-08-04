@@ -30,7 +30,7 @@ export interface CodeBlockProps {
   filename?: string;
   /** Show the copy button. Default: true. */
   copyable?: boolean;
-  /** Toast shown on a successful copy (defaults to the translated "Copied to clipboard"). */
+  /** Toast shown on a successful copy. */
   copyMessage?: I18nText;
   /** Tooltips for the reveal/hide toggle (when `codeMasked` is set). */
   revealTooltip?: I18nText;

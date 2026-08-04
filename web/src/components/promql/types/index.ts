@@ -58,18 +58,12 @@ export interface PromqlStepArgSpec {
    */
   options?: Array<string | number> | boolean;
   optional?: boolean;
-  /**
-   * Placeholder shown when the field is empty, for the EXAMPLE-VALUE case only
-   * (`"5m"`, `"0.95"`) — a code token that reads identically in every language,
-   * so it stays untranslated. Prose placeholders use {@link placeholderKey}.
-   */
+  /** Example-value placeholder only (`"5m"`, `"0.95"`) — a code token, so untranslated. */
   placeholder?: I18nText;
   /**
-   * i18n KEY for a prose placeholder ("Select labels"). The catalog is built by
-   * a module-level singleton (`promqlRenderer` in ../operations/queryModeller),
-   * so it runs at import time and cannot call `t()` — the key is stored as data
-   * and resolved by `OperationsList.vue` at render time, where it follows the
-   * active locale. Wins over {@link placeholder} when both are set.
+   * Prose placeholder ("Select labels"), translated by `OperationsList.vue` at
+   * render time — the catalog is built at import, so it cannot call `t()`.
+   * Wins over {@link placeholder} when both are set.
    */
   placeholderKey?: I18nKey;
   /** i18n KEY for the argument's help text. Stored as data — see `placeholderKey`. */

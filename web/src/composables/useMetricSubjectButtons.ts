@@ -54,11 +54,9 @@ export type SubjectButtonSpec = {
   /** Stable identifier for the button (used as a Vue key). */
   id: string;
   /**
-   * Display label rendered on the chip. `label` holds names that must read the
-   * same in every language — Kubernetes API kinds (`Pod`, `Node`) and cloud
-   * product names (`ECS Task`, `Cloud Run`). Ordinary nouns (`Host`, `Role`)
-   * use `labelKey` instead and are translated by the consumer.
-   * Exactly one of the pair is set; `labelKey` wins when both are.
+   * Names that must read the same in every language — K8s kinds (`Pod`) and cloud
+   * product names (`ECS Task`). Ordinary nouns (`Host`) use `labelKey`, which wins
+   * if both are set.
    */
   label?: I18nText;
   /** i18n KEY for the chip label, translated at render time. */

@@ -205,7 +205,6 @@ export default defineComponent({
     // ── Level 3 detail crumb ────────────────────────────────────────────────
     const detailLabels: Record<string, () => I18nText> = {
       pipelineEditor: () => {
-        // The crumb is the pipeline's own name (data) when the URL carries one.
         const name = router.currentRoute.value.query.name as string;
         return name ? raw(name) : t("pipeline.editPipeline");
       },

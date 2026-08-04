@@ -149,9 +149,8 @@ export default defineComponent({
       store.dispatch("setSearchCollapseToggle", store.state.searchCollapsibleSection == 0 ? 20 : 0);
     };
 
-    // `pageTitle` is supplied by the caller already translated and normally plural
-    // ("Dashboards"). Pick the form that matches the row count rather than printing
-    // the untranslatable "(s)" suffix this used to append.
+    // `pageTitle` arrives already translated and normally plural ("Dashboards"):
+    // singularize it for one row rather than appending an untranslatable "(s)".
     const countedPageTitle = computed(() => {
       const title: string = props.pageTitle ?? "";
       if (props.resultTotal === 1 && title.slice(-1) === "s") return title.slice(0, -1);

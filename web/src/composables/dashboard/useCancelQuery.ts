@@ -12,7 +12,6 @@ import type { TranslateFn } from "@/types/i18n";
  *   searchRequestTraceIds: (data: any) => void,
  * }}
  */
-// `t` injected: invoked directly by specs outside any component.
 const useCancelQuery = (t: TranslateFn) => {
   const { showPositiveNotification, showErrorNotification } = useNotifications();
   const traceIdRef: any = ref([]);

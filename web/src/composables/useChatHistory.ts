@@ -363,7 +363,6 @@ export function useChatHistory(getUserEmail: () => string, getOrgIdentifier: () 
             resolve(false);
             return;
           }
-          // A chat title is user/assistant-authored data, never translated copy.
           chat.title = raw(newTitle);
           const putRequest = store.put(chat);
           putRequest.onsuccess = () => resolve(true);

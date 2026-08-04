@@ -249,9 +249,8 @@ const pinnedSelected = ref<Set<string>>(new Set());
 
 const inputEnabled = computed(() => props.searchable);
 
-// Resolved at render time rather than as a `withDefaults` default: a default is
-// evaluated once at module scope, which would freeze the placeholder in whatever
-// locale happened to be active when the module first loaded.
+// Not a `withDefaults` default: that is evaluated once at module scope, which
+// would freeze the placeholder in whatever locale was active at first load.
 const resolvedSearchPlaceholder = computed(
   () => props.searchPlaceholder ?? t("common.searchEllipsis"),
 );

@@ -166,8 +166,7 @@ describe("useTracesTableColumns", () => {
       return buildCols(false, "spans", ["span_kind"]).find((c) => c.id === "span_kind");
     }
 
-    // Known columns store an i18n KEY (headerKey) and translate it at build
-    // time; the mocked `t` above echoes the key back.
+    // The mocked `t` above echoes keys back, so the header comes out as its key.
     it("should translate the Span Kind header key", () => {
       expect(getSpanKindCol()?.header).toBe("traces.tableColumns.spanKind");
     });

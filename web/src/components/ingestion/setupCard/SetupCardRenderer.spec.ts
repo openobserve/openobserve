@@ -119,10 +119,8 @@ describe("SetupCardRenderer — advanced section", () => {
   });
 });
 
-// The in-repo content builders (setupCard/content/*) are plain modules with no
-// i18n context, so translatable copy is stored as an i18n KEY (titleKey /
-// descriptionKey / labelKey) and resolved HERE. A consumer that forgets to call
-// t() renders the dotted path to the user, so guard each one.
+// Content builders (setupCard/content/*) store copy as i18n keys and the
+// renderer resolves them; a consumer that forgets t() shows the user a key.
 describe("SetupCardRenderer — key-as-data copy", () => {
   let wrapper: VueWrapper<any>;
 
@@ -161,7 +159,6 @@ describe("SetupCardRenderer — key-as-data copy", () => {
     expect(text).toContain("set the host/port below");
     expect(text).toContain("JMX Host");
     expect(text).toContain("Generic Windows");
-    // No unresolved dotted path leaked anywhere on the card.
     expect(text).not.toContain("ingestion.setupCard.");
   });
 });

@@ -88,10 +88,8 @@ export function outcomeBucket(status: unknown): OutcomeBucket {
 }
 
 /**
- * Human label for a raw outcome value. Every label is caller-supplied so the
- * wording can be localised (or made domain-specific — workflows say
- * "Failed"/"Success"); the English defaults are the fallback for call sites
- * that have no i18n context.
+ * Human label for a raw outcome value. Every label is caller-supplied so callers
+ * can localise or use domain wording; the English defaults cover non-i18n callers.
  */
 export function outcomeLabel(
   status: unknown,

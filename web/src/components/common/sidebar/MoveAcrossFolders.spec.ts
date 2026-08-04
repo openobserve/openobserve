@@ -108,10 +108,8 @@ const mockStore = createStore({
   },
 });
 
-// No local createI18n here on purpose: a mount-level i18n plugin is installed
-// AFTER the global one from setupTests.ts and therefore replaces the real
-// en-US bag, so every key outside the local copy renders empty and the copy
-// silently goes stale. The global install serves the real messages.
+// No local createI18n on purpose: a mount-level i18n plugin replaces the global
+// one from setupTests.ts, so every key outside the local bag renders empty.
 
 // Factory — single source of truth for mount config
 const createWrapper = (props: Record<string, any> = {}) => {

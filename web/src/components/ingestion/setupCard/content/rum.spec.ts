@@ -538,9 +538,8 @@ describe("rumCard builder", () => {
       const exposureEntry = ts.find((e: any) => e.q.toLowerCase().includes("visible"));
 
       // The init step (both NPM and CDN tabs) states the token ships to
-      // visitors' browsers and can be rotated. The step carries an i18n KEY
-      // (SetupCardRenderer translates it at render time), so assert on the
-      // en-US copy that key resolves to.
+      // visitors' browsers and can be rotated. That copy now sits behind an i18n
+      // key, so assert on the en-US text the key resolves to.
       expect(init.descriptionKey).toBe("ingestion.setupCard.rumInitDesc");
       expect(enLocale.ingestion.setupCard.rumInitDesc).toContain("ships to visitors' browsers");
       expect(enLocale.ingestion.setupCard.rumInitDesc).toContain("rotate");

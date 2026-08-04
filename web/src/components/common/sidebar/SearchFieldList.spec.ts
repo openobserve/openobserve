@@ -114,8 +114,6 @@ const mockI18n = createI18n({
       search: {
         searchField: "Search field",
       },
-      // The component passes t("common.valueCopiedToClipboard") to
-      // copyToClipboard; without the key this mock echoes the key path.
       common: {
         valueCopiedToClipboard: "Value copied to clipboard",
       },

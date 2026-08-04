@@ -63,10 +63,8 @@ const mockStore = createStore({
   },
 });
 
-// No local createI18n here: setupTests.ts installs the real i18n instance
-// globally, so mounting needs no i18n plugin. A mount-level one is installed
-// AFTER the global and replaces it, which is how partial bags end up shadowing
-// the real messages.
+// No local createI18n here: setupTests.ts installs the real i18n globally, and a
+// mount-level plugin would replace it with a partial bag.
 
 // ─── BaseImport stub ──────────────────────────────────────────────────────────
 const BaseImportStub = {

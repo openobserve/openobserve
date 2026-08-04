@@ -23,10 +23,7 @@ import {
   type PrefixGroup,
 } from "./prefixGrouping";
 
-/**
- * The catch-all bucket's label as it resolves in en-US — the module stores the
- * i18n KEY and translates it per call, so the expectation is the rendered text.
- */
+/** The rendered en-US text: the module stores the key and translates per call. */
 const MISC_GROUP_LABEL = raw("Other");
 
 /**

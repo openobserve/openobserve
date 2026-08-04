@@ -280,7 +280,6 @@ const mappingOptions = computed<SelectOption[]>(() => {
     const value = mappingExpression(field.value);
     if (systemValues.has(value) || seenAttributes.has(value)) return [];
     seenAttributes.add(value);
-    // Span-attribute names come from the stream schema — not translated copy.
     return [{ label: raw(field.label), value }];
   });
 

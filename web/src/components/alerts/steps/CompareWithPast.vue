@@ -350,9 +350,8 @@ export default defineComponent({
       commit();
     };
 
-    // Offset code ("15m") → counted noun ("15 Minutes"). Shares the *Count plural
-    // keys with convertMinutesToDisplayValue so "1m" reads "1 Minute", not
-    // "1 Minutes".
+    // Offset code ("15m") → counted noun. Shares the *Count plural keys with
+    // convertMinutesToDisplayValue so "1m" reads "1 Minute", not "1 Minutes".
     const UNIT_COUNT_KEYS: Record<string, I18nKey> = {
       s: "alerts.compareWithPast.secondCount",
       m: "alerts.compareWithPast.minuteCount",

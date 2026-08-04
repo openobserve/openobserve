@@ -21,8 +21,6 @@ import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
 import searchState from "./searchState";
 import i18nInstance from "@/locales";
-// Converted composables take an injected translator; this spec runs outside a
-// component, so it supplies the shared instance's t.
 const t = (i18nInstance.global as any).t;
 
 const i18n = createI18n({

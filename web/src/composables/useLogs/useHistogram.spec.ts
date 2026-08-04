@@ -20,10 +20,8 @@ import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import enLocale from "@/locales/languages/en-US.json";
 
-// Create i18n instance.
-// The real `search` messages are used rather than a stub: the histogram title is
-// built from them and SearchResult.vue parses that title back into chips, so the
-// exact wording is part of the contract these tests guard.
+// Create i18n instance. Uses the real `search` messages rather than a stub —
+// these tests pin the exact rendered en-US wording.
 const i18n = createI18n({
   legacy: false,
   locale: "en",
@@ -173,10 +171,7 @@ describe("useHistogram Composable", () => {
   });
 
   // --------------------------------------------------------------------------
-  // getHistogramTitle — pins the rendered en-US sentence. SearchResult.vue does
-  // NOT parse this string: its result chips read the structured
-  // chartParams.titleParts (see the describe below), so the title is free to
-  // localize without the chips breaking.
+  // getHistogramTitle — pins the rendered en-US sentence
   // --------------------------------------------------------------------------
   describe("getHistogramTitle", () => {
     beforeEach(() => {

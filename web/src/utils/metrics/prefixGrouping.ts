@@ -37,12 +37,8 @@ import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n
 export const MISC_GROUP_ID = "misc";
 
 /**
- * i18n key for the {@link MISC_GROUP_ID} bucket's label.
- *
- * The KEY is the constant, not the text: resolving it here (at module scope)
- * would freeze the label in whatever locale happened to be active when this
- * module first loaded. It is translated per call inside
- * {@link computePrefixAssignment} instead.
+ * i18n key for the {@link MISC_GROUP_ID} bucket's label — the KEY is the constant,
+ * translated per call in {@link computePrefixAssignment} so it follows the locale.
  */
 export const MISC_GROUP_LABEL_KEY: I18nKey = "metrics.explorer.miscGroup";
 

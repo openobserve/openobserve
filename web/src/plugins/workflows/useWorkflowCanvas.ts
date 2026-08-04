@@ -531,8 +531,6 @@ export const hydrateWorkflow = (wf: any) => {
   workflowObj.isEditWorkflow = true;
 };
 
-// `t` injected: this composable is invoked directly by specs outside any
-// component, so it cannot obtain a translator itself.
 export default function useWorkflowCanvas(t: TranslateFn) {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 

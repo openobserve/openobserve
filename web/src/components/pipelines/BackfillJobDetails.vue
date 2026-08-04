@@ -411,7 +411,6 @@ const getDeletionTimelineSubtitle = computed(() => {
   if (job.value.deletion_status === "pending")
     return t("pipeline.backfillDetails.waitingToStartDeletion");
   if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
-    // Backend-provided failure detail, shown verbatim.
     return raw(job.value.deletion_status.failed);
   }
   return raw("");

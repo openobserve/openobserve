@@ -212,8 +212,8 @@ const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
   emit("update:modelValue", `${picker.data.selectedDate.relative.value}${newPeriod}`);
 };
 
-// Display the current selected offset. Built from a parameterised message
-// rather than concatenation — word order around the value differs by language.
+// Display the current selected offset
+// Parameterised rather than concatenated — word order around the value varies by language.
 const getDisplayValue = () => {
   return t("common.relativeTimeAgo", {
     value: picker.data.selectedDate.relative.value,

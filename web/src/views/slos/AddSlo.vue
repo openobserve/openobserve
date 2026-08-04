@@ -501,7 +501,6 @@ const sliTypeDescription = computed(
   () => sliTypeOptions.value.find((o) => o.value === form.sli_type)?.description ?? "",
 );
 
-// Visible dropdown labels, so they translate — the wire value stays lowercase.
 const streamTypeOptions = computed(() => [
   { value: "logs", label: t("common.logs") },
   { value: "metrics", label: t("common.metrics") },

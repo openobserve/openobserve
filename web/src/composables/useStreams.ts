@@ -23,8 +23,6 @@ import type { TranslateFn, I18nText } from "@/types/i18n";
 
 const getStreamsPromise: any = ref(null);
 
-// `t` injected: this composable is invoked directly by specs outside any
-// component, so it cannot obtain a translator itself.
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
 

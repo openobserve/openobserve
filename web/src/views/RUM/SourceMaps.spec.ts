@@ -325,10 +325,7 @@ describe("SourceMaps.vue", () => {
 
       wrapper = await mountComponent();
 
-      // OTable is always rendered; when data is empty it renders #empty slot with
-      // OEmptyState. This spec loads the real en-US messages, so assert the copy the
-      // user actually sees — the previous `toContain("emptyState")` only passed
-      // because the message set was empty and t() echoed the key back.
+      // OTable is always rendered; when data is empty it renders #empty slot with OEmptyState.
       expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
       expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain(
         "No source maps uploaded",

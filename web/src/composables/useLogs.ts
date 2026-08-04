@@ -41,7 +41,6 @@ import useStreamingSearch from "@/composables/useStreamingSearch";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
 
-// `t` injected: invoked directly by specs outside any component.
 const useLogs = (t: TranslateFn) => {
   const store = useStore();
 

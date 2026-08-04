@@ -40,8 +40,6 @@ export function buildAgentSelectOptions(
   }
   const result: SelectOption[] = [];
   if (options.includeAllAgents) {
-    // `t` is the caller-injected translator (plain `(k) => string`), so the text
-    // is already translated by the time it lands here — `raw` only re-brands it.
     result.push({ label: raw(t("traces.allAgents")), value: ALL_AGENTS_VALUE });
   }
   for (const [name, variants] of byName) {

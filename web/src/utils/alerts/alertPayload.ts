@@ -54,7 +54,6 @@ export interface PayloadContext {
 
 export interface SaveAlertContext {
   store: any;
-  /** Injected translator — this module has no Vue context of its own. */
   t: TranslateFn;
   props: any;
   emit: any;

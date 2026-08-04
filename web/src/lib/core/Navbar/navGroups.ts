@@ -216,8 +216,7 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
  */
 export function groupNavLinks(
   links: NavItem[],
-  // Defaults to `raw`, which brands the key unchanged — the same identity
-  // fallback as before, for callers (and specs) that pass no translator.
+  // `raw` brands the key unchanged — the identity fallback for callers with no translator.
   t: TranslateFn = raw,
 ): RailEntry[] {
   const presentNames = new Set(links.map((l) => l.name));

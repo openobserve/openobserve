@@ -137,8 +137,7 @@ const props = withDefaults(defineProps<Props>(), {
   confirmation: null,
 });
 
-// Render-time defaults so the labels stay locale-reactive; a withDefaults
-// literal would freeze the English text.
+// Render-time defaults — a withDefaults literal would freeze the English text.
 const resolvedConfirmLabel = computed(() => props.confirmLabel ?? t("common.yes"));
 const resolvedCancelLabel = computed(() => props.cancelLabel ?? t("common.no"));
 
