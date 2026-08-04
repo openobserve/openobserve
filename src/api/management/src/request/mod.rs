@@ -32,6 +32,8 @@ pub mod dashboards;
 #[cfg(feature = "enterprise")]
 pub mod datasets;
 #[cfg(feature = "enterprise")]
+pub mod discovery;
+#[cfg(feature = "enterprise")]
 pub mod domain_management;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
