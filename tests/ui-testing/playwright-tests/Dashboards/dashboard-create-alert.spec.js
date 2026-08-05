@@ -74,15 +74,17 @@ test.describe("Dashboard Create Alert testcases", () => {
       // Click the panel dropdown menu and select "Create Alert"
       await pm.dashboardPanelEdit.createAlertFromPanelMenu(panelName);
 
-      // Verify navigation to alert creation page with fromPanel=true and panelData
-      await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+      // Verify navigation to the alert form, flagged as a panel prefill
+      await page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
         timeout: 15000,
       });
 
-      // Verify URL contains panelData (proves panel data was passed)
+      // The prefill marker is in the URL; the payload deliberately is not.
       const currentUrl = page.url();
-      expect(currentUrl).toContain("fromPanel=true");
-      expect(currentUrl).toContain("panelData=");
+      expect(currentUrl).toContain("prefill=panel");
+      // The panel payload rides sessionStorage now, not the URL — a query string
+      // long enough to be truncated by a browser or proxy was the reason.
+      expect(currentUrl).not.toContain("panelData=");
 
       testLogger.info("Navigated to alert creation page with panel data", {
         url: currentUrl,
@@ -165,15 +167,17 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Click "above threshold" option and wait for navigation simultaneously
       await Promise.all([
-        page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+        page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
           timeout: 15000,
         }),
         pm.dashboardPanelEdit.selectAlertAboveThreshold(),
       ]);
 
       const currentUrl = page.url();
-      expect(currentUrl).toContain("fromPanel=true");
-      expect(currentUrl).toContain("panelData=");
+      expect(currentUrl).toContain("prefill=panel");
+      // The panel payload rides sessionStorage now, not the URL — a query string
+      // long enough to be truncated by a browser or proxy was the reason.
+      expect(currentUrl).not.toContain("panelData=");
 
       testLogger.info(
         "Navigated to alert creation page from context menu (above threshold)"
@@ -246,15 +250,17 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Click "below threshold" option and wait for navigation simultaneously
       await Promise.all([
-        page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+        page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
           timeout: 15000,
         }),
         pm.dashboardPanelEdit.selectAlertBelowThreshold(),
       ]);
 
       const currentUrl = page.url();
-      expect(currentUrl).toContain("fromPanel=true");
-      expect(currentUrl).toContain("panelData=");
+      expect(currentUrl).toContain("prefill=panel");
+      // The panel payload rides sessionStorage now, not the URL — a query string
+      // long enough to be truncated by a browser or proxy was the reason.
+      expect(currentUrl).not.toContain("panelData=");
 
       testLogger.info(
         "Navigated to alert creation page from context menu (below threshold)"
@@ -400,7 +406,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.dashboardPanelEdit.createAlertFromPanelMenu(panelName);
 
       // Verify navigation to pre-filled alert creation page
-      await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+      await page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
         timeout: 15000,
       });
 
