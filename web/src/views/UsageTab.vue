@@ -557,7 +557,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
-import configService from "@/services/config";
+import { refetchConfig } from "@/composables/query/queries/config";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import { formatEventCount } from "@/utils/formatters";
@@ -955,8 +955,7 @@ onMounted(() => {
 
 const refreshConfig = async () => {
   try {
-    const res: any = await configService.get_config();
-    store.dispatch("setConfig", res.data);
+    store.dispatch("setConfig", await refetchConfig());
   } catch (error) {
     console.log(error);
   }

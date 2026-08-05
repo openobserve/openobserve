@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createApp } from "vue";
+import { VueQueryPlugin } from "@tanstack/vue-query";
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
@@ -24,13 +25,14 @@ import "./styles/tailwind.css";
 // here instead of re-@imported inside each consumer's <style> block.
 import "./assets/styles/log-highlighting.css";
 import config from "./aws-exports";
-import configService from "./services/config";
 
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { queryClient } from "./composables/query/queryClient";
+import { fetchConfig } from "./composables/query/queries/config";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 
@@ -45,6 +47,8 @@ app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
+
+app.use(VueQueryPlugin, { queryClient });
 
 // Initialize default context provider globally
 const defaultProvider = createDefaultContextProvider(router, store);
@@ -76,7 +80,10 @@ interface ConfigResponse {
 }
 
 const getConfig = async () => {
-  await configService.get_config().then((res: ConfigResponse) => {
+  // Seeds the shared `/config` query — MainLayout, Login, General and UsageTab
+  // read the same cached entry instead of each issuing their own request.
+  await fetchConfig().then((data: ConfigResponse["data"]) => {
+    const res: ConfigResponse = { data };
     if (!res.data) return;
 
     store.dispatch("setConfig", res.data);

@@ -199,7 +199,6 @@ import { getLocale } from "../locales";
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
-import configService from "@/services/config";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
@@ -216,6 +215,8 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
+import { purgeOrgQueries } from "@/composables/query/queryClient";
+import { fetchConfig } from "@/composables/query/queries/config";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -1160,9 +1161,9 @@ export default defineComponent({
      * @throws {Error} If the request fails.
      */
     const getConfig = async () => {
-      await configService
-        .get_config()
-        .then(async (res: any) => {
+      await fetchConfig()
+        .then(async (data: any) => {
+          const res = { data };
           if (config.isCloud == "false") {
             linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           }
@@ -1417,9 +1418,12 @@ export default defineComponent({
       deep: true,
       immediate: true,
     },
-    async changeOrganizationIdentifier() {
+    async changeOrganizationIdentifier(_next: string, previous: string) {
       this.isLoading = false;
       this.resetStreams();
+      // Every query key is rooted at ["org", id], so the previous org's cached
+      // reads — in memory and persisted — go in one call.
+      if (previous) purgeOrgQueries(previous);
       // Clear notifications from the previous org — they no longer apply.
       dismissAll();
       this.store.dispatch("setOrganizationPasscode", "");

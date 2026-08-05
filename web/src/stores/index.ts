@@ -19,6 +19,7 @@ import streams from "./streams";
 import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
+import { purgeAllQueries } from "@/composables/query/queryClient";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -246,7 +247,12 @@ export default createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      state.organizationData.foldersByType = payload;
+      // Merge, not replace: callers pass a single `{ [type]: folders }` entry,
+      // and replacing dropped every sibling type's cached list.
+      state.organizationData.foldersByType = {
+        ...state.organizationData.foldersByType,
+        ...payload,
+      };
     },
     appTheme(state, payload) {
       state.theme = payload;
@@ -369,6 +375,9 @@ export default createStore({
     },
     logout(context) {
       context.commit("logout");
+      // Nothing from the previous session may survive — including anything the
+      // query layer persisted to localStorage/IndexedDB.
+      purgeAllQueries();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);

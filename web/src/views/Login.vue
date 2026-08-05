@@ -42,7 +42,7 @@ import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import config from "@/aws-exports";
-import configService from "@/services/config";
+import { fetchConfig } from "@/composables/query/queries/config";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
@@ -79,10 +79,9 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
-        await configService
-          .get_config()
-          .then(async (res) => {
-            store.commit("setConfig", res.data);
+        await fetchConfig()
+          .then(async (data) => {
+            store.commit("setConfig", data);
           })
           .catch((err) => {
             console.error("Error while fetching config:", err);
@@ -293,10 +292,9 @@ export default defineComponent({
      */
 
     if (this.$route.hash) {
-      configService
-        .get_config()
-        .then(async (res) => {
-          this.store.commit("setZoConfig", res.data);
+      fetchConfig()
+        .then(async (data) => {
+          this.store.commit("setZoConfig", data);
           const token = getUserInfo(this.$route.hash);
 
           if (token !== null && token.email != null) {

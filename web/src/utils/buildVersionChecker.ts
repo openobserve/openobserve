@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import configService from "@/services/config";
+import { refetchConfig } from "@/composables/query/queries/config";
 
 /**
  * Approach:
@@ -67,8 +67,7 @@ class BuildVersionChecker {
       return this.cachedConfig.commit_hash;
     }
 
-    const response = await configService.get_config();
-    this.cachedConfig = response.data;
+    this.cachedConfig = await refetchConfig();
     this.lastCheckTime = now;
 
     return this.cachedConfig.commit_hash;

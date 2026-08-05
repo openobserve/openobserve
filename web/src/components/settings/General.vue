@@ -572,7 +572,7 @@ import organizations from "@/services/organizations";
 import usersService from "@/services/users";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
-import configService from "@/services/config";
+import { refetchConfig } from "@/composables/query/queries/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
@@ -974,9 +974,7 @@ export default defineComponent({
                 }),
               });
 
-              await configService.get_config().then((res: any) => {
-                store.dispatch("setConfig", res.data);
-              });
+              store.dispatch("setConfig", await refetchConfig());
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1033,9 +1031,7 @@ export default defineComponent({
               }),
             });
 
-            await configService.get_config().then((res: any) => {
-              store.dispatch("setConfig", res.data);
-            });
+            store.dispatch("setConfig", await refetchConfig());
           } else {
             toast({
               variant: "error",
