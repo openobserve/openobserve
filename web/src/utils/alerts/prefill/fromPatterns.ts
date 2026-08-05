@@ -23,12 +23,12 @@
 
 import {
   ALERT_PREFILL_VERSION,
+  type AlertPatternMode,
   type AlertPrefill,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { periodMinutesFromRange, sanitizeAlertNamePart, warn, type PrefillTimeRange } from "../alertPrefill";
 import {
-  MAX_PATTERNS_PER_ALERT,
   buildPatternSetSqlQuery,
   extractConstantsFromPattern,
 } from "@/plugins/logs/patterns/patternUtils";
@@ -36,10 +36,23 @@ import {
 export interface PatternsPrefillInput {
   streamName: string;
   streamType?: string;
-  /** Pattern templates the alert should match. */
-  includes?: string[];
-  /** Pattern templates the alert should ignore. */
-  excludes?: string[];
+  /**
+   * The patterns the user can currently see. The severity chips narrow this,
+   * which the dialog states explicitly rather than leaving implicit.
+   */
+  templates?: string[];
+  /** Every extracted pattern, for the "N of M" line. */
+  totalCount?: number;
+  /** True when the severity chips are narrowing the list. */
+  filtered?: boolean;
+  /** Whether the visible patterns are matched, ignored, or left out. */
+  mode?: AlertPatternMode;
+  /**
+   * Block when no usable pattern is available, instead of quietly falling back
+   * to an alert on the bare search. Set by the single-pattern entry point, where
+   * the user explicitly named the pattern they meant.
+   */
+  requirePatterns?: boolean;
   /**
    * The current search's WHERE fragment. Only meaningful in filter mode — in
    * SQL mode the editor holds a whole statement, which cannot be spliced in, so
@@ -62,42 +75,48 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
   const streamName = input.streamName?.trim() ?? "";
   if (!streamName) warnings.push(warn("noStream", "blocking"));
 
-  const requestedIncludes = input.includes ?? [];
-  const requestedExcludes = input.excludes ?? [];
+  const mode: AlertPatternMode = input.mode ?? "exclude";
+  const requested = input.templates ?? [];
 
   // A pattern with no invariant constants has nothing that identifies it — its
-  // wildcards are per-log samples, not something to match on. Such patterns are
-  // unselectable in the UI; this is the belt-and-braces half.
-  const includes = usable(requestedIncludes);
-  const excludes = usable(requestedExcludes);
-  const droppedCount =
-    requestedIncludes.length - includes.length + (requestedExcludes.length - excludes.length);
-  if (droppedCount > 0) warnings.push(warn("noConstants", "warning"));
-
-  const total = includes.length + excludes.length;
-  if (total === 0) {
-    warnings.push(warn("noConstants", "blocking"));
+  // wildcards are per-log samples, not something to match on.
+  const templates = usable(requested);
+  if (requested.length && templates.length < requested.length) {
+    warnings.push(warn("noConstants", "warning"));
   }
 
-  // Cap the set so the generated SQL stays something a human can read back in
-  // the confirm dialog — and say what was left out rather than truncating
-  // silently.
-  let cappedIncludes = includes;
-  let cappedExcludes = excludes;
-  if (total > MAX_PATTERNS_PER_ALERT) {
-    cappedIncludes = includes.slice(0, MAX_PATTERNS_PER_ALERT);
-    cappedExcludes = excludes.slice(0, Math.max(0, MAX_PATTERNS_PER_ALERT - cappedIncludes.length));
-    warnings.push(warn("patternLimit", "warning", { max: MAX_PATTERNS_PER_ALERT }));
+  // With no usable patterns there is nothing to include or exclude, so the alert
+  // is simply the user's current search. Degrade to "none" rather than blocking:
+  // blocking would stop the user at a dialog to tell them about a choice that
+  // does not exist. The single-pattern path opts out via `requirePatterns` —
+  // there the user named one pattern, and quietly alerting on the whole stream
+  // instead would be wrong rather than merely unhelpful.
+  let effectiveMode = mode;
+  if (mode !== "none" && !templates.length) {
+    if (input.requirePatterns) {
+      warnings.push(warn("noConstants", "blocking"));
+    } else {
+      effectiveMode = "none";
+      // Only worth saying when patterns existed but none could be used; a page
+      // with no patterns at all needs no explanation.
+      if (requested.length) warnings.push(warn("patternsUnusable", "info"));
+    }
   }
+
+  const applied = effectiveMode === "none" ? [] : templates;
+
+  // No cap: "exclude all patterns" is only correct if it really is all of them,
+  // and silently dropping the tail would produce an alert that still fires on
+  // the noise the user asked to ignore.
 
   const baseFilter = input.baseFilter?.trim();
   if (input.baseFilterDropped) {
     warnings.push(warn("sqlModeFilterDropped", "warning"));
   }
 
-  // Excluding without including anything, over no base filter, means "everything
-  // except these" — legitimate, but it matches nearly the whole stream.
-  if (!cappedIncludes.length && cappedExcludes.length && !baseFilter) {
+  // Excluding without a base filter means "everything except these" — legitimate
+  // but close to the whole stream.
+  if (effectiveMode === "exclude" && applied.length && !baseFilter) {
     warnings.push(warn("broadMatch", "warning"));
   }
 
@@ -105,8 +124,8 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
 
   const sql = buildPatternSetSqlQuery({
     streamName,
-    includes: cappedIncludes,
-    excludes: cappedExcludes,
+    includes: effectiveMode === "include" ? applied : [],
+    excludes: effectiveMode === "exclude" ? applied : [],
     baseFilter,
     select,
   });
@@ -114,15 +133,14 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
   const { minutes, warnings: rangeWarnings } = periodMinutesFromRange(input.datetime);
   warnings.push(...rangeWarnings);
 
-  const label =
-    cappedExcludes.length && !cappedIncludes.length
-      ? `${streamName} (${cappedExcludes.length} ignored)`
-      : `${streamName} (${cappedIncludes.length} pattern${cappedIncludes.length === 1 ? "" : "s"})`;
+  const totalCount = input.totalCount ?? requested.length;
+  const modeLabel =
+    effectiveMode === "exclude" ? "ignored" : effectiveMode === "include" ? "matched" : "patterns";
 
   return {
     version: ALERT_PREFILL_VERSION,
     source: "patterns",
-    sourceLabel: label,
+    sourceLabel: `${streamName} (${applied.length} ${modeLabel})`,
     name: `Alert_from_${sanitizeAlertNamePart(streamName, "patterns")}_patterns`,
     streamType: input.streamType || "logs",
     streamName,
@@ -139,10 +157,15 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
         : null,
     periodMinutes: minutes,
     timezone: input.timezone,
+    patternFilter: {
+      mode: effectiveMode,
+      visibleCount: templates.length,
+      totalCount,
+      filtered: !!input.filtered,
+    },
     warnings,
     meta: {
-      includedPatterns: cappedIncludes,
-      excludedPatterns: cappedExcludes,
+      appliedPatterns: applied,
     },
   };
 };

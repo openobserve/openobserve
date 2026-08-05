@@ -773,11 +773,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupAlerts')">
             <CreateAlertAction
               variant="menu-item"
-              source="logs"
-              :build="buildLogsAlertPrefill"
+              :source="createAlertSource"
+              :build="buildAlertPrefill"
               :disabled-reason="createAlertDisabledReason"
               data-test="logs-create-alert-btn"
-            />
+            >
+              <!-- Same icon badge every other item in this menu uses, so the
+                   label column lines up. -->
+              <template #icon-left="{ icon }">
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon :name="icon" size="sm" />
+                </span>
+              </template>
+            </CreateAlertAction>
           </ODropdownGroup>
 
           <ODropdownSeparator />
@@ -1997,6 +2007,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromLogs, logsAlertSnapshot } from "@/utils/alerts/prefill/fromLogs";
+import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
@@ -2237,6 +2249,7 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
+    const { buildPatternsAlertPrefill } = usePatternActions();
     const { buildSearch } = useSearchStream();
 
     const {
@@ -4792,6 +4805,16 @@ export default defineComponent({
       );
     };
 
+    // On the patterns tab the alert is about patterns, so the patterns adapter
+    // takes over — which is what surfaces the include/exclude-all control in the
+    // confirm dialog. Same menu item either way; the source just changes.
+    const isPatternsTab = computed(() => searchObj.meta.logsVisualizeToggle === "patterns");
+
+    const createAlertSource = computed(() => (isPatternsTab.value ? "patterns" : "logs"));
+
+    const buildAlertPrefill = (options: AlertBuildOptions = {}) =>
+      isPatternsTab.value ? buildPatternsAlertPrefill(options) : buildLogsAlertPrefill();
+
     const openSearchInspectDialog = () => {
       searchInspectTraceId.value = "";
       searchInspectDialog.value = true;
@@ -5076,7 +5099,8 @@ export default defineComponent({
       addJobScheduler,
       routeToSearchSchedule,
       createScheduleJob,
-      buildLogsAlertPrefill,
+      buildAlertPrefill,
+      createAlertSource,
       createAlertDisabledReason,
       searchInspectDialog,
       searchInspectTraceId,

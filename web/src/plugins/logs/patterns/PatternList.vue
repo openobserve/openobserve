@@ -81,10 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :index="index"
           :wrap="wrap"
           :max-frequency="maxFrequency"
-          :selection="selectionOf(pattern)"
-          :selectable="isPatternSelectable(pattern)"
           @click="openDetails(pattern, index)"
-          @toggle-selection="cycleSelection"
         />
       </template>
 
@@ -102,21 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :index="index"
             :wrap="wrap"
             :max-frequency="maxFrequency"
-            :selection="selectionOf(pattern)"
-            :selectable="isPatternSelectable(pattern)"
             @click="openDetails(pattern, index)"
-            @toggle-selection="cycleSelection"
           />
         </template>
       </OVirtualScroll>
-
-      <PatternSelectionBar
-        :included-count="includedCount"
-        :excluded-count="excludedCount"
-        :build="buildPatternsAlertPrefill"
-        :disabled-reason="alertDisabledReason"
-        @clear="clearSelection"
-      />
     </div>
 
     <!-- Loading State — Skeleton Rows (same shimmer style as logs table) -->
@@ -220,7 +206,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
-import PatternSelectionBar from "./PatternSelectionBar.vue";
 import { usePatternActions } from "./usePatternActions";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
@@ -235,7 +220,7 @@ import {
   compactCount,
   type PatternSeverityKey,
 } from "./patternUtils";
-import { computed, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { DateTime } from "luxon";
 
 const SKELETON_WIDTHS = [
@@ -311,18 +296,11 @@ const openDetails = (pattern: any, index: number) => {
 
 const { hoveredToken, onPopoverEnter, onPopoverLeave } = useWildcardHover();
 
-// Alert selection (include / exclude) — the state and the prefill builder both
-// live in usePatternActions so the detail drawer shares them.
-const {
-  selectionOf,
-  isPatternSelectable,
-  cycleSelection,
-  clearSelection,
-  includedCount,
-  excludedCount,
-  alertDisabledReason,
-  buildPatternsAlertPrefill,
-} = usePatternActions();
+
+// The severity filter is shared through usePatternActions rather than kept
+// local: "create an alert from the visible patterns" has to know which patterns
+// are visible, and that decision is made here.
+const { activeSeverities, setActiveSeverities } = usePatternActions();
 
 // --- Severity filter (multi-select; empty = show all) -----------------------
 const SEVERITY_ORDER: PatternSeverityKey[] = ["error", "warning", "info", "debug", "uncategorized"];
@@ -334,10 +312,8 @@ const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
   uncategorized: "logs.patternList.severityUncategorized",
 };
 
-const activeSeverities = ref<PatternSeverityKey[]>([]);
-
 const onSeverityFilterChange = (value: unknown) => {
-  activeSeverities.value = Array.isArray(value) ? (value as PatternSeverityKey[]) : [];
+  setActiveSeverities(Array.isArray(value) ? (value as PatternSeverityKey[]) : []);
 };
 
 // Chip counts come from the extraction sample, which is a clean partition
@@ -380,7 +356,7 @@ watch(severityChips, (chips) => {
   const available = new Set(chips.map((c) => c.key));
   const pruned = activeSeverities.value.filter((k) => available.has(k));
   if (pruned.length !== activeSeverities.value.length) {
-    activeSeverities.value = pruned;
+    setActiveSeverities(pruned);
   }
 });
 

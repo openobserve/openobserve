@@ -143,6 +143,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPageHeader>
       </template>
 
+      <!-- What the source adapter had to change to turn the user's query into an
+           alert — a stripped LIMIT, an absolute range become a rolling window.
+           Shown here rather than only in the confirm dialog because most
+           surfaces now skip that dialog and come straight to this form; without
+           this the transforms would be silent. -->
+      <div v-if="prefillWarnings.length" class="flex shrink-0 flex-col gap-2 px-3 pt-2">
+        <OBanner
+          v-for="(warning, index) in prefillWarnings"
+          :key="`${warning.key}-${index}`"
+          dense
+          :variant="warning.level === 'info' ? 'info' : 'warning'"
+          :content="t(`alerts.prefill.warnings.${warning.key}`, warning.params ?? {})"
+          :data-test="`add-alert-prefill-warning-${warning.key}`"
+        />
+      </div>
+
       <div class="flex min-h-0 flex-1">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2">
@@ -564,6 +580,7 @@ import { useAutoName } from "@/composables/useAutoName";
 import { buildAlertAutoName } from "@/utils/autoName";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -589,6 +606,7 @@ export default defineComponent({
   components: {
     OIcon,
     OPageLayout,
+    OBanner,
     JsonEditor,
     QueryConfig,
     AlertSettings,

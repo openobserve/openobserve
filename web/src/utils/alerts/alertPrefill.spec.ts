@@ -5,6 +5,7 @@ import {
   firstAggregateAlias,
   hasHistogramBucketing,
   isPrefillBlocked,
+  needsConfirmation,
   normalizePrefill,
   periodMinutesFromRange,
   sanitizeAlertNamePart,
@@ -244,5 +245,57 @@ describe("normalizePrefill — invariants", () => {
     const result = normalizePrefill(basePrefill({ queryType: "custom", sql: "  ", promql: " " }));
     expect(result.sql).toBeUndefined();
     expect(result.promql).toBeUndefined();
+  });
+});
+
+describe("needsConfirmation — when the dialog earns its click", () => {
+  it("skips the dialog for the ordinary case: one stream, no patterns, nothing lossy", () => {
+    expect(needsConfirmation(basePrefill())).toBe(false);
+  });
+
+  it("skips it for non-blocking warnings, which ride along to the form instead", () => {
+    const p = basePrefill({
+      warnings: [
+        { key: "limitStripped", level: "warning" },
+        { key: "absoluteToRolling", level: "warning", params: { minutes: 30 } },
+      ],
+    });
+    expect(needsConfirmation(p)).toBe(false);
+  });
+
+  it("asks when more than one stream could be meant", () => {
+    const p = basePrefill({
+      streamCandidates: [
+        { name: "a", type: "logs" },
+        { name: "b", type: "logs" },
+      ],
+    });
+    expect(needsConfirmation(p)).toBe(true);
+  });
+
+  it("does not ask when the surface offered exactly one candidate", () => {
+    expect(
+      needsConfirmation(basePrefill({ streamCandidates: [{ name: "a", type: "logs" }] })),
+    ).toBe(false);
+  });
+
+  it("asks when there are patterns to include or exclude", () => {
+    const p = basePrefill({
+      patternFilter: { mode: "exclude", visibleCount: 6, totalCount: 15, filtered: true },
+    });
+    expect(needsConfirmation(p)).toBe(true);
+  });
+
+  it("skips it when the patterns tab found nothing to offer", () => {
+    const p = basePrefill({
+      patternFilter: { mode: "exclude", visibleCount: 0, totalCount: 0, filtered: false },
+    });
+    expect(needsConfirmation(p)).toBe(false);
+  });
+
+  it("always asks when the prefill is blocked, so the reason gets stated", () => {
+    expect(needsConfirmation(basePrefill({ warnings: [{ key: "noStream", level: "blocking" }] }))).toBe(
+      true,
+    );
   });
 });

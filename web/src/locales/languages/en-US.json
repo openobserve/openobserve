@@ -5466,7 +5466,7 @@
     },
     "prefill": {
       "dialog": {
-        "title": "Create alert from this query",
+        "title": "Create alert",
         "continue": "Continue to alert",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert on",
@@ -5475,7 +5475,13 @@
         "windowLabel": "Window",
         "windowValue": "Last {minutes} minutes (from your time range)",
         "queryLabel": "Query",
-        "queryCopied": "Query copied to clipboard"
+        "queryCopied": "Query copied to clipboard",
+        "patternsLabel": "Patterns",
+        "patternsNone": "Don't use",
+        "patternsIncludeAll": "Include all",
+        "patternsExcludeAll": "Exclude all",
+        "patternsScopeAll": "Using all {total} extracted patterns.",
+        "patternsScopeFiltered": "Using {visible} of {total} patterns — the severity filter is applied to the list, and the alert follows it."
       },
       "sources": {
         "default": {
@@ -5513,8 +5519,8 @@
         "emptyQuery": "There is no query to create an alert from.",
         "noQueries": "This panel has no query to create an alert from.",
         "noConstants": "The selected patterns have no distinctive text to match on.",
-        "patternLimit": "Only the first {max} patterns were used.",
-        "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns."
+        "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
+        "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only."
       }
     }
   },
@@ -9707,14 +9713,7 @@
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
       "noStreamSelected": "No stream selected. Please select a stream before creating an alert.",
-      "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters.",
-      "alertPatternLimit": "You can build an alert from at most {max} patterns.",
-      "alertSelectionCleared": "Pattern selection cleared — the patterns were rebuilt for the new search.",
-      "alertNoSelection": "Select at least one pattern to alert on or ignore.",
-      "alertOn": "Alert on",
-      "ignoreInAlert": "Ignore in alert",
-      "alertSelectionSummary": "{included} included · {excluded} ignored",
-      "clearSelection": "Clear"
+      "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters."
     },
     "patternDetailsDialog": {
       "token": "token",

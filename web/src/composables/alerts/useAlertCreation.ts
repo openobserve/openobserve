@@ -22,9 +22,10 @@
  * query-param shape.
  */
 
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
+import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { isPrefillBlocked, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { writeAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 
@@ -32,6 +33,63 @@ export interface OpenAlertCreationOptions {
   /** Folder the alert lands in. Defaults to the org's default folder. */
   folder?: string;
 }
+
+export interface AlertCreationDialogState {
+  open: boolean;
+  prefill: AlertPrefill;
+  options: OpenAlertCreationOptions;
+  /**
+   * The surface's builder, retained so the dialog can re-parameterise the
+   * prefill (e.g. switching pattern mode) by asking the SOURCE to rebuild
+   * rather than editing SQL itself. Kept out of the persisted payload — only
+   * the resulting prefill is stored.
+   */
+  build?: (options?: AlertBuildOptions) => AlertPrefill;
+}
+
+/**
+ * Module-level singleton, rendered by CreateAlertDialogProvider at the app root
+ * — deliberately NOT owned by CreateAlertAction.
+ *
+ * Most entry points are dropdown items, and reka-ui unmounts a dropdown's
+ * content the moment an item is selected. A dialog rendered inside the action
+ * therefore died in the same tick it was born: the user saw it flash open and
+ * vanish. Hoisting the state out of the trigger's subtree means the dialog
+ * outlives whatever opened it.
+ *
+ * Same shape as useConfirmDialog — only one alert-creation dialog at a time.
+ */
+const dialogState = ref<AlertCreationDialogState | null>(null);
+
+export const alertCreationDialog = dialogState;
+
+/** Ask for the confirm dialog. Safe to call from a control that is about to unmount. */
+export const requestAlertCreation = (
+  prefill: AlertPrefill,
+  options: OpenAlertCreationOptions = {},
+  build?: (options?: AlertBuildOptions) => AlertPrefill,
+): void => {
+  dialogState.value = { open: true, prefill: normalizePrefill(prefill), options, build };
+};
+
+/**
+ * Re-run the source's builder with new options and swap the result in. Used when
+ * the dialog offers a choice only the source can act on — folding patterns into
+ * the query, say — so the dialog never has to understand the query itself.
+ */
+export const rebuildAlertPrefill = (buildOptions: AlertBuildOptions): void => {
+  const current = dialogState.value;
+  if (!current?.build) return;
+
+  dialogState.value = {
+    ...current,
+    prefill: normalizePrefill(current.build(buildOptions)),
+  };
+};
+
+export const closeAlertCreationDialog = (): void => {
+  dialogState.value = null;
+};
 
 export interface UseAlertCreationDeps {
   /** Supplied by callers outside a setup() context, which cannot call useRouter/useStore. */

@@ -112,12 +112,12 @@ describe("usePatternActions", () => {
     // Reset shared state between tests
     mockSearchObj.data.stream.addToFilter = "";
     mockSearchObj.meta.logsVisualizeToggle = "patterns";
-    const { selectedPattern, showPatternDetails, clearSelection } = usePatternActions();
+    const { selectedPattern, showPatternDetails, setActiveSeverities } = usePatternActions();
     selectedPattern.value = null;
     showPatternDetails.value = false;
-    // Selection is module-scoped (shared across call sites), so it must be
-    // reset between tests like any other singleton.
-    clearSelection();
+    // The severity filter is module-scoped (shared with the alert builder), so
+    // it must be reset between tests like any other singleton.
+    setActiveSeverities([]);
   });
 
   describe("openPatternDetails", () => {
@@ -265,141 +265,91 @@ describe("usePatternActions", () => {
     });
   });
 
-  describe("alert selection (include / exclude)", () => {
-    beforeEach(() => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
-      mockSearchObj.data.stream.selectedStream = ["test-stream"];
-    });
+  describe("severity filter (shared with the alert builder)", () => {
+    it("is module-scoped so the list and the builder cannot disagree", () => {
+      const a = usePatternActions();
+      const b = usePatternActions();
 
-    const p1 = { pattern_id: "p1", template: "User <*> logged in" };
-    const p2 = { pattern_id: "p2", template: "Probe <*> succeeded" };
-
-    it("cycles a pattern unselected → include → exclude → unselected", () => {
-      const api = usePatternActions();
-
-      api.cycleSelection(p1);
-      expect(api.selectionOf(p1)).toBe("include");
-
-      api.cycleSelection(p1);
-      expect(api.selectionOf(p1)).toBe("exclude");
-
-      api.cycleSelection(p1);
-      expect(api.selectionOf(p1)).toBeNull();
-    });
-
-    it("tracks include and exclude counts separately", () => {
-      const api = usePatternActions();
-
-      api.cycleSelection(p1);
-      api.cycleSelection(p2);
-      api.cycleSelection(p2);
-
-      expect(api.includedCount.value).toBe(1);
-      expect(api.excludedCount.value).toBe(1);
-      expect(api.hasSelection.value).toBe(true);
-    });
-
-    it("refuses a pattern with no distinctive constants", () => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([]);
-      const api = usePatternActions();
-
-      api.cycleSelection({ pattern_id: "p3", template: "<*> <*>" });
-
-      expect(api.selectionOf({ pattern_id: "p3" })).toBeNull();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
-    });
-
-    it("marks an all-wildcard pattern unselectable", () => {
-      const api = usePatternActions();
-      expect(api.isPatternSelectable(p1)).toBe(true);
-
-      vi.mocked(extractConstantsFromPattern).mockReturnValue([]);
-      expect(api.isPatternSelectable({ template: "<*>" })).toBe(false);
-    });
-
-    it("clears the whole selection", () => {
-      const api = usePatternActions();
-      api.cycleSelection(p1);
-      api.clearSelection();
-
-      expect(api.hasSelection.value).toBe(false);
-    });
-
-    it("disables alert creation until something is selected", () => {
-      const api = usePatternActions();
-      expect(api.alertDisabledReason.value).toBeTruthy();
-
-      api.cycleSelection(p1);
-      expect(api.alertDisabledReason.value).toBeNull();
-    });
-
-    it("disables alert creation when no stream is selected", () => {
-      mockSearchObj.data.stream.selectedStream = [];
-      const api = usePatternActions();
-      api.cycleSelection(p1);
-
-      expect(api.alertDisabledReason.value).toBeTruthy();
+      a.setActiveSeverities(["error"]);
+      expect(b.activeSeverities.value).toEqual(["error"]);
     });
   });
 
   describe("buildPatternsAlertPrefill", () => {
-    // These templates carry constants long enough to survive the real
-    // extractConstantsFromPattern, which the SQL builder calls internally.
-    const REAL_TEMPLATE = "Connection refused to upstream <*>";
+    // Templates whose constants survive the real extractConstantsFromPattern,
+    // which the SQL builder calls internally.
+    const ERR = "Connection refused to upstream <*>";
+    const PROBE = "Health probe succeeded for endpoint <*>";
 
     beforeEach(() => {
-      vi.mocked(extractConstantsFromPattern).mockReturnValue(["User logged in"]);
+      vi.mocked(extractConstantsFromPattern).mockReturnValue(["Connection refused to upstream"]);
       mockSearchObj.data.stream.selectedStream = ["test-stream"];
       mockSearchObj.meta.sqlMode = false;
       mockSearchObj.data.query = "";
+      mockPatternsState.value.patterns.patterns = [
+        { pattern_id: "p1", template: ERR, level: "error" },
+        { pattern_id: "p2", template: PROBE, level: "info" },
+      ];
+      usePatternActions().setActiveSeverities([]);
     });
 
-    it("builds a prefill from the current selection", () => {
-      mockPatternsState.value.patterns.patterns[0].template = REAL_TEMPLATE;
-      const api = usePatternActions();
-      api.cycleSelection({ pattern_id: "p1", template: REAL_TEMPLATE });
-
-      const prefill = api.buildPatternsAlertPrefill();
+    it("folds every visible pattern into the filter, excluding by default", () => {
+      const prefill = usePatternActions().buildPatternsAlertPrefill();
 
       expect(prefill.source).toBe("patterns");
       expect(prefill.streamName).toBe("test-stream");
-      expect(prefill.sql).toContain("match_all('Connection refused to upstream')");
+      expect(prefill.patternFilter?.mode).toBe("exclude");
+      expect(prefill.patternFilter?.visibleCount).toBe(2);
+      expect(prefill.patternFilter?.totalCount).toBe(2);
+      expect(prefill.sql).toContain("NOT (");
+    });
+
+    it("honours the mode the dialog asks for", () => {
+      const prefill = usePatternActions().buildPatternsAlertPrefill({ patternMode: "include" });
+
+      expect(prefill.patternFilter?.mode).toBe("include");
+      expect(prefill.sql).not.toContain("NOT (");
+    });
+
+    it("uses only the patterns the severity filter leaves visible", () => {
+      const api = usePatternActions();
+      api.setActiveSeverities(["error"]);
+
+      const prefill = api.buildPatternsAlertPrefill();
+
+      expect(prefill.patternFilter?.visibleCount).toBe(1);
+      expect(prefill.patternFilter?.totalCount).toBe(2);
+      expect(prefill.patternFilter?.filtered).toBe(true);
+    });
+
+    it("reports an unfiltered list as such", () => {
+      expect(usePatternActions().buildPatternsAlertPrefill().patternFilter?.filtered).toBe(false);
     });
 
     it("ANDs the current search filter in front of the pattern terms", () => {
       mockSearchObj.data.query = "code = 500";
-      mockPatternsState.value.patterns.patterns[0].template = REAL_TEMPLATE;
-      const api = usePatternActions();
-      api.cycleSelection({ pattern_id: "p1", template: REAL_TEMPLATE });
-
-      expect(api.buildPatternsAlertPrefill().sql).toContain("(code = 500)");
+      expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain("(code = 500)");
     });
 
     it("says so when a SQL-mode query cannot be spliced in", () => {
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.data.query = 'SELECT * FROM "test-stream"';
-      mockPatternsState.value.patterns.patterns[0].template = REAL_TEMPLATE;
-      const api = usePatternActions();
-      api.cycleSelection({ pattern_id: "p1", template: REAL_TEMPLATE });
 
-      const prefill = api.buildPatternsAlertPrefill();
+      const prefill = usePatternActions().buildPatternsAlertPrefill();
+
       expect(prefill.warnings.map((w: any) => w.key)).toContain("sqlModeFilterDropped");
-      expect(prefill.sql).not.toContain("SELECT * FROM \"test-stream\")");
+      expect(prefill.sql).not.toContain('SELECT * FROM "test-stream")');
     });
 
     it("builds a single-pattern prefill for the detail drawer", () => {
-      const api = usePatternActions();
-
-      const prefill = api.buildSinglePatternAlertPrefill({
-        template: REAL_TEMPLATE,
+      const prefill = usePatternActions().buildSinglePatternAlertPrefill({
+        template: ERR,
         pattern_id: "p1",
       });
 
       expect(prefill.source).toBe("patterns");
-      expect(prefill.meta?.includedPatterns).toEqual([REAL_TEMPLATE]);
-      expect(prefill.sql).toContain("match_all('Connection refused to upstream')");
+      expect(prefill.patternFilter?.mode).toBe("include");
+      expect(prefill.meta?.appliedPatterns).toEqual([ERR]);
     });
   });
 });

@@ -298,3 +298,29 @@ export const normalizePrefill = (input: AlertPrefill): AlertPrefill => {
 /** True when the prefill cannot be taken to the form. */
 export const isPrefillBlocked = (prefill: AlertPrefill): boolean =>
   prefill.warnings.some((w) => w.level === "blocking");
+
+/**
+ * Whether the confirm dialog is worth the extra click.
+ *
+ * The default is NO: for the common case — one stream, nothing lossy, no
+ * choices — the dialog is a speed bump between the user and the form, and every
+ * surface pays for it. It earns its click only when there is a decision the
+ * user alone can make, or a reason they cannot proceed:
+ *
+ *   • patterns to fold in — include/exclude is a genuine choice (and pointless
+ *     when the page found no patterns, so an empty set skips it too);
+ *   • more than one stream — alerts are single-stream, and silently taking the
+ *     first is exactly the trap this whole flow exists to avoid;
+ *   • a blocking warning — the user needs to be told why, not dropped into a
+ *     form that cannot work.
+ *
+ * Non-blocking warnings do NOT justify a dialog: they ride along and are shown
+ * as a banner on the form itself.
+ */
+export const needsConfirmation = (prefill: AlertPrefill): boolean => {
+  if (isPrefillBlocked(prefill)) return true;
+  if ((prefill.streamCandidates?.length ?? 0) > 1) return true;
+
+  const patterns = prefill.patternFilter;
+  return !!patterns && patterns.visibleCount > 0;
+};

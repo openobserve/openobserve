@@ -31,10 +31,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdownItem
     v-if="variant === 'menu-item'"
     :disabled="!!disabledReason"
-    :icon-left="source_.icon"
     :data-test="dataTest"
     @select="onActivate"
   >
+    <!-- Host menus present icons differently — the logs More menu badges them,
+         the dashboards panel menu does not — so the presentation is the host's
+         call while the icon NAME stays the registry's. -->
+    <template #icon-left>
+      <slot name="icon-left" :icon="source_.icon">
+        <OIcon :name="source_.icon" size="sm" />
+      </slot>
+    </template>
     <span>{{ label }}</span>
     <OTooltip v-if="disabledReason" :content="disabledReason" side="left" />
   </ODropdownItem>
@@ -64,33 +71,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OTooltip :content="disabledReason || label" side="top" />
   </OButton>
-
-  <CreateAlertFromSourceDialog
-    v-model:open="dialogOpen"
-    :prefill="pendingPrefill"
-    @confirm="onConfirm"
-    @cancel="pendingPrefill = null"
-  />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import CreateAlertFromSourceDialog from "@/components/alerts/CreateAlertFromSourceDialog.vue";
-import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
-import { normalizePrefill } from "@/utils/alerts/alertPrefill";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
-import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
+import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
+import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
 
 const props = withDefaults(
   defineProps<{
     /** Registered source id — see utils/alerts/alertSourceRegistry.ts. */
     source: string;
-    /** Builds the prefill from the host's current state. Called on click only. */
-    build: () => AlertPrefill;
+    /**
+     * Builds the prefill from the host's current state. Called on click only,
+     * and again if the dialog re-parameterises it (see rebuildAlertPrefill).
+     */
+    build: (options?: AlertBuildOptions) => AlertPrefill;
     variant?: "menu-item" | "button" | "icon";
     /** Non-null disables the control and is shown as the tooltip reason. */
     disabledReason?: string | null;
@@ -110,23 +113,26 @@ const props = withDefaults(
 const { t } = useI18n();
 const { openAlertCreation } = useAlertCreation();
 
-const dialogOpen = ref(false);
-const pendingPrefill = ref<AlertPrefill | null>(null);
-
 const source_ = computed(() => getAlertSource(props.source));
 const label = computed(() => t(source_.value.labelKey));
 
 const onActivate = () => {
   if (props.disabledReason) return;
 
-  // Normalized up front so the dialog can show the blocking reason rather than
-  // the user discovering it after landing in the form.
-  pendingPrefill.value = normalizePrefill(props.build());
-  dialogOpen.value = true;
-};
+  const prefill = normalizePrefill(props.build());
 
-const onConfirm = (prefill: AlertPrefill) => {
-  openAlertCreation(prefill, { folder: props.folder });
-  pendingPrefill.value = null;
+  // Straight to the form unless there is genuinely something to decide. The
+  // confirm dialog is an extra click every surface would otherwise pay on every
+  // alert; lossy transforms are still reported, as a banner on the form itself.
+  if (!needsConfirmation(prefill)) {
+    openAlertCreation(prefill, { folder: props.folder });
+    return;
+  }
+
+  // Hand the prefill to the app-level dialog rather than rendering one here:
+  // this control is usually a dropdown item, and reka-ui unmounts the dropdown's
+  // content on select, which would tear down a locally-owned dialog in the same
+  // tick it opened.
+  requestAlertCreation(prefill, { folder: props.folder }, props.build);
 };
 </script>

@@ -88,6 +88,34 @@ export interface AlertPrefillThresholdCondition {
  */
 export type AlertPrefillThresholdShape = "matching-rows" | "count";
 
+/**
+ * How the surface's pattern set folds into the alert's filter. "none" leaves
+ * patterns out entirely; "include" matches any of them; "exclude" ignores them.
+ */
+export type AlertPatternMode = "none" | "include" | "exclude";
+
+/**
+ * Declared by a surface that can fold patterns into the query, so the confirm
+ * dialog can offer the choice WITHOUT knowing what a pattern is. The dialog
+ * re-invokes the surface's builder with the chosen mode rather than editing SQL
+ * itself — that is what keeps the dialog source-agnostic.
+ */
+export interface AlertPrefillPatternFilter {
+  /** Mode reflected in the current `sql`. */
+  mode: AlertPatternMode;
+  /** Patterns that will be used — the ones the user can actually see. */
+  visibleCount: number;
+  /** Every extracted pattern, for the "6 of 15" line. */
+  totalCount: number;
+  /** True when a severity filter is narrowing the list, which the dialog states. */
+  filtered: boolean;
+}
+
+/** Options a surface's builder accepts when the dialog re-parameterises it. */
+export interface AlertBuildOptions {
+  patternMode?: AlertPatternMode;
+}
+
 /** Bumped whenever the persisted shape changes; a stale blob is ignored. */
 export const ALERT_PREFILL_VERSION = 1;
 
@@ -118,6 +146,9 @@ export interface AlertPrefill {
 
   /** Populated when the surface had more than one stream to choose from. */
   streamCandidates?: AlertPrefillStreamCandidate[];
+
+  /** Present when the surface can fold its patterns into the query. */
+  patternFilter?: AlertPrefillPatternFilter;
 
   warnings: AlertPrefillWarning[];
 
