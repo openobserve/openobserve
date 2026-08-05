@@ -8778,6 +8778,8 @@
         "scoreConfigsHint": "A queue scores items on one or more dimensions. Each Score Config is a single dimension — pick the configs to bind, and pin each to a version.",
         "scoreConfigsEmpty": "Pick the Score Configs to bind.",
         "addScoreConfig": "Add Score Config",
+        "allScoreConfigsAdded": "All score configs are added.",
+        "noScoreConfigs": "No score configs yet — create one in Score Configs first.",
         "targetDatasetLabel": "Target Dataset",
         "targetDatasetNone": "None (review-only)",
         "targetDatasetHint": "Review-only queue — reviewed items won't be distilled to a dataset.",
