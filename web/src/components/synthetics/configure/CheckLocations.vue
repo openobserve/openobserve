@@ -264,6 +264,17 @@ const privateNoMatches = computed(
     filteredPrivateLocations.value.length === 0,
 );
 
+/** The search matched nothing anywhere — the whole list area collapses to a
+ *  single empty state (carrying the private-location CTA when allowed) instead
+ *  of two section-level messages. */
+const allNoMatches = computed(
+  () =>
+    hasSearch.value &&
+    props.locations.length > 0 &&
+    filteredPublicLocations.value.length === 0 &&
+    filteredPrivateLocations.value.length === 0,
+);
+
 const selectedLocations = computed({
   get: () => props.check.locations,
   set: (v: (string | number)[]) =>
@@ -323,8 +334,20 @@ const selectedLocations = computed({
              the "new private location" CTA, which is the only way out of a
              no-locations org. Without private support an empty list has nothing
              actionable, so it falls through to the plain empty state below. -->
+        <!-- ── Search matched nothing anywhere ──────────────────────────────── -->
+        <OEmptyState
+          v-if="allNoMatches"
+          size="inline"
+          icon="search-off"
+          :title="t('synthetics.locations.noSearchResults')"
+          :action-label="allowPrivate ? t('synthetics.locations.newPrivateLocation') : undefined"
+          action-icon="add"
+          data-test="synthetics-check-locations-no-results"
+          @action="emit('new-location')"
+        />
+
         <OCheckboxGroup
-          v-if="locations.length || allowPrivate"
+          v-else-if="locations.length || allowPrivate"
           v-model="selectedLocations"
           data-test="synthetics-check-locations-group"
         >
@@ -355,13 +378,13 @@ const selectedLocations = computed({
             </template>
           </OCheckbox>
 
-          <!-- ── Search matched no public locations ───────────────────────── -->
+          <!-- ── Search matched no public locations (private still has hits) ── -->
           <OEmptyState
             v-if="publicNoMatches"
             size="inline"
             icon="search-off"
-            :title="t('synthetics.locations.noSearchResults')"
-            data-test="synthetics-check-locations-no-results"
+            :title="t('synthetics.locations.noPublicMatches')"
+            data-test="synthetics-check-locations-public-no-results"
           />
 
           <!-- ── Private section ──────────────────────────────────────────── -->
@@ -456,12 +479,12 @@ const selectedLocations = computed({
               </div>
             </template>
 
-            <!-- ── Search matched no private locations ───────────────────── -->
+            <!-- ── Search matched no private locations (public still has hits) ── -->
             <OEmptyState
               v-else-if="privateNoMatches"
               size="inline"
               icon="search-off"
-              :title="t('synthetics.locations.noSearchResults')"
+              :title="t('synthetics.locations.noPrivateMatches')"
               data-test="synthetics-check-locations-private-no-results"
             />
 

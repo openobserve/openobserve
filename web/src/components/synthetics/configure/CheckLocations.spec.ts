@@ -138,8 +138,11 @@ const OBadgeStub = {
 };
 
 const OEmptyStateStub = {
-  props: ["size", "icon", "title", "preset", "filtered"],
-  template: '<div v-bind="$attrs" class="empty-state-stub">{{ title }}</div>',
+  props: ["size", "icon", "title", "preset", "filtered", "actionLabel", "actionIcon"],
+  emits: ["action"],
+  template: `<div v-bind="$attrs" class="empty-state-stub">{{ title }}
+    <button v-if="actionLabel" class="empty-state-action" @click="$emit('action')">{{ actionLabel }}</button>
+  </div>`,
 };
 
 const STUBS = {
@@ -692,32 +695,85 @@ describe("CheckLocations", () => {
       expect(wrapper.find('[data-test="synthetics-check-locations-empty"]').exists()).toBe(false);
     });
 
-    it("should show per-section no-results and no creation empty state when search filters out existing private locations", async () => {
+    it("should collapse to a single empty state with the new-location CTA when nothing matches anywhere", async () => {
       wrapper = mountWithPrivate();
       await wrapper
         .find('[data-test="synthetics-check-locations-search"]')
         .setValue("zzz-no-such-location");
 
-      expect(wrapper.find('[data-test="synthetics-check-locations-no-results"]').exists()).toBe(
-        true,
-      );
+      const noResults = wrapper.find('[data-test="synthetics-check-locations-no-results"]');
+      expect(noResults.exists()).toBe(true);
+      expect(noResults.text()).toContain("synthetics.locations.noSearchResults");
+      // Per-section messages and the creation empty state give way to it
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-public-no-results"]').exists(),
+      ).toBe(false);
       expect(
         wrapper.find('[data-test="synthetics-check-locations-private-no-results"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists(),
+      ).toBe(false);
+
+      // Its action button creates a private location
+      const action = noResults.find("button.empty-state-action");
+      expect(action.exists()).toBe(true);
+      expect(action.text()).toContain("synthetics.locations.newPrivateLocation");
+      await action.trigger("click");
+      expect(wrapper.emitted("new-location")).toBeTruthy();
+    });
+
+    it("should not offer the new-location action on a full miss when private locations are not allowed", async () => {
+      wrapper = mountCheckLocations();
+      await wrapper
+        .find('[data-test="synthetics-check-locations-search"]')
+        .setValue("zzz-no-such-location");
+
+      const noResults = wrapper.find('[data-test="synthetics-check-locations-no-results"]');
+      expect(noResults.exists()).toBe(true);
+      expect(noResults.find("button.empty-state-action").exists()).toBe(false);
+    });
+
+    it("should show only the public no-results message when the search matches private locations only", async () => {
+      wrapper = mountWithPrivate();
+      await wrapper.find('[data-test="synthetics-check-locations-search"]').setValue("mumbai");
+
+      const publicMiss = wrapper.find(
+        '[data-test="synthetics-check-locations-public-no-results"]',
+      );
+      expect(publicMiss.exists()).toBe(true);
+      expect(publicMiss.text()).toContain("synthetics.locations.noPublicMatches");
+      expect(wrapper.find('[data-test="synthetics-check-locations-no-results"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-option-private-mumbai-1"]').exists(),
+      ).toBe(true);
+
+      // Both section headers stay visible
+      const text = wrapper.text();
+      expect(text).toContain("synthetics.locations.publicTitle");
+      expect(text).toContain("synthetics.locations.privateTitle");
+    });
+
+    it("should show only the private no-results message when the search matches public locations only", async () => {
+      wrapper = mountWithPrivate();
+      await wrapper.find('[data-test="synthetics-check-locations-search"]').setValue("ireland");
+
+      const privateMiss = wrapper.find(
+        '[data-test="synthetics-check-locations-private-no-results"]',
+      );
+      expect(privateMiss.exists()).toBe(true);
+      expect(privateMiss.text()).toContain("synthetics.locations.noPrivateMatches");
+      expect(wrapper.find('[data-test="synthetics-check-locations-no-results"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-option-eu-west-1"]').exists(),
       ).toBe(true);
       expect(
         wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists(),
       ).toBe(false);
-    });
-
-    it("should keep the section headers visible when the search matches nothing", async () => {
-      wrapper = mountWithPrivate();
-      await wrapper
-        .find('[data-test="synthetics-check-locations-search"]')
-        .setValue("zzz-no-such-location");
-
-      const text = wrapper.text();
-      expect(text).toContain("synthetics.locations.publicTitle");
-      expect(text).toContain("synthetics.locations.privateTitle");
     });
 
     it("should clear the no-results state when the query is emptied", async () => {
