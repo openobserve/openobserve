@@ -111,6 +111,26 @@ describe("AlertGroupChart — threshold visibility", () => {
     expect(config.y_axis_max).toBeGreaterThan(0.9);
   });
 
+  it("names a label-less PromQL series instead of legending it '{}'", async () => {
+    // An alert's PromQL usually aggregates, which strips every label — the
+    // legend then rendered the empty label set as "{}".
+    wrapper = await mountChart({
+      stream_name: "http_requests",
+      stream_type: "metrics",
+      query_condition: {
+        type: "promql",
+        promql: "count(rate(errors[5m]))",
+        promql_condition: { value: 0.9 },
+      },
+    });
+
+    const query = wrapper
+      .findComponent({ name: "PanelSchemaRenderer" })
+      .props("panelSchema").queries[0];
+
+    expect(query.config.promql_legend_fallback).toBe("http_requests");
+  });
+
   it("leaves the axis alone when the alert has no threshold", async () => {
     // Nothing to keep in view — the chart should scale to its data as before.
     wrapper = await mountChart({

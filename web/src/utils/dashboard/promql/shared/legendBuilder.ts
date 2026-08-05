@@ -26,8 +26,12 @@
  *
  * getPromqlLegendName({ job: "api" }, "")
  * // Returns: '{"job":"api"}'
+ *
+ * getPromqlLegendName({}, "", "Value")
+ * // Returns: "Value" — a query that aggregates every label away has nothing
+ * // to stringify, and "{}" in a legend tells the reader nothing at all.
  */
-export const getPromqlLegendName = (metric: any, label: string): string => {
+export const getPromqlLegendName = (metric: any, label: string, fallback?: string): string => {
   if (label) {
     let template = label || "";
     const placeholders = template.match(/\{([^}]+)\}/g);
@@ -47,6 +51,13 @@ export const getPromqlLegendName = (metric: any, label: string): string => {
     });
     return template;
   } else {
+    // An aggregating query (`count(...)`, `sum(...)`) strips every label, so
+    // `metric` is `{}` and stringifying it produces a legend entry that names
+    // nothing. Callers that know what the series represents pass a fallback;
+    // without one the previous output is preserved.
+    if (fallback && metric && typeof metric === "object" && Object.keys(metric).length === 0) {
+      return fallback;
+    }
     return JSON.stringify(metric);
   }
 };

@@ -663,6 +663,7 @@ export const convertPromQLData = async (
               const seriesName = getPromqlLegendName(
                 metric.metric,
                 panelSchema.queries[index].config.promql_legend,
+                panelSchema.queries[index].config.promql_legend_fallback,
               );
 
               const resolvedSeriesColor = (() => {
@@ -747,6 +748,7 @@ export const convertPromQLData = async (
               const seriesName = getPromqlLegendName(
                 metric.metric,
                 panelSchema.queries[index].config.promql_legend,
+                panelSchema.queries[index].config.promql_legend_fallback,
               );
 
               const resolvedVectorColor = (() => {
@@ -832,6 +834,7 @@ export const convertPromQLData = async (
           const seriesName = getPromqlLegendName(
             metric.metric,
             panelSchema.queries[index].config.promql_legend,
+            panelSchema.queries[index].config.promql_legend_fallback,
           );
 
           return {
