@@ -56,6 +56,7 @@ import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
+import Extension from "~icons/material-symbols/extension-outline";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
 import FormatListBulleted from "~icons/material-symbols/format-list-bulleted";
 import FormatBold from "~icons/material-symbols/format-bold";
@@ -394,6 +395,7 @@ export const iconRegistry = {
   "error-outline": ErrorOutline,
   event: Event,
   "expand-more": ExpandMore,
+  extension: Extension,
   "upload-file": UploadFile,
   "format-list-bulleted": FormatListBulleted,
   "format-bold": FormatBold,
