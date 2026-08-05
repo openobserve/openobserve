@@ -717,7 +717,7 @@ pub async fn promote_draft_to_workflow(org_id: &str, draft: Workflow) -> Result<
     if let Err(e) = workflow_drafts::Entity::delete_many()
         .filter(workflow_drafts::Column::OrgId.eq(org_id))
         .filter(workflow_drafts::Column::Id.eq(&id))
-        .exec(client)
+        .exec(&txn)
         .await
     {
         log::error!(
