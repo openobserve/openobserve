@@ -501,18 +501,19 @@ const clearGroupFilter = () => {
   fetchTransitions();
 };
 
-// The alert editor lives on the list route, opened by query params. The action
-// value is `update` — `edit` is silently ignored, which just lands you on the
-// list with nothing open.
+// Straight to the editor. This used to push the LIST route with
+// `action=update`, which mounted the list, fetched every alert, then fetched
+// this one — so pressing Edit visibly bounced through the list on the way to
+// the form.
 const editAlert = () => {
   router.push({
-    name: "alertList",
+    name: "editAlert",
+    params: { alert_id: alertId.value },
     query: {
       org_identifier: orgId.value,
-      action: "update",
-      alert_id: alertId.value,
       // The GET response carries no folder, so carry through the one the list
-      // navigated with; "default" is the folder every org is created with.
+      // navigated with; "default" is the folder every org is created with. The
+      // editor needs it to send the user back to the right folder on save.
       folder: route.query.folder || "default",
     },
   });
