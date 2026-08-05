@@ -46,6 +46,8 @@ const props = defineProps<{
   validationErrors?: Record<string, string>;
   /** Protocol checks show the private-locations subsection + setup CTA. */
   allowPrivateLocations?: boolean;
+  /** When true, CheckLocations shows skeleton rows instead of the list. */
+  loadingLocations?: boolean;
 }>();
 
 const { t } = useI18nTyped();
@@ -73,7 +75,9 @@ const showAuthNetwork = computed(() =>
 const emit = defineEmits<{
   "update:check": [value: BrowserCheck];
   "refresh:destinations": [];
-  "setup-agent": [];
+  "new-location": [];
+  "add-agent": [locationId: string];
+  "refresh-locations": [];
 }>();
 
 function handleUpdate(value: BrowserCheck) {
@@ -127,9 +131,12 @@ function handleUpdate(value: BrowserCheck) {
         :locations="locations ?? []"
         :allow-private="allowPrivateLocations"
         :validation-errors="props.validationErrors ?? {}"
+        :loading-locations="loadingLocations ?? false"
         data-test="synthetics-check-configure-locations"
         @update:check="handleUpdate"
-        @setup-agent="emit('setup-agent')"
+        @new-location="emit('new-location')"
+        @add-agent="(id: string) => emit('add-agent', id)"
+        @refresh-locations="emit('refresh-locations')"
       />
       <CheckBrowserDevices
         v-if="(checkType ?? 'browser') === 'browser'"
