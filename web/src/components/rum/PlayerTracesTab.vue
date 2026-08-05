@@ -439,9 +439,7 @@ async function fetchTraces() {
     // 400, so each optional column is selected only when present (NULL-aliased otherwise)
     // and the `action_id` filter is applied only when that column exists. `session_id` and
     // the guarded `trace_id` are the only hard requirements.
-    const presentCols = new Set(
-      (rumStream?.schema ?? []).map((field: any) => field?.name),
-    );
+    const presentCols = new Set((rumStream?.schema ?? []).map((field: any) => field?.name));
     const has = (col: string): boolean => presentCols.has(col);
     const aggOrNull = (fn: string, col: string, alias: string): string =>
       has(col) ? `${fn}(${col}) as ${alias}` : `NULL as ${alias}`;

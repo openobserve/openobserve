@@ -86,21 +86,14 @@ const useRumPerformanceTab = (
 ): RumPerformanceTab => {
   const { performanceState } = usePerformance();
   const { getStream } = useStreams();
-  const {
-    hasBrowser,
-    hasMobile,
-    resolvedKey,
-    detectPlatforms,
-  } = useRumPlatforms();
+  const { hasBrowser, hasMobile, resolvedKey, detectPlatforms } = useRumPlatforms();
 
   // Schema migration runs once; the raw JSON is a module-level import.
   const baseDashboard = convertDashboardSchemaVersion(rawDashboard) as RumDashboard;
 
   const schemaResolved = ref(false);
 
-  const rumSchemaMap = computed(
-    () => performanceState.data.streams?.[RUM_STREAM]?.schema ?? null,
-  );
+  const rumSchemaMap = computed(() => performanceState.data.streams?.[RUM_STREAM]?.schema ?? null);
   const presentFields = computed(() => presentFieldsFromSchemaMap(rumSchemaMap.value));
 
   // Null until this tab has opted in (by passing a range) AND the probe has answered.

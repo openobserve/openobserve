@@ -170,12 +170,7 @@ describe("rumAndroidCard builder", () => {
     it("step ids are install, init, session-replay, verify in order", () => {
       const card = buildCard();
 
-      expect(card.steps.map((s) => s.id)).toEqual([
-        "install",
-        "init",
-        "session-replay",
-        "verify",
-      ]);
+      expect(card.steps.map((s) => s.id)).toEqual(["install", "init", "session-replay", "verify"]);
     });
 
     it("install step is required", () => {
@@ -246,9 +241,7 @@ describe("rumAndroidCard builder", () => {
       const install = card.steps.find((s) => s.id === "install")!;
       const kotlin = install.variants!.find((v) => v.id === "kotlin")!;
 
-      expect(kotlin.code.raw).toContain(
-        "ai.openobserve:o2-sdk-android-rum:0.1.0-alpha4",
-      );
+      expect(kotlin.code.raw).toContain("ai.openobserve:o2-sdk-android-rum:0.1.0-alpha4");
     });
 
     it("kotlin variant filename is 'build.gradle.kts'", () => {
@@ -372,9 +365,7 @@ describe("rumAndroidCard builder", () => {
     it("extras.installs contains the android RUM artifact", () => {
       const card = buildCard();
 
-      expect(card.extras?.installs).toContain(
-        "ai.openobserve:o2-sdk-android-rum",
-      );
+      expect(card.extras?.installs).toContain("ai.openobserve:o2-sdk-android-rum");
     });
 
     it("extras.troubleshooting is a non-empty array", () => {
@@ -387,9 +378,7 @@ describe("rumAndroidCard builder", () => {
     it("includes a troubleshooting entry mentioning session replay", () => {
       const card = buildCard();
       const ts = card.extras!.troubleshooting as any[];
-      const entry = ts.find((e: any) =>
-        e.q.toLowerCase().includes("session replay"),
-      );
+      const entry = ts.find((e: any) => e.q.toLowerCase().includes("session replay"));
 
       expect(entry).toBeDefined();
     });

@@ -286,7 +286,7 @@ ${rumEndpoint(subs).replace(/\/\/(localhost|127\.0\.0\.1)/, "//10.0.2.2")}`,
         },
         {
           q: "A release/debug build sends nothing over plain HTTP",
-          a: "Android blocks cleartext traffic by default. For an `http://` endpoint, allow cleartext on the SDK with `_InternalProxy.allowClearTextHttp(builder)` and set `android:usesCleartextTraffic=\"true\"` (or a network-security-config exception) for your host. Prefer HTTPS outside local development.",
+          a: 'Android blocks cleartext traffic by default. For an `http://` endpoint, allow cleartext on the SDK with `_InternalProxy.allowClearTextHttp(builder)` and set `android:usesCleartextTraffic="true"` (or a network-security-config exception) for your host. Prefer HTTPS outside local development.',
         },
         {
           q: "Requests return 401 or 403",

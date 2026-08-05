@@ -286,15 +286,10 @@ const useErrorIssuesData = (t: TranslateFn) => {
 
   // Shape a raw issues hit into an ErrorIssue. deployTs may be null on first paint (the
   // deploy query lands in stage 2); computeIssueStatus falls back to a window heuristic.
-  const mapIssue = (
-    hit: any,
-    deployTs: number | null,
-    params: FetchIssuesParams,
-  ): ErrorIssue => ({
+  const mapIssue = (hit: any, deployTs: number | null, params: FetchIssuesParams): ErrorIssue => ({
     ...hit,
     events: Number(hit.events) || 0,
-    users_affected:
-      hit.users_affected !== undefined ? Number(hit.users_affected) || 0 : undefined,
+    users_affected: hit.users_affected !== undefined ? Number(hit.users_affected) || 0 : undefined,
     status: computeIssueStatus(
       Number(hit.first_seen) || 0,
       deployTs,
@@ -360,8 +355,7 @@ const useErrorIssuesData = (t: TranslateFn) => {
         // A superseded/aborted run is our own cancellation, not a failure — no toast.
         if (!isAbortError(err)) {
           toast({
-            message:
-              (err as any)?.response?.data?.message || "Error while fetching error events",
+            message: (err as any)?.response?.data?.message || "Error while fetching error events",
             variant: "error",
           });
         }

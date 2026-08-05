@@ -304,11 +304,7 @@
         "i": 10
       },
       "o2Platform": "mobile",
-      "o2RequiresAnyField": [
-        "error_is_crash",
-        "error_category",
-        "vital_app_launch_metric"
-      ]
+      "o2RequiresAnyField": ["error_is_crash", "error_category", "vital_app_launch_metric"]
     },
     {
       "id": "Panel_ID_CrashFreeSessions",

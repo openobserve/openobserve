@@ -262,7 +262,12 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
       filter: "source = 'ios'",
     },
     extras: {
-      installs: ["OpenObserveCore", "OpenObserveRUM", "OpenObserveLogs", "OpenObserveSessionReplay"],
+      installs: [
+        "OpenObserveCore",
+        "OpenObserveRUM",
+        "OpenObserveLogs",
+        "OpenObserveSessionReplay",
+      ],
       fixTitle: "Give Each Feature Its FULL Intake URL",
       fixBody:
         "The native iOS SDK appends nothing to a `customEndpoint` — it posts to exactly the URL you pass. A base URL without the `/rum`, `/logs` or `/replay` suffix silently drops that signal. Use the complete per-feature URLs:",

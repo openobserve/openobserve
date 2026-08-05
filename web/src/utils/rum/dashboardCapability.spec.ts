@@ -74,7 +74,9 @@ describe("dashboardCapability", () => {
 
     it("returns the SAME dashboard reference when presentFields is undefined", () => {
       // Arrange
-      const dashboard = makeDashboard([makePanel(1, 0, 0, 6, 4, "SELECT session_id FROM _rumdata")]);
+      const dashboard = makeDashboard([
+        makePanel(1, 0, 0, 6, 4, "SELECT session_id FROM _rumdata"),
+      ]);
 
       // Act
       const result = filterDashboardBySchema(dashboard, undefined);
@@ -569,7 +571,9 @@ describe("dashboardCapability", () => {
 
     it("keeps untagged panels for every platform combination", () => {
       // Arrange
-      const dashboard = makeDashboard([makePanel(1, 0, 0, 3, 4, "SELECT session_id FROM _rumdata")]);
+      const dashboard = makeDashboard([
+        makePanel(1, 0, 0, 3, 4, "SELECT session_id FROM _rumdata"),
+      ]);
 
       // Act
       const noData = filterDashboardBySchema(dashboard, ALL_FIELDS, {
@@ -760,9 +764,13 @@ describe("dashboardCapability", () => {
       ) as RumDashboard;
 
       // Act
-      const result = filterDashboardBySchema(converted, new Set([...COMMON_FIELDS, ...MOBILE_FIELDS]), {
-        platforms: { hasBrowser: false, hasMobile: true },
-      });
+      const result = filterDashboardBySchema(
+        converted,
+        new Set([...COMMON_FIELDS, ...MOBILE_FIELDS]),
+        {
+          platforms: { hasBrowser: false, hasMobile: true },
+        },
+      );
       const panels = result.dashboard.tabs?.[0]?.panels ?? [];
       const titles = panels.map((p) => p.title as string);
 

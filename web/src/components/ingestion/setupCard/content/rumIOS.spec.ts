@@ -170,12 +170,7 @@ describe("rumIOSCard builder", () => {
     it("step ids are install, init, session-replay, verify in order", () => {
       const card = buildCard();
 
-      expect(card.steps.map((s) => s.id)).toEqual([
-        "install",
-        "init",
-        "session-replay",
-        "verify",
-      ]);
+      expect(card.steps.map((s) => s.id)).toEqual(["install", "init", "session-replay", "verify"]);
     });
 
     it("install step is required", () => {
@@ -246,9 +241,7 @@ describe("rumIOSCard builder", () => {
       const install = card.steps.find((s) => s.id === "install")!;
       const spm = install.variants!.find((v) => v.id === "spm")!;
 
-      expect(spm.code.raw).toContain(
-        "github.com/openobserve/openobserve-sdk-ios.git",
-      );
+      expect(spm.code.raw).toContain("github.com/openobserve/openobserve-sdk-ios.git");
       expect(spm.code.raw).toContain("OpenObserveRUM");
     });
 

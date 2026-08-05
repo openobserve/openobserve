@@ -1167,9 +1167,7 @@ describe("useErrorIssuesData", () => {
           // Second issues call is run B's — a single distinctive issue, resolved
           // immediately.
           return Promise.resolve(
-            makeHitsResponse([
-              { ...MOCK_ISSUE_HITS[1], error_message: "RUN_B_ONLY_MSG" },
-            ]),
+            makeHitsResponse([{ ...MOCK_ISSUE_HITS[1], error_message: "RUN_B_ONLY_MSG" }]),
           );
         }
         // Stage-2 aggregates (histogram/kpis/denominators/deploys) and the deploy

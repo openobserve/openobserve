@@ -223,9 +223,7 @@ const reflowPanels = (
   panels: DashboardPanel[],
   gridWidth: number = DASHBOARD_GRID_COLUMNS,
 ): DashboardPanel[] => {
-  const ordered = [...panels].sort(
-    (a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x,
-  );
+  const ordered = [...panels].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x);
 
   let cursorX = 0;
   let rowY = 0;
@@ -304,7 +302,7 @@ export const filterDashboardBySchema = (
     !(fields && panelReferencesAbsentField(panel, fields));
 
   // v8+ shape: filter each tab's panels in place, aggregate counts across tabs.
-  const usesTabs = Array.isArray(dashboard?.tabs) && !(dashboard.panels?.length);
+  const usesTabs = Array.isArray(dashboard?.tabs) && !dashboard.panels?.length;
   if (usesTabs) {
     let droppedCount = 0;
     let keptCount = 0;
@@ -314,7 +312,9 @@ export const filterDashboardBySchema = (
       droppedCount += panels.length - kept.length;
       keptCount += kept.length;
       // Only rebuild a tab whose panels actually changed, so untouched tabs keep identity.
-      return kept.length === panels.length ? tab : { ...tab, panels: reflowPanels(kept, gridWidth) };
+      return kept.length === panels.length
+        ? tab
+        : { ...tab, panels: reflowPanels(kept, gridWidth) };
     });
 
     if (droppedCount === 0) return { dashboard, droppedCount: 0, keptCount };

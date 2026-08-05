@@ -696,15 +696,13 @@ describe("WebVitalsDashboard", () => {
       wrapper = createWrapper();
 
       // Assert
-      expect(wrapper.find('[data-test="web-vitals-dashboard-schema-loading"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="web-vitals-dashboard-schema-loading"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Loading Dashboard");
       expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
-      expect(
-        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists()).toBe(
+        false,
+      );
 
       // Cleanup — settle the pending promise so it doesn't leak into other tests
       resolve({ schema: [] });
@@ -726,9 +724,9 @@ describe("WebVitalsDashboard", () => {
       expect(wrapper.find('[data-test="web-vitals-dashboard-schema-loading"]').exists()).toBe(
         false,
       );
-      expect(
-        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists()).toBe(
+        false,
+      );
       expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
     });
@@ -768,9 +766,9 @@ describe("WebVitalsDashboard", () => {
       expect(mockGetStream).not.toHaveBeenCalled();
       expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists()).toBe(
+        false,
+      );
     });
 
     it("does not call getStream and renders the empty state when a shared mobile-only schema is already known", async () => {
@@ -783,9 +781,9 @@ describe("WebVitalsDashboard", () => {
 
       // Assert
       expect(mockGetStream).not.toHaveBeenCalled();
-      expect(
-        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(false);
     });
 
@@ -801,9 +799,9 @@ describe("WebVitalsDashboard", () => {
       expect(wrapper.find('[data-test="web-vitals-dashboard-schema-loading"]').exists()).toBe(
         false,
       );
-      expect(
-        wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="web-vitals-dashboard-browser-only-empty"]').exists()).toBe(
+        false,
+      );
       expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
     });
