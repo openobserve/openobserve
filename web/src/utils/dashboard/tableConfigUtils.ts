@@ -443,7 +443,22 @@ export const resolveMetricValueStyle = (
 ): ResolvedMetricStyle => {
   const { mappings, unit, customUnit, decimals, panelBackground } = opts;
   const cache = buildValueMappingCache(mappings);
-  const mapping = lookupValueMappingFull(rawValue, cache);
+  let mapping = lookupValueMappingFull(rawValue, cache);
+
+  const numValue =
+    rawValue === null || rawValue === undefined || rawValue === "" ? NaN : Number(rawValue);
+  if (!mapping && cache && !Number.isNaN(numValue)) {
+    const fixed = numValue.toFixed(decimals ?? 2);
+    if (fixed !== String(rawValue)) {
+      mapping = lookupValueMappingFull(fixed, cache);
+    }
+    if (!mapping) {
+      const normalized = String(Number(fixed));
+      if (normalized !== fixed && normalized !== String(rawValue)) {
+        mapping = lookupValueMappingFull(normalized, cache);
+      }
+    }
+  }
 
   const formatted = formatNumericValue(rawValue, null, unit, customUnit, decimals ?? 2);
   const mappedText = mapping?.text;

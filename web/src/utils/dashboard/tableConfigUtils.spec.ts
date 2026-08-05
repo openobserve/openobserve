@@ -418,6 +418,53 @@ describe("tableConfigUtils", () => {
       expect(r.text).toBe("High");
       expect(r.bgColor).toBe("#900");
     });
+
+    it("matches an exact mapping written against the displayed (rounded) value", () => {
+      // User sees "54.83" (decimals: 2) and maps Equals 54.83; raw value keeps
+      // full precision. The display-precision retry must bridge the gap.
+      const r = resolveMetricValueStyle(54.8347391, {
+        ...base,
+        mappings: [{ type: "value", value: "54.83", text: "Mapped", color: "#0a0" }],
+      });
+      expect(r.text).toBe("Mapped");
+      expect(r.bgColor).toBe("#0a0");
+    });
+
+    it("matches the padded displayed spelling (48.40) for a raw 48.4", () => {
+      const r = resolveMetricValueStyle(48.4, {
+        ...base,
+        mappings: [{ type: "value", value: "48.40", text: "Padded" }],
+      });
+      expect(r.text).toBe("Padded");
+    });
+
+    it("matches the normalized spelling (48.4) for a raw 48.4000001", () => {
+      const r = resolveMetricValueStyle(48.4000001, {
+        ...base,
+        mappings: [{ type: "value", value: "48.4", text: "Normalized" }],
+      });
+      expect(r.text).toBe("Normalized");
+    });
+
+    it("does not false-positive when the rounded value still differs", () => {
+      const r = resolveMetricValueStyle(54.9, {
+        ...base,
+        mappings: [{ type: "value", value: "54.83", text: "Mapped" }],
+      });
+      expect(r.text).not.toBe("Mapped");
+      expect(r.text).toContain("54.9");
+    });
+
+    it("prefers the raw exact match over the rounded retry", () => {
+      const r = resolveMetricValueStyle(100, {
+        ...base,
+        mappings: [
+          { type: "value", value: "100", text: "RawHit" },
+          { type: "value", value: "100.00", text: "RoundedHit" },
+        ],
+      });
+      expect(r.text).toBe("RawHit");
+    });
   });
 
   describe("backward compatibility (legacy mappings)", () => {
