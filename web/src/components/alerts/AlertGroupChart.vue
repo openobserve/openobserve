@@ -159,6 +159,12 @@ const build = async () => {
     panel.data.queries[0].vrlFunctionQuery = null;
     panel.data.config.table_dynamic_columns = false;
     panel.data.queries[0].config.promql_mode = true;
+    // An alert's PromQL usually aggregates (count/sum/avg), which strips every
+    // label — leaving the series with an empty label set that the legend used
+    // to render as "{}". Name it after what the alert measures. Series that DO
+    // carry labels keep them; this is only consulted when there are none.
+    panel.data.queries[0].config.promql_legend_fallback =
+      props.alert?.stream_name || t("alerts.groups.evaluation");
     panel.data.queries[0].fields.stream = props.alert.stream_name;
     panel.data.queries[0].fields.stream_type = props.alert.stream_type;
     // PromQL names its own series from the returned labels.
