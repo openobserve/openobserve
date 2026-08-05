@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, h, inject, markRaw } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -110,8 +110,8 @@ export default defineComponent({
   components: { OSwitch, OSelect, OInput, OSlider, ColorSwatchPicker },
   setup() {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
     const store = useStore();
 
     const seriesSwatches = computed(() => {

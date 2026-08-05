@@ -64,12 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       font-weight="700"
       fill="currentColor"
     >
-      3.14
+      {{ raw("3.14") }}
     </text>
   </svg>
 </template>
 
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
+
 // null → "auto"; otherwise "bottom" | "background".
 defineProps<{ layout: string | null }>();
 </script>
