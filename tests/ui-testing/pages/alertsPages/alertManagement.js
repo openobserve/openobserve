@@ -189,16 +189,21 @@ export class AlertManagement {
         const kebabButton = this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).first();
         // Under parallel load the just-created alert's row can be slow to render, or sit below the
         // fold in a long/unrefreshed list, so a bare wait for its more-options kebab times out
-        // (alerts-ui-operations:71/131). Filter the list to this alert first so its row is
-        // guaranteed rendered at the top, and re-search once if the kebab still hasn't appeared.
+        // (alerts-ui-operations:71/131). First filter the current folder (client-side) to bring
+        // the row to the top.
         if (!(await kebabButton.isVisible({ timeout: 3000 }).catch(() => false))) {
             await this.searchAlert(alertName).catch(() => {});
         }
         try {
             await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
         } catch (e) {
-            testLogger.warn('Alert kebab not visible after search; re-searching before delete', { alertName });
-            await this.searchAlert(alertName).catch(() => {});
+            // The in-folder filter runs client-side over the already-fetched list, so if
+            // navigateToFolder resolved on a transient empty-state before the folder's alerts
+            // finished fetching (common under load), the row simply isn't there to filter. Fall
+            // back to an across-folders search, which issues a fresh SERVER-SIDE query and finds
+            // the alert regardless of which folder finished loading.
+            testLogger.warn('Alert kebab not visible after in-folder search; retrying via across-folders search', { alertName });
+            await this.searchAlertAcrossFolders(alertName).catch(() => {});
             await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
         }
         await kebabButton.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
@@ -245,6 +250,33 @@ export class AlertManagement {
             testLogger.error('Neither table nor no data message found after search', { alertName, error: error.message });
             throw new Error(`Failed to search for alert "${alertName}": Neither table nor empty state appeared`);
         }
+    }
+
+    /**
+     * Search for an alert across ALL folders. The scope toggle switches the search input from a
+     * client-side folder filter (filterQuery) to a SERVER-SIDE query (searchQuery), so this finds
+     * the alert even when the active folder's list hasn't finished fetching under load. Uses the
+     * exact-case name (the backend match is case-insensitive) and is idempotent on the toggle.
+     * @param {string} alertName
+     */
+    async searchAlertAcrossFolders(alertName) {
+        const allScope = this.page.locator('[data-test="alert-list-search-across-folders-toggle"]');
+        const state = await allScope.getAttribute('data-state').catch(() => null);
+        if (state !== 'on' && state !== 'active') {
+            await allScope.click({ force: true }).catch(() => {});
+        }
+        await this.page.waitForTimeout(500);
+
+        const inputField = this.page.locator(this.locators.alertSearchInputField);
+        await inputField.waitFor({ state: 'attached', timeout: 10000 });
+        await inputField.fill('', { force: true });
+        await inputField.fill(alertName, { force: true });
+        await this.page.waitForTimeout(2000);
+
+        await Promise.race([
+            this.page.locator(this.locators.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
+            this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 30000 })
+        ]).catch(() => {});
     }
 
     /**
