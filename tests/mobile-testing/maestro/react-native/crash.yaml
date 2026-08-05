@@ -1,0 +1,14 @@
+# Drives O2RumTester: trigger a fatal error, then relaunch to flush the crash report.
+# Note: the SDK captures the uncaught error and the process may or may not terminate,
+# so we don't assert the app disappeared — we stop + relaunch to flush regardless.
+appId: com.o2rumtester
+---
+- launchApp:
+    clearState: false
+- assertVisible: "O2 RUM Tester"
+- tapOn: "Trigger native crash"
+- waitForAnimationToEnd:
+    timeout: 4000
+- stopApp
+- launchApp
+- assertVisible: "O2 RUM Tester"

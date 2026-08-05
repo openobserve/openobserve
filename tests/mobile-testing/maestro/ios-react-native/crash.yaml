@@ -1,0 +1,8 @@
+appId: org.reactjs.native.example.O2RumTester
+---
+- launchApp
+- assertVisible: "O2 RUM Tester"
+- tapOn: "Trigger native crash"
+- waitForAnimationToEnd:
+    timeout: 4000
+- launchApp
