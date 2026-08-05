@@ -371,8 +371,10 @@ export const convertMultiSQLData = async (
         : top + height * (METRIC_SPARKLINE.bottomBandTopPct / 100);
       // Band height is intentionally cell-specific (not shared with the series path).
       const bandH = sparkBackground ? height : height * 0.33;
+      const bottomGap = sparkBackground ? bandH * 0.08 : 0;
+      const floorY = bandTop + bandH - bottomGap;
       const xAt = (i: number) => left + hpad + (i / (n - 1)) * (width - 2 * hpad);
-      const yAt = (v: number) => bandTop + bandH - ((v - min) / range) * bandH;
+      const yAt = (v: number) => floorY - ((v - min) / range) * (bandH - bottomGap);
       const color = cfg?.color || chartColor("--color-chart-metric-text");
       const opacity = sparkBackground ? METRIC_SPARKLINE.faintOpacity : 1;
       const out: any[] = [];
@@ -383,7 +385,7 @@ export const convertMultiSQLData = async (
           const y = yAt(data[i]);
           out.push({
             type: "rect",
-            shape: { x: x - bw / 2, y, width: bw, height: bandTop + bandH - y },
+            shape: { x: x - bw / 2, y, width: bw, height: floorY - y },
             style: { fill: color, opacity },
             silent: true,
           });
@@ -396,7 +398,7 @@ export const convertMultiSQLData = async (
           out.push({
             type: "polygon",
             shape: {
-              points: [...points, [xAt(n - 1), bandTop + bandH], [xAt(0), bandTop + bandH]],
+              points: [...points, [xAt(n - 1), floorY], [xAt(0), floorY]],
             },
             style: {
               fill: color,
