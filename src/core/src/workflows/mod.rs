@@ -305,10 +305,33 @@ pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn save_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+    db::workflows::save_draft_record(workflow.clone()).await?;
+    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
+    // TODO YJDoc2 add SC sync for workflow drafts
+    // db::workflows::notify_workflow_upsert(&workflow).await?;
+    Ok(())
+}
+
 pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow).await?;
     db::workflows::update_workflow_record(workflow.clone()).await?;
     db::workflows::notify_workflow_upsert(&workflow).await?;
+    Ok(())
+}
+
+pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+    db::workflows::update_draft_record(workflow.clone()).await?;
+    // TODO YJDoc2: add SC sync for drafts
+    // db::workflows::notify_workflow_upsert(&workflow).await?;
+    Ok(())
+}
+
+pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
+    validate_workflow(&workflow).await?;
+    db::workflows::promote_draft(org_id, workflow).await?;
+    // TODO YJDoc2: add SC sync for promotion
+    // db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
 }
 
@@ -339,8 +362,25 @@ pub async fn list_workflows(
     Ok(ret)
 }
 
+pub async fn list_drafts(
+    org_id: &str,
+    permitted: Option<Vec<String>>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    let ret = workflows::list_drafts_by_org(org_id)
+        .await?
+        .into_iter()
+        .filter(|draft| is_permitted(&draft.id, org_id, permitted.as_ref()))
+        .collect();
+    Ok(ret)
+}
+
 pub async fn get_workflow_by_id(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
     let ret = db::workflows::get_workflow(org_id, id).await?;
+    Ok(ret)
+}
+
+pub async fn get_draft_by_id(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
+    let ret = db::workflows::get_draft(org_id, id).await?;
     Ok(ret)
 }
 
@@ -379,6 +419,14 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
     db::workflows::delete_workflow_record(id).await?;
     remove_ownership(org_id, "workflows", Authz::new(id)).await;
     db::workflows::notify_workflow_delete(id).await?;
+    Ok(())
+}
+
+pub async fn delete_draft(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
+    db::workflows::delete_draft_record(id).await?;
+    remove_ownership(org_id, "workflows", Authz::new(id)).await;
+    // TODO YJDoc2 add SC sync for workflow drafts
+    // db::workflows::notify_workflow_delete(id).await?;
     Ok(())
 }
 

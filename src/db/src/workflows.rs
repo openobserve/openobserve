@@ -103,8 +103,18 @@ pub async fn get_workflow(
     Ok(workflow)
 }
 
+pub async fn get_draft(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
+    let draft = infra::table::workflows::get_draft_by_org_draft_id(org_id, id).await?;
+    Ok(draft)
+}
+
 pub async fn save_workflow_record(workflow: Workflow) -> Result<(), anyhow::Error> {
     infra::table::workflows::save_workflow(workflow).await?;
+    Ok(())
+}
+
+pub async fn save_draft_record(workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::save_draft(workflow).await?;
     Ok(())
 }
 
@@ -113,8 +123,23 @@ pub async fn update_workflow_record(workflow: Workflow) -> Result<(), anyhow::Er
     Ok(())
 }
 
+pub async fn update_draft_record(workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::update_draft(workflow).await?;
+    Ok(())
+}
+
+pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::promote_draft_to_workflow(org_id, workflow).await?;
+    Ok(())
+}
+
 pub async fn delete_workflow_record(id: &str) -> Result<(), anyhow::Error> {
     infra::table::workflows::delete_workflow(id).await?;
+    Ok(())
+}
+
+pub async fn delete_draft_record(id: &str) -> Result<(), anyhow::Error> {
+    infra::table::workflows::delete_draft(id).await?;
     Ok(())
 }
 

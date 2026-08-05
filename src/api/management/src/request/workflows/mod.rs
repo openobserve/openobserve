@@ -109,6 +109,7 @@ pub struct WorkflowListItem {
     associations: Vec<WorkflowAssociation>,
     #[serde(flatten)]
     workflow: Workflow,
+    is_draft: bool,
 }
 
 #[derive(Deserialize)]
@@ -145,6 +146,7 @@ pub struct WorkflowCreatePayload {
 pub async fn save_workflow(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
     Json(payload): Json<WorkflowCreatePayload>,
 ) -> Response {
     let mut workflow = payload.workflow;
@@ -155,33 +157,52 @@ pub async fn save_workflow(
 
     let id = workflow.id.to_string();
     let name = workflow.name.clone();
-    match workflows::save_workflow(workflow).await {
-        Ok(()) => {
-            if payload.trigger_type == WorkflowTriggerType::IncidentEvent
-                && let Err(e) = db::workflows::associate_workflow(
-                    &org_id,
-                    &id,
-                    "system",
-                    WorkflowTriggerEntity::Incident.to_string(),
-                    WorkflowTriggerType::IncidentEvent.to_string(),
-                )
-                .await
-            {
-                log::error!(
-                    "error in associating workflow to incident after successful creation of workflow : {org_id}/{id} : {e}"
-                );
-                MetaHttpResponse::internal_error(format!(
-                    "workflow created successfully , but failed to save the association : {e}"
-                ))
-            } else {
-                MetaHttpResponse::json(
-                    MetaHttpResponse::message(StatusCode::OK, "Workflow created successfully")
-                        .with_id(id)
-                        .with_name(name),
-                )
+
+    let is_draft = match query.get("draft") {
+        Some(v) => v.as_str(),
+        None => "false",
+    };
+
+    let is_draft: bool = is_draft.parse().unwrap_or(true);
+
+    if !is_draft {
+        match workflows::save_workflow(workflow).await {
+            Ok(()) => {
+                if payload.trigger_type == WorkflowTriggerType::IncidentEvent
+                    && let Err(e) = db::workflows::associate_workflow(
+                        &org_id,
+                        &id,
+                        "system",
+                        WorkflowTriggerEntity::Incident.to_string(),
+                        WorkflowTriggerType::IncidentEvent.to_string(),
+                    )
+                    .await
+                {
+                    log::error!(
+                        "error in associating workflow to incident after successful creation of workflow : {org_id}/{id} : {e}"
+                    );
+                    MetaHttpResponse::internal_error(format!(
+                        "workflow created successfully , but failed to save the association : {e}"
+                    ))
+                } else {
+                    MetaHttpResponse::json(
+                        MetaHttpResponse::message(StatusCode::OK, "Workflow created successfully")
+                            .with_id(id)
+                            .with_name(name),
+                    )
+                }
             }
+            Err(e) => MetaHttpResponse::bad_request(e),
         }
-        Err(e) => MetaHttpResponse::bad_request(e),
+    } else {
+        match workflows::save_draft(workflow).await {
+            Ok(()) => MetaHttpResponse::json(
+                MetaHttpResponse::message(StatusCode::OK, "draft saved successfully")
+                    .with_id(id)
+                    .with_name(name),
+            ),
+            Err(e) => MetaHttpResponse::bad_request(e),
+        }
     }
 }
 
@@ -212,37 +233,33 @@ pub async fn list_workflows(
     Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
-    let mut _permitted = None;
     // Get List of allowed objects
-    #[cfg(feature = "enterprise")]
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    let permitted = match openobserve_api_common::auth::validator::list_objects_for_user(
+        &org_id,
+        &_user_email.user_id,
+        "GET",
+        OFGA_MODELS
+            .get("workflows")
+            .map_or("workflows", |model| model.key),
+    )
+    .await
     {
-        use o2_openfga::meta::mapping::OFGA_MODELS;
-
-        match openobserve_api_common::auth::validator::list_objects_for_user(
-            &org_id,
-            &_user_email.user_id,
-            "GET",
-            OFGA_MODELS
-                .get("workflows")
-                .map_or("workflows", |model| model.key),
-        )
-        .await
-        {
-            Ok(list) => {
-                _permitted = list;
-            }
-            Err(e) => {
-                return common::meta::http::HttpResponse::forbidden(e.to_string());
-            }
+        Ok(list) => list,
+        Err(e) => {
+            return common::meta::http::HttpResponse::forbidden(e.to_string());
         }
-        // Get List of allowed objects ends
-    }
+    };
+    // Get List of allowed objects ends
 
-    let workflows = match workflows::list_workflows(&org_id, _permitted).await {
+    let workflows = match workflows::list_workflows(&org_id, permitted.clone()).await {
         Ok(workflows) => workflows,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
+
     let mut ret = Vec::with_capacity(workflows.len());
+
     for w in workflows {
         let associations = match workflows::get_workflow_associations(&org_id, &w.id).await {
             Ok(v) => v,
@@ -254,11 +271,27 @@ pub async fn list_workflows(
                 continue;
             }
         };
+
         ret.push(WorkflowListItem {
             workflow: w,
             associations,
+            is_draft: false,
         });
     }
+
+    let drafts = match workflows::list_drafts(&org_id, permitted).await {
+        Ok(workflows) => workflows,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+
+    for draft in drafts {
+        ret.push(WorkflowListItem {
+            workflow: draft,
+            associations: vec![],
+            is_draft: true,
+        });
+    }
+
     MetaHttpResponse::json(ret)
 }
 
@@ -286,12 +319,32 @@ pub async fn list_workflows(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "list"})),
     )
 )]
-pub async fn delete_workflows(Path((org_id, id)): Path<(String, String)>) -> Response {
-    match workflows::delete_workflow(&org_id, &id).await {
-        Ok(_) => MetaHttpResponse::ok("deleted successfully"),
-        Err(e) => {
-            log::error!("error deleting workflow {org_id}/{id} : {e}");
-            MetaHttpResponse::internal_error(e)
+pub async fn delete_workflows(
+    Path((org_id, id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let is_draft = match query.get("draft") {
+        Some(v) => v.as_str(),
+        None => "false",
+    };
+
+    let is_draft: bool = is_draft.parse().unwrap_or(false);
+
+    if !is_draft {
+        match workflows::delete_workflow(&org_id, &id).await {
+            Ok(_) => MetaHttpResponse::ok("deleted successfully"),
+            Err(e) => {
+                log::error!("error deleting workflow {org_id}/{id} : {e}");
+                MetaHttpResponse::internal_error(e)
+            }
+        }
+    } else {
+        match workflows::delete_draft(&org_id, &id).await {
+            Ok(_) => MetaHttpResponse::ok("deleted successfully"),
+            Err(e) => {
+                log::error!("error deleting workflow {org_id}/{id} : {e}");
+                MetaHttpResponse::internal_error(e)
+            }
         }
     }
 }
@@ -323,6 +376,7 @@ pub async fn delete_workflows(Path((org_id, id)): Path<(String, String)>) -> Res
 )]
 pub async fn update_workflows(
     Path((org_id, id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
     Json(payload): Json<WorkflowCreatePayload>,
 ) -> Response {
     let mut workflow = payload.workflow;
@@ -333,26 +387,55 @@ pub async fn update_workflows(
         return MetaHttpResponse::bad_request("id mismatch in payload and path");
     }
 
-    match workflows::get_workflow_by_id(&org_id, &id).await {
-        Err(e) => {
-            log::error!("error getting workflow {org_id}/{id} : {e}");
-            return MetaHttpResponse::internal_error(e);
-        }
-        Ok(None) => {
-            return MetaHttpResponse::bad_request("workflow with given id does not exist");
-        }
-        _ => {}
+    let is_draft = match query.get("draft") {
+        Some(v) => v.as_str(),
+        None => "false",
     };
+
+    let is_draft: bool = is_draft.parse().unwrap_or(false);
 
     let id = workflow.id.to_string();
     let name = workflow.name.clone();
-    match workflows::update_workflow(workflow).await {
-        Ok(()) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Workflow updated successfully")
-                .with_id(id)
-                .with_name(name),
-        ),
-        Err(e) => MetaHttpResponse::bad_request(e),
+
+    if !is_draft {
+        match workflows::get_workflow_by_id(&org_id, &id).await {
+            Err(e) => {
+                log::error!("error getting workflow {org_id}/{id} : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+            Ok(None) => {
+                return MetaHttpResponse::bad_request("workflow with given id does not exist");
+            }
+            _ => {}
+        };
+        match workflows::update_workflow(workflow).await {
+            Ok(()) => MetaHttpResponse::json(
+                MetaHttpResponse::message(StatusCode::OK, "Workflow updated successfully")
+                    .with_id(id)
+                    .with_name(name),
+            ),
+            Err(e) => MetaHttpResponse::bad_request(e),
+        }
+    } else {
+        match workflows::get_draft_by_id(&org_id, &id).await {
+            Err(e) => {
+                log::error!("error getting draft {org_id}/{id} : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+            Ok(None) => {
+                return MetaHttpResponse::bad_request("draft with given id does not exist");
+            }
+            _ => {}
+        };
+
+        match workflows::update_draft(workflow).await {
+            Ok(()) => MetaHttpResponse::json(
+                MetaHttpResponse::message(StatusCode::OK, "Draft updated successfully")
+                    .with_id(id)
+                    .with_name(name),
+            ),
+            Err(e) => MetaHttpResponse::bad_request(e),
+        }
     }
 }
 
@@ -730,4 +813,77 @@ pub async fn get_workflow_history(
         .collect();
 
     MetaHttpResponse::json(ret)
+}
+
+/// PromoteDraftWorkflow
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/workflows/promote/{id}",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "promoteDraftWorkflow",
+    summary = "Promote draft to workflows",
+    description = "",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "Workflow id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "post"})),
+    )
+)]
+pub async fn promote_draft(
+    Path((org_id, id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let trigger_type = match query.get("trigger_type") {
+        Some(v) => v.as_str(),
+        None => "AlertFired",
+    };
+
+    let trigger_type: WorkflowTriggerType = trigger_type.into();
+
+    let draft = match workflows::get_draft_by_id(&org_id, &id).await {
+        Err(e) => {
+            log::error!("error getting draft {org_id}/{id} : {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+        Ok(None) => {
+            return MetaHttpResponse::bad_request("draft with given id does not exist");
+        }
+        Ok(Some(v)) => v,
+    };
+
+    if let Err(e) = workflows::promote_draft(&org_id, draft).await {
+        return MetaHttpResponse::bad_request(format!(
+            "error in promoting draft to workflow : {e}"
+        ));
+    }
+
+    if trigger_type == WorkflowTriggerType::IncidentEvent
+        && let Err(e) = db::workflows::associate_workflow(
+            &org_id,
+            &id,
+            "system",
+            WorkflowTriggerEntity::Incident.to_string(),
+            WorkflowTriggerType::IncidentEvent.to_string(),
+        )
+        .await
+    {
+        log::error!(
+            "error in associating promoted workflow to incident after successful promotion of draft : {org_id}/{id} : {e}"
+        );
+        return MetaHttpResponse::internal_error(format!(
+            "draft promoted successfully , but failed to save the association : {e}"
+        ));
+    };
+
+    MetaHttpResponse::created("converted to workflow successfully")
 }
