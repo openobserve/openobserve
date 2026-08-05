@@ -7820,8 +7820,9 @@ export class LogsPage {
             }
         }
         // Fallback: streams listing page (LogStream.vue) uses a custom #bottom
-        // slot that renders "{totalRows} Stream(s)" without a data-test.
-        const streamCount = this.page.locator('text=/\\d+ Stream\\(s\\)/').first();
+        // slot that renders "{count} Stream" / "{count} Streams" (pluralised via
+        // i18n, so match both forms) without a data-test.
+        const streamCount = this.page.locator('text=/\\d+ Streams?\\b/').first();
         if (await streamCount.count().catch(() => 0) > 0) {
             const text = await streamCount.textContent().catch(() => null);
             if (text && text.trim()) return text.trim();
