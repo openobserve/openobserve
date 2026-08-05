@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip
                           :content="
                             logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                              ?.tooltip || ''
+                              ?.tooltip || raw('')
                           "
                           :delay="400"
                         />
@@ -449,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip
                           :content="
                             logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                              ?.tooltip || ''
+                              ?.tooltip || raw('')
                           "
                           :delay="400"
                         />
@@ -845,7 +845,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           v-if="cronTimezone"
-                          :content="cronTimezone"
+                          :content="raw(cronTimezone)"
                           :delay="300"
                           side="bottom"
                         />
@@ -1093,10 +1093,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-promql-sample-${sample.id}`"
                       @click="insertPromqlSample(sample)"
                     >
-                      <OTag type="exampleChip" value="dim" :label="sample.label" />
+                      <OTag type="exampleChip" value="dim" :label="raw(sample.label)" />
                       <OTooltip
                         :content="
-                          canInsertPromqlSample ? sample.query : t('alerts.promqlSampleDisabled')
+                          canInsertPromqlSample
+                            ? raw(sample.query)
+                            : t('alerts.promqlSampleDisabled')
                         "
                         :delay="300"
                       />
@@ -1256,7 +1258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           v-if="cronTimezone"
-                          :content="cronTimezone"
+                          :content="raw(cronTimezone)"
                           :delay="300"
                           side="bottom"
                         />
@@ -1610,7 +1612,7 @@ import {
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
   b64EncodeUnicode,
@@ -1762,7 +1764,7 @@ export default defineComponent({
     "update:triggerCondition",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // Descendant step: the AddAlert orchestrator owns the ONE form and provides
@@ -1973,7 +1975,7 @@ export default defineComponent({
     // variant rules that drive each metric card's function dialog
     // (metricDefaults "Rule set A"), so they are real queries for the actual
     // metric. The rate window binds to the alert's period.
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
     const promqlMetricType = ref("");
     watch(
       () => [props.streamName, props.streamType, localTab.value],
@@ -2775,11 +2777,11 @@ export default defineComponent({
             value: "custom",
           },
           {
-            label: "SQL",
+            label: raw("SQL"),
             value: "sql",
           },
           {
-            label: "PromQL",
+            label: raw("PromQL"),
             value: "promql",
           },
         ];
@@ -2792,7 +2794,7 @@ export default defineComponent({
           value: "custom",
         },
         {
-          label: "SQL",
+          label: raw("SQL"),
           value: "sql",
         },
       ];
@@ -3465,6 +3467,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       store,
       highlightedSqlQuery,

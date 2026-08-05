@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <BaseImport
     ref="baseImportRef"
-    title="Import Template"
+    :title="t('alert_templates.importTemplateTitle')"
     test-prefix="template"
     :is-importing="isTemplateImporting"
     container-class=""
@@ -32,10 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
-          {{ templateErrorsToDisplay.length > 0 ? "Error Validations" : "Output Messages" }}
+          {{
+            templateErrorsToDisplay.length > 0
+              ? t("alerts.errorValidations")
+              : t("alerts.outputMessagesLabel")
+          }}
         </div>
         <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
-          Output Messages
+          {{ t("alert_templates.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto">
@@ -70,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateTemplateName(val, index);
                           }
                         "
-                        :label="'Template Name *'"
+                        :label="t('alert_templates.importNameLabel')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -91,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateTemplateBody(val, index);
                           }
                         "
-                        :label="'Template Body *'"
+                        :label="t('alert_templates.importBodyLabel')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -114,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="destinationTypes"
-                        :label="'Template Type *'"
+                        :label="t('alert_templates.importTypeLabel')"
                         class="showLabelOnTop no-case py-2"
                       />
                     </div>
@@ -134,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateTemplateTitle(val, index);
                           }
                         "
-                        :label="'Template Title *'"
+                        :label="t('alert_templates.importTitleLabel')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -151,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-primary mb-2.5 text-base uppercase"
               data-test="template-import-creation-title"
             >
-              Template Creation
+              {{ t("alert_templates.templateCreationTitle") }}
             </div>
             <div
               class="error-list"
@@ -182,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import templateService from "@/services/alert_templates";
@@ -214,15 +218,15 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type templateCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
     type templateErrors = (ErrorMessage | string)[][];
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
@@ -323,7 +327,9 @@ export default defineComponent({
       // Only redirect and show success message if ALL templates were imported successfully
       if (successCount === totalCount) {
         toast({
-          message: `Successfully imported template(s)`,
+          message: t("toastMessages.alerts.successfullyImportedTemplates", {
+            count: successCount,
+          }),
           variant: "success",
         });
 
@@ -355,7 +361,7 @@ export default defineComponent({
         return hasCreatedTemplate;
       } catch (e: any) {
         toast({
-          message: "Error importing Template please check the JSON",
+          message: t("toastMessages.alerts.errorImportingTemplatePleaseCheckThe"),
           variant: "error",
         });
         return false;
@@ -363,17 +369,17 @@ export default defineComponent({
     };
 
     const validateTemplateInputs = async (input: any, index: number) => {
-      let templateErrors: (string | { message: string; field: string })[] = [];
+      let templateErrors: (string | ErrorMessage)[] = [];
 
       // Validate name using the updated props.templates
       if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
         templateErrors.push({
-          message: `Template - ${index}: The "name" field is required and should be a valid string.`,
+          message: t("alert_templates.import.nameRequired", { index }),
           field: "template_name",
         });
       } else if (props.templates.some((template: any) => template.name === input.name)) {
         templateErrors.push({
-          message: `Template - ${index}: "${input.name}" already exists`,
+          message: t("alert_templates.import.nameExists", { index, name: input.name }),
           field: "template_name",
         });
       }
@@ -381,7 +387,7 @@ export default defineComponent({
       // Validate type
       if (!input.type || (input.type !== "email" && input.type !== "http")) {
         templateErrors.push({
-          message: `Template - ${index}: The "type" field must be either "email" or "http"`,
+          message: t("alert_templates.import.typeInvalid", { index }),
           field: "type",
         });
       }
@@ -389,14 +395,14 @@ export default defineComponent({
       // Validate body
       if (!input.body || typeof input.body !== "string" || input.body.trim() === "") {
         templateErrors.push({
-          message: `Template - ${index}: The "body" field is required and should be a valid JSON string.`,
+          message: t("alert_templates.import.bodyRequired", { index }),
           field: "body",
         });
       } else {
         const result = validateTemplateBody(input.body);
         if (!result.valid) {
           templateErrors.push({
-            message: `Template - ${index}: The "body" field should contain valid JSON. Placeholders like {value} for numbers and "{name}" for strings are supported.`,
+            message: t("alert_templates.import.bodyInvalidJson", { index }),
             field: "body",
           });
         }
@@ -406,7 +412,7 @@ export default defineComponent({
       if (input.type === "email") {
         if (!input.title || typeof input.title !== "string" || input.title.trim() === "") {
           templateErrors.push({
-            message: `Template - ${index}: The "title" field is required for email type templates.`,
+            message: t("alert_templates.import.titleRequiredEmail", { index }),
             field: "title",
           });
         }
@@ -439,7 +445,7 @@ export default defineComponent({
         });
 
         tempalteCreators.value.push({
-          message: `Template - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file `,
+          message: t("alert_templates.import.createSuccess", { index, name: input.name }),
           success: true,
         });
 
@@ -449,7 +455,11 @@ export default defineComponent({
         return true;
       } catch (error: any) {
         tempalteCreators.value.push({
-          message: `Template - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("alert_templates.import.createFailed", {
+            index,
+            name: input.name,
+            reason: error?.response?.data?.message || t("alert_templates.import.unknownError"),
+          }),
           success: false,
         });
         return false;

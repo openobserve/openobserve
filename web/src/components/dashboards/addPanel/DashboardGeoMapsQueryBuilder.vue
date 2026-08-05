@@ -401,7 +401,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
@@ -431,7 +431,7 @@ export default defineComponent({
   },
   props: ["dashboardData"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
       latitude: true,
@@ -452,7 +452,7 @@ export default defineComponent({
       addFilteredItem,
       promqlMode,
       cleanupDraggingFields,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
       { label: t("dashboard.countDistinct"), value: "count-distinct" },

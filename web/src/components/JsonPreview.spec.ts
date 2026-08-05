@@ -181,7 +181,8 @@ describe("JsonPreview", () => {
       expect(clipboardUtils.copyToClipboard).toHaveBeenCalledOnce();
       expect(clipboardUtils.copyToClipboard).toHaveBeenCalledWith(
         JSON.stringify(value, null, 2),
-        expect.objectContaining({ successMessage: expect.any(String), timeout: 1500 }),
+        expect.any(Function),
+        expect.objectContaining({ timeout: 1500 }),
       );
     });
   });

@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import useIngestion from "@/composables/useIngestion";
@@ -33,6 +34,7 @@ const props = defineProps<{
   integrationSlug: string;
 }>();
 
+const { t } = useI18nTyped();
 const store = useStore();
 const { aiContent, endpoint } = useIngestion();
 
@@ -82,24 +84,24 @@ const richContent = computed(() =>
       :logo-url="integration.logo"
       :logo-url-dark="integration.logoDark"
     />
-    <AIIntegrationCard v-else-if="cardContent" :content="cardContent" :doc-url="docURL" />
+    <AIIntegrationCard v-else-if="cardContent" :content="raw(cardContent)" :doc-url="docURL" />
     <div v-else class="text-base">
-      <CopyContent :content="aiContent" />
+      <CopyContent :content="raw(aiContent)" />
       <div class="pt-6 pb-2 font-bold">
-        Click
+        {{ t("ingestion.ai.viewDocsPrefix") }}
         <a
           :href="safeHttpUrl(docURL)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >here</a
+          >{{ t("ingestion.ai.viewDocsLinkLabel") }}</a
         >
-        to check further documentation.
+        {{ t("ingestion.ai.viewDocsSuffix") }}
       </div>
     </div>
   </div>
   <div v-else class="p-2">
-    <p>Select an integration to view details.</p>
+    <p>{{ t("ingestion.ai.selectIntegrationPrompt") }}</p>
   </div>
 </template>

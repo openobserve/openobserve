@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, nextTick, ref } from "vue";
 import Sortable from "sortablejs";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
 import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
@@ -243,7 +243,7 @@ export default defineComponent({
       sortableInstance = null;
     });
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Wrapper around the global OTable; used to reach its rendered <tbody>
     // so SortableJS can provide row drag-and-drop (OTable has no native row
@@ -254,7 +254,7 @@ export default defineComponent({
     const columns: OTableColumnDef[] = [
       {
         id: "drag",
-        header: "",
+        header: raw(""),
         size: 32,
         minSize: 32,
         maxSize: 32,
@@ -300,6 +300,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.tabsSettings.tabReorderFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
@@ -342,6 +343,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.tabsSettings.tabUpdationFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
@@ -392,6 +394,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.tabsSettings.tabDeletionFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {

@@ -18,6 +18,8 @@
 // changes flow DynamoDB Streams → Kinesis Data Stream → Kinesis Firehose → the
 // OpenObserve Firehose endpoint (an AWS-console flow; no OTel collector).
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
@@ -30,18 +32,17 @@ export default function dynamodbCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "DynamoDB",
-      tagline: "Stream DynamoDB item changes into OpenObserve via Kinesis Firehose.",
+      tagline: gt("ingestion.setupCard.dynamodbTagline"),
       logo: getImageURL("images/ingestion/dynamodb.png"),
       tone: "#4053D6",
-      metaBadges: ["Logs"],
+      metaBadges: [gt("common.logs")],
     },
     steps: [
       {
         id: "firehose-endpoint",
-        title: "OpenObserve Firehose Endpoint",
-        description:
-          "Use these as the **HTTP Endpoint** destination when creating your Kinesis Data Firehose delivery stream.",
-        chip: { kind: "editor", label: "firehose" },
+        titleKey: "ingestion.setupCard.dynamodbFirehoseEndpointTitle",
+        descriptionKey: "ingestion.setupCard.dynamodbFirehoseEndpointDesc",
+        chip: { kind: "editor", label: raw("firehose") },
         completeOn: "copy",
         code: {
           lang: "text",
@@ -51,20 +52,21 @@ export default function dynamodbCard(subs: CardSubstitutions): RichCardContent {
       },
       {
         id: "pipeline",
-        title: "Stream DynamoDB → Firehose",
-        description:
-          "Enable **DynamoDB Streams** on your table, connect it to a **Kinesis Data Stream**, then point a **Kinesis Data Firehose** delivery stream at the HTTP endpoint above.",
-        chip: { kind: "editor", label: "AWS Console" },
+        titleKey: "ingestion.setupCard.dynamodbPipelineTitle",
+        descriptionKey: "ingestion.setupCard.dynamodbPipelineDesc",
+        chip: { kind: "editor", label: raw("AWS Console") },
         completeOn: "copy",
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or open Logs for the `dynamodb` stream once items change.",
-        chip: { kind: "traces", label: "Logs" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyDynamodbLogsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Item Changes", "Inserts", "Updates", "Deletes"],
+        // DynamoDB Streams record kinds — they mirror the `eventName` values
+        // (INSERT / MODIFY / REMOVE) the user sees verbatim in the ingested stream.
+        pills: [raw("Item Changes"), raw("Inserts"), raw("Updates"), raw("Deletes")],
       },
     ],
     detect: { streamType: "logs", match: "keyword", streamName: "dynamodb", filter: "" },

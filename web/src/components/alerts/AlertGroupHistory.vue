@@ -44,7 +44,7 @@
       <OTag
         variant="primary-soft"
         size="sm"
-        :label="groupFilter.group_labels || groupFilter.group_key"
+        :label="raw(groupFilter.group_labels || groupFilter.group_key)"
       />
       <OButton
         variant="ghost"
@@ -130,7 +130,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -162,7 +162,7 @@ const emit = defineEmits<{
   "clear-filter": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // The transitions table has no surrogate key, and (group_key, at) can repeat

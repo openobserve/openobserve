@@ -137,7 +137,7 @@ jobs:
         if: contains(matrix.arch, 'linux-musl')
         env:
           CROSS_CONFIG: Cross.oss.toml
-        run: RUSTFLAGS="" cross build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
+        run: cross build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
 
       - name: Run cargo build (SIMD)
         if: contains(matrix.file_name, '-simd')

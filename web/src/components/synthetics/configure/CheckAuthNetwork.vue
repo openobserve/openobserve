@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -30,7 +30,7 @@ import { getUUID } from "@/utils/uuid";
 const props = defineProps<{ check: BrowserCheck }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ── Header summary ─────────────────────────────────────────────────────────────
 
@@ -227,7 +227,7 @@ function removeCookie(index: number) {
                 :type="variable.secure ? 'password' : 'text'"
                 :placeholder="
                   variable.secure && !variable.value
-                    ? variable.example || t('synthetics.authNetwork.passwordPlaceholder')
+                    ? raw(variable.example) || t('synthetics.authNetwork.passwordPlaceholder')
                     : t('synthetics.authNetwork.variableValuePlaceholder')
                 "
                 :data-test="`synthetics-check-auth-network-variable-value-${index}-input`"
@@ -242,7 +242,7 @@ function removeCookie(index: number) {
                 class="gap-1.5"
                 @click="updateVariable(index, 'secure', !variable.secure)"
               >
-                <OSwitch v-model="variable.secure" size="md" />
+                <OSwitch :model-value="variable.secure" size="md" />
                 <OIcon name="lock" size="sm" />
                 <OTooltip
                   :content="

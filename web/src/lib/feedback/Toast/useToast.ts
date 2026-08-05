@@ -1,13 +1,14 @@
 import { reactive, ref } from "vue";
 import type { ToastVariant, ToastOptions, ToastPosition, ToastDetail } from "./OToast.types";
+import type { I18nText } from "@/types/i18n";
 
 // ── Internal record shape ────────────────────────────────────────────────────
 
 interface ToastRecord {
   id: string;
   variant: ToastVariant;
-  message: string;
-  title?: string;
+  message: I18nText;
+  title?: I18nText;
   timeout: number; // ms; 0 = persistent
   position: ToastPosition;
   open: boolean; // Reka controls enter/exit animation via this
@@ -115,9 +116,9 @@ function resumeTimer(id: string): void {
   record.timer = setTimeout(() => dismiss(record.id), record.remainingTimeout);
 }
 
-function capitalizeFirst(str: string): string {
+function capitalizeFirst(str: I18nText): I18nText {
   if (!str) return str;
-  return str.charAt(0).toUpperCase() + str.slice(1);
+  return (str.charAt(0).toUpperCase() + str.slice(1)) as I18nText;
 }
 
 function toast(options: ToastOptions): DismissFn {
@@ -176,7 +177,7 @@ function toast(options: ToastOptions): DismissFn {
 // to an already-visible notification rather than stacking a second one.
 function updateToast(
   id: string,
-  updates: { title?: string; message?: string; details?: ToastDetail[]; titleCount?: number },
+  updates: { title?: I18nText; message?: I18nText; details?: ToastDetail[]; titleCount?: number },
 ): void {
   const record = toastRecords.find((r) => r.id === id);
   if (!record) return;

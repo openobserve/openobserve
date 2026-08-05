@@ -166,8 +166,9 @@ describe("useTracesTableColumns", () => {
       return buildCols(false, "spans", ["span_kind"]).find((c) => c.id === "span_kind");
     }
 
-    it("should use 'Span Kind' as the header", () => {
-      expect(getSpanKindCol()?.header).toBe("Span Kind");
+    // The mocked `t` above echoes keys back, so the header comes out as its key.
+    it("should translate the Span Kind header key", () => {
+      expect(getSpanKindCol()?.header).toBe("traces.tableColumns.spanKind");
     });
 
     it("should use size 120", () => {
@@ -282,9 +283,9 @@ describe("useTracesTableColumns", () => {
       expect(ids).toContain("span_status");
     });
 
-    it("should use 'Span Status' as the header for span_status", () => {
+    it("should translate the Span Status header key for span_status", () => {
       const col = buildCols(false, "spans", ["span_status"]).find((c) => c.id === "span_status");
-      expect(col?.header).toBe("Span Status");
+      expect(col?.header).toBe("traces.tableColumns.spanStatus");
     });
 
     it("should use size 120 for span_status", () => {

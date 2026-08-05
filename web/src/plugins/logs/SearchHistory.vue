@@ -122,7 +122,7 @@
                       size="icon-chip"
                       class="ml-2"
                       @click.stop="
-                        copyToClipboard(row.sql, {
+                        copyToClipboard(row.sql, t, {
                           successMessage: t('logs.searchHistory.sqlQueryCopied'),
                           timeout: 5000,
                         })
@@ -195,7 +195,7 @@
                       size="icon-chip"
                       class="ml-2"
                       @click.stop="
-                        copyToClipboard(row.function, {
+                        copyToClipboard(row.function, t, {
                           successMessage: t('logs.searchHistory.functionDefinitionCopied'),
                           timeout: 5000,
                         })
@@ -294,7 +294,7 @@ import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import config from "@/aws-exports";
@@ -345,7 +345,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
     const { searchObj } = searchState();
@@ -509,7 +509,7 @@ export default defineComponent({
         return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return t("logs.searchHistory.minutes", { minutes });
+        return t("logs.searchHistory.minutes", { count: minutes });
       }
     });
 

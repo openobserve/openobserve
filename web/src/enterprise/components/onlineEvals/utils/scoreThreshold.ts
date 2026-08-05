@@ -9,6 +9,8 @@
 // the "unhealthy" count on the KPI tile, the per-config row, and the detail panel
 // agree across data types (numeric / categorical / boolean).
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "./evalEntity";
 
@@ -18,7 +20,7 @@ export interface ThresholdSql {
    *  defined (we can't classify the row). */
   unhealthyExpr: string | null;
   /** Human label for the threshold, e.g. "≥ 0.7", "true", "good · great". */
-  label: string;
+  label: I18nText;
 }
 
 export type ScoreValue = number | string | boolean | null;
@@ -35,45 +37,45 @@ function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined
 export function thresholdForConfig(config: ScoreConfig): ThresholdSql {
   const ht = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
   const type = dataTypeOf(config);
-  if (!ht) return { unhealthyExpr: null, label: "" };
+  if (!ht) return { unhealthyExpr: null, label: raw("") };
 
   if (type === "numeric") {
     if (ht.value === undefined || ht.value === null || !ht.direction) {
-      return { unhealthyExpr: null, label: "" };
+      return { unhealthyExpr: null, label: raw("") };
     }
     const op = ht.direction === "gte" ? "<" : ">";
     const sym = ht.direction === "gte" ? "≥" : "≤";
     return {
       unhealthyExpr: `value_numeric ${op} ${Number(ht.value)}`,
-      label: `${sym} ${ht.value}`,
+      label: raw(`${sym} ${ht.value}`),
     };
   }
 
   if (type === "categorical") {
     const list: string[] = ht.healthy_categories || ht.healthyCategories || [];
     if (!Array.isArray(list) || list.length === 0) {
-      return { unhealthyExpr: null, label: "" };
+      return { unhealthyExpr: null, label: raw("") };
     }
     const inList = list.map((c) => `'${escapeSqlString(String(c))}'`).join(", ");
     return {
       unhealthyExpr: `value_categorical NOT IN (${inList})`,
-      label: list.join(" · "),
+      label: raw(list.join(" · ")),
     };
   }
 
   if (type === "boolean") {
     const healthy = ht.healthy_value ?? ht.healthyValue;
     if (healthy === undefined || healthy === null) {
-      return { unhealthyExpr: null, label: "" };
+      return { unhealthyExpr: null, label: raw("") };
     }
     const expected = healthy === true || healthy === "true";
     return {
       unhealthyExpr: `value_boolean = ${!expected}`,
-      label: String(expected),
+      label: raw(String(expected)),
     };
   }
 
-  return { unhealthyExpr: null, label: "" };
+  return { unhealthyExpr: null, label: raw("") };
 }
 
 /** Classify one concrete score using the same semantics as

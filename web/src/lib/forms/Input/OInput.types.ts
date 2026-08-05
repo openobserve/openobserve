@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type InputSize = "sm" | "md";
 
 /**
@@ -35,13 +37,13 @@ export interface InputProps {
   /** HTML input type — use `textarea` for a multi-line field */
   type?: InputType;
   /** Floating / static label */
-  label?: string;
+  label?: I18nText;
   /** Placeholder text */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Helper text displayed below the field */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in an error state without a message */
   error?: boolean;
   /** Text prefix rendered inside the field (left) */

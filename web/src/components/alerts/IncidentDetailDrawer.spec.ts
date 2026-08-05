@@ -1233,8 +1233,9 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should have translation for fired times with parameter", () => {
-      const translation = wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 });
-      expect(translation).toBe("Fired 5 time(s)");
+      // Pipe plural: `count` in the named bag selects the branch AND fills {count}.
+      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 })).toBe("Fired 5 times");
+      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 1 })).toBe("Fired 1 time");
     });
 
     it("should have translation for refresh correlated data", () => {

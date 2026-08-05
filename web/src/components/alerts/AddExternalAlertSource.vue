@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -205,14 +205,14 @@ export default defineComponent({
   emits: ["update:open", "created", "updated"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const schema = makeAlertSourceSchema(t);
     return { store, t, router, schema, FORM_ID };
   },
   data() {
     return {
-      destinationOptions: [] as Array<{ label: string; value: string }>,
+      destinationOptions: [] as Array<{ label: I18nText; value: string }>,
       defaultValues: alertSourceDefaults(),
       formKey: 0,
       created: false,
@@ -235,36 +235,42 @@ export default defineComponent({
       if (!this.created) return 1;
       return this.waitingForEvent ? 2 : 3;
     },
-    createdUrlSnippet(): string {
-      if (!this.createdIntegration) return "";
+    // A URL and a bearer token the user copies verbatim — machine vocabulary,
+    // identical in every locale.
+    createdUrlSnippet(): I18nText {
+      if (!this.createdIntegration) return raw("");
       const ingestionURL = getIngestionURL();
       const base = getEndPoint(ingestionURL).url;
-      return [
-        "# URL",
-        `${base}/api/v2/${this.orgIdentifier}/incidents/events`,
-        "",
-        "# Authorization header",
-        `Bearer ${this.createdIntegration.token}`,
-      ].join("\n");
+      return raw(
+        [
+          "# URL",
+          `${base}/api/v2/${this.orgIdentifier}/incidents/events`,
+          "",
+          "# Authorization header",
+          `Bearer ${this.createdIntegration.token}`,
+        ].join("\n"),
+      );
     },
-    createdCurlSnippet(): string {
-      if (!this.createdIntegration) return "";
+    createdCurlSnippet(): I18nText {
+      if (!this.createdIntegration) return raw("");
       const ingestionURL = getIngestionURL();
       const base = getEndPoint(ingestionURL).url;
       const url = `${base}/api/v2/${this.orgIdentifier}/incidents/events`;
       // Pasted straight into a shell, so: no comment lines. The body is the
       // minimal payload detect.rs accepts — an empty `{}` is rejected.
-      return [
-        `curl -X POST '${url}' \\`,
-        `  -H 'Authorization: Bearer ${this.createdIntegration.token}' \\`,
-        `  -H 'Content-Type: application/json' \\`,
-        `  -d '{"status": "firing", "labels": {"source": "test"}}'`,
-      ].join("\n");
+      return raw(
+        [
+          `curl -X POST '${url}' \\`,
+          `  -H 'Authorization: Bearer ${this.createdIntegration.token}' \\`,
+          `  -H 'Content-Type: application/json' \\`,
+          `  -d '{"status": "firing", "labels": {"source": "test"}}'`,
+        ].join("\n"),
+      );
     },
-    connectedLabel(): string {
+    connectedLabel(): I18nText {
       // Plain t() + concatenation: named interpolation THROWS on a missing
       // key, which would take down this whole branch's render.
-      return `${this.t("alert_sources.connectedPrefix")} ${this.detectedFormat}`;
+      return raw(`${this.t("alert_sources.connectedPrefix")} ${this.detectedFormat}`);
     },
   },
   watch: {
@@ -296,7 +302,7 @@ export default defineComponent({
           module: "alert",
         });
         this.destinationOptions = (res.data ?? []).map((d: any) => ({
-          label: d.name,
+          label: raw(d.name),
           value: d.name,
         }));
       } catch (e) {

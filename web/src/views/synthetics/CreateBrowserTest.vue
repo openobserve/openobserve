@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
@@ -65,7 +65,7 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
 // The i18n message "Supports {variables} like {baseUrl}." uses these params to
@@ -156,6 +156,7 @@ async function probeExtension() {
 
 // Server-driven lists fetched once here and threaded down to CheckConfigure.
 const locations = ref<SyntheticsLocation[]>([]);
+const locationsLoading = ref(false);
 const browsers = ref<string[]>([]);
 const devices = ref<SyntheticsDevice[]>([]);
 const destinations = ref<string[]>([]);
@@ -202,8 +203,14 @@ async function fetchFolders() {
 // ── Private agent setup (drawer opened from the locations card) ──────────
 const showAgentSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const agentSetupLocationId = ref<string | null>(null);
+const agentSetupLocationName = ref<string | null>(null);
 
-async function openAgentSetup() {
+async function openAgentSetup(locationId?: string) {
+  agentSetupLocationId.value = locationId ?? null;
+  agentSetupLocationName.value = locationId
+    ? (locations.value.find((l) => l.id === locationId)?.label ?? null)
+    : null;
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -216,6 +223,7 @@ async function openAgentSetup() {
 }
 
 async function fetchLocations() {
+  locationsLoading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
@@ -228,11 +236,17 @@ async function fetchLocations() {
     );
     browsers.value = (data.browsers ?? []) as string[];
     devices.value = (data.devices ?? []) as SyntheticsDevice[];
-  } catch {
-    // Enterprise-gated endpoint — community builds return 403; fall back to empty.
+  } catch (err: any) {
+    // A 403 means the endpoint isn't available on this build; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
     browsers.value = [];
     devices.value = [];
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
+  } finally {
+    locationsLoading.value = false;
   }
 }
 
@@ -776,7 +790,7 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -810,7 +824,7 @@ function onClearResults() {
             v-model="startUrl"
             :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
             :error="!!urlError"
-            :error-message="urlError"
+            :error-message="raw(urlError)"
             data-test="synthetics-create-url-input"
             @update:model-value="clearUrlError"
             @blur="validateGateUrl"
@@ -894,7 +908,7 @@ function onClearResults() {
           <div class="flex items-start gap-4 p-4">
             <span
               class="bg-accent text-text-inverse flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              >1</span
+              >{{ "1" }}</span
             >
             <div class="min-w-0 flex-1">
               <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
@@ -915,7 +929,7 @@ function onClearResults() {
                   ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
                   : 'bg-accent text-text-inverse'
               "
-              >2</span
+              >{{ "2" }}</span
             >
             <div class="flex min-w-0 flex-1 justify-between">
               <div class="flex flex-col items-start">
@@ -950,7 +964,7 @@ function onClearResults() {
                     ? 'bg-accent text-text-inverse'
                     : 'bg-surface-subtle text-text-muted'
               "
-              >3</span
+              >{{ "3" }}</span
             >
             <div class="min-w-0 flex-1">
               <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
@@ -1048,6 +1062,7 @@ function onClearResults() {
               :check="check"
               check-type="browser"
               :locations="locations"
+              :loading-locations="locationsLoading"
               :browsers="browsers"
               :devices="devices"
               :destinations="destinations"
@@ -1058,7 +1073,9 @@ function onClearResults() {
               class="w-full!"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
-              @setup-agent="openAgentSetup"
+              @new-location="openAgentSetup()"
+              @add-agent="(id: string) => openAgentSetup(id)"
+              @refresh-locations="fetchLocations"
             />
           </OStep>
         </OStepper>
@@ -1073,9 +1090,14 @@ function onClearResults() {
           :o2-url="agentSetup?.o2_url"
           :script-url="agentSetup?.script_url"
           :install="agentSetup?.install"
+          :location-id="agentSetupLocationId"
+          :location-name="agentSetupLocationName"
           @update:open="
             (open: boolean) => {
-              if (!open) fetchLocations();
+              if (!open) {
+                agentSetupLocationId = null;
+                agentSetupLocationName = null;
+              }
             }
           "
         />

@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -49,7 +49,7 @@ const emit = defineEmits<{
   (e: "apply:template", name: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const title = computed(() => {
   switch (props.topic) {
@@ -227,7 +227,7 @@ const builtInVars: { name: string; desc: string }[] = [
 const showBuiltIns = ref(false);
 
 function copyVar(name: string) {
-  copyToClipboard(`{${name}}`, { successMessage: `Copied {${name}}` });
+  copyToClipboard(`{${name}}`, t, { successMessage: `Copied {${name}}` });
 }
 
 defineExpose({ applyTemplate, previewTemplate });
@@ -248,17 +248,21 @@ defineExpose({ applyTemplate, previewTemplate });
       <div v-if="showLegend" data-test="help-legend" class="help-legend">
         <span class="help-legend__title">{{ t("alerts.alertSettings.helpLegendTitle") }}</span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--live">High CPU</span>
+          <span class="help-legend__swatch help-legend__swatch--live">{{
+            t("alerts.alertSettings.helpLegendLiveExample")
+          }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendLive") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--sample">42</span>
+          <span class="help-legend__swatch help-legend__swatch--sample">{{
+            t("alerts.alertSettings.helpLegendSampleExample")
+          }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendSample") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--opaque">{{ "{rows}" }}</span>
+          <span class="help-legend__swatch help-legend__swatch--opaque">{{ raw("{rows}") }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendOpaque") }}
         </span>

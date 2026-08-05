@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw } from "@/types/i18n";
+
 import { PromqlStepSpec, PromqlStepId, PromqlStepGroup } from "../types";
 
 /**
@@ -28,8 +30,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
-          description: "Time range for rate calculation",
+          placeholder: raw("5m"),
+          descriptionKey: "metrics.operationsList.params.rateRangeDesc",
         },
       ],
       defaultParams: ["$__rate_interval"],
@@ -44,8 +46,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
-          description: "Time range for instant rate calculation",
+          placeholder: raw("5m"),
+          descriptionKey: "metrics.operationsList.params.irateRangeDesc",
         },
       ],
       defaultParams: ["$__interval"],
@@ -60,8 +62,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
-          description: "Time range for increase calculation",
+          placeholder: raw("5m"),
+          descriptionKey: "metrics.operationsList.params.increaseRangeDesc",
         },
       ],
       defaultParams: ["$__rate_interval"],
@@ -75,7 +77,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -89,7 +91,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -103,7 +105,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -117,7 +119,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -131,7 +133,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -145,7 +147,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -159,7 +161,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -173,7 +175,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -187,13 +189,13 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Quantile",
           type: "number",
-          placeholder: "0.95",
+          placeholder: raw("0.95"),
           options: [0.5, 0.75, 0.9, 0.95, 0.99],
         },
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: [0.95, "$__interval"],
@@ -207,7 +209,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Range",
           type: "string",
-          placeholder: "5m",
+          placeholder: raw("5m"),
         },
       ],
       defaultParams: ["$__interval"],
@@ -225,8 +227,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
-          description: "Labels to group by",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
+          descriptionKey: "metrics.operationsList.params.byLabelsDesc",
         },
       ],
       defaultParams: [[]],
@@ -242,7 +244,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
       ],
       defaultParams: [[]],
@@ -258,7 +260,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
       ],
       defaultParams: [[]],
@@ -274,7 +276,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
       ],
       defaultParams: [[]],
@@ -290,7 +292,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
       ],
       defaultParams: [[]],
@@ -306,7 +308,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
       ],
       defaultParams: [[]],
@@ -320,15 +322,15 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "K",
           type: "number",
-          placeholder: "10",
-          description: "Number of top elements to return",
+          placeholder: raw("10"),
+          descriptionKey: "metrics.operationsList.params.topKDesc",
         },
         {
           name: "By Labels",
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
       ],
       defaultParams: [10, []],
@@ -342,14 +344,14 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "K",
           type: "number",
-          placeholder: "10",
+          placeholder: raw("10"),
         },
         {
           name: "By Labels",
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
       ],
       defaultParams: [10, []],
@@ -363,7 +365,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Quantile",
           type: "number",
-          placeholder: "0.95",
+          placeholder: raw("0.95"),
           options: [0.5, 0.75, 0.9, 0.95, 0.99],
         },
         {
@@ -371,7 +373,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           type: "select",
           optional: true,
           options: true,
-          placeholder: "Select labels",
+          placeholderKey: "metrics.operationsList.params.selectLabelsPlaceholder",
         },
       ],
       defaultParams: [0.95, []],
@@ -387,7 +389,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Quantile",
           type: "number",
-          placeholder: "0.95",
+          placeholder: raw("0.95"),
           options: [0.5, 0.75, 0.9, 0.95, 0.99],
         },
       ],
@@ -427,7 +429,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
           name: "Nearest multiple",
           type: "number",
           optional: true,
-          placeholder: "1",
+          placeholder: raw("1"),
         },
       ],
       defaultParams: [1],
@@ -497,12 +499,12 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Min",
           type: "number",
-          placeholder: "0",
+          placeholder: raw("0"),
         },
         {
           name: "Max",
           type: "number",
-          placeholder: "100",
+          placeholder: raw("100"),
         },
       ],
       defaultParams: [0, 100],
@@ -516,7 +518,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Max",
           type: "number",
-          placeholder: "100",
+          placeholder: raw("100"),
         },
       ],
       defaultParams: [100],
@@ -530,7 +532,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Min",
           type: "number",
-          placeholder: "0",
+          placeholder: raw("0"),
         },
       ],
       defaultParams: [0],
@@ -726,8 +728,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Value",
           type: "number",
-          placeholder: "0",
-          description: "Value to add",
+          placeholder: raw("0"),
+          descriptionKey: "metrics.operationsList.params.valueToAddDesc",
         },
       ],
       defaultParams: [0],
@@ -741,8 +743,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Value",
           type: "number",
-          placeholder: "0",
-          description: "Value to subtract",
+          placeholder: raw("0"),
+          descriptionKey: "metrics.operationsList.params.valueToSubtractDesc",
         },
       ],
       defaultParams: [0],
@@ -756,8 +758,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Value",
           type: "number",
-          placeholder: "1",
-          description: "Value to multiply by",
+          placeholder: raw("1"),
+          descriptionKey: "metrics.operationsList.params.valueToMultiplyDesc",
         },
       ],
       defaultParams: [1],
@@ -771,8 +773,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Value",
           type: "number",
-          placeholder: "1",
-          description: "Value to divide by",
+          placeholder: raw("1"),
+          descriptionKey: "metrics.operationsList.params.valueToDivideDesc",
         },
       ],
       defaultParams: [1],
@@ -786,8 +788,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Value",
           type: "number",
-          placeholder: "1",
-          description: "Modulo divisor",
+          placeholder: raw("1"),
+          descriptionKey: "metrics.operationsList.params.moduloDivisorDesc",
         },
       ],
       defaultParams: [1],
@@ -801,8 +803,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
         {
           name: "Value",
           type: "number",
-          placeholder: "2",
-          description: "Exponent power",
+          placeholder: raw("2"),
+          descriptionKey: "metrics.operationsList.params.exponentPowerDesc",
         },
       ],
       defaultParams: [2],

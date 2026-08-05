@@ -22,7 +22,7 @@
 
 import { ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import service_accounts from "@/services/service_accounts";
 import { createRole, updateRole } from "@/services/iam";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
@@ -42,7 +42,7 @@ export interface McpCredential {
 
 export function useMcpCredential() {
   const store = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const generating = ref(false);
   const error = ref("");

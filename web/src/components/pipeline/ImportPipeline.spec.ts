@@ -813,8 +813,10 @@ describe("ImportPipeline.vue", () => {
   // -----------------------------------------------------------------------
 
   describe("validateRemoteDestination", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       wrapper = createWrapper();
+      // onMounted's awaited fetch overwrites pipelineDestinations, so seed after it.
+      await flushPromises();
       wrapper.vm.pipelineDestinations = ["valid-dest", "other-dest"];
     });
 

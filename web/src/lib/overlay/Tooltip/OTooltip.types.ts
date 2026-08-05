@@ -2,6 +2,8 @@
  * OTooltip.types.ts ΓÇö public types for OTooltip.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { TooltipContentProps } from "reka-ui";
 
 export type TooltipSide = "top" | "right" | "bottom" | "left";
@@ -9,7 +11,7 @@ export type TooltipAlign = "start" | "center" | "end";
 
 export interface TooltipProps {
   /** Tooltip text ΓÇö shorthand for `#content` slot when content is plain text */
-  content?: string;
+  content?: I18nText;
   /** Which side of the trigger to render the tooltip on */
   side?: TooltipSide;
   /** Alignment along the chosen side */

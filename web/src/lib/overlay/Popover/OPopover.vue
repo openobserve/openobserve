@@ -13,6 +13,7 @@
   Slots: trigger | default
 -->
 <script lang="ts">
+import type { I18nText } from "@/types/i18n";
 // True when the last document interaction was pointer-based (shared across
 // instances). Lets a mouse-close avoid leaving a :focus-visible ring on the
 // trigger, while keyboard closes keep it for a11y.
@@ -57,7 +58,7 @@ const props = withDefaults(
     sideOffset?: number;
     /** Hide the content when the trigger scrolls out of view (Floating UI). */
     hideWhenDetached?: boolean;
-    ariaLabel?: string;
+    ariaLabel?: I18nText;
     /** Content stacking order. Default sits above the app header/drawer (2000/3000). */
     zIndex?: number;
     /** Extra classes merged onto the content surface. */

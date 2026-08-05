@@ -33,7 +33,7 @@ import {
   splitDelimited,
   STATUS_REASON,
   deviceIconName,
-  deviceLabel,
+  deviceLabelKey,
   mapHistogram,
   deriveKpiFromHistogram,
   mapRun,
@@ -530,25 +530,25 @@ describe("deviceIconName", () => {
   });
 });
 
-describe("deviceLabel", () => {
-  it("should return the correct label for desktop", () => {
-    expect(deviceLabel("desktop")).toBe("Desktop");
+describe("deviceLabelKey", () => {
+  it("should return the label key for desktop", () => {
+    expect(deviceLabelKey("desktop")).toBe("synthetics.browserDevices.desktop");
   });
 
-  it("should return the correct label for tablet", () => {
-    expect(deviceLabel("tablet")).toBe("Tablet");
+  it("should return the label key for tablet", () => {
+    expect(deviceLabelKey("tablet")).toBe("synthetics.browserDevices.tablet");
   });
 
-  it("should return the correct label for mobile", () => {
-    expect(deviceLabel("mobile")).toBe("Mobile");
+  it("should return the label key for mobile", () => {
+    expect(deviceLabelKey("mobile")).toBe("synthetics.browserDevices.mobile");
   });
 
-  it("should fall back to the raw device ID for an unknown device", () => {
-    expect(deviceLabel("some_custom_device")).toBe("some_custom_device");
+  it("should return undefined for an unknown device (caller shows the raw ID)", () => {
+    expect(deviceLabelKey("some_custom_device")).toBeUndefined();
   });
 
-  it("should fall back to the raw ID for an empty string", () => {
-    expect(deviceLabel("")).toBe("");
+  it("should return undefined for an empty string", () => {
+    expect(deviceLabelKey("")).toBeUndefined();
   });
 });
 

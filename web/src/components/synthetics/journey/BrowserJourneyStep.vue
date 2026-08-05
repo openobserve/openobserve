@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { BrowserStep, StepReplayResult } from "@/types/synthetics";
-import { ACTION_ICONS, ACTION_LABELS } from "@/constants/synthetics";
+import { ACTION_ICONS, ACTION_LABEL_KEYS } from "@/constants/synthetics";
 
 /**
  * Replay status dot states.
@@ -34,7 +34,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   step: BrowserStep;
@@ -62,7 +62,7 @@ const emit = defineEmits<{
 
 // ── Computed from shared constants ──────────────────────────────────
 const actionIcon = computed(() => ACTION_ICONS[props.step.action]);
-const actionLabel = computed(() => ACTION_LABELS[props.step.action]);
+const actionLabel = computed(() => t(ACTION_LABEL_KEYS[props.step.action]));
 const displayName = computed(() => props.step.name || actionLabel.value);
 /**
  * What the collapsed row shows on the right.
@@ -150,7 +150,7 @@ function toggleStackTrace() {
 
 function copyStackTrace() {
   const stack = se.value?.stack;
-  if (stack) copyToClipboard(stack);
+  if (stack) copyToClipboard(stack, t);
 }
 
 function toggleExpanded() {
@@ -314,7 +314,7 @@ function toggleExpanded() {
                 ? t("synthetics.journey.hideStackTrace")
                 : t("synthetics.journey.showStackTrace")
             }}
-            stack trace
+            {{ t("synthetics.journey.stackTraceLabel") }}
           </OButton>
           <OButton
             v-if="showStackTrace"

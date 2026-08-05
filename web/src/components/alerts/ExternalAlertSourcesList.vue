@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -342,7 +342,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // useShortcuts must run in setup(); the proxy reaches this Options-API
     // component's own methods.
@@ -367,7 +367,7 @@ export default defineComponent({
       },
     ]);
 
-    return { store, t };
+    return { store, t, raw };
   },
   data() {
     return {
@@ -614,10 +614,10 @@ export default defineComponent({
       }
     },
     copyUrlFor(integration: AlertSourceIntegration) {
-      copyToClipboard(this.fullUrlFor(integration));
+      copyToClipboard(this.fullUrlFor(integration), this.t);
     },
     copyTokenFor(integration: AlertSourceIntegration) {
-      copyToClipboard(integration.token);
+      copyToClipboard(integration.token, this.t);
     },
     fullUrlFor(integration: AlertSourceIntegration): string {
       return `${this.ingestionBaseUrl}${integration.url}`;

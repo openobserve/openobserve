@@ -109,7 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">TTFT</span>
+            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+              t("traces.traceDetailsSidebar.ttft")
+            }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getTTFT }}</span>
           </OTag>
 
@@ -250,7 +252,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="text-3xs text-badge-orange-ol-text font-semibold"
-              >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
+              >{{ t("traces.sessionDetail.currencySymbol")
+              }}{{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
         </div>
@@ -509,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
-                JSON
+                {{ t("common.json") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
                 <template #icon-left
@@ -828,7 +831,7 @@ import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
@@ -972,7 +975,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
     const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
     const canPreviewSpan = computed(() => hasTracePreview(props.span));
@@ -1456,7 +1459,7 @@ export default defineComponent({
     });
 
     const copySpanId = () => {
-      copyToClipboard(props.span?.span_id || "", {
+      copyToClipboard(props.span?.span_id || "", t, {
         successMessage: t("traces.traceDetailsSidebar.spanIdCopied"),
       });
     };
@@ -1465,7 +1468,7 @@ export default defineComponent({
       const attributes = props.span?.attributes || {};
       const attributesText = JSON.stringify(attributes, null, 2);
 
-      copyToClipboard(attributesText, {
+      copyToClipboard(attributesText, t, {
         successMessage: t("traces.traceDetailsSidebar.attributesCopied"),
       });
     };
@@ -1806,7 +1809,7 @@ export default defineComponent({
         }
 
         // Copy to clipboard
-        copyToClipboard(textToCopy, {
+        copyToClipboard(textToCopy, t, {
           successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", {
             type: type.charAt(0).toUpperCase() + type.slice(1),
           }),
@@ -1929,7 +1932,7 @@ export default defineComponent({
     );
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
+      copyToClipboard(JSON.stringify(log), t, {
         successMessage: t("traces.traceDetailsSidebar.contentCopied"),
         timeout: 1000,
       });

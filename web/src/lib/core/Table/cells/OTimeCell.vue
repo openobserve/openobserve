@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OTimeCell — the ONE timestamp renderer for every table.
@@ -32,7 +33,7 @@ const props = withDefaults(
     /** IANA timezone for the absolute rendering. Defaults to the browser zone. */
     timezone?: string;
     /** Text shown when the value is empty/zero/invalid. Default "—". */
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
     /**
      * In "relative" mode, only show "x ago" for timestamps within this many
      * days; older ones fall back to an absolute date (e.g. "Jun 24, 2024").
@@ -41,7 +42,7 @@ const props = withDefaults(
      */
     relativeCutoffDays?: number;
   }>(),
-  { unit: "auto", mode: "relative", emptyLabel: "—", relativeCutoffDays: 30 },
+  { unit: "auto", mode: "relative", emptyLabel: raw("—"), relativeCutoffDays: 30 },
 );
 
 /** Normalise any supported input to epoch milliseconds, or null if invalid. */

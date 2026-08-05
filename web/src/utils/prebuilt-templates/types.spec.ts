@@ -147,14 +147,14 @@ describe("Prebuilt Templates Types", () => {
       const type: PrebuiltType = {
         id: "slack",
         name: "Slack",
-        description: "Send notifications to Slack",
+        descriptionKey: "alert_destinations.prebuilt.slackDescription",
         icon: "slack",
         category: "messaging",
       };
 
       expect(type.id).toBeTruthy();
       expect(type.name).toBeTruthy();
-      expect(type.description).toBeTruthy();
+      expect(type.descriptionKey).toBeTruthy();
       expect(type.icon).toBeTruthy();
       expect(["messaging", "incident", "email", "custom"]).toContain(type.category);
     });

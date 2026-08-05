@@ -88,7 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div class="text-text-body text-2xl font-bold">
-                  {{ hasNoData ? "NA" : (profileData?.data_records || 0).toLocaleString() }}
+                  {{
+                    hasNoData
+                      ? t("common.notAvailableShort")
+                      : (profileData?.data_records || 0).toLocaleString()
+                  }}
                 </div>
                 <div class="text-3xs text-text-secondary">
                   {{ t("logs.searchJobInspector.returnedFromQuery") }}
@@ -122,7 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div class="text-text-body text-2xl font-bold">
-                  {{ hasNoData ? "NA" : (profileData?.scan_records || 0).toLocaleString() }}
+                  {{
+                    hasNoData
+                      ? t("common.notAvailableShort")
+                      : (profileData?.scan_records || 0).toLocaleString()
+                  }}
                 </div>
                 <div class="text-3xs text-text-secondary">
                   {{ t("logs.searchJobInspector.scannedEventsForQuery") }}
@@ -164,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-body text-2xl font-bold">
                   {{
                     hasNoData
-                      ? "NA"
+                      ? t("common.notAvailableShort")
                       : formatDuration(profileData?.time_taken || profileData?.total_duration)
                   }}
                 </div>
@@ -233,8 +241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold"
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
-                  {{ hasNoData ? "NA" : traceId }}
-                  <OTooltip v-if="!hasNoData" :content="traceId" />
+                  {{ hasNoData ? t("common.notAvailableShort") : traceId }}
+                  <OTooltip v-if="!hasNoData" :content="raw(traceId)" />
                 </div>
               </div>
             </div>
@@ -286,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="errorMessage"
         variant="error"
         icon="error"
-        :content="errorMessage"
+        :content="raw(errorMessage)"
         class="mb-2.5 shrink-0"
         data-test="inspector-error-banner"
       />
@@ -411,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -480,7 +488,7 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const loading = ref(false);
     const errorMessage = ref("");
@@ -503,7 +511,7 @@ export default defineComponent({
     const columns = computed<OTableColumnDef[]>(() => [
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         accessorKey: "index",
         meta: { align: "left" },
         size: indexColumnWidth.value,
@@ -741,7 +749,7 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      copyToClipboard(traceId.value, {
+      copyToClipboard(traceId.value, t, {
         errorMessage: t("logs.searchJobInspector.failedToCopyTraceId"),
       }).then((success) => {
         if (success) {
@@ -755,7 +763,7 @@ export default defineComponent({
 
     const copiedSql = ref(false);
     const copySql = () => {
-      copyToClipboard(profileData.value?.sql || "", {
+      copyToClipboard(profileData.value?.sql || "", t, {
         errorMessage: t("logs.searchJobInspector.failedToCopySql"),
       }).then((success) => {
         if (success) {
@@ -772,6 +780,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       loading,
       errorMessage,
       profileData,

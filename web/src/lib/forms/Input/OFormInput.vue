@@ -5,6 +5,7 @@ import { inject } from "vue";
 import OInput from "./OInput.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw } from "@/types/i18n";
 import type { FormInputProps } from "./OFormInput.types";
 
 defineOptions({ inheritAttrs: false });
@@ -46,7 +47,7 @@ if (import.meta.env.DEV && !form) {
         :error="field.state.meta.errors.length > 0"
         :error-message="
           !$slots.error && field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
+            ? raw(firstFieldError(field.state.meta.errors))
             : undefined
         "
         @update:model-value="(val: unknown) => field.handleChange(val)"

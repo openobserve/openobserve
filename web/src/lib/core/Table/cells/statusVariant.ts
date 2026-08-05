@@ -9,6 +9,8 @@
 //   const { variant, label, dot } = statusVariant("paused", "pipeline");
 //   <OBadge :variant="variant" :dot="dot">{{ label }}</OBadge>
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 /** Semantic tone — the calm, low-chroma "soft" badge family reads best at
@@ -131,7 +133,7 @@ const DOMAIN_TONE: Record<string, Record<string, StatusTone>> = {
 export interface StatusVariantResult {
   variant: BadgeVariant;
   tone: StatusTone;
-  label: string;
+  label: I18nText;
   dot: boolean;
 }
 
@@ -150,8 +152,8 @@ export function humanizeStatus(value: string): string {
  * @param domain optional feature key for overrides ("invoice"|"eval"|"service"|"node"|…).
  */
 export function statusVariant(value: unknown, domain?: string): StatusVariantResult {
-  const raw = typeof value === "boolean" ? String(value) : String(value ?? "").trim();
-  const key = raw.toLowerCase();
+  const rawValue = typeof value === "boolean" ? String(value) : String(value ?? "").trim();
+  const key = rawValue.toLowerCase();
 
   let tone: StatusTone | undefined;
 
@@ -174,7 +176,7 @@ export function statusVariant(value: unknown, domain?: string): StatusVariantRes
   return {
     variant: TONE_VARIANT[tone],
     tone,
-    label: raw ? humanizeStatus(raw) : "—",
+    label: raw(rawValue ? humanizeStatus(rawValue) : "—"),
     dot: true,
   };
 }

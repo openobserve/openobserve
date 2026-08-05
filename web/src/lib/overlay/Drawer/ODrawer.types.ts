@@ -6,6 +6,8 @@
  * in positioning and transition (slide instead of zoom/fade).
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 /** Which viewport edge the drawer slides in from. */
@@ -63,7 +65,7 @@ export interface DrawerProps {
    * Convenience prop: plain-text title rendered in the header.
    * Ignored when the `header` slot is provided.
    */
-  title?: string;
+  title?: I18nText;
 
   /**
    * Optional data-test attribute rendered on the structured title element,
@@ -91,7 +93,7 @@ export interface DrawerProps {
    * Optional subtitle rendered below the title in the header, left-aligned.
    * Ignored when the `header` slot is provided.
    */
-  subTitle?: string;
+  subTitle?: I18nText;
 
   // ── Inbuilt footer buttons ──────────────────────────────────────────────
 
@@ -102,11 +104,11 @@ export interface DrawerProps {
   formId?: string;
 
   /** Label for the primary action button (right side). Omit to hide. */
-  primaryButtonLabel?: string;
+  primaryButtonLabel?: I18nText;
   /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
-  secondaryButtonLabel?: string;
+  secondaryButtonLabel?: I18nText;
   /** Label for the neutral action button (left side). Omit to hide. */
-  neutralButtonLabel?: string;
+  neutralButtonLabel?: I18nText;
 
   /** OButton variant for the primary button. @default "primary" */
   primaryButtonVariant?: ButtonVariant;
