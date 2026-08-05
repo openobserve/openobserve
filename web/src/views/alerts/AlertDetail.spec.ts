@@ -371,4 +371,41 @@ describe("AlertDetail — History tab", () => {
       expect(back.to.query.org_identifier).toBeTruthy();
     });
   });
+
+  describe("edit navigation", () => {
+    beforeEach(() => {
+      for (const key of Object.keys(mockRouteQuery)) delete mockRouteQuery[key];
+      mockRouterPush.mockClear();
+    });
+
+    it("goes straight to the editor, not through the list", async () => {
+      // Editing used to push the list route with ?action=update, so the list
+      // rendered and refetched before the form appeared.
+      const wrapper = await mountView({});
+      await wrapper.find('[data-test="alerts-alertdetail-edit"]').trigger("click");
+
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      const target = mockRouterPush.mock.calls[0][0];
+
+      expect(target.name).toBe("editAlert");
+      expect(target.params.alert_id).toBe("alert-1");
+      expect(target.query.action).toBeUndefined();
+    });
+
+    it("carries the folder so saving returns to the right one", async () => {
+      mockRouteQuery.folder = "team-a";
+
+      const wrapper = await mountView({});
+      await wrapper.find('[data-test="alerts-alertdetail-edit"]').trigger("click");
+
+      expect(mockRouterPush.mock.calls[0][0].query.folder).toBe("team-a");
+    });
+
+    it("falls back to the default folder when none was carried in", async () => {
+      const wrapper = await mountView({});
+      await wrapper.find('[data-test="alerts-alertdetail-edit"]').trigger("click");
+
+      expect(mockRouterPush.mock.calls[0][0].query.folder).toBe("default");
+    });
+  });
 });
