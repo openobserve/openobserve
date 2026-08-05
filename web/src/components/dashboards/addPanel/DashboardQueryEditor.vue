@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :maxlength="60"
                   :id="`dashboard-query-rename-input-${index}`"
                   :aria-label="t('dashboard.renameQuery')"
-                  class="text-tabs-active-text field-sizing-content min-w-16 max-w-40 shrink-0 bg-transparent px-0.5 text-sm outline-none"
+                  class="text-tabs-active-text field-sizing-content max-w-40 min-w-16 shrink-0 bg-transparent px-0.5 text-sm outline-none"
                   :data-test="`dashboard-panel-query-tab-name-input-${index}`"
                   @mousedown.stop
                   @dblclick.stop
