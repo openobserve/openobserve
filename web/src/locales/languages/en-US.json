@@ -12495,6 +12495,7 @@
       "exhausted": "Budget exhausted (0%)",
       "neutralBurn": "Budget-neutral (×1)",
       "empty": "No slices measured in this window yet.",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events — the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "Could not load measurement history",
       "about": "About this chart",
       "formulaLabel": "Formula",

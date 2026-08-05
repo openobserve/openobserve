@@ -109,110 +109,127 @@
     <!-- No `mt-*`: OContent's bottom inset above already separates the strip
          from the tabs, and no horizontal padding either — a tab strip's first
          label self-aligns to the page-edge grid. -->
-    <OTabs v-model="tab" data-test="slos-slodetail-tabs">
+    <OTabs v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
       <OTab name="trend" :label="t('slos.tab.trend')" icon="show-chart" />
       <OTab name="groups" :label="t('slos.tab.groups')" icon="layers" v-if="isGrouped" />
       <OTab name="config" :label="t('slos.tab.configuration')" icon="settings" />
     </OTabs>
 
-    <OTabPanels v-model="tab">
-      <OTabPanel name="trend">
-        <OContent>
-          <SloBurndownChart
-            v-if="slo"
-            :slo-id="slo.id"
-            :generation="slo.definition_generation"
-            :target="slo.target"
-            :window-secs="slo.window_secs"
-            :slice-interval-secs="slo.slice_interval_secs"
-            :sli-type="slo.sli_type"
-            data-test="slos-slodetail-burndown"
-          />
-        </OContent>
-      </OTabPanel>
+    <!-- The page body is a FIXED flex column (OPageLayout's default: no
+         `scroll`, so nothing scrolls unless something inside says it does), and
+         the panels below it are taller than a short viewport — two 15rem charts
+         on Trend, a JSON block on Configuration. Without a scroller here they
+         were simply clipped: on a 1280×620 screen the burn-rate panel ended
+         ~245px below the fold with no way to reach it.
 
-      <OTabPanel v-if="isGrouped" name="groups">
-        <OTable
-          :data="groups"
-          :columns="groupColumns"
-          row-key="group_key"
-          :loading="groupsLoading"
-          :frame="false"
-          :page-size="25"
-          :show-global-filter="false"
-          table-id="slo-groups"
-          data-test="slos-slodetail-groups-table"
-        >
-          <template #cell-group_key="{ row }">
-            <span class="text-compact font-mono">{{ row.group_key }}</span>
-          </template>
-          <template #cell-sli="{ row }">
-            <span v-if="!row.no_data" class="tabular-nums">{{ formatSli(row.sli) }}</span>
-            <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-          </template>
-          <template #cell-budget="{ row }">
-            <span
-              v-if="!row.no_data"
-              class="tabular-nums"
-              :class="(row.error_budget_remaining ?? 0) <= 0 ? 'text-negative font-semibold' : ''"
-            >
-              {{ formatBudget(row.error_budget_remaining) }}
-            </span>
-            <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-          </template>
-          <template #cell-burn="{ row }">
-            <span v-if="!row.no_data" class="tabular-nums">{{ formatBurn(row.burn_rate) }}</span>
-            <span v-else class="text-text-secondary">{{ ABSENT }}</span>
-          </template>
-          <template #cell-coverage="{ row }">
-            <span class="tabular-nums" :class="row.no_data ? 'text-warning font-semibold' : ''">
-              {{ formatCoverage(row.coverage) }}
-            </span>
-          </template>
-          <template #empty>
-            <OEmptyState
-              icon="layers"
-              :title="t('slos.groups.emptyTitle')"
-              :description="t('slos.groups.emptyDescription')"
+         The header, stat strip and tab bar stay PINNED (`shrink-0`) and only
+         the panel scrolls — scrolling the whole body instead would push the
+         SLI and budget numbers off-screen, and those are the readings the
+         charts below are being compared against. -->
+    <div class="min-h-0 flex-1">
+      <OTabPanels v-model="tab" grow scroll="y" class="h-full min-h-0">
+        <OTabPanel name="trend">
+          <OContent>
+            <SloBurndownChart
+              v-if="slo"
+              :slo-id="slo.id"
+              :generation="slo.definition_generation"
+              :target="slo.target"
+              :window-secs="slo.window_secs"
+              :slice-interval-secs="slo.slice_interval_secs"
+              :sli-type="slo.sli_type"
+              data-test="slos-slodetail-burndown"
             />
-          </template>
-        </OTable>
-      </OTabPanel>
+          </OContent>
+        </OTabPanel>
 
-      <OTabPanel name="config">
-        <OContent v-if="slo">
-          <dl class="text-compact grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2">
-            <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
-            <dd>{{ sliTypeLabel(slo.sli_type) }}</dd>
-
-            <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
-            <dd>
-              {{ formatTarget(slo.target) }}
-              <span class="text-text-secondary">
-                {{ t("slos.overRolling", { window: formatWindow(slo.window_secs) }) }}
+        <!-- Deliberately NOT `stretch`/`fill-height`: this OTable is `h-auto`,
+             so it sizes to its 25 rows and rides the one scroller above rather
+             than opening a second, nested one. Every tab then scrolls the same
+             way, which is the point of putting the scroller on the panels. -->
+        <OTabPanel v-if="isGrouped" name="groups">
+          <OTable
+            :data="groups"
+            :columns="groupColumns"
+            row-key="group_key"
+            :loading="groupsLoading"
+            :frame="false"
+            :page-size="25"
+            :show-global-filter="false"
+            table-id="slo-groups"
+            data-test="slos-slodetail-groups-table"
+          >
+            <template #cell-group_key="{ row }">
+              <span class="text-compact font-mono">{{ row.group_key }}</span>
+            </template>
+            <template #cell-sli="{ row }">
+              <span v-if="!row.no_data" class="tabular-nums">{{ formatSli(row.sli) }}</span>
+              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+            </template>
+            <template #cell-budget="{ row }">
+              <span
+                v-if="!row.no_data"
+                class="tabular-nums"
+                :class="(row.error_budget_remaining ?? 0) <= 0 ? 'text-negative font-semibold' : ''"
+              >
+                {{ formatBudget(row.error_budget_remaining) }}
               </span>
-            </dd>
+              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+            </template>
+            <template #cell-burn="{ row }">
+              <span v-if="!row.no_data" class="tabular-nums">{{ formatBurn(row.burn_rate) }}</span>
+              <span v-else class="text-text-secondary">{{ ABSENT }}</span>
+            </template>
+            <template #cell-coverage="{ row }">
+              <span class="tabular-nums" :class="row.no_data ? 'text-warning font-semibold' : ''">
+                {{ formatCoverage(row.coverage) }}
+              </span>
+            </template>
+            <template #empty>
+              <OEmptyState
+                icon="layers"
+                :title="t('slos.groups.emptyTitle')"
+                :description="t('slos.groups.emptyDescription')"
+              />
+            </template>
+          </OTable>
+        </OTabPanel>
 
-            <dt class="text-text-secondary">{{ t("slos.field.sliceInterval") }}</dt>
-            <dd>{{ formatSlice(slo.slice_interval_secs) }}</dd>
+        <OTabPanel name="config">
+          <OContent v-if="slo">
+            <dl class="text-compact grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2">
+              <dt class="text-text-secondary">{{ t("slos.field.sliType") }}</dt>
+              <dd>{{ sliTypeLabel(slo.sli_type) }}</dd>
 
-            <dt class="text-text-secondary">{{ t("slos.field.groupBy") }}</dt>
-            <dd>
-              <span v-if="isGrouped" class="font-mono">{{ slo.group_by?.join(", ") }}</span>
-              <span v-else class="text-text-secondary">{{ t("slos.noGrouping") }}</span>
-            </dd>
+              <dt class="text-text-secondary">{{ t("slos.field.target") }}</dt>
+              <dd>
+                {{ formatTarget(slo.target) }}
+                <span class="text-text-secondary">
+                  {{ t("slos.overRolling", { window: formatWindow(slo.window_secs) }) }}
+                </span>
+              </dd>
 
-            <dt class="text-text-secondary">{{ t("slos.field.reservation") }}</dt>
-            <dd>{{ t("slos.reservationValue", { groups: slo.groups_reserved }) }}</dd>
+              <dt class="text-text-secondary">{{ t("slos.field.sliceInterval") }}</dt>
+              <dd>{{ formatSlice(slo.slice_interval_secs) }}</dd>
 
-            <dt class="text-text-secondary">{{ t("slos.field.owner") }}</dt>
-            <dd>{{ slo.owner || ABSENT }}</dd>
-          </dl>
+              <dt class="text-text-secondary">{{ t("slos.field.groupBy") }}</dt>
+              <dd>
+                <span v-if="isGrouped" class="font-mono">{{ slo.group_by?.join(", ") }}</span>
+                <span v-else class="text-text-secondary">{{ t("slos.noGrouping") }}</span>
+              </dd>
 
-          <OCode class="mt-4" language="json" :code="configJson" />
-        </OContent>
-      </OTabPanel>
-    </OTabPanels>
+              <dt class="text-text-secondary">{{ t("slos.field.reservation") }}</dt>
+              <dd>{{ t("slos.reservationValue", { groups: slo.groups_reserved }) }}</dd>
+
+              <dt class="text-text-secondary">{{ t("slos.field.owner") }}</dt>
+              <dd>{{ slo.owner || ABSENT }}</dd>
+            </dl>
+
+            <OCode class="mt-4" language="json" :code="configJson" />
+          </OContent>
+        </OTabPanel>
+      </OTabPanels>
+    </div>
   </OPageLayout>
 </template>
 

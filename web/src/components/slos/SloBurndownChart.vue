@@ -43,6 +43,28 @@
 -->
 <template>
   <div class="flex flex-col gap-3" data-test="slos-sloburndownchart-root">
+    <!-- Coverage is a property of the DATA, not of either panel, so it is
+         stated once above both rather than twice in their headers. Without it
+         a window that is almost entirely unmeasured renders as two panels of
+         bare axes and the reader has no way to tell that apart from a broken
+         chart — which is the whole failure this note exists to prevent. -->
+    <OBanner
+      v-if="sparse && !loading && !error"
+      variant="info"
+      icon="info"
+      dense
+      data-test="slos-sloburndownchart-sparse"
+    >
+      <span class="text-compact">
+        {{
+          t("slos.chart.sparseCoverage", {
+            measured: measuredBuckets,
+            total: points.length,
+          })
+        }}
+      </span>
+    </OBanner>
+
     <div
       v-for="panel in panels"
       :key="panel.key"
@@ -127,6 +149,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -178,6 +201,23 @@ const loading = ref(false);
 const error = ref("");
 
 const hasData = computed(() => points.value.some((p) => p.remaining !== null || p.burn !== null));
+
+/** Buckets that actually scored something. `burn` is non-null exactly when the
+ *  bucket had events, which makes it the measured/unmeasured flag — `remaining`
+ *  is not, because cumulative spend carries forward across a trailing gap and
+ *  stays non-null over time nobody measured. */
+const measuredBuckets = computed(() => points.value.filter((p) => p.burn !== null).length);
+
+/** Below this share of measured buckets the pair reads as EMPTY even though it
+ *  is not: too few segments to form a line, and the panels come up as bare
+ *  axes. A backfilled SLO sits here — the window is thirty days and the stream
+ *  may only have started reporting an hour ago — and so does any window that
+ *  spans a long ingestion outage. */
+const SPARSE_BUCKET_SHARE = 0.25;
+
+const sparse = computed(
+  () => hasData.value && measuredBuckets.value < points.value.length * SPARSE_BUCKET_SHARE,
+);
 
 /** Read a design token for the chart renderer, which takes colour STRINGS and
  *  cannot be handed a utility class. Resolved at build time rather than
@@ -283,6 +323,27 @@ function twoUnitTooltip(rows: (value: number) => Array<[string, string]>) {
   };
 }
 
+/**
+ * Series data carrying a marker on every ISOLATED point.
+ *
+ * A line is drawn BETWEEN points, so a measured bucket whose neighbours are
+ * both gaps has no segment to belong to: with `showSymbol: false` it renders
+ * as nothing whatsoever. That is not a corner case on this page — a window
+ * that is mostly backfilled empty slices (a new SLO, or a stream that only
+ * started reporting an hour ago) collapses to ONE measured bucket, and the
+ * panel then comes up as bare axes. `hasData` is true, so not even the empty
+ * state fires to explain it.
+ *
+ * Marking ONLY the isolated points is what keeps a dense series clean:
+ * everywhere the line already shows the value, the symbol stays at size 0.
+ */
+function withIsolatedMarkers(values: (number | null)[]) {
+  return values.map((value, i) => ({
+    value,
+    symbolSize: value !== null && values[i - 1] == null && values[i + 1] == null ? 5 : 0,
+  }));
+}
+
 /** A right-hand axis is a SCALE, not a second series: it borrows the left
  *  axis's gridlines and draws no chrome of its own, so nobody goes hunting for
  *  the line that belongs to it. */
@@ -355,13 +416,15 @@ const budgetOptions = computed(() => {
         name: t("slos.chart.budgetRemaining"),
         type: "line",
         smooth: false,
-        showSymbol: false,
+        // Symbols are sized per point rather than switched off wholesale — see
+        // `withIsolatedMarkers`. Everything with a neighbour draws at size 0.
+        showSymbol: true,
         // Gaps stay gaps: an unmeasured bucket is `null`, and joining across it
         // would draw a budget line through time nobody observed.
         connectNulls: false,
         lineStyle: { width: 2, color: accent },
         itemStyle: { color: accent },
-        data: points.value.map((p) => p.remaining),
+        data: withIsolatedMarkers(points.value.map((p) => p.remaining)),
         markLine: {
           symbol: "none",
           animation: false,
@@ -419,11 +482,11 @@ const burnOptions = computed(() => {
         name: t("slos.chart.burnRate"),
         type: "line",
         smooth: false,
-        showSymbol: false,
+        showSymbol: true,
         connectNulls: false,
         lineStyle: { width: 2, color: accent },
         itemStyle: { color: accent },
-        data: points.value.map((p) => p.burn),
+        data: withIsolatedMarkers(points.value.map((p) => p.burn)),
         // ×1 is the only threshold that means anything here: at exactly 1 the
         // budget lands on the window's end. Above it the SLO is overspending,
         // below it is banking budget — which is unreadable without the line.
