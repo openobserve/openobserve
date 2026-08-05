@@ -17,15 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar bg-section-header-bg flex h-10 flex-row items-center justify-between gap-x-3"
+      class="sql-bar bg-surface-base border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b"
       @click.stop
     >
-      <div class="flex min-w-0 flex-1 flex-row items-center" data-test="dashboard-query-data">
-        <div class="max-w-150 overflow-hidden">
+      <div
+        class="flex min-w-0 flex-1 flex-row items-center self-stretch"
+        data-test="dashboard-query-data"
+      >
+        <!-- -mt-0.75 cancels the pt-0.75 OTabs puts inside its scroll container,
+             so the full-height tabs center between the bar's two separators and
+             the active underline lands on the bottom divider. -->
+        <div class="-mt-0.75 min-w-0 self-stretch">
           <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
-            dense
-            mobile-arrows
             @click.stop
             data-test="dashboard-panel-query-tab"
           >
@@ -104,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="close"
                 size="sm"
-                class="hover:bg-hover-gray cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
+                class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
@@ -167,34 +171,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-border-default h-full w-1 transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
-              <UnifiedQueryEditor
-                ref="queryEditorRef"
-                :languages="['sql', 'promql']"
-                :default-language="dashboardPanelData.data.queryType"
-                :query="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query
-                "
-                :read-only="
-                  !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .customQuery
-                "
-                :hide-nl-toggle="
-                  !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .customQuery
-                "
-                :keywords="currentEditorKeywords"
-                :suggestions="currentEditorSuggestions"
-                :field-value-resolver="resolveFieldValues"
-                @update:query="handleQueryUpdate"
-                @focus="_sqlOnFocus"
-                @blur="_sqlOnBlur"
-                @language-change="handleLanguageChange"
-                @ask-ai="handleAskAI"
-                @run-query="handleRunQuery"
-                data-test="dashboard-panel-query-editor"
-                data-test-prefix="dashboard-query"
-                editor-height="100%"
-              />
+              <div class="relative h-full w-full">
+                <UnifiedQueryEditor
+                  ref="queryEditorRef"
+                  :languages="['sql', 'promql']"
+                  :default-language="dashboardPanelData.data.queryType"
+                  :query="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .query
+                  "
+                  :read-only="
+                    !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery
+                  "
+                  :hide-nl-toggle="
+                    !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery
+                  "
+                  :keywords="currentEditorKeywords"
+                  :suggestions="currentEditorSuggestions"
+                  :field-value-resolver="resolveFieldValues"
+                  @update:query="handleQueryUpdate"
+                  @focus="_sqlOnFocus"
+                  @blur="_sqlOnBlur"
+                  @language-change="handleLanguageChange"
+                  @ask-ai="handleAskAI"
+                  @run-query="handleRunQuery"
+                  data-test="dashboard-panel-query-editor"
+                  data-test-prefix="dashboard-query"
+                  editor-height="100%"
+                />
+              </div>
             </template>
             <template #after>
               <div class="flex h-full w-full flex-col">
