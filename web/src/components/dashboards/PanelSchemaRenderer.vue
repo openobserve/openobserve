@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{
             errorDetail?.code?.toString().startsWith("4")
               ? errorDetail.message
-              : "Error Loading Data"
+              : t("common.errorLoadingData")
           }}
         </div>
       </div>
@@ -243,7 +243,7 @@ import {
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
@@ -461,7 +461,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
 
@@ -492,7 +492,7 @@ export default defineComponent({
     // wrong panel data in contexts that don't need the hiding feature
     let dashboardPanelDataForHiding: any = null;
     if (dashboardPanelDataPageKey) {
-      const result = useDashboardPanelData(dashboardPanelDataPageKey);
+      const result = useDashboardPanelData(dashboardPanelDataPageKey, t);
       dashboardPanelDataForHiding = result.dashboardPanelData;
     }
 
@@ -604,7 +604,7 @@ export default defineComponent({
     const metricCopiedIdx = ref<number | null>(null);
     const copyMetricItem = (m: any) => {
       if (m?.text == null) return;
-      copyToClipboard(String(m.text), { silent: true }).then(() => {
+      copyToClipboard(String(m.text), t, { silent: true }).then(() => {
         metricCopiedIdx.value = m?.idx;
         setTimeout(() => {
           if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
@@ -688,6 +688,7 @@ export default defineComponent({
       dashboardId.value,
       panelSchema.value.id,
       folderId.value,
+      t,
     );
 
     // Filter data based on hiddenQueries for PromQL panels

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // timing waterfall, and assertion outcomes. No steps/screenshots/replay
 // (those are browser-run concepts).
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -48,16 +48,22 @@ const props = withDefaults(
 const emit = defineEmits<{
   (
     e: "update-status",
-    status: { variant: BadgeVariant; icon: string; label: string; url: string; timestamp: string },
+    status: {
+      variant: BadgeVariant;
+      icon: string;
+      label: I18nText;
+      url: string;
+      timestamp: string;
+    },
   ): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 // The check's folder ID, carried on the results-page route as ?folder=.
 const folderId = computed(() => String(route.query.folder ?? ""));
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 
 const run = computed(() => synthetics.protocolRunDetail.value);
 
@@ -249,7 +255,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
-        :subtitle="run ? fmtTs(run.timestamp) : ''"
+        :subtitle="raw(run ? fmtTs(run.timestamp) : '')"
         :back="{
           label: t('synthetics.results.monitors'),
           to: backTo,
@@ -507,8 +513,10 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
                 t("synthetics.protocolRun.timeline")
               }}</span>
               <span class="text-xs">
-                {{ t("synthetics.protocolRun.scheduled") }} {{ fmtTs(run.scheduledTs) }} →
-                {{ t("synthetics.protocolRun.started") }} {{ fmtTs(run.startedTs) }} →
+                {{ t("synthetics.protocolRun.scheduled") }} {{ fmtTs(run.scheduledTs) }}
+                {{ t("synthetics.protocolRun.timelineArrow") }}
+                {{ t("synthetics.protocolRun.started") }} {{ fmtTs(run.startedTs) }}
+                {{ t("synthetics.protocolRun.timelineArrow") }}
                 {{ t("synthetics.protocolRun.completed") }} {{ fmtTs(run.completedTs) }}
               </span>
             </div>

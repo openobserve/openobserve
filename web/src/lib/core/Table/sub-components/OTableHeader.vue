@@ -4,7 +4,7 @@
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
 import { FlexRender } from "@tanstack/vue-table";
 import { computed, inject, reactive } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -14,6 +14,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 
+const { t } = useI18nTyped();
 const props = defineProps<{
   headerGroups: HeaderGroup<any>[];
   table: Table<any>;
@@ -45,8 +46,6 @@ const props = defineProps<{
   /** Show the per-column value-filter dropdown on filterable columns. */
   enableColumnFilter?: boolean;
 }>();
-
-const { t } = useI18n();
 
 // ── Per-column value filter ─────────────────────────────────────
 // Filter state lives in the TanStack instance (column.getFilterValue /
@@ -592,7 +591,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             type="button"
             :data-test="`o2-table-th-remove-${header.id}-btn`"
             class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-            aria-label="Remove column"
+            :aria-label="t('components.table.removeColumnAria')"
             @click.stop="emit('close-column', header.column.columnDef)"
           >
             <OIcon name="close" size="xs" />
@@ -685,7 +684,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         <div
           v-if="header.column.getCanResize()"
           class="resizer group/resizer absolute top-0 right-0 z-10 flex h-full w-1.25 cursor-col-resize touch-none items-center justify-end select-none"
-          :title="'Drag to resize · double-click to reset'"
+          :title="t('common.dragToResizeResetHint')"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="startResize(header, $event)"
           @touchstart.prevent.stop="startResize(header, $event)"
@@ -862,7 +861,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             type="button"
             :data-test="`o2-table-th-remove-${header.id}-btn`"
             class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-            aria-label="Remove column"
+            :aria-label="t('components.table.removeColumnAria')"
             @click.stop="emit('close-column', header.column.columnDef)"
           >
             <OIcon name="close" size="xs" />
@@ -953,7 +952,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         <div
           v-if="header.column.getCanResize()"
           class="resizer group/resizer absolute top-0 right-0 z-10 flex h-full w-1.25 cursor-col-resize touch-none items-center justify-end select-none"
-          :title="'Drag to resize · double-click to reset'"
+          :title="t('common.dragToResizeResetHint')"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="startResize(header, $event)"
           @touchstart.prevent.stop="startResize(header, $event)"

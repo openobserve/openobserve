@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ (currentPage - 1) * displayPageSize + 1 }}–{{
               Math.min(currentPage * displayPageSize, searchResults.length)
             }}
-            of {{ searchResults.length }}
+            {{ t("search.of") }} {{ searchResults.length }}
           </span>
           <OPagination
             :model-value="currentPage"
@@ -335,7 +335,7 @@ import {
   resolveSetId,
   type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -377,7 +377,7 @@ const emit = defineEmits<{
 }>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
@@ -600,7 +600,7 @@ const highlightQuery = computed(() => {
 const getFilterOptions = (
   key: string,
   currentValue: string,
-): Array<{ label: string; value: string }> => {
+): Array<{ label: I18nText; value: string }> => {
   const uniqueValues = new Set<string>();
 
   // Always include wildcard option
@@ -634,7 +634,7 @@ const getFilterOptions = (
 
   // Convert to { label, value } format for the select with map-options
   return Array.from(uniqueValues).map((val) => ({
-    label: val === SELECT_ALL_VALUE ? "All Values" : val,
+    label: val === SELECT_ALL_VALUE ? t("correlation.logs.allValues") : raw(val),
     value: val,
   }));
 };
@@ -858,7 +858,7 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
         id: field,
         accessorKey: field,
         label: t("search.timestamp") + ` (${store.state.timezone})`,
-        header: t("search.timestamp") + ` (${store.state.timezone})`,
+        header: raw(`${t("search.timestamp")} (${store.state.timezone})`),
         align: "left",
         sortable: true,
         enableResizing: false,
@@ -891,7 +891,7 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
       name: field,
       id: field,
       accessorKey: field,
-      header: field,
+      header: raw(field),
       align: "left",
       sortable: true,
       enableResizing: true,
@@ -996,8 +996,8 @@ const handleRowClick = () => {};
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData, {
-    successMessage: "Content Copied Successfully!",
+  copyToClipboard(copyData, t, {
+    successMessage: t("common.contentCopiedSuccessfully"),
     timeout: 1000,
   });
 };
@@ -1024,14 +1024,14 @@ const handleAddFieldToTable = (field: string) => {
     // Show success notification
     toast({
       variant: "success",
-      message: `Column "${field}" added to table`,
+      message: t("toastMessages.correlation.columnAddedToTable", { name: field }),
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
     toast({
       variant: "info",
-      message: `Column "${field}" is already visible`,
+      message: t("toastMessages.correlation.columnIsAlreadyVisible", { name: field }),
       timeout: 1500,
     });
   }
@@ -1347,7 +1347,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
       (key) =>
         ({
           key,
-          label: dimensionDisplayLabel(key),
+          label: raw(dimensionDisplayLabel(key)),
           value: chipDimensionSource.value[key],
           kind: "context" as DimensionChip["kind"],
         }) as DimensionChip,

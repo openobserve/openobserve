@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -104,7 +104,7 @@ import {
   buildTriggerSampleText,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const running = ref(false);
@@ -165,9 +165,9 @@ const runFromOptions = computed(() => {
     const type = n.data?.node_type;
     seen[type] = (seen[type] || 0) + 1;
     const base = t(nodeMeta(type)?.titleKey || type);
-    const numbered = totals[type] > 1 ? `${base} ${seen[type]}` : base;
+    const numbered = totals[type] > 1 ? raw(`${base} ${seen[type]}`) : base;
     const detail = nodeDetail(n);
-    return { label: detail ? `${numbered} · ${detail}` : numbered, value: n.id };
+    return { label: detail ? raw(`${numbered} · ${detail}`) : numbered, value: n.id };
   });
   return [{ label: t("workflow.test.runFromBeginning"), value: RUN_FROM_BEGINNING }, ...opts];
 });
@@ -199,7 +199,7 @@ const run = async () => {
   if (r.ok) workflowObj.testRun.show = false;
   else
     toast({
-      message: r.error || t("workflow.test.runError"),
+      message: raw(r.error || t("workflow.test.runError")),
       variant: "error",
     });
 };

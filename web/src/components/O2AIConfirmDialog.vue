@@ -36,7 +36,7 @@
             @click="handleConfirm"
             @focus="handleYesFocus"
             @blur="handleYesBlur"
-            >Allow</OButton
+            >{{ t("aiAssistant.confirmDialog.allow") }}</OButton
           >
           <OButton
             ref="alwaysButtonRef"
@@ -52,7 +52,7 @@
             @click="handleAlwaysConfirm"
             @focus="handleAlwaysFocus"
             @blur="handleAlwaysBlur"
-            >Always Allow</OButton
+            >{{ t("aiAssistant.confirmDialog.alwaysAllow") }}</OButton
           >
           <OButton
             ref="noButtonRef"
@@ -68,7 +68,7 @@
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"
-            >No</OButton
+            >{{ t("aiAssistant.confirmDialog.no") }}</OButton
           >
         </template>
 
@@ -88,7 +88,7 @@
             @click="handleConfirm"
             @focus="handleYesFocus"
             @blur="handleYesBlur"
-            >{{ confirmLabel }}</OButton
+            >{{ resolvedConfirmLabel }}</OButton
           >
           <OButton
             ref="noButtonRef"
@@ -104,7 +104,7 @@
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"
-            >{{ cancelLabel }}</OButton
+            >{{ resolvedCancelLabel }}</OButton
           >
         </template>
       </div>
@@ -114,27 +114,32 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, onMounted, onUnmounted } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface ConfirmationData {
   tool?: string;
   args?: Record<string, any>;
-  message?: string;
+  message?: I18nText;
 }
 
 interface Props {
   visible: boolean;
   confirmation: ConfirmationData | null;
-  confirmLabel?: string;
-  cancelLabel?: string;
+  confirmLabel?: I18nText;
+  cancelLabel?: I18nText;
 }
 
+const { t } = useI18nTyped();
+
 const props = withDefaults(defineProps<Props>(), {
-  confirmLabel: "Yes",
-  cancelLabel: "No",
   confirmation: null,
 });
+
+// Render-time defaults — a withDefaults literal would freeze the English text.
+const resolvedConfirmLabel = computed(() => props.confirmLabel ?? t("common.yes"));
+const resolvedCancelLabel = computed(() => props.cancelLabel ?? t("common.no"));
 
 const emit = defineEmits<{
   confirm: [];

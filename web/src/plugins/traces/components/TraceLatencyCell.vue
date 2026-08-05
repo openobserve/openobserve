@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
@@ -72,7 +72,7 @@ const props = defineProps<{
   item: Record<string, any>;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { searchObj } = useTraces();
 const serviceColors = computed(() => searchObj.meta.serviceColors ?? {});
 

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import type { StreamInfo } from "@/services/service_streams";
@@ -34,7 +36,7 @@ export interface CorrelatedLogsProps {
   sourceEvent?: {
     timestamp?: number | string;
     severity?: string;
-    message?: string;
+    message?: I18nText;
   };
   logStreams: StreamInfo[];
   sourceStream: string;

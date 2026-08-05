@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Discord prebuilt destination configuration
@@ -101,7 +101,7 @@ export const discordConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.discordWebhookUrl",
       type: "text",
       required: true,
-      hint: "Get your webhook URL from Discord channel settings",
+      hintKey: "alerts.prebuiltDestinations.discordWebhookUrlHint",
       validator: (url: string) => {
         const invalid = { key: "alerts.prebuiltDestinations.invalidDiscordWebhookUrl" };
         try {
@@ -122,17 +122,17 @@ export const discordConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.discordUsername",
       type: "text",
       required: false,
-      hint: "Custom username for the webhook bot",
+      hintKey: "alerts.prebuiltDestinations.discordUsernameHint",
     },
   ],
 };
 
 import discordLogo from "@/assets/images/alerts/destinations/discord.png";
 
-export const discordDestinationType = {
+export const discordDestinationType: PrebuiltType = {
   id: "discord",
   name: "Discord",
-  description: "Send notifications to Discord channels",
+  descriptionKey: "alert_destinations.prebuilt.discordDescription",
   icon: "discord",
   image: discordLogo,
   popular: true,

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 // Services
 import alertDestinationService from "@/services/alert_destination";
@@ -68,7 +68,7 @@ function parseEmailRecipients(recipients: string | string[]): string[] {
  * Provides functionality for template management, validation, testing, and creation
  */
 export function usePrebuiltDestinations() {
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const store = useStore();
 
   // Reactive state

@@ -19,7 +19,7 @@
     :open="open"
     side="right"
     :width="55"
-    :title="title"
+    :title="raw(title)"
     data-test="agent-signal-detail-panel"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
@@ -153,7 +153,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -196,13 +196,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: "update:open", v: boolean): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
 const errorRows = ref<
   Array<{
-    message: string;
+    message: I18nText;
     full: string;
     occurrences: number;
     traces: number;
@@ -488,7 +488,7 @@ const fetchDetails = async () => {
       ).map((h: any) => ({
         // `message` is the condensed one-line gist (scannable); `full` is the
         // raw text, revealed on demand via the expand toggle.
-        message: condenseError(h.message),
+        message: raw(condenseError(h.message)),
         full: h.message,
         occurrences: h.occurrences,
         traces: h.traces,

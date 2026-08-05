@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useNotifications from "@/composables/useNotifications";
@@ -27,8 +28,9 @@ import {
   WebSocketErrorResponse,
 } from "@/ts/interfaces/query";
 import { generateTraceContext } from "@/utils/zincutils";
+import { raw } from "@/types/i18n";
 
-export const useSearchConnection = () => {
+export const useSearchConnection = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
   const { addTraceId, removeTraceId, fnParsedSQL, isLimitQuery, isDistinctQuery, isWithQuery } =
     logsUtils();
@@ -135,7 +137,10 @@ export const useSearchConnection = () => {
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
-        notificationMsg.value || "Error occurred while sending socket message.",
+        raw(
+          notificationMsg.value ||
+            t("toastMessages.useLogs.errorOccurredWhileSendingSocketMessage"),
+        ),
       );
       notificationMsg.value = "";
     }
@@ -177,7 +182,8 @@ export const useSearchConnection = () => {
           breakdownField: null,
           breakdownSeries: null,
           chartParams: {
-            title: "",
+            title: raw(""),
+            titleParts: null,
             unparsed_x_data: [],
             timezone: "",
           },
@@ -221,7 +227,11 @@ export const useSearchConnection = () => {
     } catch (e: any) {
       console.error(`Error while getting data through ${searchObj.communicationMethod}`, e);
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
+      showErrorNotification(
+        raw(
+          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+        ),
+      );
       notificationMsg.value = "";
     }
   };

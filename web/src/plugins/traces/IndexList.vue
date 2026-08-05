@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
-        :label="searchObj.data.stream.selectedStream?.label ? '' : t('search.selectIndex')"
+        :label="searchObj.data.stream.selectedStream?.label ? raw('') : t('search.selectIndex')"
         :options="streamOptions"
         data-cy="index-dropdown"
         @search="onStreamSearch"
@@ -104,7 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                          :title="
+                            t('common.durationGte', {
+                              value: formatPercentile(durationPercentiles[p.key]),
+                            })
+                          "
                           @click.stop="
                             addSearchTerm(
                               `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
@@ -117,7 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                          :title="
+                            t('common.durationLte', {
+                              value: formatPercentile(durationPercentiles[p.key]),
+                            })
+                          "
                           @click.stop="
                             addSearchTerm(
                               `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
@@ -169,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, defineAsyncComponent, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
@@ -226,7 +234,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { searchObj, tracesParser } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
 
@@ -299,7 +307,7 @@ export default defineComponent({
       // No match clears to the empty-stream sentinel (the codebase's "cleared"
       // convention everywhere else — resetSearchObj, SearchBar, Index).
       searchObj.data.stream.selectedStream = matched ?? {
-        label: "",
+        label: raw(""),
         value: "",
       };
       searchObj.data.query = "";
@@ -551,6 +559,7 @@ export default defineComponent({
       fieldName === "span_kind" ? spanKindValueMapper : undefined;
 
     return {
+      raw,
       t,
       store,
       router,

@@ -671,7 +671,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -713,7 +713,7 @@ const emit = defineEmits<{
   (e: "refresh-providers"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Co-located Zod schema (factory keeps messages i18n-driven). The form is
 // mounted fresh for each create/edit action, so building it once is safe.
@@ -815,7 +815,7 @@ const extraFieldTypeOptions = computed(() => [
 ]);
 
 const httpMethodOptions = computed(() =>
-  ["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => ({ label: m, value: m })),
+  ["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => ({ label: raw(m), value: m })),
 );
 
 const authTypeOptions = computed(() => [
@@ -859,7 +859,14 @@ function cleanHeaders(headers: CustomHeader[]) {
     .filter((h) => h.key.length > 0);
 }
 
-function cleanExtraFields(fields: ExtraMetadataField[]): ExtraMetadataField[] {
+// A row's `description` is free text the user typed, never a translated literal.
+type ExtraMetadataFieldRow = {
+  name: string;
+  type: ExtraMetadataField["type"];
+  description?: string;
+};
+
+function cleanExtraFields(fields: ExtraMetadataFieldRow[]): ExtraMetadataField[] {
   return fields
     .map((field) => ({
       name: field.name.trim(),
@@ -870,7 +877,7 @@ function cleanExtraFields(fields: ExtraMetadataField[]): ExtraMetadataField[] {
     .map((field) => ({
       name: field.name,
       type: field.type,
-      ...(field.description ? { description: field.description } : {}),
+      ...(field.description ? { description: raw(field.description) } : {}),
     }));
 }
 
@@ -1019,14 +1026,14 @@ const titleText = computed(() => {
 
 const scoreConfigOptions = computed(() =>
   props.scoreConfigs.map((config) => ({
-    label: config.name,
+    label: raw(config.name),
     value: entityId(config),
   })),
 );
 
 const providerOptions = computed(() =>
   props.providers.map((provider) => ({
-    label: provider.name,
+    label: raw(provider.name),
     value: provider.id,
   })),
 );

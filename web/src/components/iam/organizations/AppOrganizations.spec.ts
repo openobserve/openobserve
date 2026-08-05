@@ -970,14 +970,14 @@ describe("AppOrganizations.vue", () => {
       }).toThrow(); // Should throw because store is required
     });
 
-    it("should handle missing i18n gracefully", () => {
+    it("should mount without a locally supplied i18n", () => {
       expect(() => {
         wrapper = mount(AppOrganizations, {
           global: {
             plugins: [store],
           },
         });
-      }).toThrow(); // i18n is required by the component
+      }).not.toThrow();
     });
 
     it("should handle corrupted store state", () => {

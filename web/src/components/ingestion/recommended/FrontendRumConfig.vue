@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getIngestionURL, maskText } from "@/utils/zincutils";
 import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -39,6 +39,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
 import rumCard from "@/components/ingestion/setupCard/content/rum";
 import rumReactNativeCard from "@/components/ingestion/setupCard/content/rumReactNative";
+import type { I18nKey } from "@/types/i18n";
 
 defineProps<{
   currOrgIdentifier?: string;
@@ -46,7 +47,7 @@ defineProps<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const rumToken = computed<string>(() => store.state.organizationData?.rumToken?.rum_token ?? "");
 
@@ -64,7 +65,7 @@ const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
  */
 const PLATFORMS: {
   id: string;
-  labelKey: string;
+  labelKey: I18nKey;
   icon: IconName;
   build: () => RichCardContent;
 }[] = [

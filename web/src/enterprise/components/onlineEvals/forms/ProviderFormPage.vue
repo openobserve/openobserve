@@ -23,7 +23,7 @@
           <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
               class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
-              >01</span
+              >{{ t("onlineEvals.provider.sectionStep1") }}</span
             >
             <div class="text-text-heading m-0 text-sm font-semibold">
               {{ t("onlineEvals.provider.sectionTitle") }}
@@ -81,7 +81,7 @@
             </div>
             <OFormInput
               name="endpoint"
-              :placeholder="endpointPlaceholder"
+              :placeholder="raw(endpointPlaceholder)"
               size="sm"
               data-test="provider-form-endpoint-input"
             />
@@ -122,7 +122,7 @@
           <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
               class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
-              >02</span
+              >{{ t("onlineEvals.provider.sectionStep2") }}</span
             >
             <div class="text-text-heading m-0 text-sm font-semibold">
               {{ t("onlineEvals.provider.authSection") }}
@@ -185,7 +185,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -210,7 +210,7 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Co-located Zod schema (factory keeps messages i18n-driven). apiKey is optional
 // in both modes.
@@ -228,14 +228,14 @@ const form = useOForm<ProviderForm>({
 const formValues = form.useStore((s: any) => s.values as ProviderForm);
 
 const providerTypeOptions = computed(() => [
-  { label: "OpenAI", value: "openai" },
-  { label: "DeepSeek", value: "deepseek" },
-  { label: "Anthropic", value: "anthropic" },
-  { label: "Azure OpenAI", value: "azure_openai" },
-  { label: "Ollama", value: "ollama" },
-  { label: "vLLM", value: "vllm" },
-  { label: "OpenAI-compatible", value: "openai_compatible" },
-  { label: "Other", value: "other" },
+  { label: raw("OpenAI"), value: "openai" },
+  { label: raw("DeepSeek"), value: "deepseek" },
+  { label: raw("Anthropic"), value: "anthropic" },
+  { label: raw("Azure OpenAI"), value: "azure_openai" },
+  { label: raw("Ollama"), value: "ollama" },
+  { label: raw("vLLM"), value: "vllm" },
+  { label: raw("OpenAI-compatible"), value: "openai_compatible" },
+  { label: t("ingestion.otherLabel"), value: "other" },
 ]);
 
 // Default API endpoint for each provider type, shown as a placeholder to hint

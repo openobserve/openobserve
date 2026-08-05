@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
@@ -26,7 +26,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /**
  * Retry ceiling for this check's type, mirroring the server's
@@ -89,7 +89,7 @@ const retryDelayMs = computed({
           min="0"
           :max="maxRetries"
           class="w-25!"
-          placeholder="0"
+          :placeholder="raw('0')"
           data-test="synthetics-check-retries-count-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{
@@ -114,7 +114,7 @@ const retryDelayMs = computed({
           v-model="retryDelayMs"
           type="number"
           class="w-25!"
-          placeholder="0"
+          :placeholder="raw('0')"
           data-test="synthetics-check-retries-delay-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{

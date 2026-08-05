@@ -199,7 +199,7 @@ import {
   reactive,
   nextTick,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { getDashboard, deleteVariable, updateDashboard } from "../../../utils/commons";
@@ -237,7 +237,7 @@ export default defineComponent({
   emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const isAddVariable = ref(false);
 
@@ -254,7 +254,7 @@ export default defineComponent({
     const columns: OTableColumnDef[] = [
       {
         id: "drag",
-        header: "",
+        header: raw(""),
         size: 32,
         minSize: 32,
         maxSize: 32,
@@ -262,7 +262,7 @@ export default defineComponent({
       },
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
@@ -396,6 +396,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.variableSettingsPage.variableReorderFailed"),
+            t,
           );
         } else {
           showErrorNotification(
@@ -504,6 +505,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.variableSettingsPage.variableDeletionFailed"),
+            t,
           );
         } else {
           showErrorNotification(

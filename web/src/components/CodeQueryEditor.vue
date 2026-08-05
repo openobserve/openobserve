@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- name="" satisfies the required prop; empty name renders only the slot -->
       <OIcon name="" size="md">
-        <img :src="aiIcon" alt="AI" class="h-4.5 w-4.5" />
+        <img :src="aiIcon" :alt="t('search.aiIconAlt')" class="h-4.5 w-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
         <template #content>{{
@@ -57,8 +57,8 @@ import {
   onActivated,
   watch,
   computed,
+  type PropType,
 } from "vue";
-import type { PropType } from "vue";
 
 import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
 
@@ -121,7 +121,7 @@ import { useTheme } from "@/composables/useTheme";
 import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
-import { useI18n } from "vue-i18n";
+import { type I18nText, useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
@@ -203,8 +203,8 @@ export default defineComponent({
       default: false,
     },
     disableAiReason: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     /**
      * Resolves the values of one field, awaited by the completion provider.
@@ -231,7 +231,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
     let editorObj: any = null;
@@ -332,7 +332,7 @@ export default defineComponent({
           const errorMsg = isAuthError(streamingResponse.value)
             ? streamingResponse.value
             : t("search.nlQueryGenerationFailed");
-          showErrorNotification(errorMsg);
+          showErrorNotification(raw(errorMsg));
           if (isAuthError(streamingResponse.value)) {
             return; // Auth error already handled, don't trigger catch block
           }

@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import NoData from "@/components/shared/grid/NoData.vue";
 import BillingService from "@/services/billings";
@@ -71,13 +71,13 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const columns: OTableColumnDef[] = [
   {
     id: "id",
-    header: "#",
+    header: raw("#"),
     accessorKey: "id",
     sortable: true,
     meta: { align: "left" },
@@ -163,7 +163,7 @@ const invoiceHistory = ref<InvoiceRow[]>([]);
 const getInvoiceHistory = () => {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading invoice history...",
+    message: t("toastMessages.billings.pleaseWaitWhileLoadingInvoiceHistory"),
     timeout: 0,
   });
 
@@ -177,7 +177,7 @@ const getInvoiceHistory = () => {
             id: ++index,
             start_date: invoice.period_start,
             end_date: invoice.period_end,
-            paid: invoice.paid ? "Yes" : "No",
+            paid: invoice.paid ? t("common.yes") : t("common.no"),
             amount: invoice.total + " " + invoice.currency.toUpperCase(),
             amount_paid: invoice.amount_paid,
             amount_due: invoice.amount_due,
