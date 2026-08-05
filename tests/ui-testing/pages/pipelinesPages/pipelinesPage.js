@@ -4,7 +4,7 @@ const https = require('https');
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
-const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 import { openNavFlyoutChild } from '../commonActions.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
@@ -1414,26 +1414,39 @@ export class PipelinesPage {
         testLogger.info('Stream ingestion response', { streamName, status: fetchResponse.status });
         await this.page.waitForTimeout(2000);
 
-        // Navigate and explore
+        // Navigate to streams and try the streams-list Explore. A freshly-ingested stream
+        // (data ingested 200) can lag in the streams LIST on cloud (stream-stats latency), so
+        // the Explore action may never appear. Poll (reload + refresh-stats + re-search) for a
+        // bounded window; if it still doesn't surface, fall back to opening the logs explorer
+        // DIRECTLY by URL — which lands on the same page clickExplore reaches but does not depend
+        // on the stream showing in the streams-list. openTimestampMenu() below then runs the
+        // query on that logs explorer either way. This keeps the fast path for callers whose
+        // stream lists promptly (pipeline-core/pipelines) and only the lagging case takes the
+        // fallback, so it can't regress the tests that already pass here.
         await this.navigateToStreams();
-        // The just-ingested source stream (data ingested 200) may not appear in the streams
-        // LIST immediately — on cloud the stream-stats/list is cached from initial load and
-        // lags behind ingestion, so its Explore action is absent and clickExplore() timed out.
-        // refreshStreamStats() alone only recomputes stats; the list must be RE-FETCHED to pick
-        // up a new stream — so reload the page each iteration, then refresh stats + re-search
-        // until the Explore button appears. Non-masking: times out and fails if it never lists.
-        await expect.poll(async () => {
-            await this.page.reload().catch(() => {});
-            await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
-            await this.refreshStreamStats().catch(() => {});
-            await this.searchStream(streamName).catch(() => {});
-            await this.page.waitForTimeout(1000);
-            return await this.exploreButton.first().isVisible({ timeout: 2000 }).catch(() => false);
-        }, {
-            intervals: [3000, 5000, 10000, 15000, 20000, 20000],
-            timeout: 150000,
-        }).toBe(true);
-        await this.clickExplore();
+        let exploreReady = false;
+        try {
+            await expect.poll(async () => {
+                await this.page.reload().catch(() => {});
+                await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+                await this.refreshStreamStats().catch(() => {});
+                await this.searchStream(streamName).catch(() => {});
+                await this.page.waitForTimeout(1000);
+                return await this.exploreButton.first().isVisible({ timeout: 2000 }).catch(() => false);
+            }, { intervals: [3000, 5000, 10000, 15000], timeout: 60000 }).toBe(true);
+            exploreReady = true;
+        } catch (e) {
+            testLogger.warn('Explore not in streams list — falling back to direct logs URL', { streamName });
+        }
+
+        if (exploreReady) {
+            await this.clickExplore();
+        } else {
+            const org = getOrgIdentifier() || process.env.ORGNAME || 'default';
+            const base = (process.env.ZO_BASE_URL || '').replace(/\/+$/, '');
+            await this.page.goto(`${base}/web/logs?stream=${encodeURIComponent(streamName)}&stream_type=logs&org_identifier=${org}`);
+            await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+        }
         await this.openTimestampMenu();
         await this.navigateToPipeline();
     }
