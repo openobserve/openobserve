@@ -84,15 +84,7 @@ export interface LlmDatasetItemPayload {
   tags?: string[];
 }
 
-// Frontend-first: the `llm_datasets` schema exists but the HTTP API does not yet.
-// Until it ships, VITE_LLM_ANNOTATION_MOCK (default ON) serves in-memory
-// fixtures. Set it to "false" — a one-line swap — the moment the API lands; the
-// views and components never change.
-const USE_MOCK = import.meta.env.VITE_LLM_ANNOTATION_MOCK !== "false";
-
-// TODO(BE): confirm the real path when the datasets API lands (existing eval
-// endpoints are flat, e.g. `/api/{org}/score_configs`).
-const base = (org: string) => `/api/${org}/llm/datasets`;
+const base = (org: string) => `/api/${org}/datasets`;
 
 /** Fold the API's snake_case (or already-camel) row into the normalized shape. */
 function normalize(d: any): LlmDataset {
@@ -115,59 +107,6 @@ function normalize(d: any): LlmDataset {
     updatedAt: d.updated_at ?? d.updatedAt,
   };
 }
-
-// ─── Mock backend (removed the day VITE_LLM_ANNOTATION_MOCK flips to false) ──
-let mockSeq = 4;
-const mockDatasets: LlmDataset[] = [
-  {
-    id: "ds_mock_1",
-    name: "RAG regression set",
-    description: "Retrieval-augmented answers graded for faithfulness against the source docs.",
-    globalVersion: 214,
-    itemCount: 128,
-    tags: ["rag", "faithfulness", "retrieval"],
-    sources: { trace: 88, annotation: 34, manual: 6 },
-    createdBy: "priya@openobserve.ai",
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 21,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 2,
-  },
-  {
-    id: "ds_mock_2",
-    name: "Refund-policy goldens",
-    description: "Support replies about refunds, reviewed for policy accuracy.",
-    globalVersion: 96,
-    itemCount: 64,
-    tags: ["refund", "policy", "support"],
-    sources: { trace: 40, annotation: 20, manual: 4 },
-    createdBy: "sam@openobserve.ai",
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 9,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24,
-  },
-  {
-    id: "ds_mock_3",
-    name: "Hallucination goldens",
-    description: "Grounding checks for answers that must cite retrieved context.",
-    globalVersion: 12,
-    itemCount: 6,
-    tags: ["hallucination", "grounding"],
-    sources: { trace: 3, annotation: 2, manual: 1 },
-    createdBy: "you@openobserve.ai",
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 3,
-  },
-  {
-    id: "ds_mock_4",
-    name: "Tool-call accuracy",
-    description: "Agent tool invocations checked for correct tool and argument selection.",
-    globalVersion: 30,
-    itemCount: 22,
-    tags: ["tool-call", "agent", "args"],
-    sources: { trace: 18, annotation: 2, manual: 2 },
-    createdBy: "sam@openobserve.ai",
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 12,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 5,
-  },
-];
 
 /** Fold an API item row into the normalized shape. */
 function normalizeItem(d: any): LlmDatasetItem {
@@ -280,153 +219,96 @@ const withLatency = <T>(value: T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), 250));
 
 const llmDatasetsService = {
+  // Dataset-level CRUD is bound to the real API. The response has no
+  // itemCount/tags/sources — normalize() defaults them (TODO(BE): aggregate).
   async list(orgId: string): Promise<LlmDataset[]> {
-    if (USE_MOCK) return withLatency(mockDatasets.map(normalize));
     const res = await http().get(base(orgId));
     const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
     return rows.map(normalize);
   },
 
   async get(orgId: string, id: string): Promise<LlmDataset> {
-    if (USE_MOCK) {
-      const row = mockDatasets.find((d) => d.id === id);
-      if (!row) throw new Error("dataset not found");
-      return withLatency(normalize(row));
-    }
     const res = await http().get(`${base(orgId)}/${id}`);
     return normalize(res.data);
   },
 
-  async listItems(orgId: string, datasetId: string): Promise<LlmDatasetItem[]> {
-    if (USE_MOCK) {
-      const ds = mockDatasets.find((d) => d.id === datasetId);
-      const items = mockItems[datasetId] ?? generatedItems(datasetId, ds?.itemCount ?? 0);
-      return withLatency(items.map(normalizeItem));
-    }
-    const res = await http().get(`${base(orgId)}/${datasetId}/items`);
-    const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-    return rows.map(normalizeItem);
+  // TODO(BE): no list-dataset-items endpoint yet. Items stay on in-memory mock
+  // until the API lands; the whole item subsystem (list/add/edit/delete) is mock
+  // for consistency (add/edit/delete item endpoints are also incomplete).
+  async listItems(_orgId: string, datasetId: string): Promise<LlmDatasetItem[]> {
+    const items = mockItems[datasetId] ?? generatedItems(datasetId, 6);
+    return withLatency(items.map(normalizeItem));
   },
 
+  // Create/Update accept only { name, description } — the backend rejects extra
+  // fields (deny_unknown_fields). Dataset-level tags aren't in the API (tags are
+  // per-item), so they're dropped here (TODO(BE)).
   async update(orgId: string, id: string, payload: LlmDatasetPayload): Promise<LlmDataset> {
-    if (USE_MOCK) {
-      const row = mockDatasets.find((d) => d.id === id);
-      if (!row) throw new Error("dataset not found");
-      row.name = payload.name;
-      row.description = payload.description?.trim() ? payload.description.trim() : null;
-      row.tags = payload.tags ?? [];
-      row.updatedAt = Date.now();
-      return withLatency(normalize(row));
-    }
-    const res = await http().put(`${base(orgId)}/${id}`, payload);
+    const res = await http().put(`${base(orgId)}/${id}`, {
+      name: payload.name,
+      description: payload.description ?? null,
+    });
     return normalize(res.data);
   },
 
   async remove(orgId: string, id: string): Promise<void> {
-    if (USE_MOCK) {
-      const idx = mockDatasets.findIndex((d) => d.id === id);
-      if (idx >= 0) mockDatasets.splice(idx, 1);
-      delete mockItems[id];
-      return withLatency(undefined);
-    }
     await http().delete(`${base(orgId)}/${id}`);
   },
 
+  // Item mutations stay on mock (see listItems TODO(BE) above).
   async addItem(
-    orgId: string,
+    _orgId: string,
     datasetId: string,
     payload: LlmDatasetItemPayload,
   ): Promise<LlmDatasetItem> {
-    if (USE_MOCK) {
-      const row: LlmDatasetItem = {
-        id: `it_mock_${++mockItemSeq}`,
-        datasetId,
-        input: payload.input.trim(),
-        expectedOutput: payload.expectedOutput.trim(),
-        source: payload.source ?? "manual",
-        tags: payload.tags ?? [],
-        version: 1,
-        distilledFrom: null,
-        updatedAt: Date.now(),
-      };
-      (mockItems[datasetId] ??= []).unshift(row);
-      const ds = mockDatasets.find((d) => d.id === datasetId);
-      if (ds) {
-        ds.itemCount += 1;
-        ds.globalVersion += 1;
-        ds.updatedAt = Date.now();
-      }
-      return withLatency(normalizeItem(row));
-    }
-    const res = await http().post(`${base(orgId)}/${datasetId}/items`, payload);
-    return normalizeItem(res.data);
+    const row: LlmDatasetItem = {
+      id: `it_mock_${++mockItemSeq}`,
+      datasetId,
+      input: payload.input.trim(),
+      expectedOutput: payload.expectedOutput.trim(),
+      source: payload.source ?? "manual",
+      tags: payload.tags ?? [],
+      version: 1,
+      distilledFrom: null,
+      updatedAt: Date.now(),
+    };
+    (mockItems[datasetId] ??= []).unshift(row);
+    return withLatency(normalizeItem(row));
   },
 
   /** Edit an item. MVCC: changing expected_output appends a new version. */
   async updateItem(
-    orgId: string,
+    _orgId: string,
     datasetId: string,
     itemId: string,
     payload: LlmDatasetItemPayload,
   ): Promise<LlmDatasetItem> {
-    if (USE_MOCK) {
-      const pool = mockItems[datasetId] ?? [];
-      const row = pool.find((it) => it.id === itemId);
-      if (!row) throw new Error("item not found");
-      const answerChanged = row.expectedOutput !== payload.expectedOutput.trim();
-      row.input = payload.input.trim();
-      row.expectedOutput = payload.expectedOutput.trim();
-      if (payload.tags) row.tags = payload.tags;
-      if (answerChanged) row.version += 1;
-      row.updatedAt = Date.now();
-      const ds = mockDatasets.find((d) => d.id === datasetId);
-      if (ds) {
-        ds.globalVersion += 1;
-        ds.updatedAt = Date.now();
-      }
-      return withLatency(normalizeItem(row));
-    }
-    const res = await http().put(`${base(orgId)}/${datasetId}/items/${itemId}`, payload);
-    return normalizeItem(res.data);
+    const pool = mockItems[datasetId] ?? [];
+    const row = pool.find((it) => it.id === itemId);
+    if (!row) throw new Error("item not found");
+    const answerChanged = row.expectedOutput !== payload.expectedOutput.trim();
+    row.input = payload.input.trim();
+    row.expectedOutput = payload.expectedOutput.trim();
+    if (payload.tags) row.tags = payload.tags;
+    if (answerChanged) row.version += 1;
+    row.updatedAt = Date.now();
+    return withLatency(normalizeItem(row));
   },
 
-  async removeItem(orgId: string, datasetId: string, itemId: string): Promise<void> {
-    if (USE_MOCK) {
-      const pool = mockItems[datasetId];
-      if (pool) {
-        const idx = pool.findIndex((it) => it.id === itemId);
-        if (idx >= 0) pool.splice(idx, 1);
-      }
-      const ds = mockDatasets.find((d) => d.id === datasetId);
-      if (ds) {
-        ds.itemCount = Math.max(0, ds.itemCount - 1);
-        ds.globalVersion += 1;
-        ds.updatedAt = Date.now();
-      }
-      return withLatency(undefined);
+  async removeItem(_orgId: string, datasetId: string, itemId: string): Promise<void> {
+    const pool = mockItems[datasetId];
+    if (pool) {
+      const idx = pool.findIndex((it) => it.id === itemId);
+      if (idx >= 0) pool.splice(idx, 1);
     }
-    await http().delete(`${base(orgId)}/${datasetId}/items/${itemId}`);
+    return withLatency(undefined);
   },
 
   async create(orgId: string, payload: LlmDatasetPayload): Promise<LlmDataset> {
-    if (USE_MOCK) {
-      const now = Date.now();
-      const row: LlmDataset = {
-        id: `ds_mock_${++mockSeq}`,
-        name: payload.name,
-        description: payload.description?.trim() ? payload.description.trim() : null,
-        globalVersion: 0,
-        itemCount: 0,
-        tags: payload.tags ?? [],
-        sources: { trace: 0, annotation: 0, manual: 0 },
-        createdBy: "you@openobserve.ai",
-        createdAt: now,
-        updatedAt: now,
-      };
-      mockDatasets.unshift(row);
-      return withLatency(row);
-    }
-    const res = await http().post(base(orgId), payload);
+    const res = await http().post(base(orgId), {
+      name: payload.name,
+      description: payload.description ?? null,
+    });
     return normalize(res.data);
   },
 };

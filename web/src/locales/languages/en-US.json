@@ -8673,6 +8673,7 @@
       "sessions": "Sessions",
       "agentGraph": "Agent Graph",
       "agentBehavior": "Agent Behavior",
+      "discovery": "Discovery",
       "queues": "Queues",
       "datasets": "Datasets",
       "quality": "Quality",
@@ -8685,12 +8686,67 @@
       "sessions": "Browse and inspect agent sessions turn by turn",
       "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
       "agentBehavior": "Spot agents stuck in loops and the errors making them fail",
+      "discovery": "Find unhealthy traces worth reviewing",
       "queues": "Stateful review to-do lists",
       "datasets": "Curate golden datasets from annotated traces and reviews",
       "quality": "Track score quality across span, trace, and session evaluations",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
+    },
+    "discovery": {
+      "unhealthyFilter": "Unhealthy · Issue ∪ Multiple",
+      "scopeNote": "Showing unhealthy {scope} in the selected window",
+      "loadError": "Failed to load discovery results",
+      "scope": {
+        "span": "Spans",
+        "trace": "Traces",
+        "session": "Sessions"
+      },
+      "scopeNoun": {
+        "span": "spans",
+        "trace": "traces",
+        "session": "sessions"
+      },
+      "inQueueFilter": {
+        "all": "In Queue: All",
+        "enqueued": "In Queue: Enqueued",
+        "notEnqueued": "In Queue: Not Enqueued"
+      },
+      "columns": {
+        "timestamp": "Timestamp",
+        "type": "Type",
+        "service": "Service",
+        "input": "Input",
+        "quality": "Quality",
+        "inQueue": "In Queue?",
+        "actions": "Actions"
+      },
+      "quality": {
+        "issue": "Issue",
+        "multiple": "Multiple"
+      },
+      "inQueue": {
+        "yes": "In Queue",
+        "no": "Not Enqueued"
+      },
+      "addToQueue": "Add to Queue",
+      "selectedCount": "{count} selected",
+      "bulkAdd": "Add {count} to Queue",
+      "footerTitle": "Unhealthy {scope}",
+      "emptyTitle": "Nothing Unhealthy Here",
+      "emptyBody": "No unhealthy items match the current scope, window, and filter.",
+      "addDialog": {
+        "title": "Add to Queue",
+        "body": "{count} item(s) will be added to the selected review queue.",
+        "queueLabel": "Queue",
+        "queuePlaceholder": "Select a queue...",
+        "noQueues": "No queues yet — create one from the Queues page first.",
+        "queuesError": "Failed to load queues",
+        "confirm": "Add to Queue",
+        "success": "{count} item(s) added to the queue",
+        "error": "Failed to add items to the queue"
+      }
     },
     "queues": {
       "listTitle": "Queues",

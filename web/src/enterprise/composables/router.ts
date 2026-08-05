@@ -32,6 +32,7 @@ const AIAgentBehaviorPage = () =>
 const AIDatasetsPage = () => import("@/enterprise/views/AIObservability/DatasetsPage.vue");
 const AIDatasetDetailPage = () =>
   import("@/enterprise/views/AIObservability/DatasetDetailPage.vue");
+const AIDiscoveryPage = () => import("@/enterprise/views/AIObservability/DiscoveryPage.vue");
 const AIQueuesPage = () => import("@/enterprise/views/AIObservability/QueuesPage.vue");
 const AIQueueWorkbenchPage = () =>
   import("@/enterprise/views/AIObservability/QueueWorkbenchPage.vue");
@@ -109,6 +110,12 @@ const useEnvRoutes = () => {
           name: "aiAgentBehavior",
           component: AIAgentBehaviorPage,
           meta: { title: "Agent Behavior", keepAlive: false },
+        },
+        {
+          path: "discovery",
+          name: "aiDiscovery",
+          component: AIDiscoveryPage,
+          meta: { title: "Discovery", keepAlive: false },
         },
         {
           path: "queues",
