@@ -116,10 +116,13 @@ vi.stubGlobal("CSS", { supports: () => false });
 // Mock Blob/URL for download tests
 const mockCreateObjectURL = vi.fn(() => "blob:mock-url");
 const mockRevokeObjectURL = vi.fn();
-vi.stubGlobal("URL", Object.assign(globalThis.URL, {
-  createObjectURL: mockCreateObjectURL,
-  revokeObjectURL: mockRevokeObjectURL,
-}));
+vi.stubGlobal(
+  "URL",
+  Object.assign(globalThis.URL, {
+    createObjectURL: mockCreateObjectURL,
+    revokeObjectURL: mockRevokeObjectURL,
+  }),
+);
 
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
