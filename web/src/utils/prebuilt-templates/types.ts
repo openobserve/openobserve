@@ -84,7 +84,12 @@ export interface PrebuiltConfig {
 export interface PrebuiltType {
   id: PrebuiltTypeId;
   name: string;
-  description: I18nText;
+  /**
+   * i18n KEY, not resolved text. These objects are module-scope literals, so a
+   * resolved string would freeze at the boot locale; the selector calls `t()` on
+   * this at render time instead.
+   */
+  descriptionKey: I18nKey;
   icon: string; // Icon name or component reference
   image?: string; // Image URL for logo
   popular?: boolean;

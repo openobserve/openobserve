@@ -1335,7 +1335,7 @@ export default defineComponent({
     const patternsColumns = [
       {
         accessorKey: "pattern_id",
-        header: "#",
+        header: raw("#"),
         id: "index",
         size: 60,
         cell: (info: any) => info.row.index + 1,
@@ -1346,7 +1346,7 @@ export default defineComponent({
       },
       {
         accessorKey: "template",
-        header: "Pattern Template",
+        header: t("search.patternTemplate"),
         id: "template",
         cell: (info: any) => info.getValue(),
         size: 500,
@@ -1357,7 +1357,7 @@ export default defineComponent({
       },
       {
         accessorKey: "frequency",
-        header: "Count",
+        header: t("search.patternCount"),
         id: "frequency",
         size: 100,
         cell: (info: any) => `${info.getValue()} (${info.row.original.percentage.toFixed(1)}%)`,
@@ -1368,7 +1368,7 @@ export default defineComponent({
       },
       {
         accessorKey: "examples",
-        header: "Example Log",
+        header: t("search.patternExampleLog"),
         id: "example",
         size: 400,
         cell: (info: any) => {

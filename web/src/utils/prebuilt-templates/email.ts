@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Email prebuilt destination configuration
@@ -145,10 +145,10 @@ export const emailConfig: PrebuiltConfig = {
 
 import emailLogo from "@/assets/images/alerts/destinations/email.png";
 
-export const emailDestinationType = {
+export const emailDestinationType: PrebuiltType = {
   id: "email",
   name: "Email",
-  description: "Send HTML formatted email notifications",
+  descriptionKey: "alert_destinations.prebuilt.emailDescription",
   icon: "email",
   image: emailLogo,
   popular: true,

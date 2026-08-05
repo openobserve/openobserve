@@ -31,7 +31,7 @@
 // asymmetry is the single most common reason RUM events arrive while session
 // replay silently does not, so it gets its own step and its own FAQ entry.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
@@ -196,13 +196,18 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       // next to it already says which guide you are on, so the heading stays
       // stable across platforms instead of rewriting itself on every click.
       name: "Real User Monitoring",
-      tagline:
-        "Capture sessions, views, user actions, crashes and session replay from your React Native app — your RUM token is already filled in below.",
+      tagline: gt("ingestion.setupCard.rumReactNativeTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
       runtime: "iOS / Android",
       setupTime: "~5 min",
-      metaBadges: ["Sessions", "Views", "Errors", "Crashes", "Session Replay"],
+      metaBadges: [
+        gt("rum.sessions"),
+        gt("ingestion.setupCard.pillViews"),
+        gt("rum.errors"),
+        gt("ingestion.setupCard.pillCrashes"),
+        gt("rum.sessionReplay"),
+      ],
     },
     steps: [
       {
@@ -241,7 +246,11 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
           filename: "App.tsx",
           raw: replayCode(subs),
         },
-        pills: ["Wireframe capture", "Privacy masking", "Android verified"],
+        pills: [
+          gt("ingestion.setupCard.pillWireframeCapture"),
+          gt("ingestion.setupCard.pillPrivacyMasking"),
+          gt("ingestion.setupCard.pillAndroidVerified"),
+        ],
         note: "Session Replay on React Native is currently verified on Android. On iOS the SDK appends its own path to this URL, so replay uploads do not yet reach OpenObserve — RUM, logs and crashes are unaffected.",
       },
       {
@@ -264,7 +273,14 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
         chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "Views", "User Actions", "Errors", "Crashes", "Session Replay"],
+        pills: [
+          gt("rum.sessions"),
+          gt("ingestion.setupCard.pillViews"),
+          gt("ingestion.setupCard.pillUserActions"),
+          gt("rum.errors"),
+          gt("ingestion.setupCard.pillCrashes"),
+          gt("rum.sessionReplay"),
+        ],
       },
     ],
     // The SDK stamps `source` on every event, so filtering on it confirms the

@@ -162,7 +162,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -237,7 +237,7 @@ const columns = computed(() =>
   [
     {
       id: "#",
-      header: "#",
+      header: raw("#"),
       accessorKey: "#",
       sortable: false,
       size: 56,

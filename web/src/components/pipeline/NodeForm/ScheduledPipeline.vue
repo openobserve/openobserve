@@ -1087,7 +1087,7 @@ const getColumns = computed(() => {
           "yyyy-MM-dd HH:mm:ss.SSS",
         ),
       label: t("search.timestamp") + ` (${store.state.timezone})`,
-      header: t("search.timestamp") + ` (${store.state.timezone})`,
+      header: raw(t("search.timestamp") + ` (${store.state.timezone})`),
       align: "left",
       sortable: true,
       enableResizing: false,
@@ -1103,7 +1103,7 @@ const getColumns = computed(() => {
       id: "source",
       accessorFn: (row: any) => JSON.stringify(row),
       cell: (info: any) => info.getValue(),
-      header: "source",
+      header: raw("source"),
       sortable: true,
       enableResizing: false,
       meta: {

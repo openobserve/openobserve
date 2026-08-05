@@ -99,7 +99,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -164,7 +164,7 @@ const groupUsersMap = ref(new Set());
 const columns: OTableColumnDef[] = [
   {
     id: "select",
-    header: "",
+    header: raw(""),
     accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
     size: TABLE_CHECKBOX_COL_SIZE,

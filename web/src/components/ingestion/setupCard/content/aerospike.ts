@@ -17,7 +17,7 @@
 // https://openobserve.ai/blog/how-to-monitor-aerospike-database (aerospike
 // receiver). No monitoring user needed for the basic setup.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -44,11 +44,10 @@ export default function aerospikeCard(subs: CardSubstitutions): RichCardContent 
   return {
     provider: {
       name: "Aerospike",
-      tagline:
-        "Collect Aerospike metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.aerospikeTagline"),
       logo: getImageURL("images/ingestion/aerospike.svg"),
       tone: "#C22127",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       collectorInstallStep(),
@@ -93,7 +92,9 @@ export default function aerospikeCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Namespaces", "Nodes", "Memory", "Storage", "Connections"],
+        // aerospike receiver metric groups (aerospike.namespace.*, aerospike.node.*,
+        // …) — kept untranslated so the pills match the ingested metrics.
+        pills: [raw("Namespaces"), raw("Nodes"), raw("Memory"), raw("Storage"), raw("Connections")],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "aerospike", filter: "" },

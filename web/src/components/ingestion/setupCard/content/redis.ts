@@ -18,7 +18,7 @@
 // Redis needs no monitoring user — the receiver connects with an optional AUTH
 // password — so there is no "prepare" step.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -54,11 +54,10 @@ export default function redisCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Redis",
-      tagline:
-        "Collect Redis metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.redisTagline"),
       logo: getImageURL("images/ingestion/redis.svg"),
       tone: "#DC382D",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       collectorInstallStep(),
@@ -107,7 +106,10 @@ export default function redisCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Commands", "Memory", "Clients", "Keyspace", "Hit Rate"],
+        // Redis INFO / redis-receiver stat names (redis.commands, redis.memory.used,
+        // redis.clients.connected, redis.keyspace.hits …) — kept untranslated so the
+        // pills match the ingested metrics.
+        pills: [raw("Commands"), raw("Memory"), raw("Clients"), raw("Keyspace"), raw("Hit Rate")],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "redis", filter: "" },

@@ -14,7 +14,7 @@
 
 import { raw } from "@/types/i18n";
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 const isValidServiceNowIncidentUrl = (url: string): boolean => {
   try {
@@ -134,10 +134,10 @@ export const servicenowConfig: PrebuiltConfig = {
 
 import servicenowLogo from "@/assets/images/alerts/destinations/servicenow.png";
 
-export const servicenowDestinationType = {
+export const servicenowDestinationType: PrebuiltType = {
   id: "servicenow",
   name: "ServiceNow",
-  description: "Create incidents in ServiceNow",
+  descriptionKey: "alert_destinations.prebuilt.servicenowDescription",
   icon: "servicenow",
   image: servicenowLogo,
   popular: true,

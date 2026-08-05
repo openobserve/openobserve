@@ -121,8 +121,8 @@ export interface OTableColumnMeta {
 export interface OTableColumnDef<TData = any> {
   /** Unique column identifier (used as accessorKey when accessorKey not explicitly set) */
   id: string;
-  /** Header display text or render function */
-  header: string | Component;
+  /** Header display text or render function. `raw()` for a glyph or empty header. */
+  header: I18nText | Component;
   /** Key in the data row object */
   accessorKey?: string;
   /** Custom accessor function (receives the full row) */

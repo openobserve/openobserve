@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * PagerDuty prebuilt destination configuration
@@ -93,10 +93,10 @@ export const pagerdutyConfig: PrebuiltConfig = {
 
 import pagerdutyLogo from "@/assets/images/alerts/destinations/pagerduty.png";
 
-export const pagerdutyDestinationType = {
+export const pagerdutyDestinationType: PrebuiltType = {
   id: "pagerduty",
   name: "PagerDuty",
-  description: "Create incidents in PagerDuty",
+  descriptionKey: "alert_destinations.prebuilt.pagerdutyDescription",
   icon: "pagerduty",
   image: pagerdutyLogo,
   popular: true,

@@ -664,7 +664,7 @@ export interface ResourceTabConfig {
   id: string; // unique tab name (= FoundGroup.group_id)
   label: I18nText; // display label
   groupField: string; // SQL GROUP BY field (= FoundGroup.aliases["traces"])
-  colLabel: string; // header of the first column (entity name)
+  colLabel: I18nText; // header of the first column (entity name)
   colId: string; // row property key for the entity name column
   environment: string; // env key derived from group_id first segment
   isDefault: boolean; // pre-selected when the environment is first detected
@@ -701,8 +701,10 @@ export interface InferredServiceTab {
   /** Preferred over `label`. This registry is module-scope so it cannot call
    *  t(); the mapper in setup() resolves the key. */
   labelKey?: I18nKey;
-  /** Column header shown in the resource table, e.g. "Host", "Database", "DB Operation" */
-  colLabel: string;
+  /** Key for the column header shown in the resource table, e.g. "Host",
+   *  "Database", "DB Operation". A key, not text: this registry is module-scope
+   *  so it cannot call t() — the mapper in setup() resolves it, like `labelKey`. */
+  colLabelKey: I18nKey;
   /**
    * Fallback-ordered field names for the attribute column, evaluated against the
    * stream schema at runtime. The first field present in the schema wins as the
@@ -739,19 +741,19 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
     {
       id: "hosts",
       labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
-      colLabel: "Host",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "databases",
       labelKey: "traces.serviceGraphNodeSidePanel.tabDatabases",
-      colLabel: "Database",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDatabase",
       fields: ["db_namespace", "db_name"],
     },
     {
       id: "queries",
       labelKey: "traces.serviceGraphNodeSidePanel.tabQueries",
-      colLabel: "DB Operation",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDbOperation",
       fields: ["db_operations"],
     },
   ],
@@ -759,13 +761,13 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
     {
       id: "hosts",
       labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
-      colLabel: "Host",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "destinations",
       labelKey: "traces.serviceGraphNodeSidePanel.tabDestinations",
-      colLabel: "Destination",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDestination",
       fields: ["messaging_destination_name", "messaging_destination"],
     },
   ],
@@ -773,13 +775,13 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
     {
       id: "hosts",
       labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
-      colLabel: "Host",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "rpc_services",
       labelKey: "traces.serviceGraphNodeSidePanel.tabRpcServices",
-      colLabel: "RPC Service",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colRpcService",
       fields: ["rpc_service"],
     },
   ],
@@ -787,13 +789,13 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
     {
       id: "hosts",
       labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
-      colLabel: "Host",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "urls",
       labelKey: "traces.serviceGraphNodeSidePanel.tabUrls",
-      colLabel: "URL",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colUrl",
       fields: ["http_url", "url_full"],
     },
   ],
@@ -1519,7 +1521,7 @@ export default defineComponent({
           id: tab.id,
           label: tab.labelKey ? t(tab.labelKey) : (tab.label ?? raw("")),
           groupField: `COALESCE(${buildCoalesceExpr(present)})`,
-          colLabel: tab.colLabel,
+          colLabel: t(tab.colLabelKey),
           colId: tab.id,
           environment: "",
           isDefault: true,
@@ -1852,7 +1854,7 @@ export default defineComponent({
     };
 
     // Generic helper: builds table columns with a dynamic first (entity) column
-    const buildEntityTableColumns = (entityId: string, entityHeader: string) => [
+    const buildEntityTableColumns = (entityId: string, entityHeader: I18nText) => [
       {
         id: entityId,
         accessorKey: entityId,
@@ -1880,7 +1882,7 @@ export default defineComponent({
       {
         id: "p99",
         accessorKey: "p99",
-        header: "P99",
+        header: t("traces.serviceGraphNodeSidePanel.p99"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -1888,7 +1890,7 @@ export default defineComponent({
       {
         id: "p95",
         accessorKey: "p95",
-        header: "P95",
+        header: t("traces.serviceGraphNodeSidePanel.p95"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -1896,7 +1898,7 @@ export default defineComponent({
       {
         id: "p75",
         accessorKey: "p75",
-        header: "P75",
+        header: t("traces.serviceGraphNodeSidePanel.p75"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -2221,7 +2223,7 @@ export default defineComponent({
             id: g.group_id,
             label: raw(g.display),
             groupField: field,
-            colLabel: g.display,
+            colLabel: raw(g.display),
             colId: g.group_id.replace(/-/g, "_"),
             environment: envKey,
             isDefault: DEFAULT_GROUP_FIELDS.has(field),

@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -301,7 +301,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     accessorKey: "id",
     size: 90,
     minSize: 90,

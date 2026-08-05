@@ -189,7 +189,7 @@ export default defineComponent({
     const columns = computed<OTableColumnDef[]>(() => [
       {
         id: "alert_name",
-        header: "Alert Name",
+        header: t("alerts.incidents.alertName"),
         accessorKey: "alert_name",
         sortable: true,
         resizable: true,
@@ -200,7 +200,7 @@ export default defineComponent({
       },
       {
         id: "detected_source",
-        header: "Source",
+        header: t("alerts.incidents.source"),
         accessorKey: "detected_source",
         sortable: true,
         resizable: true,
@@ -210,7 +210,7 @@ export default defineComponent({
       },
       {
         id: "labels",
-        header: "Labels",
+        header: t("alerts.incidents.labels"),
         accessorKey: "labels",
         sortable: false,
         resizable: true,
@@ -220,7 +220,7 @@ export default defineComponent({
       },
       {
         id: "alert_fired_at",
-        header: "Fired At",
+        header: t("alerts.incidents.firedAt"),
         accessorKey: "alert_fired_at",
         sortable: true,
         resizable: true,
@@ -230,7 +230,7 @@ export default defineComponent({
       },
       {
         id: "correlation_reason",
-        header: "Correlation Reason",
+        header: t("alerts.incidents.correlationReason"),
         accessorKey: "correlation_reason",
         sortable: false,
         resizable: true,
@@ -240,7 +240,7 @@ export default defineComponent({
       },
       {
         id: "actions",
-        header: "",
+        header: raw(""),
         isAction: true,
         size: 60,
         meta: { align: "left" },

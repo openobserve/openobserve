@@ -503,7 +503,7 @@ export default defineComponent({
       },
       {
         id: "type",
-        header: "Type",
+        header: t("common.type"),
         accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0 ? "Url" : "File"),
         sortable: true,
         resizable: true,

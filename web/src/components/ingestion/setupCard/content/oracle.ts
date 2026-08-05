@@ -16,7 +16,7 @@
 // Oracle DB data-source setup card. Follows the OpenObserve doc:
 // https://openobserve.ai/docs/integration/database/oracle/ (oracledb receiver).
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -61,11 +61,10 @@ export default function oracleCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Oracle",
-      tagline:
-        "Collect Oracle DB metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.oracleTagline"),
       logo: getImageURL("images/ingestion/oracle.svg"),
       tone: "#F80000",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
@@ -118,7 +117,16 @@ export default function oracleCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "System Stats", "Tablespace Usage", "Data Files", "Resource Limits"],
+        // The Oracle data-dictionary views granted above (V$SESSION, V$SYSSTAT,
+        // DBA_TABLESPACE_USAGE_METRICS, DBA_DATA_FILES, V$RESOURCE_LIMIT) — the
+        // names the user sees in their own data, so they stay untranslated.
+        pills: [
+          raw("Sessions"),
+          raw("System Stats"),
+          raw("Tablespace Usage"),
+          raw("Data Files"),
+          raw("Resource Limits"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "oracledb", filter: "" },

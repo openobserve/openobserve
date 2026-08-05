@@ -541,7 +541,7 @@ export default defineComponent({
         },
         {
           id: "list",
-          header: `${t("quota.listLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.listLimit")} ${unitLabel}`),
           accessorKey: "list",
           sortable: true,
           resizable: true,
@@ -551,7 +551,7 @@ export default defineComponent({
         },
         {
           id: "get",
-          header: `${t("quota.getLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.getLimit")} ${unitLabel}`),
           accessorKey: "get",
           sortable: true,
           resizable: true,
@@ -561,7 +561,7 @@ export default defineComponent({
         },
         {
           id: "create",
-          header: `${t("quota.createLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.createLimit")} ${unitLabel}`),
           accessorKey: "create",
           sortable: true,
           resizable: true,
@@ -571,7 +571,7 @@ export default defineComponent({
         },
         {
           id: "update",
-          header: `${t("quota.updateLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.updateLimit")} ${unitLabel}`),
           accessorKey: "update",
           sortable: true,
           resizable: true,
@@ -581,7 +581,7 @@ export default defineComponent({
         },
         {
           id: "delete",
-          header: `${t("quota.deleteLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.deleteLimit")} ${unitLabel}`),
           accessorKey: "delete",
           sortable: true,
           resizable: true,
@@ -608,7 +608,7 @@ export default defineComponent({
         },
         {
           id: "list",
-          header: `${t("quota.listLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.listLimit")} ${unitLabel}`),
           accessorKey: "list",
           sortable: true,
           resizable: true,
@@ -618,7 +618,7 @@ export default defineComponent({
         },
         {
           id: "get",
-          header: `${t("quota.getLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.getLimit")} ${unitLabel}`),
           accessorKey: "get",
           sortable: true,
           resizable: true,
@@ -628,7 +628,7 @@ export default defineComponent({
         },
         {
           id: "create",
-          header: `${t("quota.createLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.createLimit")} ${unitLabel}`),
           accessorKey: "create",
           sortable: true,
           resizable: true,
@@ -638,7 +638,7 @@ export default defineComponent({
         },
         {
           id: "update",
-          header: `${t("quota.updateLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.updateLimit")} ${unitLabel}`),
           accessorKey: "update",
           sortable: true,
           resizable: true,
@@ -648,7 +648,7 @@ export default defineComponent({
         },
         {
           id: "delete",
-          header: `${t("quota.deleteLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.deleteLimit")} ${unitLabel}`),
           accessorKey: "delete",
           sortable: true,
           resizable: true,

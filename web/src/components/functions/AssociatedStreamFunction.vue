@@ -314,7 +314,7 @@ export default defineComponent({
       const cols: OTableColumnDef[] = [
         {
           id: "#",
-          header: "#",
+          header: raw("#"),
           cell: " ",
           size: 50,
           meta: { align: "left" },
@@ -331,7 +331,7 @@ export default defineComponent({
         {
           id: "order",
           accessorKey: "order",
-          header: "Order",
+          header: t("function.order"),
           cell: " ",
           sortable: true,
           size: COL.count,
@@ -340,7 +340,7 @@ export default defineComponent({
         {
           id: "applyBeforeFlattening",
           accessorKey: "applyBeforeFlattening",
-          header: "Apply Before Flattening",
+          header: t("function.applyBeforeFlattening"),
           cell: " ",
           sortable: true,
           size: 180,

@@ -156,7 +156,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -270,7 +270,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     cell: " ",
     isAction: true,
     size: 70,

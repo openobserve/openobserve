@@ -20,7 +20,7 @@
 // The stream is a `streamInput`, so the name flows into the exporter config AND
 // the live detection — they can never drift apart.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
@@ -104,13 +104,12 @@ export default function otlpTracesCard(subs: CardSubstitutions): RichCardContent
   return {
     provider: {
       name: "Traces (OpenTelemetry)",
-      tagline:
-        "Point any OpenTelemetry exporter at OpenObserve — collector or SDK, HTTP or gRPC. Your endpoint and token are filled in below.",
+      tagline: gt("ingestion.setupCard.taglineOtlpTraces"),
       logo: getImageURL("images/ingestion/otlp.svg"),
       tone: "#f5a800",
       runtime: "Any",
       setupTime: "~2 min",
-      metaBadges: ["Traces"],
+      metaBadges: [gt("common.traces")],
     },
     steps: [
       {
@@ -129,7 +128,12 @@ export default function otlpTracesCard(subs: CardSubstitutions): RichCardContent
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipTraces" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Spans", "Service Map", "Latency", "Errors"],
+        pills: [
+          gt("ingestion.setupCard.pillSpans"),
+          gt("ingestion.setupCard.pillServiceMap"),
+          gt("ingestion.setupCard.pillLatency"),
+          gt("rum.errors"),
+        ],
       },
     ],
     streamInput: {

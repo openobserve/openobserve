@@ -511,7 +511,7 @@ export default defineComponent({
     const columns = computed<OTableColumnDef[]>(() => [
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         accessorKey: "index",
         meta: { align: "left" },
         size: indexColumnWidth.value,

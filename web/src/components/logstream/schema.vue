@@ -1838,7 +1838,7 @@ export default defineComponent({
       },
       {
         id: "settings",
-        header: "",
+        header: raw(""),
         accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
         size: COL.method,

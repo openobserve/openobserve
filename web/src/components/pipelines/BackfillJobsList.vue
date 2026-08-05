@@ -367,7 +367,7 @@ const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
 const columns: OTableColumnDef[] = [
   {
     id: "pipeline_name",
-    header: "Pipeline",
+    header: t("pipeline.pipelineLabel"),
     accessorKey: "pipeline_name",
     sortable: true,
     hideable: true,
@@ -376,7 +376,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "time_range",
-    header: "Time Range",
+    header: t("pipeline.timeRange"),
     accessorKey: "start_time",
     sortable: true,
     hideable: true,
@@ -385,7 +385,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "progress_percent",
-    header: "Progress",
+    header: t("pipeline.progressLabel"),
     accessorKey: "progress_percent",
     sortable: true,
     hideable: true,
@@ -394,7 +394,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "created_at",
-    header: "Created",
+    header: t("pipeline.created"),
     accessorKey: "created_at",
     sortable: true,
     hideable: true,
@@ -403,7 +403,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "last_triggered_at",
-    header: "Last Triggered",
+    header: t("pipeline.lastTriggered"),
     accessorKey: "last_triggered_at",
     sortable: true,
     hideable: true,
@@ -412,7 +412,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "actions",
-    header: "Actions",
+    header: t("common.actions"),
     accessorKey: "actions",
     meta: { align: "center", actionCount: 4 },
     isAction: true,

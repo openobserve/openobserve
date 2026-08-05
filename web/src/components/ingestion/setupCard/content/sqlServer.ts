@@ -21,7 +21,7 @@
 // receiver connect, the single-receiver config exports, and `sqlserver_*` metric
 // streams land in OpenObserve. Reference: https://openobserve.ai/blog/monitor-sql-server-with-otel/
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -75,11 +75,10 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
   return {
     provider: {
       name: "SQL Server",
-      tagline:
-        "Collect SQL Server metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.sqlServerTagline"),
       logo: getImageURL("images/ingestion/sqlserver.png"),
       tone: "#cc2927",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
@@ -162,12 +161,15 @@ export default function sqlServerCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
+        // SQL Server performance-counter names (sqlserver.user.connection.count,
+        // sqlserver.batch.request.rate, …) — untranslated so the pills match the
+        // metric names that land in the streams.
         pills: [
-          "User Connections",
-          "Batch Request Rate",
-          "SQL Compilation Rate",
-          "Lock Wait Rate",
-          "Buffer Cache Hit Ratio",
+          raw("User Connections"),
+          raw("Batch Request Rate"),
+          raw("SQL Compilation Rate"),
+          raw("Lock Wait Rate"),
+          raw("Buffer Cache Hit Ratio"),
         ],
       },
     ],

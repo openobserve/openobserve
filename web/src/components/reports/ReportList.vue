@@ -468,7 +468,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   if (searchAcrossFolders.value && searchQuery.value !== "") {
     base.splice(2, 0, {
       id: "folder_name",
-      header: "Folder",
+      header: t("reports.folder"),
       accessorKey: "folder_name",
       cell: " ",
       sortable: true,

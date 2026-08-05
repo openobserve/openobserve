@@ -1306,7 +1306,7 @@ export default defineComponent({
         baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
-          header: "Folder",
+          header: t("alerts.folder"),
           cell: " ",
           sortable: true,
           resizable: true,

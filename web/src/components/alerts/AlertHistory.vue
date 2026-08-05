@@ -539,7 +539,7 @@ const errorMessage = ref<any>("");
 const columns = ref<OTableColumnDef[]>([
   {
     id: "alert_name",
-    header: t("alerts.alertName") || "Alert Name",
+    header: t("alerts.alertName"),
     accessorKey: "alert_name",
     sortable: true,
     size: COL.name,
@@ -547,7 +547,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_realtime",
-    header: t("alerts.type") || "Type",
+    header: t("alerts.type"),
     accessorKey: "is_realtime",
     sortable: true,
     size: 37,
@@ -558,7 +558,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_silenced",
-    header: t("alerts.isSilenced") || "Is Silenced",
+    header: t("alerts.isSilenced"),
     accessorKey: "is_silenced",
     sortable: true,
     size: 37,
@@ -569,7 +569,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "timestamp",
-    header: t("alerts.timestamp") || "Timestamp",
+    header: t("alerts.timestamp"),
     accessorKey: "timestamp",
     sortable: true,
     size: COL.dateAbsolute,
@@ -579,7 +579,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "start_time",
-    header: t("alerts.startTime") || "Start Time",
+    header: t("alerts.startTime"),
     accessorKey: "start_time",
     sortable: true,
     size: COL.dateAbsolute,
@@ -589,7 +589,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "end_time",
-    header: t("alerts.endTime") || "End Time",
+    header: t("alerts.endTime"),
     accessorKey: "end_time",
     sortable: true,
     size: COL.dateAbsolute,
@@ -599,7 +599,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "duration",
-    header: t("alerts.duration") || "Duration",
+    header: t("alerts.duration"),
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: false,
     size: COL.duration,
@@ -609,7 +609,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "status",
-    header: t("alerts.status") || "Status",
+    header: t("alerts.status"),
     accessorKey: "status",
     sortable: true,
     size: COL.status,
@@ -629,7 +629,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "retries",
-    header: t("alerts.retries") || "Retries",
+    header: t("alerts.retries"),
     accessorKey: "retries",
     sortable: true,
     size: 64,
@@ -638,7 +638,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "dedup",
-    header: t("alerts.dedup") || "Dedup",
+    header: t("alerts.dedup"),
     sortable: false,
     size: 80,
     maxSize: 80,
@@ -647,7 +647,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "actions",
-    header: t("common.actions") || "Actions",
+    header: t("common.actions"),
     isAction: true,
     pinned: "right",
     size: 80,

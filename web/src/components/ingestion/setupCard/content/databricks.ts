@@ -17,7 +17,7 @@
 // https://openobserve.ai/blog/monitor-databricks/ — Databricks ships LOGS by
 // POSTing them from a notebook to OpenObserve's logs API (no OTel collector).
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -39,10 +39,10 @@ export default function databricksCard(subs: CardSubstitutions): RichCardContent
   return {
     provider: {
       name: "Databricks",
-      tagline: "Ship Databricks notebook logs to OpenObserve over the logs API.",
+      tagline: gt("ingestion.setupCard.taglineDatabricks"),
       logo: getImageURL("images/ingestion/databricks.svg"),
       tone: "#FF3621",
-      metaBadges: ["Logs"],
+      metaBadges: [gt("common.logs")],
     },
     steps: [
       {
@@ -65,7 +65,8 @@ export default function databricksCard(subs: CardSubstitutions): RichCardContent
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["databricks_logs"],
+        // The stream name the notebook writes to, not prose.
+        pills: [raw("databricks_logs")],
       },
     ],
     detect: { streamType: "logs", match: "keyword", streamName: "databricks", filter: "" },

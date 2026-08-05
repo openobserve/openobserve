@@ -22,7 +22,7 @@
 // push endpoint URL and the live detection — the page can't end up watching a
 // different stream than the one GCP is writing to.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -35,13 +35,12 @@ export default function gcpCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Google Cloud",
-      tagline:
-        "Stream Google Cloud logs into OpenObserve with a Pub/Sub push subscription — no agent or collector to run.",
+      tagline: gt("ingestion.setupCard.taglineGcp"),
       logo: getImageURL("images/ingestion/gcp.svg"),
       tone: "#4285f4",
       runtime: "Google Cloud",
       setupTime: "~5 min",
-      metaBadges: ["Logs"],
+      metaBadges: [gt("common.logs")],
     },
     steps: [
       {
@@ -83,7 +82,14 @@ gcloud logging sinks create openobserve-sink \\
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Audit Logs", "Cloud Run", "GKE", "Cloud Functions", "VPC Flow"],
+        // Everything after the first pill is a Google Cloud product name.
+        pills: [
+          gt("ingestion.setupCard.pillAuditLogs"),
+          raw("Cloud Run"),
+          raw("GKE"),
+          raw("Cloud Functions"),
+          raw("VPC Flow"),
+        ],
       },
     ],
     streamInput: {

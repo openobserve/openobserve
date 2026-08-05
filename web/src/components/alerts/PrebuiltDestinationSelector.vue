@@ -60,7 +60,7 @@ limitations under the License. -->
             data-test="destination-type-description"
             class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
           >
-            {{ type.description }}
+            {{ t(type.descriptionKey) }}
           </div>
         </div>
 

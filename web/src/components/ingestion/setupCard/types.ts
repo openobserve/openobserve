@@ -155,7 +155,7 @@ export interface RichCardStep {
   /** Small muted note rendered under the code (e.g. the load_dotenv caveat). */
   note?: string;
   /** Monospace pills rendered after the description (e.g. captured attributes). */
-  pills?: string[];
+  pills?: I18nText[];
   /**
    * Button that performs this step (cloud-console flows). Rendered after the
    * step's own content and any `#step-<id>` slot.
@@ -245,7 +245,7 @@ export interface RichCardExtras {
 
 export interface RichCardProvider {
   name: string;
-  tagline: string;
+  tagline: I18nText;
   /** Resolved logo asset URL for light mode (rendered on a neutral tile). */
   logo: string;
   /** Optional resolved logo URL used only in dark mode; falls back to `logo`. */
@@ -260,7 +260,7 @@ export interface RichCardProvider {
    * (possibly empty) to override it — e.g. non-AI data sources pass `[]` for none
    * or `["Metrics", "Logs"]` for what they capture.
    */
-  metaBadges?: string[];
+  metaBadges?: I18nText[];
 }
 
 /**

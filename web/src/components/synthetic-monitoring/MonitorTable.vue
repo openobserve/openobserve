@@ -769,7 +769,7 @@ const ASSERTIONS_COL: OTableColumnDef = {
 };
 const ACTIONS_COL: OTableColumnDef = {
   id: "actions",
-  header: "",
+  header: raw(""),
   accessorKey: "id",
   size: 160,
   minSize: 160,

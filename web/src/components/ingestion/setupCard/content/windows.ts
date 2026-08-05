@@ -18,7 +18,7 @@
 // comes from ./osAgent; this file holds the PowerShell command and the
 // Windows-specific collection list.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -41,13 +41,12 @@ export default function windowsCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Windows",
-      tagline:
-        "Install the OpenObserve agent on any Windows host — Event Log, performance counters and host metrics.",
+      tagline: gt("ingestion.setupCard.taglineWindows"),
       logo: getImageURL("images/common/windows.svg"),
       tone: "#0078d4",
       runtime: "Host",
       setupTime: "~1 min",
-      metaBadges: ["Logs", "Metrics"],
+      metaBadges: [gt("common.logs"), gt("common.metrics")],
     },
     steps: [
       {
@@ -81,13 +80,15 @@ export default function windowsCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
+        // The four Windows Event Log channels, which the Event Viewer itself
+        // localises — so they are translated rather than raw() tokens.
         pills: [
-          "Application",
-          "Security",
-          "Setup",
-          "System",
-          "Performance Counters",
-          "Host Metrics",
+          gt("ingestion.setupCard.pillApplication"),
+          gt("ingestion.setupCard.pillSecurity"),
+          gt("ingestion.setupCard.pillSetup"),
+          gt("ingestion.setupCard.pillSystem"),
+          gt("ingestion.setupCard.pillPerformanceCounters"),
+          gt("ingestion.setupCard.pillHostMetrics"),
         ],
       },
     ],

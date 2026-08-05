@@ -16,7 +16,7 @@
 // MongoDB data-source setup card. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/monitor-mongodb-metrics-otel (requires MongoDB 4.0+).
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -64,11 +64,10 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "MongoDB",
-      tagline:
-        "Collect MongoDB metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.mongodbTagline"),
       logo: getImageURL("images/ingestion/mongodb.svg"),
       tone: "#00ED64",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
@@ -146,7 +145,15 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Connections", "Operations", "Cache Hits", "Cursors", "Documents"],
+        // mongodb receiver metric names (mongodb.connection.count, mongodb.cursor.count,
+        // …) — untranslated so the pills match the ingested metrics.
+        pills: [
+          raw("Connections"),
+          raw("Operations"),
+          raw("Cache Hits"),
+          raw("Cursors"),
+          raw("Documents"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mongodb", filter: "" },

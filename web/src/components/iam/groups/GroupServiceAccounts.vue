@@ -105,7 +105,7 @@ import { cloneDeep } from "lodash-es";
 import { watch } from "vue";
 import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -167,7 +167,7 @@ const { serviceAccountsState } = usePermissions();
 const columns: OTableColumnDef[] = [
   {
     id: "select",
-    header: "",
+    header: raw(""),
     accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
     size: TABLE_CHECKBOX_COL_SIZE,

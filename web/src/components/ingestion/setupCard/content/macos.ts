@@ -26,7 +26,7 @@
 //     ndjson` into the agent's TCP receiver. That daemon is the thing to check
 //     when host metrics arrive but unified log entries do not.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -47,13 +47,12 @@ export default function macosCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "macOS",
-      tagline:
-        "Install the OpenObserve agent on any Mac — the unified log and standard log files plus CPU, memory, disk and network metrics.",
+      tagline: gt("ingestion.setupCard.taglineMacos"),
       logo: getImageURL("images/common/macos.png"),
       tone: "#86868b",
       runtime: "Host",
       setupTime: "~1 min",
-      metaBadges: ["Logs", "Metrics"],
+      metaBadges: [gt("common.logs"), gt("common.metrics")],
     },
     steps: [
       {
@@ -72,7 +71,15 @@ export default function macosCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Unified Log", "System Logs", "CPU", "Memory", "Disk", "Network"],
+        pills: [
+          gt("ingestion.setupCard.pillUnifiedLog"),
+          gt("ingestion.setupCard.pillSystemLogs"),
+          // Universal acronym — identical in every locale.
+          raw("CPU"),
+          gt("ingestion.setupCard.pillMemory"),
+          gt("ingestion.setupCard.pillDisk"),
+          gt("common.network"),
+        ],
       },
     ],
     detect: hostMetricsDetect,

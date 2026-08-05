@@ -21,7 +21,7 @@
 // The install + init steps share the "pkg" variant group: picking NPM or CDN
 // on either step switches both, so the two read as one coherent path.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
@@ -233,13 +233,17 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
   return {
     provider: {
       name: "Real User Monitoring",
-      tagline:
-        "Capture sessions, errors, Web Vitals and session replay from your web application — your RUM token is already filled in below.",
+      tagline: gt("ingestion.setupCard.rumTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
       runtime: "Browser",
       setupTime: "~2 min",
-      metaBadges: ["Sessions", "Errors", "Web Vitals", "Session Replay"],
+      metaBadges: [
+        gt("rum.sessions"),
+        gt("rum.errors"),
+        gt("rum.webVitals"),
+        gt("rum.sessionReplay"),
+      ],
     },
     steps: [
       {
@@ -269,7 +273,14 @@ export default function rumCard(subs: RumCardSubs): RichCardContent {
         chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "Page Views", "User Actions", "Errors", "Web Vitals", "Session Replay"],
+        pills: [
+          gt("rum.sessions"),
+          gt("ingestion.setupCard.pillPageViews"),
+          gt("ingestion.setupCard.pillUserActions"),
+          gt("rum.errors"),
+          gt("rum.webVitals"),
+          gt("rum.sessionReplay"),
+        ],
       },
     ],
     // Every session emits `view` events on init, so their presence in _rumdata

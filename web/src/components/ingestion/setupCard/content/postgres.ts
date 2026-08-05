@@ -18,7 +18,7 @@
 // specifics. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/how-to-monitor-postgresql-performance
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -78,11 +78,10 @@ export default function postgresCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Postgres",
-      tagline:
-        "Collect PostgreSQL metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.postgresqlTagline"),
       logo: getImageURL("images/ingestion/postgres.png"),
       tone: "#336791",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
@@ -166,7 +165,15 @@ export default function postgresCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Active Backends", "Commits", "Rollbacks", "Database Size", "Blocks Read"],
+        // pg_stat_database counter names — they appear verbatim in the ingested
+        // metrics, so translating the pill would desync it from the data.
+        pills: [
+          raw("Active Backends"),
+          raw("Commits"),
+          raw("Rollbacks"),
+          raw("Database Size"),
+          raw("Blocks Read"),
+        ],
       },
     ],
     detect: {

@@ -15,7 +15,7 @@
 
 import { nextTick, ref } from "vue";
 import { byString } from "@/utils/json";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -1097,7 +1097,7 @@ export const useStreamFields = () => {
             id: "source",
             accessorFn: (row: any) => JSON.stringify(row),
             cell: (info: any) => info.getValue(),
-            header: "source",
+            header: raw("source"),
             sortable: true,
             // Elastic: the source column fills the width left beside the
             // fixed-width timestamp column.

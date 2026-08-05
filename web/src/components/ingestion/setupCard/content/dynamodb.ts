@@ -18,7 +18,7 @@
 // changes flow DynamoDB Streams → Kinesis Data Stream → Kinesis Firehose → the
 // OpenObserve Firehose endpoint (an AWS-console flow; no OTel collector).
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -32,10 +32,10 @@ export default function dynamodbCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "DynamoDB",
-      tagline: "Stream DynamoDB item changes into OpenObserve via Kinesis Firehose.",
+      tagline: gt("ingestion.setupCard.dynamodbTagline"),
       logo: getImageURL("images/ingestion/dynamodb.png"),
       tone: "#4053D6",
-      metaBadges: ["Logs"],
+      metaBadges: [gt("common.logs")],
     },
     steps: [
       {
@@ -64,7 +64,9 @@ export default function dynamodbCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Item Changes", "Inserts", "Updates", "Deletes"],
+        // DynamoDB Streams record kinds — they mirror the `eventName` values
+        // (INSERT / MODIFY / REMOVE) the user sees verbatim in the ingested stream.
+        pills: [raw("Item Changes"), raw("Inserts"), raw("Updates"), raw("Deletes")],
       },
     ],
     detect: { streamType: "logs", match: "keyword", streamName: "dynamodb", filter: "" },

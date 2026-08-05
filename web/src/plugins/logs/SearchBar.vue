@@ -1889,7 +1889,7 @@ import {
   defineAsyncComponent,
   onBeforeUnmount,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -2203,14 +2203,14 @@ export default defineComponent({
     const savedViewColumns = [
       {
         id: "view_name",
-        header: "",
+        header: raw(""),
         accessorKey: "view_name",
         sortable: false,
         meta: { align: "left" },
       },
       {
         id: "actions",
-        header: "",
+        header: raw(""),
         isAction: true,
         sortable: false,
         size: 30,

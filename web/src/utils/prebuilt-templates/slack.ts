@@ -14,7 +14,7 @@
 
 import { raw } from "@/types/i18n";
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Slack prebuilt destination configuration
@@ -124,10 +124,10 @@ export const slackConfig: PrebuiltConfig = {
 
 import slackLogo from "@/assets/images/alerts/destinations/slack.png";
 
-export const slackDestinationType = {
+export const slackDestinationType: PrebuiltType = {
   id: "slack",
   name: "Slack",
-  description: "Send notifications to Slack channels",
+  descriptionKey: "alert_destinations.prebuilt.slackDescription",
   icon: "slack",
   image: slackLogo,
   popular: true,

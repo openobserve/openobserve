@@ -18,7 +18,7 @@
 // callout; it is now a variant toggle, with the EC2 IAM prerequisite riding on
 // the EC2 variant's note where it is actually relevant.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -42,13 +42,12 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Linux",
-      tagline:
-        "Install the OpenObserve agent on any Linux host — system and journald logs plus CPU, memory, disk and network metrics.",
+      tagline: gt("ingestion.setupCard.taglineLinux"),
       logo: getImageURL("images/common/linux.svg"),
       tone: "#f5b53d",
       runtime: "Host",
       setupTime: "~1 min",
-      metaBadges: ["Logs", "Metrics"],
+      metaBadges: [gt("common.logs"), gt("common.metrics")],
     },
     steps: [
       {
@@ -82,7 +81,15 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["System Logs", "journald", "CPU", "Memory", "Disk", "Network"],
+        pills: [
+          gt("ingestion.setupCard.pillSystemLogs"),
+          // Daemon name and a universal acronym — the same token in every locale.
+          raw("journald"),
+          raw("CPU"),
+          gt("ingestion.setupCard.pillMemory"),
+          gt("ingestion.setupCard.pillDisk"),
+          gt("common.network"),
+        ],
       },
     ],
     detect: hostMetricsDetect,

@@ -244,7 +244,7 @@ export default defineComponent({
       },
       {
         id: "destination_type",
-        header: "Destination Type",
+        header: t("alert_destinations.destination_type"),
         accessorKey: "destination_type_name",
         sortable: true,
         resizable: true,
@@ -273,7 +273,7 @@ export default defineComponent({
       },
       {
         id: "output_format",
-        header: "Output Format",
+        header: t("alert_destinations.output_format"),
         accessorKey: "output_format",
         sortable: true,
         resizable: true,

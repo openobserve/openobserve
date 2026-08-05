@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, inject, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import BillingService from "@/services/billings";
@@ -570,7 +570,7 @@ export default defineComponent({
     const inviteColumns = computed<OTableColumnDef[]>(() => [
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         accessorKey: "index",
         size: 56,
         meta: { align: "left" },
@@ -615,7 +615,7 @@ export default defineComponent({
     const superColumns = computed<OTableColumnDef[]>(() => [
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         accessorKey: "index",
         size: 56,
         meta: { align: "left" },

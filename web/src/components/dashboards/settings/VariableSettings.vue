@@ -199,7 +199,7 @@ import {
   reactive,
   nextTick,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { getDashboard, deleteVariable, updateDashboard } from "../../../utils/commons";
@@ -254,7 +254,7 @@ export default defineComponent({
     const columns: OTableColumnDef[] = [
       {
         id: "drag",
-        header: "",
+        header: raw(""),
         size: 32,
         minSize: 32,
         maxSize: 32,
@@ -262,7 +262,7 @@ export default defineComponent({
       },
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },

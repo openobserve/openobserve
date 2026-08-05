@@ -16,7 +16,7 @@
 // MySQL data-source setup card. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/monitor-mysql-metrics-otel (requires MySQL 8.0+).
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -65,11 +65,10 @@ export default function mysqlCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "MySQL",
-      tagline:
-        "Collect MySQL metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.mysqlTagline"),
       logo: getImageURL("images/ingestion/mysql.svg"),
       tone: "#00758F",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
@@ -148,7 +147,15 @@ export default function mysqlCard(subs: CardSubstitutions): RichCardContent {
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Buffer Pool", "Operations", "Threads", "Row Locks", "Handlers"],
+        // mysql receiver metric names (mysql.buffer_pool.*, mysql.operations, …) —
+        // they land verbatim in the data, so the pills stay untranslated.
+        pills: [
+          raw("Buffer Pool"),
+          raw("Operations"),
+          raw("Threads"),
+          raw("Row Locks"),
+          raw("Handlers"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },

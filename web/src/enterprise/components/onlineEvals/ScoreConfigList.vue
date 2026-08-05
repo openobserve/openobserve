@@ -229,7 +229,7 @@ const columns = computed(() =>
   [
     {
       id: "#",
-      header: "#",
+      header: raw("#"),
       accessorKey: "#",
       sortable: false,
       size: 56,

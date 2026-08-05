@@ -354,7 +354,7 @@ export default defineComponent({
       },
       {
         id: "dimensions",
-        header: "Dimensions",
+        header: t("alerts.incidents.stableDimensions"),
         accessorKey: "group_values",
         resizable: true,
         hideable: true,

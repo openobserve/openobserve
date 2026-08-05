@@ -182,13 +182,17 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
   return {
     provider: {
       name: "Kubernetes",
-      tagline:
-        "Deploy the OpenObserve collector to your cluster — container logs, Kubernetes events and cluster metrics, plus zero-code traces for your workloads.",
+      tagline: gt("ingestion.setupCard.taglineKubernetes"),
       logo: getImageURL("images/common/kubernetes.svg"),
       tone: "#326ce5",
       runtime: "Cluster",
       setupTime: "~3 min",
-      metaBadges: ["Logs", "Metrics", "Events", "Traces"],
+      metaBadges: [
+        gt("common.logs"),
+        gt("common.metrics"),
+        gt("common.events"),
+        gt("common.traces"),
+      ],
     },
     steps: [
       {
@@ -232,7 +236,13 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Container Logs", "Kubernetes Events", "Node Metrics", "Pod Metrics", "Traces"],
+        pills: [
+          gt("ingestion.setupCard.pillContainerLogs"),
+          gt("ingestion.setupCard.pillKubernetesEvents"),
+          gt("ingestion.setupCard.pillNodeMetrics"),
+          gt("ingestion.setupCard.pillPodMetrics"),
+          gt("common.traces"),
+        ],
       },
     ],
     // Collector logs carry the k8sattributes processor's resource attributes;

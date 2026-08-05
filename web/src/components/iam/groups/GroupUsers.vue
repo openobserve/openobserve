@@ -145,7 +145,7 @@ import { cloneDeep } from "lodash-es";
 import { computed, watch } from "vue";
 import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
@@ -242,7 +242,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   const baseColumns: OTableColumnDef[] = [
     {
       id: "select",
-      header: "",
+      header: raw(""),
       accessorKey: "isInGroup",
       cell: (info: any) => info.getValue(),
       size: TABLE_CHECKBOX_COL_SIZE,

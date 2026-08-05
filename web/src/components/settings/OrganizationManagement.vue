@@ -445,7 +445,7 @@ export default defineComponent({
       },
       {
         id: "ai_credits_used",
-        header: "AI Credits Used",
+        header: t("settings.organizationManagementPage.aiCreditsUsed"),
         accessorKey: "credits_used",
         sortable: true,
         resizable: true,
@@ -455,7 +455,7 @@ export default defineComponent({
       },
       {
         id: "ai_credits_total",
-        header: "AI Credits Total",
+        header: t("settings.organizationManagementPage.aiCreditsTotal"),
         accessorKey: "credits_limit",
         sortable: true,
         resizable: true,

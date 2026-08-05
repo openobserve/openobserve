@@ -18,7 +18,7 @@
 // The snowflake receiver is account-based (no host/port) and the guide pins the
 // collector to v0.92.0 (newer builds have a known float→int conversion bug).
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -56,11 +56,10 @@ export default function snowflakeCard(subs: CardSubstitutions): RichCardContent 
   return {
     provider: {
       name: "Snowflake",
-      tagline:
-        "Collect Snowflake account metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.snowflakeTagline"),
       logo: getImageURL("images/ingestion/snowflake.svg"),
       tone: "#29B5E8",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       collectorInstallStep(SNOWFLAKE_COLLECTOR_VERSION),
@@ -91,7 +90,16 @@ export default function snowflakeCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Storage Bytes", "Query Count", "Billing Credits", "Logins", "Warehouse Usage"],
+        // snowflake receiver metric names (snowflake.storage.storage_bytes.total,
+        // snowflake.billing.*, snowflake.logins.total, …) — kept untranslated so the
+        // pills match the ingested metrics.
+        pills: [
+          raw("Storage Bytes"),
+          raw("Query Count"),
+          raw("Billing Credits"),
+          raw("Logins"),
+          raw("Warehouse Usage"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "snowflake", filter: "" },

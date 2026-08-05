@@ -17,7 +17,7 @@
 // https://openobserve.ai/blog/how-to-monitor-cassandra — Cassandra is scraped via
 // the JMX receiver (needs the OTel JMX metrics jar + JMX enabled on Cassandra).
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -53,11 +53,10 @@ export default function cassandraCard(subs: CardSubstitutions): RichCardContent 
   return {
     provider: {
       name: "Cassandra",
-      tagline:
-        "Collect Cassandra metrics via the OpenTelemetry Collector's JMX receiver and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.cassandraTagline"),
       logo: getImageURL("images/ingestion/cassandra.png"),
       tone: "#1287B1",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
@@ -111,7 +110,16 @@ export default function cassandraCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Read Latency", "Write Latency", "Compactions", "GC Pauses", "Heap Usage"],
+        // Cassandra/JVM JMX metric names (cassandra.client.request.latency,
+        // cassandra.compaction.tasks.*, jvm.gc.*, jvm.memory.heap.used) — kept
+        // untranslated so the pills match the ingested metrics.
+        pills: [
+          raw("Read Latency"),
+          raw("Write Latency"),
+          raw("Compactions"),
+          raw("GC Pauses"),
+          raw("Heap Usage"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "cassandra", filter: "" },

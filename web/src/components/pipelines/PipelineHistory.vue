@@ -534,7 +534,7 @@ const errorMessage = ref<any>(null);
 const columns = ref<OTableColumnDef[]>([
   {
     id: "pipeline_name",
-    header: "Pipeline Name",
+    header: t("pipeline.pipelineNameLabel"),
     accessorKey: "pipeline_name",
     sortable: true,
     hideable: true,
@@ -544,7 +544,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_realtime",
-    header: "Type",
+    header: t("common.type"),
     accessorKey: "is_realtime",
     sortable: true,
     hideable: true,
@@ -553,7 +553,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_silenced",
-    header: "Is Silenced",
+    header: t("alerts.isSilenced"),
     accessorKey: "is_silenced",
     sortable: true,
     hideable: true,
@@ -562,7 +562,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "timestamp",
-    header: "Timestamp",
+    header: t("pipeline.timestampLabel"),
     accessorKey: "timestamp",
     sortable: true,
     hideable: true,
@@ -571,7 +571,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "start_time",
-    header: "Start Time",
+    header: t("alerts.startTime"),
     accessorKey: "start_time",
     sortable: true,
     hideable: true,
@@ -580,7 +580,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "end_time",
-    header: "End Time",
+    header: t("alerts.endTime"),
     accessorKey: "end_time",
     sortable: true,
     hideable: true,
@@ -589,7 +589,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "duration",
-    header: "Duration",
+    header: t("common.duration"),
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
     hideable: true,
@@ -598,7 +598,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "status",
-    header: "Status",
+    header: t("common.status"),
     accessorKey: "status",
     sortable: true,
     hideable: true,
@@ -611,7 +611,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "retries",
-    header: "Retries",
+    header: t("pipeline.retriesLabel"),
     accessorKey: "retries",
     sortable: true,
     hideable: true,
@@ -623,7 +623,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_partial",
-    header: "Partial",
+    header: t("common.partial"),
     accessorKey: "is_partial",
     sortable: false,
     hideable: true,
@@ -632,7 +632,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "delay_in_secs",
-    header: "Delay (s)",
+    header: t("pipeline.delayInSecs"),
     accessorKey: "delay_in_secs",
     sortable: true,
     hideable: true,
@@ -641,7 +641,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "evaluation_took_in_secs",
-    header: "Eval Time (s)",
+    header: t("pipeline.evalTimeInSecs"),
     accessorKey: "evaluation_took_in_secs",
     sortable: true,
     hideable: true,
@@ -650,7 +650,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "query_took",
-    header: "Query Time (ms)",
+    header: t("pipeline.queryTimeInMs"),
     accessorKey: "query_took",
     sortable: true,
     hideable: true,

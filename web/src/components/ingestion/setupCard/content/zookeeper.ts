@@ -17,7 +17,7 @@
 // https://openobserve.ai/blog/how-to-monitor-zookeeper-with-openteletemtry
 // (zookeeper receiver). No monitoring user needed.
 
-import { raw } from "@/types/i18n";
+import { gt, raw } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
@@ -44,11 +44,10 @@ export default function zookeeperCard(subs: CardSubstitutions): RichCardContent 
   return {
     provider: {
       name: "Zookeeper",
-      tagline:
-        "Collect Zookeeper metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.zookeeperTagline"),
       logo: getImageURL("images/ingestion/zookeeper.png"),
       tone: "#FF9900",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       collectorInstallStep(),
@@ -93,7 +92,16 @@ export default function zookeeperCard(subs: CardSubstitutions): RichCardContent 
         chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Connections", "Latency", "Outstanding Requests", "Watches", "Znodes"],
+        // ZooKeeper `mntr` stat names (zookeeper.connection.active,
+        // zookeeper.latency.avg, zookeeper.request.active, zookeeper.watch.count,
+        // zookeeper.znode.count) — untranslated so the pills match the data.
+        pills: [
+          raw("Connections"),
+          raw("Latency"),
+          raw("Outstanding Requests"),
+          raw("Watches"),
+          raw("Znodes"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "zookeeper", filter: "" },

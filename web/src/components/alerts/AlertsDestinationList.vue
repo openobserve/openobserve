@@ -353,7 +353,7 @@ export default defineComponent({
       },
       {
         id: "type",
-        header: "Type",
+        header: t("common.type"),
         accessorKey: "type",
         sortable: true,
         resizable: true,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Opsgenie prebuilt destination configuration
@@ -96,10 +96,10 @@ export const opsgenieConfig: PrebuiltConfig = {
 
 import opsgenieLogo from "@/assets/images/alerts/destinations/opsgenie.png";
 
-export const opsgenieDestinationType = {
+export const opsgenieDestinationType: PrebuiltType = {
   id: "opsgenie",
   name: "Opsgenie",
-  description: "Create alerts in Opsgenie",
+  descriptionKey: "alert_destinations.prebuilt.opsgenieDescription",
   icon: "opsgenie",
   image: opsgenieLogo,
   popular: true,

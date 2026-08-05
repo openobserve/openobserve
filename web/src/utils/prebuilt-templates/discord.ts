@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Discord prebuilt destination configuration
@@ -129,10 +129,10 @@ export const discordConfig: PrebuiltConfig = {
 
 import discordLogo from "@/assets/images/alerts/destinations/discord.png";
 
-export const discordDestinationType = {
+export const discordDestinationType: PrebuiltType = {
   id: "discord",
   name: "Discord",
-  description: "Send notifications to Discord channels",
+  descriptionKey: "alert_destinations.prebuilt.discordDescription",
   icon: "discord",
   image: discordLogo,
   popular: true,

@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, nextTick, ref } from "vue";
 import Sortable from "sortablejs";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
 import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
@@ -254,7 +254,7 @@ export default defineComponent({
     const columns: OTableColumnDef[] = [
       {
         id: "drag",
-        header: "",
+        header: raw(""),
         size: 32,
         minSize: 32,
         maxSize: 32,

@@ -100,7 +100,7 @@ export function buildFromMarkdown(
   return {
     provider: {
       name: str(card.name) ?? slug,
-      tagline: str(card.tagline) ?? "",
+      tagline: raw(str(card.tagline) ?? ""),
       // Logo from the md frontmatter, resolved to a bundled asset URL (or an
       // absolute URL as-is). A manifest `logo` overrides at render; with neither,
       // the card shows a lettered monogram. `logo_dark` is used only in dark mode.

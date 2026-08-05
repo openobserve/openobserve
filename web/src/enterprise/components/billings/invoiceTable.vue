@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import NoData from "@/components/shared/grid/NoData.vue";
 import BillingService from "@/services/billings";
@@ -77,7 +77,7 @@ const store = useStore();
 const columns: OTableColumnDef[] = [
   {
     id: "id",
-    header: "#",
+    header: raw("#"),
     accessorKey: "id",
     sortable: true,
     meta: { align: "left" },

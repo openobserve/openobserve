@@ -385,7 +385,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { conditionSummary, isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestamp } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -642,7 +642,7 @@ const onPaginationChange = async (params: { page: number; size: number }) => {
 const alertHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -702,7 +702,7 @@ const alertHistoryColumns = [
 const anomalyHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -718,7 +718,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "status",
-    header: "Result",
+    header: t("alerts.historyTable.result"),
     accessorKey: "status",
     sortable: false,
     size: 120,
@@ -734,7 +734,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "anomaly_count",
-    header: "Anomalies",
+    header: t("alerts.historyTable.anomalies"),
     accessorKey: "anomaly_count",
     sortable: false,
     size: 120,

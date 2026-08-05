@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -354,7 +354,7 @@ const agentColumns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     accessorKey: "id",
     size: 60,
     minSize: 60,

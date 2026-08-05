@@ -89,10 +89,10 @@ const isEmpty = computed(() => !candidates.value.length);
  * nothing checked.
  */
 const columns = computed<OTableColumnDef<LocatorCandidate>[]>(() => [
-  { id: "order", header: "", size: 36 },
-  { id: "locator", header: "", size: 200, meta: { autoWidth: true } },
-  { id: "origin", header: "", size: 160 },
-  { id: "actions", header: "", size: 10 },
+  { id: "order", header: raw(""), size: 36 },
+  { id: "locator", header: raw(""), size: 200, meta: { autoWidth: true } },
+  { id: "origin", header: raw(""), size: 160 },
+  { id: "actions", header: raw(""), size: 10 },
 ]);
 
 const selectedIds = ref<string[]>([]);
