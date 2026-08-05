@@ -326,18 +326,13 @@ export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelN
   testLogger.info("PromQL line panel with config ready", { dashboardName, panelName });
 }
 
-/**
- * PromQL metric chart panel — config sidebar opened and ready.
- * Used for sparkline + value-mapping tests on PromQL metric panels (the sparkline
- * trend is drawn from the query's own query_range matrix — no separate histogram fetch).
- * Query is "memory_usage" (NOT buildPromQLPanel's default "zo_node_memory_usage") —
- * that's the actual metric name ensureMetricsIngested() ingests (metrics-ingestion.js);
- * the default matches no series, and convertPromQLData.ts's "metric" case has no
- * empty-result guard (unlike other chart types), so it throws.
- * Caller's test.beforeAll must call ensureMetricsIngested().
- */
+// PromQL metric chart panel, config sidebar ready; "or vector(0)" keeps the query non-empty even if the single ingested sample goes stale late in the suite. Caller's beforeAll must call ensureMetricsIngested().
 export async function setupPromQLMetricPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
-  await buildPromQLPanel(page, pm, dashboardName, { chartType: "metric", panelName, query: "memory_usage" });
+  await buildPromQLPanel(page, pm, dashboardName, {
+    chartType: "metric",
+    panelName,
+    query: "memory_usage or vector(0)",
+  });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL metric panel with config ready", { dashboardName, panelName });
 }
