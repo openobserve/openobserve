@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div class="text-text-secondary mb-3 min-h-[3em] text-sm leading-normal">
-        {{ integration.description }}
+        {{ t(integration.descriptionKey) }}
       </div>
     </OCardSection>
 
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ template.name }}
             </span>
             <span class="text-muted-foreground mt-1 block text-xs">
-              {{ template.description }}
+              {{ t(template.descriptionKey) }}
             </span>
           </div>
           <OIcon name="chevron-right" size="sm" class="ms-auto shrink-0" />
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ option.name }}
             </span>
             <span class="text-muted-foreground mt-1 block text-xs">
-              {{ option.description }}
+              {{ t(option.descriptionKey) }}
             </span>
           </div>
           <OIcon name="chevron-right" size="sm" class="ms-auto shrink-0" />
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="aws-integration-tile-content-dialog"
       v-model:open="showComponentContent"
       size="xl"
-      :title="selectedComponentTitle"
+      :title="raw(selectedComponentTitle)"
     >
       <component
         :is="selectedComponent"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -182,7 +182,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { confirm } = useConfirmDialog();
     const router = useRouter();
@@ -280,7 +280,9 @@ export default defineComponent({
           console.error("Invalid endpoint:", endpoint);
           toast({
             variant: "error",
-            message: "Invalid ingestion endpoint. Please check configuration.",
+            message: t(
+              "toastMessages.recommended.invalidIngestionEndpointPleaseCheckConfiguration",
+            ),
           });
           return;
         }
@@ -299,7 +301,7 @@ export default defineComponent({
           });
           toast({
             variant: "error",
-            message: "Missing organization credentials. Please refresh the page.",
+            message: t("toastMessages.recommended.missingOrganizationCredentialsPleaseRefreshThe"),
           });
           return;
         }
@@ -324,7 +326,7 @@ export default defineComponent({
         if (!cloudFormationURL) {
           toast({
             variant: "warning",
-            message: "CloudFormation template not available yet",
+            message: t("toastMessages.recommended.cloudformationTemplateNotAvailableYet"),
           });
           return;
         }
@@ -341,13 +343,17 @@ export default defineComponent({
 
         toast({
           variant: "info",
-          message: `Opening AWS Console to set up ${props.integration.displayName}`,
+          message: t("toastMessages.recommended.openingAwsConsoleToSetUp", {
+            name: props.integration.displayName,
+          }),
         });
       } catch (error) {
         console.error("Error generating CloudFormation URL:", error);
         toast({
           variant: "error",
-          message: `Error opening AWS Console: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: t("toastMessages.recommended.errorOpeningAwsConsole", {
+            error: error instanceof Error ? error.message : "Unknown error",
+          }),
           timeout: 5000,
         });
       }
@@ -446,16 +452,17 @@ export default defineComponent({
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
           const ok = await confirm({
-            title: "Dashboard Already Exists",
-            message: `A dashboard for ${props.integration.displayName} already exists. Do you wish to replace it?`,
-            confirmLabel: "Replace",
-            cancelLabel: "Cancel",
+            title: t("ingestion.awsSetup.dashboardExistsTitle"),
+            message: t("ingestion.awsSetup.dashboardExistsMessage", {
+              name: props.integration.displayName,
+            }),
+            confirmLabel: t("common.replace"),
           });
           if (!ok) return;
 
           // User chose to replace
           const loadingNotif = toast({
-            message: "Replacing dashboard...",
+            message: t("toastMessages.recommended.replacingDashboard"),
             timeout: 0,
             variant: "loading",
           });
@@ -466,10 +473,12 @@ export default defineComponent({
             loadingNotif();
             toast({
               variant: "success",
-              message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
+              message: t("toastMessages.recommended.dashboardForReplacedSuccessfully", {
+                name: props.integration.displayName,
+              }),
               timeout: 5000,
               action: {
-                label: "View Dashboard",
+                label: t("toastMessages.recommended.viewDashboard"),
                 handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
               },
             });
@@ -484,7 +493,9 @@ export default defineComponent({
             console.error("Error replacing dashboard:", error);
             toast({
               variant: "error",
-              message: `Failed to replace dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
+              message: t("toastMessages.recommended.failedToReplaceDashboard", {
+                error: error instanceof Error ? error.message : "Unknown error",
+              }),
               timeout: 5000,
             });
           }
@@ -493,7 +504,7 @@ export default defineComponent({
 
         // No existing dashboard, proceed with import
         const loadingNotif = toast({
-          message: "Importing dashboard...",
+          message: t("toastMessages.recommended.importingDashboard"),
           timeout: 0,
           variant: "loading",
         });
@@ -503,10 +514,12 @@ export default defineComponent({
         loadingNotif();
         toast({
           variant: "success",
-          message: `Dashboard for ${props.integration.displayName} imported successfully!`,
+          message: t("toastMessages.recommended.dashboardForImportedSuccessfully", {
+            name: props.integration.displayName,
+          }),
           timeout: 5000,
           action: {
-            label: "View Dashboard",
+            label: t("toastMessages.recommended.viewDashboard"),
             handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
           },
         });
@@ -520,7 +533,9 @@ export default defineComponent({
         console.error("Error importing dashboard:", error);
         toast({
           variant: "error",
-          message: `Failed to import dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: t("toastMessages.recommended.failedToImportDashboard", {
+            error: error instanceof Error ? error.message : "Unknown error",
+          }),
           timeout: 5000,
         });
       }
@@ -543,6 +558,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       handleAddSource,

@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                 >
-                  Action Scripts
+                  {{ t("billing.actionScripts") }}
                 </div>
                 <div class="opacity-80">
                   <img :src="actionScriptIcon" />
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
-              2
+              {{ "2" }}
             </div>
           </div>
         </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                 >
-                  Error Tracking
+                  {{ t("billing.errorTracking") }}
                 </div>
                 <div class="opacity-80">
                   <img :src="errorTrackingIcon" />
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
-              300
+              {{ "300" }}
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                   data-test="billings-usage-tile-title"
                 >
-                  RUM Session
+                  {{ t("billing.rumSession") }}
                 </div>
                 <div class="opacity-80">
                   <img :src="rumSessionIcon" />
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
-              20
+              {{ "20" }}
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="usageCost[tile.key]"
             class="text-text-secondary text-(length:--text-xs) font-medium"
           >
-            ${{ usageCost[tile.key] }}
+            {{ "$" + usageCost[tile.key] }}
           </div>
         </div>
       </div>
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, watch, computed, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import BillingService from "@/services/billings";
 import organizations from "@/services/organizations";
 import { useRouter } from "vue-router";
@@ -273,7 +273,7 @@ export default defineComponent({
     ConfirmDialog,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
@@ -454,7 +454,7 @@ export default defineComponent({
     const getUsage = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading usage data...",
+        message: t("toastMessages.billings.pleaseWaitWhileLoadingUsageData"),
         timeout: 0,
       });
       dataLoading.value = true;

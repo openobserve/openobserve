@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -39,7 +39,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 
 interface OrgOption {
-  label: string;
+  label: I18nText;
   identifier: string;
   [key: string]: any;
 }
@@ -55,7 +55,7 @@ const emit = defineEmits<{
   (e: "select", org: OrgOption): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const open = ref(false);
 const searchQuery = ref("");
@@ -115,7 +115,7 @@ const copiedId = ref<string | null>(null);
 let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 const copyId = async (org: OrgOption) => {
-  const ok = await copyToClipboard(org.identifier, { silent: true });
+  const ok = await copyToClipboard(org.identifier, t, { silent: true });
   if (!ok) return;
   copiedId.value = org.identifier;
   if (copyTimer) clearTimeout(copyTimer);
@@ -235,7 +235,9 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
             class="text-2xs bg-select-item-hover-bg text-text-secondary shrink-0 rounded-full px-2 py-1 leading-none font-semibold"
           >
             {{
-              searchQuery ? `${filtered.length} of ${organizations.length}` : organizations.length
+              searchQuery
+                ? t("common.countOfTotal", { count: filtered.length, total: organizations.length })
+                : organizations.length
             }}
           </span>
         </div>
@@ -247,7 +249,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
             v-model="searchQuery"
             clearable
             :debounce="1"
-            placeholder="Search by name or ID"
+            :placeholder="t('organization.searchByNameOrId')"
             @keydown="onSearchKeydown"
           />
         </div>
@@ -301,7 +303,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
               <button
                 type="button"
                 data-test="organization-menu-item-copy-id"
-                :aria-label="`Copy organization ID ${row.org.identifier}`"
+                :aria-label="t('common.copyOrganizationId', { id: row.org.identifier })"
                 class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
                 :class="
                   copiedId === row.org.identifier
@@ -327,7 +329,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           data-test="organization-menu-no-data"
           class="text-compact text-text-secondary w-full py-7 text-center"
         >
-          No organizations found
+          {{ t("organization.noOrganizationsFound") }}
         </div>
       </div>
     </ODropdown>

@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type DateSize = "sm" | "md";
 
 export interface DateProps {
@@ -10,13 +12,13 @@ export interface DateProps {
   /** Maximum selectable date — `YYYY-MM-DD` */
   max?: string;
   /** Label rendered above the field */
-  label?: string;
+  label?: I18nText;
   /** Placeholder shown when the field is empty (browser support varies) */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Helper text rendered below the field */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in error state without a message */
   error?: boolean;
   /** Whether the user can clear the value */

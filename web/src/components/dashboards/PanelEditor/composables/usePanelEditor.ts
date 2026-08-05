@@ -31,6 +31,7 @@ import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/check
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useNotifications from "@/composables/useNotifications";
+import type { TranslateFn } from "@/types/i18n";
 
 /**
  * Options for usePanelEditor composable
@@ -38,6 +39,7 @@ import useNotifications from "@/composables/useNotifications";
 export interface UsePanelEditorOptions {
   /** The page type - determines default behavior */
   pageType: PanelEditorPageType;
+  t: TranslateFn;
   /** Resolved configuration (after merging props with presets) */
   config: PanelEditorConfig;
   /** Dashboard panel data from useDashboardPanelData composable */
@@ -65,6 +67,7 @@ export interface UsePanelEditorOptions {
  * Handles all shared state and actions across dashboard, metrics, and logs pages.
  */
 export function usePanelEditor(options: UsePanelEditorOptions) {
+  const { t } = options;
   const {
     pageType,
     config,
@@ -168,7 +171,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   });
 
   // ---- Cancel Query Support ----
-  const { traceIdRef, cancelQuery } = useCancelQuery();
+  const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
   // ---- Hovered Series State (for chart interactions) ----
   const hoveredSeriesState = ref({
@@ -316,7 +319,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         validatePanel(errors, true);
 
         if (errors.length) {
-          showErrorNotification("There are some errors, please fix them and try again");
+          showErrorNotification(t("toastMessages.composables.thereAreSomeErrorsPleaseFix"));
           // Do not return early — query still fires to allow partial results
         }
       }

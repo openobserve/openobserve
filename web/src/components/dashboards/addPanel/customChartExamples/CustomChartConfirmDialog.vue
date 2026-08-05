@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, type PropType } from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -58,11 +58,11 @@ export default defineComponent({
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     message: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     warningMessage: {
@@ -79,7 +79,7 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const open = computed({
       get: () => props.modelValue ?? false,

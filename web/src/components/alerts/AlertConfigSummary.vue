@@ -47,14 +47,14 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 const props = defineProps<{ alert: any }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const EMPTY = "—";
 

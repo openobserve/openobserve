@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :persist-columns="true"
     table-id="synthetic-monitoring-table"
     :enable-column-resize="true"
-    :footer-title="footerTitle"
-    :empty-message="emptyMessage"
+    :footer-title="resolvedFooterTitle"
+    :empty-message="resolvedEmptyMessage"
     :data-test="dataTest"
     :horizontal-scroll="true"
     :row-class="monitorRowClass"
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #cell-locations="{ row }">
       <OTooltip
         v-if="(row as any).locations?.length"
-        :content="formatLocationsList((row as any).locations)"
+        :content="raw(formatLocationsList((row as any).locations))"
         content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
         :delay="0"
       >
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               total: data.length,
             })
           }}</template>
-          <template v-else>{{ data.length }} {{ footerTitle }}</template>
+          <template v-else>{{ data.length }} {{ resolvedFooterTitle }}</template>
         </span>
         <template v-if="localSelectedIds.length > 0">
           <OButton
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -534,8 +534,8 @@ const props = withDefaults(
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;
-    footerTitle?: string;
-    emptyMessage?: string;
+    footerTitle?: I18nText;
+    emptyMessage?: I18nText;
     dataTest?: string;
     toggleLoadingMap?: Record<string, boolean>;
     triggerLoadingMap?: Record<string, boolean>;
@@ -550,8 +550,6 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
-    footerTitle: "Checks",
-    emptyMessage: "No results found.",
     dataTest: "monitor-table",
     toggleLoadingMap: () => ({}),
     triggerLoadingMap: () => ({}),
@@ -585,7 +583,14 @@ const emit = defineEmits<{
   "empty-action": [actionId: string];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+// Not `withDefaults` defaults: those are evaluated once at module scope, which
+// would freeze the copy in whatever locale was active at first load.
+const resolvedFooterTitle = computed(
+  () => props.footerTitle ?? t("synthetics.table.checksFooterTitle"),
+);
+const resolvedEmptyMessage = computed(() => props.emptyMessage ?? t("search.noResult"));
 
 const localSelectedIds = computed({
   get: () => props.selectedIds ?? [],
@@ -764,7 +769,7 @@ const ASSERTIONS_COL: OTableColumnDef = {
 };
 const ACTIONS_COL: OTableColumnDef = {
   id: "actions",
-  header: "",
+  header: raw(""),
   accessorKey: "id",
   size: 160,
   minSize: 160,

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { extractStatusFromTemplate, extractStatusFromLog } from "@/utils/logs/statusParser";
+import type { I18nKey } from "@/types/i18n";
 
 /**
  * Extract constant (non-variable) string segments from a pattern template.
@@ -159,9 +160,9 @@ export const patternTrendBadge = (buckets?: number[] | null): PatternTrendKind |
 
 export interface PatternBadgeDef {
   /** i18n key for the short badge label (as shown on the row chip). */
-  labelKey: string;
+  labelKey: I18nKey;
   /** i18n key for the one-line legend description. */
-  descKey: string;
+  descKey: I18nKey;
   /** Token-utility classes for the chip (color pair). */
   class: string;
 }

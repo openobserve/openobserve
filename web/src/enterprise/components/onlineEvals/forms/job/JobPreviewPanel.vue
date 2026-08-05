@@ -57,7 +57,7 @@
 
 <script setup lang="ts">
 import { computed, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { EvalTargetScope } from "@/services/online-evals.service";
@@ -76,7 +76,7 @@ const props = defineProps<{
   filterReady: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const {
   count: matchedCount,

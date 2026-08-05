@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="copyToClipboardFn()"
       >
         <OIcon name="content-copy" size="sm" />
-        <OTooltip content="Copy" side="top" />
+        <OTooltip :content="t('common.copy')" side="top" />
       </OButton>
     </div>
     <pre
@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, type PropType } from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
@@ -51,7 +51,7 @@ export default defineComponent({
   components: { OButton, OIcon, OTooltip },
   props: {
     content: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       default: "", // Default value for content prop (empty string in this case)
     },
     displayContent: {
@@ -61,7 +61,7 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const email = ref(store.state.userInfo.email);
     const passcode = ref(store.state.organizationData.organizationPasscode);
     const basicPasscode = ref();
@@ -87,9 +87,9 @@ export default defineComponent({
 
     const copyToClipboardFn = () => {
       const content = replaceValues(props.content, false);
-      copyToClipboard(content, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+      copyToClipboard(content, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("common.copyContentError"),
         timeout: 5000,
       });
     };

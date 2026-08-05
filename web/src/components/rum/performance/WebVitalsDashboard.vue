@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info" size="sm" class="mr-1" />
         {{ t("rum.learnWebVitalsLabel") }}
         <a
+          :title="raw('https://web.dev/articles/vitals')"
           href="https://web.dev/articles/vitals"
-          title="https://web.dev/articles/vitals"
           class="text-badge-indigo-soft-text ml-1"
           target="_blank"
         >
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div>
         <OSpinner size="md" class="mx-auto block" />
-        <div class="w-full text-center">Loading Dashboard</div>
+        <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
       </div>
     </div>
   </div>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, ref, watch, onActivated, nextTick, onMounted, type Ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import {
@@ -93,7 +93,7 @@ export default defineComponent({
   },
   emits: ["variablesManagerReady", "update:dateTime"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -212,6 +212,7 @@ export default defineComponent({
     return {
       currentDashboardData,
       goBackToDashboardList,
+      raw,
       addPanelData,
       t,
       getDashboard,

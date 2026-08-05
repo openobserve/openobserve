@@ -148,9 +148,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { computed, inject, nextTick, ref } from "vue";
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import { useRoute } from "vue-router";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { editTab, updateDashboard } from "@/utils/commons";
 import useNotifications from "@/composables/useNotifications";
 
@@ -176,9 +176,9 @@ export default defineComponent({
   },
   emits: ["refresh"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const route = useRoute();
     const store = useStore();
-    const { t } = useI18n();
     const {
       showPositiveNotification,
       showErrorNotification,
@@ -207,13 +207,15 @@ export default defineComponent({
 
     // Shared failure handling for both tab operations: surface a 409 with the
     // refresh CTA, everything else as a plain error, then reload canonical data.
-    const notifyTabFailure = (error: any, failKey: string) => {
+    const notifyTabFailure = (error: any, failKey: I18nKey) => {
       if (error?.response?.status === 409) {
+        // Server/network text arrives already-resolved; the fallback is a key.
         showConfictErrorNotificationWithRefreshBtn(
-          error?.response?.data?.message ?? error?.message ?? t(failKey),
+          raw(error?.response?.data?.message ?? error?.message) || t(failKey),
+          t,
         );
       } else {
-        showErrorNotification(error?.message ?? t(failKey));
+        showErrorNotification(raw(error?.message) || t(failKey));
       }
       emit("refresh");
     };

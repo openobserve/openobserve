@@ -39,6 +39,7 @@ import DescSort from "@/components/icons/DescSort.vue";
 import { inject } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "SortByBtnGrp",
@@ -50,8 +51,9 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // same object reference as props.fieldObj; nested mutation is unchanged
     const fieldObjModel = computed(() => props.fieldObj);
@@ -61,6 +63,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       dashboardPanelData,
       updateSortOption,
     };

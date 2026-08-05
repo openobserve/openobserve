@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <legend class="text-text-heading ml-2 px-1 px-2 py-0 text-xs">
         {{ getAuthenticationTypeLabel(authType) }}
-        Configuration
+        {{ t("cipherKey.configuration") }}
       </legend>
       <div v-if="authType === 'access_key'">
         <div v-if="!isUpdate || isUpdateAccessKey || accessKey == ''">
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <legend class="text-text-heading ml-2 px-1 px-2 py-0 text-xs">
         {{ getSecretOptionLabel(secretType) }}
-        Configuration
+        {{ t("cipherKey.configuration") }}
       </legend>
       <div v-if="secretType === 'static_secret'">
         <OFormInput
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, inject, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -259,7 +259,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Local "edit the stored value" toggles (pure UI).
     const isUpdateLDAPPass = ref(false);
@@ -281,12 +281,12 @@ export default defineComponent({
     const secretType = select((s) => s?.values?.key?.store?.akeyless?.store?.type, "");
 
     const authenticationTypeOptions = [
-      { label: "Access Key", value: "access_key" },
-      { label: "LDAP", value: "ldap" },
+      { label: t("cipherKey.accessKey"), value: "access_key" },
+      { label: raw("LDAP"), value: "ldap" },
     ];
     const secretTypeOptions = [
-      { label: "Static Secret", value: "static_secret" },
-      { label: "DFC", value: "dfc" },
+      { label: t("cipherKey.staticSecret"), value: "static_secret" },
+      { label: raw("DFC"), value: "dfc" },
     ];
 
     const getSecretOptionLabel = (value: string) =>
@@ -296,6 +296,7 @@ export default defineComponent({
       authenticationTypeOptions.find((option) => option.value === value)?.label ?? "";
 
     return {
+      raw,
       t,
       authenticationTypeOptions,
       secretTypeOptions,

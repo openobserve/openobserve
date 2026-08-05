@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsLocation } from "@/types/synthetics";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
@@ -41,7 +41,7 @@ const emit = defineEmits<{
   "setup-agent": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function locationIcon(provider: string): string {
   const p = provider.toLowerCase();

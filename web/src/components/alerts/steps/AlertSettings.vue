@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, inject, onMounted, ref, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -315,7 +315,7 @@ export default defineComponent({
     "update:promqlCondition",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
@@ -362,7 +362,7 @@ export default defineComponent({
         (config.isEnterprise === "true" || config.isCloud === "true") &&
         store.state.zoConfig?.workflows_enabled === true,
     );
-    const workflowOptions = ref<{ label: string; value: string }[]>([]);
+    const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
     const fetchWorkflows = async () => {
       if (!workflowsEnabled.value) return;
       try {
@@ -371,7 +371,7 @@ export default defineComponent({
         );
         const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
         workflowOptions.value = list.map((wf: any) => ({
-          label: wf.name,
+          label: raw(wf.name),
           value: wf.id,
         }));
       } catch {

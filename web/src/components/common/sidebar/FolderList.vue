@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             @click.stop="addFolder"
             data-test="dashboard-new-folder-btn"
-            title="Add Folder"
+            :title="t('common.addFolder')"
           >
             <OIcon name="add" size="sm" />
           </OButton>
@@ -154,7 +154,7 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
 import dashboardService from "@/services/dashboards";
 import { useRoute, useRouter } from "vue-router";
@@ -208,7 +208,7 @@ export default defineComponent({
   emits: ["update:folders", "update:activeFolderId"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const activeFolderId = ref("");
     const showAddFolderDialog = ref(false);
@@ -270,13 +270,17 @@ export default defineComponent({
           //check activeFolderId to be deleted
           if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
 
-          showPositiveNotification("Folder deleted successfully.", {
+          showPositiveNotification(t("toastMessages.sidebar.folderDeletedSuccessfully"), {
             timeout: 2000,
           });
         } catch (err) {
           const e = err as { response?: { data?: { message?: string } }; message?: string };
           showErrorNotification(
-            e?.response?.data?.message || e?.message || "Folder deletion failed",
+            raw(
+              e?.response?.data?.message ||
+                e?.message ||
+                t("toastMessages.sidebar.folderDeletionFailed"),
+            ),
             {
               timeout: 2000,
             },

@@ -37,7 +37,7 @@
         v-else
         class="eval-test-panel__empty text-text-secondary border-border-default rounded-default bg-surface-base [&_code]:text-text-body border px-3 py-2.5 text-xs [&_code]:font-mono [&_code]:font-semibold"
       >
-        {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{
+        {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="raw('{{ input }}')" />{{
           t("onlineEvals.scorer.testPanel.emptySuffix")
         }}
       </div>
@@ -171,7 +171,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ScorerTestResult } from "@/services/online-evals.service";
 import { formatTemplateVariable } from "../../utils/evalFormat";
@@ -192,7 +192,7 @@ const emit = defineEmits<{
   (e: "update:inputs", value: Record<string, string>): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function updateInput(variable: string, value: string) {
   emit("update:inputs", { ...props.inputs, [variable]: value });

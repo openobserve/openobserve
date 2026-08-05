@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { I18nKey, I18nText } from "@/types/i18n";
 /**
  * Prebuilt destination types
  */
@@ -51,10 +52,16 @@ export type CredentialValidatorResult = true | ValidationMessage;
  */
 export interface CredentialField {
   key: string;
-  labelKey: string;
+  labelKey: I18nKey;
   type: "text" | "password" | "email" | "select" | "toggle";
   required: boolean;
-  hint?: string;
+  /**
+   * Helper text that reads identically in every language — a URL or an example
+   * value. Translatable copy belongs in {@link hintKey} instead.
+   */
+  hint?: I18nText;
+  /** Wins over {@link hint} when both are set. */
+  hintKey?: I18nKey;
   options?: Array<{ label: string; value: string; description?: string }>;
   validator?: (value: string) => CredentialValidatorResult;
 }
@@ -77,7 +84,12 @@ export interface PrebuiltConfig {
 export interface PrebuiltType {
   id: PrebuiltTypeId;
   name: string;
-  description: string;
+  /**
+   * i18n KEY, not resolved text. These objects are module-scope literals, so a
+   * resolved string would freeze at the boot locale; the selector calls `t()` on
+   * this at render time instead.
+   */
+  descriptionKey: I18nKey;
   icon: string; // Icon name or component reference
   image?: string; // Image URL for logo
   popular?: boolean;

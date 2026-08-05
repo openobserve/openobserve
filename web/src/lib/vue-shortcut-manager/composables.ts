@@ -1,3 +1,5 @@
+import { raw } from "@/types/i18n";
+
 import { onMounted, onUnmounted, ref } from "vue";
 import { getManager } from "./manager";
 import { isMacOS } from "@/utils/keyboardShortcuts";
@@ -80,7 +82,7 @@ export function useShortcuts(shortcuts: ShortcutInput[], scope?: string): void {
             id: keys.length > 1 ? `${def.id}-${i}` : def.id,
             key,
             scope: def.scope,
-            description: def.descriptionKey,
+            description: raw(def.descriptionKey),
             handler: input.handler,
             whenFocused: input.whenFocused,
             allowInInput: def.allowInInput,

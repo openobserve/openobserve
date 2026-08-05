@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, onActivated, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -87,7 +87,7 @@ export default defineComponent({
 
     //dropdown selected tab id (primitive string for OSelect)
     const selectedTab = ref<string | null>(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // on add tab, select added tab
     const updateTabList = async (newTab: any) => {

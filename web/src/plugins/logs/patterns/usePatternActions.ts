@@ -16,7 +16,7 @@
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -29,7 +29,7 @@ import {
 export const usePatternActions = () => {
   const store = useStore();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const { searchObj } = searchState();
   const { patternsState } = usePatterns();
 

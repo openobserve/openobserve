@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * free-text path lives in the Locator block itself.
  */
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { CompositeRelation, LocatorCandidate } from "@/types/synthetics";
 import {
   canDefaultToAnd,
@@ -64,7 +64,7 @@ const emit = defineEmits<{
   combine: [value: { value: string; from: CompositePart[] }];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /**
  * `and` is provably safe when every selected row came from the recording.

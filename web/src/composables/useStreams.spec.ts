@@ -17,6 +17,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 // Mock Stream Service
 vi.mock("@/services/stream", () => ({
@@ -103,7 +105,7 @@ describe("useStreams Composable", () => {
       },
     });
 
-    streamsInstance = useStreams();
+    streamsInstance = useStreams(t);
   });
 
   afterEach(() => {

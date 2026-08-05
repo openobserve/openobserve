@@ -497,7 +497,10 @@ describe("AddTab", () => {
 
       await wrapper.vm.onSubmit({ name: "Test Tab" });
 
-      expect(mockShowConflictErrorNotification).toHaveBeenCalledWith("Tab already exists");
+      expect(mockShowConflictErrorNotification).toHaveBeenCalledWith(
+        "Tab already exists",
+        expect.any(Function),
+      );
     });
 
     it("should handle general errors", async () => {

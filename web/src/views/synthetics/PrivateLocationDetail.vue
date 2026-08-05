@@ -79,13 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.checksPerMin")
             }}</span>
-            <span class="font-medium">~{{ detail.checks_per_min }}</span>
+            <span class="font-medium">{{ "~" + detail.checks_per_min }}</span>
           </div>
           <div v-if="detail.version" class="flex flex-col">
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.detail.version")
             }}</span>
-            <span class="font-medium">v{{ detail.version }}</span>
+            <span class="font-medium">{{ t("synthetics.versionPrefix") + detail.version }}</span>
           </div>
           <div class="flex flex-col">
             <span class="text-text-muted text-xs">{{
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -239,7 +239,7 @@ import type { AgentSetup, SyntheticLocationDetail } from "@/types/synthetics";
 import { formatTimeAgoUs, formatIntervalSecs } from "@/utils/synthetics/format";
 import { syntheticsListRoute, syntheticsResultsRoute } from "@/utils/synthetics/routes";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -354,7 +354,7 @@ const agentColumns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     accessorKey: "id",
     size: 60,
     minSize: 60,

@@ -20,6 +20,8 @@ import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
 import searchState from "./searchState";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 const i18n = createI18n({
   legacy: false,
@@ -35,7 +37,7 @@ const i18n = createI18n({
 
 const TestComponent = defineComponent({
   setup() {
-    const searchBar = useSearchBar();
+    const searchBar = useSearchBar(t);
     return { ...searchBar };
   },
   template: "<div></div>",

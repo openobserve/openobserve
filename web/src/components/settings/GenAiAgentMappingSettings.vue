@@ -164,7 +164,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -179,7 +179,7 @@ import genAiAgentMappingService, {
   type GenAiAgentMappingConfig,
 } from "@/services/gen-ai-agent-mapping.service";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // The standard-tier attribute the resolver ALWAYS checks first for each

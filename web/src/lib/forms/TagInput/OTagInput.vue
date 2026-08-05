@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trailing>
             <button
               type="button"
-              :aria-label="`Remove ${tag}`"
+              :aria-label="t('common.removeTag', { tag })"
               class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="removeTag(index)"
             >
@@ -55,7 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="inputRef"
           v-model="inputValue"
           type="text"
-          :placeholder="modelValue.length > 0 ? '' : placeholder"
+          :placeholder="
+            modelValue.length > 0 ? '' : (placeholder ?? t('common.typeAndPressEnterOrComma'))
+          "
           class="text-text-body placeholder:text-text-secondary min-w-25 [flex:1_1_100px] border-0 bg-transparent p-1 text-sm outline-none"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
@@ -71,16 +73,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 interface Props {
   modelValue: string[];
-  placeholder?: string;
-  label?: string;
+  placeholder?: I18nText;
+  label?: I18nText;
 }
 
+// No `placeholder` default: `t()` in `withDefaults` would freeze the locale at
+// module-evaluation time, so the fallback is resolved in the template instead.
 const props = withDefaults(defineProps<Props>(), {
-  placeholder: "Type and press Enter or comma",
-  label: "",
+  label: raw(""),
 });
 
 const hasContent = computed(() => props.modelValue.length > 0 || inputValue.value.length > 0);

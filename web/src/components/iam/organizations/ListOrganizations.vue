@@ -193,7 +193,7 @@ import { defineComponent, ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import organizationsService from "@/services/organizations";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -239,7 +239,7 @@ export default defineComponent({
     const store = useStore();
     const { isMetaOrg } = useIsMetaOrg();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const organizations = ref([]);
     const organization = ref({});
     const showAddOrganizationDialog = ref(false);
@@ -655,7 +655,7 @@ export default defineComponent({
       this.showJoinOrganizationDialog = false;
     },
     copyAPIKey() {
-      copyToClipboard(this.organizationAPIKey, {
+      copyToClipboard(this.organizationAPIKey, this.t, {
         successMessage: this.t("iam.listOrganizations.apiKeyCopied"),
         errorMessage: this.t("iam.listOrganizations.apiKeyCopyError"),
         timeout: 5000,
