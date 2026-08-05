@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <strong>{{ t("pipeline_list.sql_query") }} : <span></span></strong>
               </div>
               <div class="flex items-start justify-center">
-                <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+                <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the SQL preview box: a border width — optical, not layout; it must not thicken with the query text -->
                 <div
                   data-test="scheduled-pipeline-expanded-sql"
                   class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-[3px] p-2.5 whitespace-normal"
@@ -470,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="nodeErrorMessages(nodeError).length > 0"
               class="node-error-messages flex flex-col gap-2"
             >
-              <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+              <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the node error message: a border width — optical, not layout; it must not thicken with the message text -->
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"

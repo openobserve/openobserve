@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showForm = false"
     >
       <template #header-left>
-        <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+        <!-- eslint-disable local/no-hardcoded-px -- 1.5px ring around the circular back button: a border width — optical, not layout; it must not thicken with the icon inside -->
         <div
           data-test="add-action-back-btn"
           class="flex cursor-pointer items-center justify-center"

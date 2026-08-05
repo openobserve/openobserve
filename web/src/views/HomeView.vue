@@ -340,7 +340,6 @@ export default defineComponent({
     PinnedDashboardTab,
   },
 });
-/* eslint-disable local/no-hardcoded-px -- covers the style block below: the 1px box-shadow offsets on .unified-input-box:focus-within are an optical effect, not layout — scaling them with text makes the elevation bloom */
 </script>
 
 <style scoped>
@@ -431,6 +430,7 @@ export default defineComponent({
 /* Stronger glow + shadow on focus, no harsh ring */
 .home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
+    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes the elevation bloom */
     0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
     0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
     0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent) !important;
@@ -438,6 +438,7 @@ export default defineComponent({
 
 .dark .home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
+    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes the elevation bloom */
     0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
     0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
     0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent) !important;

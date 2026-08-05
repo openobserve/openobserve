@@ -181,25 +181,19 @@ const sizeClasses = computed(() => {
   }
   switch (props.size) {
     case "xs":
-      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
-      return "max-w-[min(320px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(20rem,calc(100vw-2rem))] w-full";
     case "sm":
-      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
-      return "max-w-[min(480px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(30rem,calc(100vw-2rem))] w-full";
     case "md":
-      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
-      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(40rem,calc(100vw-2rem))] w-full";
     case "lg":
-      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
-      return "max-w-[min(800px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(50rem,calc(100vw-2rem))] w-full";
     case "xl":
-      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
-      return "max-w-[min(1024px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(64rem,calc(100vw-2rem))] w-full";
     case "full":
       return "w-screen h-screen max-w-none rounded-none";
     default:
-      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vw tracks the window while rem tracks font-size; keep the expression unit-consistent
-      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(40rem,calc(100vw-2rem))] w-full";
   }
 });
 

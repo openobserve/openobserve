@@ -383,7 +383,6 @@ export default defineComponent({
     return { t, isRunning, analyzedAgoLabel, formatArchivedAt, sanitize };
   },
 });
-/* eslint-disable local/no-hardcoded-px -- covers the style block below: every px there is a 1px table/thead border — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -535,6 +534,7 @@ export default defineComponent({
     border-collapse: separate;
     border-spacing: 0;
     background-color: var(--rca-bg-primary);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--rca-border-secondary);
 
     thead {
@@ -554,6 +554,7 @@ export default defineComponent({
       font-size: var(--text-3xs);
       letter-spacing: 0.08em;
       text-align: left;
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-right: 1px solid var(--rca-border-secondary);
 
       &:last-child {
@@ -563,7 +564,9 @@ export default defineComponent({
 
     td {
       padding: 0.5rem 0.75rem;
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-bottom: 1px solid var(--rca-border-table);
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-right: 1px solid var(--rca-border-table);
       color: var(--rca-text-secondary);
       font-size: var(--text-compact);

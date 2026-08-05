@@ -94,7 +94,7 @@ const metadataRows = computed(() =>
     <OCard data-test="traces-db-span-details-metadata-grid">
       <OCardSection class="px-0! py-0!">
         <div class="flex flex-wrap gap-2">
-          <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+          <!-- eslint-disable local/no-hardcoded-px -- 1px outline on the metadata tag: a border width — optical, not layout; it must not thicken with the label inside it -->
           <span
             v-for="row in metadataRows"
             :key="row.key"

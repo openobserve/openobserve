@@ -596,7 +596,6 @@ export default defineComponent({
     };
   },
 });
-/* eslint-disable local/no-hardcoded-px -- the style block below spaces rows by 1px: hairline: a 1-device-pixel gap must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -613,6 +612,7 @@ export default defineComponent({
 }
 
 .index-menu .index-table :deep(tr) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel row gap must not scale with text or it smears at fractional zoom */
   margin-bottom: 1px;
 }
 

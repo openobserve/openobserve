@@ -14,10 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- eslint-disable local/no-hardcoded-px -- 1-device-pixel trim off a 100% width to dodge sub-pixel overflow; a rem inset would open a visible gap -->
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- 1-device-pixel trim off a 100% width to dodge sub-pixel overflow; a rem inset would open a visible gap -->
   <div class="relative-position flex h-full w-[calc(100%-1px)] flex-col overflow-hidden">
-    <!-- eslint-enable local/no-hardcoded-px -->
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="mx-2! mt-2! px-2 py-1" />
     <template v-if="activeTab === 'tags'">
       <div data-test="event-metadata" class="sticky top-0 flex p-2 px-3">

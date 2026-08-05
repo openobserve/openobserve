@@ -15,10 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
-<!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px)">
-    <!-- eslint-enable local/no-hardcoded-px -->
     <OPageLayout
       v-if="!showAddDialog"
       :title="t('aiToolset.header')"

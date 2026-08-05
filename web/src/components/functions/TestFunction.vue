@@ -147,11 +147,10 @@
         </template>
         <template #right>
           <!-- o2 ai context add button in the test function -->
-          <!-- eslint-disable local/no-hardcoded-px -- imageWidth/imageHeight are forwarded to an HTML dimension attribute, which takes a bare integer -->
           <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
-            imageHeight="24px"
-            imageWidth="24px"
+            imageHeight="24"
+            imageWidth="24"
             :class="'mr-4 px-2'"
             style="
               width: 2rem !important;
@@ -160,7 +159,6 @@
               min-height: 2rem !important;
             "
           />
-          <!-- eslint-enable local/no-hardcoded-px -->
         </template>
       </FullViewContainer>
       <div
@@ -792,7 +790,6 @@ defineExpose({
   sendToAiChat,
   store,
 });
-/* eslint-disable local/no-hardcoded-px -- the style block below uses a 1px hairline margin: a 1-device-pixel offset must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -800,7 +797,7 @@ defineExpose({
 .test-function-query-container :deep(.test-function-run-query-btn) {
   padding: 0.125rem 0.5rem !important;
   font-size: var(--text-2xs) !important;
-  margin: 1px 0.125rem !important;
+  margin: 0.0625rem 0.125rem !important;
 }
 
 .functions-duration-input :deep(.date-time-button) {

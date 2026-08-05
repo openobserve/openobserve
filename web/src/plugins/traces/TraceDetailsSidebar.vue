@@ -2009,7 +2009,6 @@ export default defineComponent({
     };
   },
 });
-/* eslint-disable local/no-hardcoded-px -- covers the style block below: the px there are 1px table cell dividers — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -2060,7 +2059,9 @@ export default defineComponent({
 .trace-details-sidebar :deep(.trace-detail-tab-table) {
   th,
   td {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
     border-bottom: 1px solid var(--color-table-row-divider);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
     border-right: 1px solid var(--color-table-row-divider);
     text-align: left;
     padding: 0.5rem;

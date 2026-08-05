@@ -2076,8 +2076,7 @@ const insightChartData = computed(() => {
           const list = names
             .map(
               (n) =>
-                // eslint-disable-next-line local/no-hardcoded-px -- hairline: 1-device-pixel row padding in the tooltip HTML; scaling it with text would smear the rows
-                `<div style="padding:1px 0;padding-left:0.875rem;font-size: var(--text-2xs);">${n}</div>`,
+                `<div style="padding:0.0625rem 0;padding-left:0.875rem;font-size: var(--text-2xs);">${n}</div>`,
             )
             .join("");
           return header + '<div style="margin-top:0.25rem;">' + list + "</div>";

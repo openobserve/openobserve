@@ -1906,7 +1906,6 @@ export default defineComponent({
     };
   },
 });
-/* eslint-disable local/no-hardcoded-px -- style block below: the 1px row gap and 1px toggle border are hairlines that must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped>
@@ -1922,6 +1921,7 @@ export default defineComponent({
 }
 
 .logs-index-menu .index-table :deep(tr) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel row gap must not scale with text or it smears at fractional zoom */
   margin-bottom: 1px;
 }
 
@@ -1935,6 +1935,7 @@ export default defineComponent({
 }
 
 .logs-index-menu .index-table :deep(.schema-field-toggle) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel toggle border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-card-glass-border);
   border-radius: 0.325rem;
   background-color: transparent;

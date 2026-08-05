@@ -460,7 +460,6 @@ export default defineComponent({
     };
   },
 });
-/* eslint-disable local/no-hardcoded-px -- covers the style block below: the 1px column divider and 1px row border are hairlines — a 1-device-pixel rule must not scale with text or it smears at fractional zoom. A directive inside a style block is not surfaced to ESLint, so it is placed here at the end of the script block. */
 </script>
 
 <style scoped>
@@ -491,6 +490,7 @@ export default defineComponent({
   right: 0;
   transform: translateY(-50%);
   height: 1rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the column divider is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
   width: 1px;
   background: var(--color-border-default);
 }
@@ -513,6 +513,7 @@ export default defineComponent({
   font-weight: 600;
   /* 1px so this matches the value→data separator weight; heavier lines on both
      sides of a short value row read as a double line. */
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the pivot group-header rule is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-table-row-divider);
 }
 

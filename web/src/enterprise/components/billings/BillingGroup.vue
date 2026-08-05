@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)]"
           >
-            <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+            <!-- eslint-disable local/no-hardcoded-px -- 1.5px ring on the invite icon badge — a border width, optical not layout; it must not grow with the surrounding text -->
             <div
               class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
             >

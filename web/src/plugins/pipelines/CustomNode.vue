@@ -363,7 +363,6 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   );
   return node ? node.icon : undefined;
 }
-/* eslint-disable local/no-hardcoded-px -- the style block below sets a node's border-width: structural border width, not a text-relative dimension */
 </script>
 
 <template>
@@ -569,6 +568,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   width: 9.375rem;
   font-size: var(--text-xs);
   text-align: center;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px outline on the flow node: a border width — optical, not layout; it must not thicken with the node label */
   border-width: 1px;
   border-style: solid;
   color: var(--vf-node-text);

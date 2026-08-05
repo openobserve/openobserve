@@ -189,7 +189,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
-                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormSelect
                   ref="streamNameRef"
                   name="stream_name"
@@ -200,7 +199,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                   @update:model-value="updateStreamFields($event)"
                 />
-                <!-- eslint-enable local/no-hardcoded-px -->
                 <OTooltip
                   v-if="!formData.stream_type"
                   :content="t('alerts.selectStreamTypeFirst')"

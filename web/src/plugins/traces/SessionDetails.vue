@@ -1734,8 +1734,6 @@ function formatTokens(n: number): string {
 }
 
 onMounted(load);
-
-/* eslint-disable local/no-hardcoded-px -- covers the style block below (a comment inside style is not honoured): its 1px values are hairlines — a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -1801,6 +1799,7 @@ onMounted(load);
   }
   :deep(pre) {
     background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel code block border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--color-border-default);
     padding: 0.5rem 0.625rem;
     border-radius: var(--radius-default);
@@ -1825,6 +1824,7 @@ onMounted(load);
   }
   :deep(th),
   :deep(td) {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--color-border-default);
     padding: 0.3rem 0.5rem;
     text-align: left;
@@ -1835,6 +1835,7 @@ onMounted(load);
   }
   :deep(hr) {
     border: none;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
     border-top: 1px solid var(--color-border-default);
     margin: 0.625rem 0;
   }

@@ -43,16 +43,14 @@
     </span>
     <!-- o2 ai context add button in the cell actions when user adds a interesting field to the table 
      then we show some options there we need this  -->
-    <!-- eslint-disable local/no-hardcoded-px -- imageWidth/imageHeight are forwarded to an HTML dimension attribute, which takes a bare integer -->
     <O2AIContextAddBtn
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
       class="border border-solid border-white"
       :size="'0.375rem'"
-      :imageHeight="'16px'"
-      :imageWidth="'16px'"
+      :imageHeight="'16'"
+      :imageWidth="'16'"
     />
-    <!-- eslint-enable local/no-hardcoded-px -->
   </div>
 </template>
 

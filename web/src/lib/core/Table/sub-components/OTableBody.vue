@@ -146,7 +146,6 @@ function getRowForIndex(index: number) {
 function getRowForItem(item: any): Row<any> {
   return rowByOriginal.value.get(item) ?? props.rows[0];
 }
-/* eslint-disable local/no-hardcoded-px -- the style block below uses a 1px dashed drag-ghost border: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>
@@ -340,6 +339,7 @@ function getRowForItem(item: any): Row<any> {
 .o2-table-drag-ghost {
   opacity: 0.3;
   background: var(--color-primary-50);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel dashed drag-ghost border must not scale with text or it smears at fractional zoom */
   border: 1px dashed var(--color-accent);
   border-radius: 0.375rem;
 }

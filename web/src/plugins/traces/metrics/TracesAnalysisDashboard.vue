@@ -1029,7 +1029,6 @@ watch(
   },
   { deep: true },
 );
-/* eslint-disable local/no-hardcoded-px -- style block below: the 1px chip border is a hairline that must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -1055,6 +1054,7 @@ watch(
 .time-range-chip.baseline-chip,
 .time-range-chip.selected-chip {
   background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel chip border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
   color: color-mix(in srgb, var(--chip-color) 80%, var(--color-text-heading)) !important;
   font-weight: 500;

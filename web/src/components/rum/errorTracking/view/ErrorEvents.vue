@@ -115,7 +115,6 @@ const offsetLabel = (event: any) => {
 
 const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
-/* eslint-disable local/no-hardcoded-px -- style block below: the 1px timeline rail and 1px dot border are hairlines that must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped>
@@ -132,6 +131,7 @@ const getFormattedDate = (timestamp: number) =>
     left: 0.4375rem;
     top: 0.25rem;
     bottom: 0.25rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel timeline rail must not scale with text or it smears at fractional zoom */
     width: 1px;
     background: var(--color-card-glass-border);
   }
@@ -144,6 +144,7 @@ const getFormattedDate = (timestamp: number) =>
   width: 0.5625rem;
   height: 0.5625rem;
   border-radius: var(--radius-full);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel timeline dot border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-card-glass-border);
 }
 

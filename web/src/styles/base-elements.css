@@ -41,7 +41,7 @@
   ::-webkit-scrollbar-thumb {
     background: var(--color-scrollbar-thumb);
     border-radius: 0.375rem;
-    /* eslint-disable-next-line local/no-hardcoded-px -- structural border width on the native scrollbar thumb, not a text-relative dimension */
+    /* eslint-disable-next-line local/no-hardcoded-px -- transparent border + background-clip: content-box insets the thumb inside the fixed-width native scrollbar track — a paint gutter, not text-driven layout */
     border: 2px solid transparent;
     background-clip: content-box;
   }

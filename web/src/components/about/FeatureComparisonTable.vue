@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body font-semibold">{{ ed.support }}</span>
             </div>
           </div>
-          <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+          <!-- eslint-disable local/no-hardcoded-px -- 1.5px CTA button border — a border width, optical not layout; it must not thicken with the label text -->
           <a
             v-if="ed.ctaUrl"
             :href="ed.ctaUrl"
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- eslint-enable local/no-hardcoded-px -->
             {{ ed.ctaLabel }}
           </a>
-          <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+          <!-- eslint-disable local/no-hardcoded-px -- 1.5px border on the current-plan button — a border width, optical not layout; it must match the CTA outline at any text size -->
           <button
             v-else
             data-test="feature-comparison-table-cta-btn"

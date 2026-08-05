@@ -231,7 +231,6 @@ function copyVar(name: string) {
 }
 
 defineExpose({ applyTemplate, previewTemplate });
-/* eslint-disable local/no-hardcoded-px -- the style block below uses only 1px borders: hairlines, a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>
@@ -661,6 +660,7 @@ defineExpose({ applyTemplate, previewTemplate });
   font-weight: 600;
   color: var(--color-text-heading);
   background: var(--color-surface-base);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-subtle);
 }
 .help-legend__swatch--sample {
@@ -668,6 +668,7 @@ defineExpose({ applyTemplate, previewTemplate });
   color: var(--color-text-secondary);
   text-decoration: underline dashed;
   background: var(--color-surface-base);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-subtle);
 }
 .help-legend__swatch--opaque {
@@ -799,6 +800,7 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
   gap: 0.375rem;
   padding: 0.75rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-surface);
   border-left-width: 0.125rem;
@@ -849,6 +851,7 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-surface);
   background: var(--color-surface-base);
@@ -878,6 +881,7 @@ defineExpose({ applyTemplate, previewTemplate });
 
 .help-chip {
   padding: 0.25rem 0.5rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-default);
   background: transparent;
@@ -907,6 +911,7 @@ defineExpose({ applyTemplate, previewTemplate });
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.375rem 0.5rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-default);
 }
@@ -930,6 +935,7 @@ defineExpose({ applyTemplate, previewTemplate });
   margin: 0;
   padding: 0.75rem;
   border-radius: var(--radius-surface);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   background: var(--color-surface-subtle);
   color: var(--color-text-body);

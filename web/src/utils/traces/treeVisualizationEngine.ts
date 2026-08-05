@@ -365,14 +365,14 @@ export function createTreeVisualizationEngine() {
     const tooltipEl = document.createElement("div");
 
     // Exact styling from Service Graph implementation
-    /* eslint-disable local/no-hardcoded-px -- raw cssText string for the ECharts tooltip chrome: blur radius, hairline border and fixed tooltip metrics are optical, not text-relative, and must stay identical to the Service Graph tooltip */
+    /* eslint-disable local/no-hardcoded-px -- optical effects: backdrop blur radii and a 1-device-pixel border, which must not scale with text */
     tooltipEl.style.cssText = `
       position: absolute; pointer-events: none; z-index: 9999;
       background: ${isDarkMode ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
       backdrop-filter: blur(24px) saturate(180%);
       -webkit-backdrop-filter: blur(24px) saturate(180%);
       border: 1px solid ${isDarkMode ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
-      border-radius: 8px; padding: 9px 13px; font-size: 12px; line-height: 1.5;
+      border-radius: 0.5rem; padding: 0.5625rem 0.8125rem; font-size: 0.75rem; line-height: 1.5;
       font-family: var(--font-sans);
       letter-spacing: 0.01em; white-space: nowrap; display: none;
       color: ${isDarkMode ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.82)"};

@@ -15,7 +15,7 @@ limitations under the License. -->
 <template>
   <div data-test="destination-test-result" class="mt-3">
     <!-- Success State -->
-    <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+    <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe — a border width, optical not layout; it must not thicken with the message text -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
@@ -49,7 +49,7 @@ limitations under the License. -->
     </div>
 
     <!-- Failure State -->
-    <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+    <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the failure callout — a border width, optical not layout; it stays constant while the error text reflows -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
@@ -159,7 +159,7 @@ limitations under the License. -->
     </div>
 
     <!-- Loading State -->
-    <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+    <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the loading callout — a border width, optical not layout; it must not grow with the text beside it -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"

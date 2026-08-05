@@ -2477,7 +2477,6 @@ export default defineComponent({
     },
   },
 });
-/* eslint-disable local/no-hardcoded-px -- hairline: the 1px rule and 1px row padding in the style block below are 1-device-pixel values that must not scale with text */
 </script>
 
 <style scoped>
@@ -2546,6 +2545,7 @@ export default defineComponent({
   opacity: 0.65;
   padding: 0 0.625rem 0.25rem;
   margin-bottom: 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid color-mix(in srgb, var(--color-grey-500) 15%, transparent);
 }
 
@@ -2553,7 +2553,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 1px 0.625rem;
+  padding: 0.0625rem 0.625rem;
   transition: background 0.1s;
 
   &:hover {

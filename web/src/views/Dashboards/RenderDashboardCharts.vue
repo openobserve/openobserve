@@ -1590,7 +1590,6 @@ export default defineComponent({
     },
   },
 });
-/* eslint-disable local/no-hardcoded-px -- the style blocks below draw the 1px grid-item hairline border: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <!--
@@ -1613,6 +1612,7 @@ export default defineComponent({
 }
 
 .displayDiv :deep(.grid-stack-item .grid-stack-item-content) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the grid-item border is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: 0.375rem;
   overflow: visible;

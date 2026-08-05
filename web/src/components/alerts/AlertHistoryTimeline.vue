@@ -436,8 +436,6 @@ function formatDuration(ms: number): string {
   if (h) return `${h}h`;
   return `${m}m`;
 }
-
-/* eslint-disable local/no-hardcoded-px -- covers the style block below (a comment inside style is not honoured): its 1px values are hairlines — a 1-device-pixel hatch stripe and inset ring must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped>
@@ -449,7 +447,9 @@ function formatDuration(ms: number): string {
     repeating-linear-gradient(
       45deg,
       color-mix(in srgb, var(--color-white) 40%, transparent) 0,
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel hatch stripe must not scale with text or it smears at fractional zoom */
       color-mix(in srgb, var(--color-white) 40%, transparent) 1px,
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel hatch stripe must not scale with text or it smears at fractional zoom */
       transparent 1px,
       transparent 0.1875rem
     ),
@@ -466,6 +466,7 @@ function formatDuration(ms: number): string {
     transparent 0.125rem,
     transparent 0.375rem
   );
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel inset ring must not scale with text or it smears at fractional zoom */
   box-shadow: inset 0 0 0 1px
     color-mix(in srgb, var(--color-badge-purple-solid-bg) 55%, transparent);
 }

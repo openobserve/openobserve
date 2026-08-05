@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary mb-1 block text-sm font-semibold">{{
                 t("traces.messageLabel")
               }}</span>
-              <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+              <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the exception message: a border width — optical, not layout; it must not thicken with the message text -->
               <div
                 class="text-text-secondary bg-code-bg rounded-default border-l-status-warning-text border-l-[3px] p-2 text-sm leading-normal break-words whitespace-pre-wrap"
               >

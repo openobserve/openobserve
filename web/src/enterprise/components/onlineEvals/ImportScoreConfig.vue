@@ -225,14 +225,16 @@ const dataTypeOptions = [
   { label: "Boolean", value: "boolean" },
 ];
 
-/* eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent */
 const editorHeights = computed(() => ({
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
   urlEditor: "calc(100vh - 266px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
   fileEditor: "calc(100vh - 296px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
   outputContainer: "calc(100vh - 130px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
   errorReport: "calc(100vh - 192px)",
 }));
-/* eslint-enable local/no-hardcoded-px */
 
 const orgId = computed(() => props.orgId);
 

@@ -385,7 +385,6 @@ function scrollToTop() {
 }
 
 defineExpose({ scrollToTop });
-/* eslint-disable local/no-hardcoded-px -- the style block below draws a 1px chip separator: hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -419,6 +418,7 @@ defineExpose({ scrollToTop });
   background-color: transparent !important;
 }
 .o-field-list__actions > :deep(*:not(:first-child)) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel chip separator must not scale with text or it smears at fractional zoom */
   border-left: 1px solid var(--color-field-list-actions-border) !important;
 }
 </style>

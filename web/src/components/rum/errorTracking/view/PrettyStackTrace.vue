@@ -17,13 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- Loading state -->
-    <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+    <!-- eslint-disable local/no-hardcoded-px -- 1px container border — a border width, optical not layout; scaling it with text thickens the rule -->
     <div
       v-if="isLoadingTranslation"
       data-test="rum-pretty-stack-trace-loading"
       class="loading-container rounded-default flex min-h-50 flex-col items-center justify-center p-6 text-center"
       :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <OSpinner variant="dots" size="lg" />
       <div class="text-text-secondary mt-3 font-medium" style="font-size: var(--text-sm)">
         {{ t("rum.translatingStackTrace") }}
@@ -34,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- No source maps available message -->
+    <!-- eslint-disable local/no-hardcoded-px -- 1px container border — a border width, optical not layout; it must not thicken with the message text -->
     <div
       v-else-if="allSourceInfoNull"
       data-test="rum-pretty-stack-trace-unavailable"
@@ -104,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- First stack frame - expandable/collapsible -->
-        <!-- eslint-disable local/no-hardcoded-px -- structural border widths plus an optical box-shadow; neither is a text-relative dimension and scaling the shadow makes elevation bloom -->
+        <!-- eslint-disable local/no-hardcoded-px -- 1px frame borders plus a box-shadow offset and blur — optical effects, not layout; scaling them with text thickens the rule and makes elevation bloom -->
         <div
           v-if="stackTrace.stack.length > 0"
           class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
@@ -181,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Remaining frames - collapsed by default -->
-        <!-- eslint-disable local/no-hardcoded-px -- structural border widths plus an optical box-shadow; neither is a text-relative dimension and scaling the shadow makes elevation bloom -->
+        <!-- eslint-disable local/no-hardcoded-px -- 1px bottom/side borders plus a box-shadow offset and blur — optical effects, not layout; the collapsed panel must not gain weight with its text -->
         <div
           v-if="stackTrace.stack.length > 1"
           class="remaining-frames rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
@@ -193,7 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'background-color': backgroundColor,
           }"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <!-- Show more button - only visible when frames are hidden -->
+          <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel top rule must not scale with text or it smears at fractional zoom -->
           <div
             v-if="!expandedTraces[traceIndex]"
             class="show-more-button hover:bg-surface-subtle flex cursor-pointer items-center gap-1.5 !px-4 px-3 !py-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out"
@@ -213,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Collapsed frames - shown after clicking show more -->
           <div v-if="expandedTraces[traceIndex]">
-            <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+            <!-- eslint-disable local/no-hardcoded-px -- 1px divider border between collapsed frames — a border width, optical not layout; it must not thicken with the frame text -->
             <div
               v-for="(frame, frameIndex) in stackTrace.stack.slice(1)"
               :key="frameIndex + 1"

@@ -665,7 +665,6 @@ const renderMarkdown = (content: string): string => {
   const markdownContent = toMarkdown(content);
   return DOMPurify.sanitize(marked.parse(markdownContent) as string);
 };
-/* eslint-disable local/no-hardcoded-px -- the style block below draws a 1px table rule: hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -749,6 +748,7 @@ const renderMarkdown = (content: string): string => {
 
 .messages-view .message-item .message-content :deep(table th),
 .messages-view .message-item .message-content :deep(table td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table rule must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   padding: 0.375rem 0.5rem;
   text-align: left;

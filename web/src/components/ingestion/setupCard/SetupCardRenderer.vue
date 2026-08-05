@@ -432,7 +432,6 @@ function fireConfetti() {
   };
   confettiRaf = requestAnimationFrame(frame);
 }
-/* eslint-disable local/no-hardcoded-px -- covers the style block below: every px there is a 1px border or a 1px optical nudge — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>
@@ -960,6 +959,7 @@ function fireConfetti() {
 }
 .ds-mono.logo {
   background: var(--panel);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   padding: 0.5rem;
 }
@@ -973,6 +973,7 @@ function fireConfetti() {
 /* ---- hero — its own header band: [logo + name] row, then tagline + chips ---- */
 .c-hero {
   padding: 0.375rem 0 1.125rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--border);
   margin-bottom: 1.375rem;
 }
@@ -1081,6 +1082,7 @@ function fireConfetti() {
 }
 .step-note :deep(svg) {
   flex: none;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px optical nudge, not layout — a single device pixel of alignment that must not scale with text */
   margin-top: 1px;
 }
 /* In-card jump link (see noteMd) — same treatment as the footer's doc link. */
@@ -1098,7 +1100,7 @@ function fireConfetti() {
   font-size: var(--text-xs);
   background: var(--track);
   color: var(--text-1);
-  padding: 1px 0.375rem;
+  padding: 0.0625rem 0.375rem;
   border-radius: var(--radius-default);
 }
 
@@ -1110,6 +1112,7 @@ function fireConfetti() {
   margin-top: 0.875rem;
   padding: 0.8125rem 1.125rem;
   border-radius: var(--radius-surface);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   background: var(--panel);
   transition: all 0.3s;
@@ -1177,6 +1180,7 @@ function fireConfetti() {
 
 /* ---- fix box ---- */
 .fixbox {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--warn) 38%, var(--border));
   border-radius: var(--radius-surface);
   background: var(--warn-soft);
@@ -1216,6 +1220,7 @@ function fireConfetti() {
   margin-top: 0.875rem;
 }
 .acc-item {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: var(--panel);
@@ -1239,7 +1244,7 @@ function fireConfetti() {
   font-size: var(--text-2xs);
   background: var(--track);
   color: var(--text-1);
-  padding: 1px 0.3125rem;
+  padding: 0.0625rem 0.3125rem;
   border-radius: var(--radius-default);
 }
 
@@ -1253,6 +1258,7 @@ function fireConfetti() {
 /* ---- troubleshooting ---- */
 .ts-row {
   padding: 0.6875rem 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-bottom: 1px dashed var(--border);
 }
 .ts-row:last-child {
@@ -1269,6 +1275,7 @@ function fireConfetti() {
 .ts-q :deep(svg) {
   color: var(--warn);
   flex: none;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px optical nudge, not layout — a single device pixel of alignment that must not scale with text */
   margin-top: 1px;
 }
 .ts-a {
@@ -1282,6 +1289,7 @@ function fireConfetti() {
 .pv-foot {
   margin-top: 1rem;
   padding-top: 0.875rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;

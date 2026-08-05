@@ -5737,7 +5737,6 @@ export default defineComponent({
     };
   },
 });
-/* eslint-disable local/no-hardcoded-px -- style block below: 1px hairline borders must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped>
@@ -5853,6 +5852,7 @@ export default defineComponent({
 .tool-call-item.pending-confirmation {
   cursor: default;
   background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 .dark .tool-call-item.pending-confirmation {
@@ -5863,6 +5863,7 @@ export default defineComponent({
 .tool-call-item.pending-navigation {
   cursor: default;
   background: color-mix(in srgb, var(--color-info) 8%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
 }
 .dark .tool-call-item.pending-navigation {
@@ -5950,6 +5951,7 @@ export default defineComponent({
 .text-block :deep(th),
 .text-block :deep(td) {
   padding: 0.5rem 0.75rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -6007,6 +6009,7 @@ export default defineComponent({
   margin: 0;
   max-width: 100%;
   background-color: var(--color-surface-base);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-subtle);
   border-top: none;
 }

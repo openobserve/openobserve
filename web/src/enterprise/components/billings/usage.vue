@@ -14,10 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <div class="w-full p-3" style="height: calc(100vh - 130px)">
-    <!-- eslint-enable local/no-hardcoded-px -->
     <!-- Billing usage tiles (always shown). When self-usage reporting is
            enabled, the calendar in the toolbar drives the range and a daily
            chart is appended below. -->

@@ -62,7 +62,6 @@ const renderedSections = computed(() =>
     segments: renderCardSegments(s.body, subs.value),
   })),
 );
-/* eslint-disable local/no-hardcoded-px -- covers the style block below: the px there is a 1px border-top — a hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <template>
@@ -140,6 +139,7 @@ const renderedSections = computed(() =>
 
 .o2-section {
   padding: 1.25rem 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border-top must not scale with text or it smears at fractional zoom */
   border-top: 1px solid var(--color-border-default);
 
   &:first-of-type {

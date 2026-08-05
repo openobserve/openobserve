@@ -1,7 +1,6 @@
-<!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <div style="width: 60vw; height: calc(100vh - 59px)" :class="'bg-surface-base'">
-    <!-- eslint-enable local/no-hardcoded-px -->
     <div class="flex flex-nowrap items-center justify-between px-4 py-2">
       <div class="flex items-center">
         <div class="col-auto"></div>
@@ -338,7 +337,7 @@
                         :placeholder="t('regex_patterns.output_string_placeholder')"
                         :rows="5"
                       />
-                      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+                      <!-- eslint-disable local/no-hardcoded-px -- 1px sides/bottom rules on the empty test-output box: border widths — optical, not layout; they must not thicken with the hint text -->
                       <div
                         v-else
                         class="bg-surface-base flex h-27.75 flex-col items-center justify-center [border-bottom:1px_solid_var(--color-border-default)] [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)]"

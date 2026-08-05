@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 class="threshould-input"
                                 data-test="scheduled-pipeline-threshold-operator-select"
                               >
-                                <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+                                <!-- eslint-disable local/no-hardcoded-px -- 1px border on the operator select: a border width — optical, not layout; it must not thicken with the option text -->
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
@@ -435,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 />
                                 <!-- eslint-enable local/no-hardcoded-px -->
                               </div>
-                              <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+                              <!-- eslint-disable local/no-hardcoded-px -- 1px border on the threshold value field abutting the select: a border width — optical, not layout; it must not thicken with the input text -->
                               <div
                                 class="flex items-center"
                                 style="
@@ -793,9 +793,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="height: calc(100vh - 190px) !important"
                       class="flex items-center justify-center"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <OSpinner size="md" />
                     </div>
 
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <OTable
                       v-else-if="expandState.output && rows.length > 0 && tab == 'sql'"
                       style="height: calc(100vh - 190px) !important"
@@ -812,6 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expand-on-row-click="true"
                       data-test="scheduled-pipeline-sql-preview-table"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <template #cell-source="{ row }">
                         <span class="font-mono text-xs">{{ JSON.stringify(row) }}</span>
                       </template>
@@ -837,6 +840,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </OTable>
 
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <div
                       v-else-if="rows.length == 0 && expandState.output && tab == 'sql'"
                       style="height: calc(100vh - 236px) !important"

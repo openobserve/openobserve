@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Recent Errors Section -->
-            <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+            <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the errors panel — a border width, optical not layout; it must not thicken with the text it flags -->
             <div
               v-if="claimParserFunction"
               class="rounded-default bg-surface-subtle border-l-status-negative border-l-[3px] p-4"

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="props.showSummary"
       class="thread-summary bg-surface-base border-border-default flex flex-wrap items-center gap-[0.4rem] border-b px-4 py-2"
     >
-      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+      <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the steps chip: a border width — optical, not layout; it must not thicken with the chip text -->
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]! px-2.5! py-0! text-xs!"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </OTag>
 
-      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+      <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the tools chip: a border width — optical, not layout; it must not thicken with the chip text -->
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]! px-2.5! py-0! text-xs!"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </OTag>
 
-      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+      <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the duration chip: a border width — optical, not layout; it must not thicken with the chip text -->
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]! px-2.5! py-0! text-xs!"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
-      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+      <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the cost chip: a border width — optical, not layout; it must not thicken with the chip text -->
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-l-success-600! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
-      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+      <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the model chip: a border width — optical, not layout; it must not thicken with the chip text -->
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </OTag>
 
-      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+      <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the error chip: a border width — optical, not layout; it must not thicken with the chip text -->
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
       <!-- System prompt (global — identical across traces in a session). -->
-      <!-- eslint-disable local/no-hardcoded-px -- structural border width, not a text-relative dimension -->
+      <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the system-prompt panel: a border width — optical, not layout; it must not thicken with the prompt text -->
       <div
         v-if="head.systemPrompt"
         class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base mb-4 overflow-hidden border border-l-[3px] dark:border-l-(--color-purple-400)"
@@ -549,7 +549,6 @@ function formatTime(ns: number): string {
   const ss = String(d.getSeconds()).padStart(2, "0");
   return `${hh}:${mm}:${ss}`;
 }
-/* eslint-disable local/no-hardcoded-px -- the style block below uses 1px borders: hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -614,6 +613,7 @@ function formatTime(ns: number): string {
   }
   :deep(pre) {
     background: color-mix(in srgb, var(--color-text-body) 5%, transparent);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel code block border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--color-border-default);
     padding: 0.5rem 0.625rem;
     border-radius: 0.25rem;
@@ -638,6 +638,7 @@ function formatTime(ns: number): string {
   }
   :deep(th),
   :deep(td) {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--color-border-default);
     padding: 0.3rem 0.5rem;
     text-align: left;
@@ -648,6 +649,7 @@ function formatTime(ns: number): string {
   }
   :deep(hr) {
     border: none;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
     border-top: 1px solid var(--color-border-default);
     margin: 0.625rem 0;
   }

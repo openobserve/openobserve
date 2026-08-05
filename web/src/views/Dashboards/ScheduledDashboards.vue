@@ -374,7 +374,6 @@ const getTimeRangeValue = (dateTime: any) => {
     return `${startDateTime} - ${endDateTime}`;
   }
 };
-/* eslint-disable local/no-hardcoded-px -- covers the style block below: the .rum-tabs border is a hairline, a 1-device-pixel rule that must not scale with text or it smears at fractional zoom */
 </script>
 
 <style scoped>
@@ -385,6 +384,7 @@ const getTimeRangeValue = (dateTime: any) => {
 }
 
 .scheduled-dashboards :deep(.rum-tabs) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the tab-group outline is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   height: fit-content;
   border-radius: 0.25rem;

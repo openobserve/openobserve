@@ -174,7 +174,6 @@ function formatDuration(ns: number): string {
   if (ms < 60_000) return (ms / 1000).toFixed(2) + "s";
   return (ms / 60_000).toFixed(2) + "m";
 }
-/* eslint-disable local/no-hardcoded-px -- the style block below only uses px for hairlines: 1-device-pixel borders and a 1px shadow offset must not scale with text or they smear at fractional zoom */
 </script>
 
 <style scoped>
@@ -219,6 +218,7 @@ function formatDuration(ns: number): string {
     gap: 0.125rem;
     padding: 0.5rem 1.125rem;
     border-radius: 0.625rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes elevation bloom */
     box-shadow: 0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent);
     transition:
       box-shadow 0.15s ease,
@@ -259,6 +259,7 @@ function formatDuration(ns: number): string {
 }
 
 .thread-tool {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel tool row divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid color-mix(in srgb, var(--tt-accent) 15%, transparent);
   background: color-mix(in srgb, var(--tt-accent) 4%, transparent);
   transition: background 120ms ease;
@@ -343,12 +344,14 @@ function formatDuration(ns: number): string {
 .thread-pill--ok {
   background: color-mix(in srgb, var(--color-success-600) 10%, transparent);
   color: var(--color-success-600);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-success-600) 25%, transparent);
 }
 
 .thread-pill--error {
   background: color-mix(in srgb, var(--color-error-600) 10%, transparent);
   color: var(--color-error-600);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-error-600) 25%, transparent);
 }
 
