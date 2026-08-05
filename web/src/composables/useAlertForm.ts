@@ -2721,6 +2721,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         if (data.folder_id) activeFolderId.value = data.folder_id;
         anomalyEditMode.value = true;
         lastValidStep.value = 6;
+
+        // The stream is only known NOW. initializeFormData already ran its
+        // updateStreams, but at that point stream_type was empty, so it
+        // returned early — leaving the stream select with no options and the
+        // stream's columns unloaded. The form value was set, yet nothing was
+        // selectable and every field picker downstream was empty.
+        if (data.stream_type) await updateStreams(false);
       } catch {
         toast({
           variant: "error",

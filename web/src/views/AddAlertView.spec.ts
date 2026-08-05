@@ -282,7 +282,7 @@ describe("AddAlertView.vue", () => {
       // list and refetch everything before the form appeared.
       vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
       vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
-        data: { name: "my-alert", stream_name: "logs" },
+        data: { name: "my-alert", stream_name: "k8s_logs", stream_type: "logs" },
       } as any);
 
       const wrapper = await mountEditing();
@@ -291,7 +291,13 @@ describe("AddAlertView.vue", () => {
 
       const form = wrapper.findComponent(AddAlertStub);
       expect(form.props("isUpdated")).toBe(true);
-      expect((form.props("modelValue") as any).name).toBe("my-alert");
+
+      // The whole fetched alert reaches the form, not just its name — the form
+      // takes its entire edit prefill from this one object.
+      const seeded = form.props("modelValue") as any;
+      expect(seeded.name).toBe("my-alert");
+      expect(seeded.stream_name).toBe("k8s_logs");
+      expect(seeded.stream_type).toBe("logs");
     });
 
     it("does not fetch an alert when creating one", async () => {
