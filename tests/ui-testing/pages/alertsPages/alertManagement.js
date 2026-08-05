@@ -187,7 +187,11 @@ export class AlertManagement {
      */
     async deleteAlertByRow(alertName) {
         const kebabButton = this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).first();
-        await kebabButton.waitFor({ state: 'visible', timeout: 5000 });
+        // 5s was too tight under alpha load — the just-created alert's row (and its
+        // more-options kebab) can take longer to render in the list, failing cleanup
+        // (alerts-ui-operations:131). Give it room and scroll it into view before clicking.
+        await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
+        await kebabButton.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
         await kebabButton.click();
 
         // Target the Delete item by data-test (robust to label/shortcut-hint changes)
