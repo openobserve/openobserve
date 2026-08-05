@@ -40,7 +40,7 @@ import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
 /** Published iOS SDK release these snippets are written against. */
-export const RUM_IOS_SDK_VERSION = "0.1.0-alpha.4";
+export const RUM_IOS_SDK_VERSION = "0.1.0";
 
 /** Swift Package Manager git source for the iOS SDK. */
 const SPM_URL = "https://github.com/openobserve/openobserve-sdk-ios.git";

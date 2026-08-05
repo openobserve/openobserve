@@ -72,8 +72,8 @@ describe("rumIOSCard builder", () => {
   // ── RUM_IOS_SDK_VERSION ────────────────────────────────────────────────────
 
   describe("RUM_IOS_SDK_VERSION", () => {
-    it("is 0.1.0-alpha.4", () => {
-      expect(RUM_IOS_SDK_VERSION).toBe("0.1.0-alpha.4");
+    it("is 0.1.0", () => {
+      expect(RUM_IOS_SDK_VERSION).toBe("0.1.0");
     });
   });
 

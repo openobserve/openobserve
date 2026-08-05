@@ -37,7 +37,7 @@ import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
 /** Published React Native SDK release these snippets are written against. */
-export const RUM_RN_SDK_VERSION = "0.1.0-alpha.4";
+export const RUM_RN_SDK_VERSION = "0.1.0";
 
 const PKG_CORE = "@openobserve/mobile-react-native";
 const PKG_REPLAY = "@openobserve/mobile-react-native-session-replay";

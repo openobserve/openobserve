@@ -72,8 +72,8 @@ describe("rumAndroidCard builder", () => {
   // ── RUM_ANDROID_SDK_VERSION ────────────────────────────────────────────────
 
   describe("RUM_ANDROID_SDK_VERSION", () => {
-    it("is 0.1.0-alpha4", () => {
-      expect(RUM_ANDROID_SDK_VERSION).toBe("0.1.0-alpha4");
+    it("is 0.1.0", () => {
+      expect(RUM_ANDROID_SDK_VERSION).toBe("0.1.0");
     });
   });
 
@@ -241,7 +241,7 @@ describe("rumAndroidCard builder", () => {
       const install = card.steps.find((s) => s.id === "install")!;
       const kotlin = install.variants!.find((v) => v.id === "kotlin")!;
 
-      expect(kotlin.code.raw).toContain("ai.openobserve:o2-sdk-android-rum:0.1.0-alpha4");
+      expect(kotlin.code.raw).toContain("ai.openobserve:o2-sdk-android-rum:0.1.0");
     });
 
     it("kotlin variant filename is 'build.gradle.kts'", () => {

@@ -36,7 +36,7 @@ import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
 /** Published Android SDK release these snippets are written against. */
-export const RUM_ANDROID_SDK_VERSION = "0.1.0-alpha4";
+export const RUM_ANDROID_SDK_VERSION = "0.1.0";
 
 /** Maven group for every OpenObserve Android artifact. */
 const GROUP = "ai.openobserve";
