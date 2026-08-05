@@ -344,7 +344,14 @@ const backTarget = computed(() => ({
   label: t("alerts.header"),
   to: {
     name: "alertList",
-    query: { org_identifier: orgId.value },
+    query: {
+      org_identifier: orgId.value,
+      // Carry the folder the list navigated in with. Without it the list falls
+      // back to "default" and the user lands somewhere their alert isn't —
+      // going "back" has to mean back, not back-to-the-first-folder. Same
+      // reasoning (and the same fallback) as editAlert below.
+      folder: route.query.folder || "default",
+    },
   },
 }));
 
