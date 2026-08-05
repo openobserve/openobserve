@@ -40,49 +40,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
-              <!-- Inline editable query name (multi-SQL).
-                   Wrapped in a <div @click.stop> because OInput has
-                   inheritAttrs: false and doesn't re-emit `click`, so a
-                   listener on <OInput> wouldn't catch the tab-click. -->
-              <div
+              <!-- Rename-in-place, matching the dashboard tab bar (TabList.vue):
+                   no box, no fill — the name just becomes editable in the active
+                   tab's own colour, with a tick to commit. field-sizing-content
+                   sizes the input to its text; min-w floors it so the name can
+                   never collapse under the tab's flex shrink. -->
+              <span
                 v-if="editingQueryIndex === index"
                 @click.stop
-                class="inline-block w-22.5 max-w-40 min-w-12.5"
+                class="inline-flex items-center gap-1"
               >
-                <OInput
-                  ref="renameInputRef"
+                <input
                   v-model="editingQueryName"
-                  size="sm"
-                  autofocus
+                  type="text"
+                  size="1"
+                  :maxlength="60"
                   :id="`dashboard-query-rename-input-${index}`"
-                  class="query-tab-name-input"
+                  :aria-label="t('dashboard.renameQuery')"
+                  class="text-tabs-active-text field-sizing-content min-w-16 max-w-40 shrink-0 bg-transparent px-0.5 text-sm outline-none"
                   :data-test="`dashboard-panel-query-tab-name-input-${index}`"
+                  @mousedown.stop
+                  @dblclick.stop
                   @keydown.enter.stop="saveQueryName(index)"
                   @keydown.escape.stop="cancelQueryNameEdit"
                   @blur="saveQueryName(index)"
                 />
-              </div>
+                <span class="relative inline-flex items-center">
+                  <OIcon
+                    name="check"
+                    size="sm"
+                    :aria-label="t('common.save')"
+                    class="text-text-secondary cursor-pointer opacity-70 transition-opacity duration-150 hover:opacity-100"
+                    @click.stop.prevent="saveQueryName(index)"
+                    @mousedown.stop.prevent
+                    @pointerdown.stop.prevent
+                    :data-test="`dashboard-panel-query-tab-rename-save-${index}`"
+                  />
+                  <OTooltip :content="t('common.save')" />
+                </span>
+              </span>
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="cursor-pointer text-xs whitespace-nowrap select-none"
-                :title="'Double-click to rename'"
+                class="cursor-pointer text-sm whitespace-nowrap select-none"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
                 >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
               >
-              <!-- Eye icon + its tooltip wrapped in a span so the tooltip's
-                   trigger is scoped to JUST the icon, not the entire OTab. -->
-              <span
-                v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
-                class="relative inline-flex items-center"
-              >
+              <!-- Every tab action (rename / visibility / close) is visible at
+                   rest — no hover reveal. Each icon is wrapped in a span so its
+                   tooltip trigger is scoped to JUST that icon, not the OTab. -->
+              <span v-if="editingQueryIndex !== index" class="relative inline-flex items-center">
+                <OIcon
+                  name="edit"
+                  size="sm"
+                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
+                  @click.stop.prevent="startEditQueryName(index, tab)"
+                  @mousedown.stop.prevent
+                  @pointerdown.stop.prevent
+                  :data-test="`dashboard-panel-query-tab-rename-${index}`"
+                />
+                <OTooltip :content="t('dashboard.renameQuery')" />
+              </span>
+              <span class="relative inline-flex items-center">
                 <OIcon
                   :name="
                     (dashboardPanelData.layout.hiddenQueries || []).includes(index)
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="hover:bg-hover-gray ml-1 cursor-pointer opacity-[0.7] transition-all duration-150 hover:rounded-full hover:opacity-100"
+                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-[0.7] transition-all duration-150 hover:rounded-full hover:opacity-100"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
@@ -308,7 +334,6 @@ import type { SelectModelValue, SelectOptionInput } from "@/lib/forms/Select/OSe
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
 // Minimal surface of UnifiedQueryEditor's exposed methods used here.
@@ -339,7 +364,6 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OSplitter,
-    OInput,
     OTag,
   },
   emits: ["searchdata", "run-query"],
@@ -883,23 +907,22 @@ export default defineComponent({
     // Inline query tab renaming
     const editingQueryIndex = ref(-1);
     const editingQueryName = ref("");
-    // Vue ref to the OInput wrapper for the rename field.
-    // OInput doesn't call defineExpose, so we reach into $el and grab the
-    // underlying <input> via querySelector. Cleaner than a global DOM lookup.
-    const renameInputRef = ref<any>(null);
 
     const startEditQueryName = (rawIndex: string | number, tab: any) => {
       const index = Number(rawIndex);
       editingQueryIndex.value = index;
       editingQueryName.value = tab.tabName || "Query " + (index + 1);
-      // OInput renders on the next tick; focus + select the inner <input>
-      // by its deterministic id (forwarded by OInput onto the input element).
+      // The input renders on the next tick; focus it with the caret at the END
+      // of the name — NOT select-all, where the first keystroke silently wipes
+      // the whole name.
       nextTick(() => {
         const el = document.getElementById(
           `dashboard-query-rename-input-${index}`,
         ) as HTMLInputElement | null;
-        el?.focus();
-        el?.select();
+        if (!el) return;
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
       });
     };
 
@@ -957,7 +980,6 @@ export default defineComponent({
       handleVrlGenerationSuccess,
       editingQueryIndex,
       editingQueryName,
-      renameInputRef,
       startEditQueryName,
       saveQueryName,
       cancelQueryNameEdit,
