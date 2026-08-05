@@ -165,6 +165,11 @@ const defaultWorkflow = {
   nodes: <any>[],
   edges: <any>[],
   org: "",
+  // True while this is an unpublished draft (persisted via the drafts table,
+  // skips graph validation). Flips to false once promoted/published. A brand-new
+  // workflow starts false — it's neither a saved draft nor a published workflow
+  // until the first Save-as-Draft / Publish.
+  isDraft: false,
 };
 
 const defaultObject = {
@@ -567,7 +572,9 @@ export const hydrateWorkflow = (wf: any) => {
     const styled = makeEdge(src, tgt, e.sourceHandle);
     return { ...e, ...styled, id: e.id || styled.id };
   });
-  workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges };
+  // List rows carry `is_draft`; normalize it onto the store's `isDraft` so the
+  // editor knows to save via the draft endpoints and to offer Publish.
+  workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges, isDraft: !!wf.is_draft };
   // Snapshot the NORMALIZED graph (VueFlow type + styled edges), not raw `wf`,
   // so any cancel/restore or dirty-compare baseline matches what's on canvas.
   workflowObj.workflowWithoutChange = JSON.parse(

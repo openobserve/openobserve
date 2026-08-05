@@ -45,6 +45,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import workflowService from "@/services/workflows";
 import useWorkflowCanvas, {
   workflowObj,
+  hydrateWorkflow,
   loadWorkflowRun,
   executeTestRun,
   serializeWorkflow,
@@ -482,6 +483,29 @@ describe("serializeWorkflow — backend Workflow shape", () => {
     expect(wf.name).toBe("");
     expect(wf.nodes).toEqual([]);
     expect(wf.edges).toEqual([]);
+  });
+});
+
+describe("hydrateWorkflow — draft flag normalization", () => {
+  it("normalizes a list row's is_draft:true onto the store's isDraft", () => {
+    hydrateWorkflow({ id: "d1", name: "draft wf", nodes: [], edges: [], is_draft: true });
+    expect(workflowObj.currentSelectedWorkflow.isDraft).toBe(true);
+  });
+
+  it("sets isDraft false for a published row (is_draft:false)", () => {
+    hydrateWorkflow({ id: "w1", name: "wf", nodes: [], edges: [], is_draft: false });
+    expect(workflowObj.currentSelectedWorkflow.isDraft).toBe(false);
+  });
+
+  it("defaults isDraft to false when the row has no is_draft field", () => {
+    hydrateWorkflow({ id: "w1", name: "wf", nodes: [], edges: [] });
+    expect(workflowObj.currentSelectedWorkflow.isDraft).toBe(false);
+  });
+
+  it("flips isEditWorkflow on and preserves the name/graph while normalizing", () => {
+    hydrateWorkflow({ id: "d1", name: "wip", nodes: [], edges: [], is_draft: true });
+    expect(workflowObj.isEditWorkflow).toBe(true);
+    expect(workflowObj.currentSelectedWorkflow.name).toBe("wip");
   });
 });
 

@@ -108,7 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.cancel") }}
         </OButton>
+        <!-- An already-published workflow saves as a single validated update.
+             A new or draft workflow gets two actions: Save as Draft (lenient —
+             persists an incomplete graph) and Publish (validates + promotes). -->
         <OButton
+          v-if="isExistingPublished"
           variant="primary"
           size="sm-action"
           data-test="workflow-editor-save"
@@ -118,6 +122,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.save") }}
         </OButton>
+        <template v-else>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="workflow-editor-save-draft"
+            :loading="saving"
+            :disabled="saving"
+            @click="onSaveDraft"
+          >
+            {{ t("workflow.saveDraft") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            data-test="workflow-editor-publish"
+            :loading="saving"
+            :disabled="saving"
+            @click="onPublish"
+          >
+            {{ t("workflow.publish") }}
+          </OButton>
+        </template>
       </template>
     </OPageHeader>
 
@@ -374,7 +400,10 @@ const saving = ref(false);
 // (unconnected) nodes. Mirrors PipelineEditor's checks. Save also requires a name
 // (`requireName`); Test skips it — a draft graph is testable before it's named,
 // it just has to be a connected trigger -> step chain.
-const validate = ({ requireName = true }: { requireName?: boolean } = {}): boolean => {
+const validate = ({
+  requireName = true,
+  requireGraph = true,
+}: { requireName?: boolean; requireGraph?: boolean } = {}): boolean => {
   const wf = workflowObj.currentSelectedWorkflow;
   if (requireName) {
     const name = (wf.name || "").trim();
@@ -385,6 +414,11 @@ const validate = ({ requireName = true }: { requireName?: boolean } = {}): boole
     }
     workflowObj.nameError = false;
   }
+
+  // A draft may be an incomplete graph (no trigger yet, missing steps, orphan
+  // nodes) — skip the connectivity checks so it can be saved as-is. The backend
+  // re-runs full validation on Publish/promote.
+  if (!requireGraph) return true;
 
   const nodes = wf.nodes || [];
   const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
@@ -497,6 +531,115 @@ const onSave = async () => {
 const onLinkAlertsDone = () => {
   linkAlerts.value.show = false;
   goBack();
+};
+
+// A workflow already promoted to the workflows table: shows a single validated
+// Save. New workflows and drafts show Save-as-Draft + Publish instead.
+const isExistingPublished = computed(
+  () =>
+    !!workflowObj.currentSelectedWorkflow.id && !workflowObj.currentSelectedWorkflow.isDraft,
+);
+
+// Save-as-Draft: lenient (name only, no graph checks) and always writes to the
+// drafts table. First save creates the draft (backend mints the id); subsequent
+// saves update it. Never validates the graph — that's Publish's job.
+const persistDraft = async (): Promise<boolean> => {
+  if (saving.value || !validate({ requireGraph: false })) return false;
+  saving.value = true;
+  const org = orgId();
+  const data = buildPayload();
+  const wf = workflowObj.currentSelectedWorkflow;
+  try {
+    if (wf.id) {
+      await workflowService.updateWorkflow({
+        org_identifier: org,
+        id: wf.id,
+        data,
+        draft: true,
+      });
+    } else {
+      const res = await workflowService.createWorkflow({
+        org_identifier: org,
+        data,
+        draft: true,
+      });
+      const newId = res.data?.id;
+      if (newId) {
+        wf.id = newId;
+        workflowObj.isEditWorkflow = true;
+      }
+    }
+    wf.isDraft = true;
+    workflowObj.dirtyFlag = false;
+    toast({ message: t("workflow.draftSaveSuccess"), variant: "success" });
+    emit("saved");
+    return true;
+  } catch (e: any) {
+    toast({
+      message: e?.response?.data?.message || t("workflow.saveError"),
+      variant: "error",
+    });
+    return false;
+  } finally {
+    saving.value = false;
+  }
+};
+
+const onSaveDraft = async () => {
+  if (!(await persistDraft())) return;
+  goBack();
+};
+
+// Promote a saved draft into a published workflow. The backend promote reads the
+// draft from the DB (not the request body), so flush the current editor state to
+// the draft row first, then promote. The graph is validated client-side up front
+// (good inline UX) and again on the backend (the 400 safety net).
+const promoteDraft = async (): Promise<void> => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  if (saving.value || !validate()) return;
+  saving.value = true;
+  const org = orgId();
+  try {
+    await workflowService.updateWorkflow({
+      org_identifier: org,
+      id: wf.id,
+      data: buildPayload(),
+      draft: true,
+    });
+    await workflowService.promoteWorkflow({
+      org_identifier: org,
+      id: wf.id,
+      trigger_type: triggerTypeForKind(currentTriggerKind()),
+    });
+    wf.isDraft = false;
+    workflowObj.dirtyFlag = false;
+    toast({ message: t("workflow.publishSuccess"), variant: "success" });
+    emit("saved");
+    // Freshly published — offer the same link-to-alerts prompt as a new create.
+    if (triggerDef(currentTriggerKind()).linksAlerts) {
+      linkAlerts.value = { show: true, id: wf.id, name: wf.name || "" };
+      return;
+    }
+    goBack();
+  } catch (e: any) {
+    toast({
+      message: e?.response?.data?.message || t("workflow.publishError"),
+      variant: "error",
+    });
+  } finally {
+    saving.value = false;
+  }
+};
+
+// Publish: an existing draft is promoted; a brand-new workflow is created
+// directly as a published (validated) workflow — same path as the old Save.
+const onPublish = async () => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  if (wf.id && wf.isDraft) {
+    await promoteDraft();
+  } else {
+    await onSave();
+  }
 };
 
 // Test dry-runs the current in-memory graph — the whole workflow is sent in the

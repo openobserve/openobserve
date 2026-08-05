@@ -2147,6 +2147,12 @@
     "triggerRequired": "A Trigger Is Required",
     "addStepRequired": "Add At Least One Step After The Trigger",
     "connectAllNodes": "Connect All Nodes Before Saving",
+    "draft": "Draft",
+    "saveDraft": "Save as Draft",
+    "publish": "Publish",
+    "draftSaveSuccess": "Draft Saved Successfully",
+    "publishSuccess": "Workflow Published Successfully",
+    "publishError": "Error While Publishing Workflow",
     "comingSoon": "This Is Coming In A Later Step",
     "triggerType": {
       "pick": "Choose A Trigger",

@@ -660,7 +660,7 @@ pub async fn update_draft(draft: Workflow) -> Result<(), anyhow::Error> {
         ..Default::default()
     };
     workflow_drafts::Entity::update_many()
-        .filter(workflows::Column::Id.eq(draft.id))
+        .filter(workflow_drafts::Column::Id.eq(draft.id))
         .set(model)
         .exec(client)
         .await?;
