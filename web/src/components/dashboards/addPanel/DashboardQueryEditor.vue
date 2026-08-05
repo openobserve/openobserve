@@ -24,9 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-w-0 flex-1 flex-row items-center self-stretch"
         data-test="dashboard-query-data"
       >
-        <!-- -mt-0.75 cancels the pt-0.75 OTabs puts inside its scroll container,
-             so the full-height tabs center between the bar's two separators and
-             the active underline lands on the bottom divider. -->
+        <!-- -mt-0.75 cancels OTabs' inner pt-0.75 so the tabs sit centred
+             between the bar's separators. -->
         <div class="-mt-0.75 min-w-0 self-stretch">
           <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
@@ -40,13 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
-              <!-- Rename-in-place, matching the dashboard tab bar (TabList.vue):
-                   no box, no fill — the name just becomes editable in the active
-                   tab's own colour, with a tick to commit.
-                   The tab must not resize when it flips between the two modes, so
-                   the input mirrors the display span exactly: same px-0.5, same
-                   text-sm, width from field-sizing-content (no min-w floor), and
-                   gap-1.5 here matching OTab's own gap between name and pencil. -->
+              <!-- Box mirrors the display span (px-0.5, text-sm, OTab's gap-1.5,
+                   content-sized width) so the tab can't resize on edit. -->
               <span
                 v-if="editingQueryIndex === index"
                 @click.stop
@@ -88,9 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
                 >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
               >
-              <!-- Every tab action (rename / visibility / close) is visible at
-                   rest. The pencil occupies the same slot the tick takes while
-                   editing (both xs), so swapping them costs no width. -->
+              <!-- xs matches the tick it swaps with, so the tab keeps its width. -->
               <span v-if="editingQueryIndex !== index" class="relative inline-flex items-center">
                 <OIcon
                   name="edit"
@@ -914,8 +906,7 @@ export default defineComponent({
       const index = Number(rawIndex);
       editingQueryIndex.value = index;
       editingQueryName.value = tab.tabName || "Query " + (index + 1);
-      // The input renders on the next tick; focus it with the caret at the END
-      // of the name — NOT select-all, where the first keystroke silently wipes
+      // Caret at the end, not select-all: the first keystroke must not wipe
       // the whole name.
       nextTick(() => {
         const el = document.getElementById(
