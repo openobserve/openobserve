@@ -2378,6 +2378,12 @@ export class AlertsPage {
     async exportAlerts() {
         const headerCheckbox = this.page.locator(this.locators.alertListHeaderCheckbox).first();
         await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for at least one alert ROW to render before select-all. After navigating to a
+        // folder the OTable can still be loading; clicking select-all over a not-yet-populated
+        // table selects nothing, so the selection-gated Export button never appears (the 30s
+        // toPass timeout in CI). OTable renders rows as [data-test^="o2-table-row-"].
+        await this.page.locator('[data-test^="o2-table-row-"]').first()
+            .waitFor({ state: 'visible', timeout: 15000 });
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
 
