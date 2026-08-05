@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar bg-surface-base border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b"
+      class="sql-bar bg-section-header-bg border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b"
       @click.stop
     >
       <div
@@ -42,13 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Rename-in-place, matching the dashboard tab bar (TabList.vue):
                    no box, no fill — the name just becomes editable in the active
-                   tab's own colour, with a tick to commit. field-sizing-content
-                   sizes the input to its text; min-w floors it so the name can
-                   never collapse under the tab's flex shrink. -->
+                   tab's own colour, with a tick to commit.
+                   The tab must not resize when it flips between the two modes, so
+                   the input mirrors the display span exactly: same px-0.5, same
+                   text-sm, width from field-sizing-content (no min-w floor), and
+                   gap-1.5 here matching OTab's own gap between name and pencil. -->
               <span
                 v-if="editingQueryIndex === index"
                 @click.stop
-                class="inline-flex items-center gap-1"
+                class="inline-flex items-center gap-1.5"
               >
                 <input
                   v-model="editingQueryName"
@@ -57,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :maxlength="60"
                   :id="`dashboard-query-rename-input-${index}`"
                   :aria-label="t('dashboard.renameQuery')"
-                  class="text-tabs-active-text field-sizing-content max-w-40 min-w-16 shrink-0 bg-transparent px-0.5 text-sm outline-none"
+                  class="text-tabs-active-text field-sizing-content max-w-40 min-w-0 shrink-0 bg-transparent px-0.5 text-sm outline-none"
                   :data-test="`dashboard-panel-query-tab-name-input-${index}`"
                   @mousedown.stop
                   @dblclick.stop
@@ -68,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="relative inline-flex items-center">
                   <OIcon
                     name="check"
-                    size="sm"
+                    size="xs"
                     :aria-label="t('common.save')"
                     class="text-text-secondary cursor-pointer opacity-70 transition-opacity duration-150 hover:opacity-100"
                     @click.stop.prevent="saveQueryName(index)"
@@ -82,18 +84,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="cursor-pointer text-sm whitespace-nowrap select-none"
+                class="cursor-pointer px-0.5 text-sm whitespace-nowrap select-none"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
                 >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
               >
               <!-- Every tab action (rename / visibility / close) is visible at
-                   rest — no hover reveal. Each icon is wrapped in a span so its
-                   tooltip trigger is scoped to JUST that icon, not the OTab. -->
+                   rest. The pencil occupies the same slot the tick takes while
+                   editing (both xs), so swapping them costs no width. -->
               <span v-if="editingQueryIndex !== index" class="relative inline-flex items-center">
                 <OIcon
                   name="edit"
-                  size="sm"
-                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
+                  size="xs"
+                  class="text-text-secondary cursor-pointer opacity-60 transition-opacity duration-150 hover:opacity-100"
                   @click.stop.prevent="startEditQueryName(index, tab)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
