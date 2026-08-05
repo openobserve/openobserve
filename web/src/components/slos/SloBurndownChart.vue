@@ -71,9 +71,7 @@
       class="rounded-default border-border-default flex flex-col overflow-hidden border"
       :data-test="`slos-sloburndownchart-${panel.key}`"
     >
-      <div
-        class="border-border-default text-compact text-text-heading flex min-h-7 w-full items-center justify-between gap-2 border-b px-2 py-1 font-medium tracking-[0.02em]"
-      >
+      <PanelBar class="w-full justify-between gap-2">
         <span class="flex items-center gap-1">
           {{ panel.label }}
           <!-- The formula, not just prose: "budget remaining" and "burn rate"
@@ -109,7 +107,7 @@
           </OIcon>
         </span>
         <span class="text-text-secondary font-normal">{{ panel.hint }}</span>
-      </div>
+      </PanelBar>
 
       <div class="h-60 w-full">
         <div
@@ -153,6 +151,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import searchService from "@/services/search";
 import {
   bucketSecsFor,
