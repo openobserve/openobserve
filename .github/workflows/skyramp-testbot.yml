@@ -70,8 +70,16 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
+      # UI test-support deps: workspace.yml runs the Playwright suite via
+      # tests/ui-testing/node_modules/.bin/playwright, so those deps must exist
+      # before any generated UI test can execute.
+      - name: Install UI test-support dependencies
+        run: cd tests/ui-testing && (npm ci || npm install)
+
       - name: Build frontend (embedded into the binary via RustEmbed)
         run: cd web && npm ci && npm run build
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
 
       - name: Build OpenObserve debug binary
         # Debug (not release-ci): far faster to compile, and this SUT is used
