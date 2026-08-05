@@ -32,6 +32,7 @@
 // Session Replay `/replay`. Getting this wrong is the single most common reason
 // one signal arrives while another silently does not.
 
+import { gt, raw } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
@@ -166,14 +167,14 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
   const installVariants: RichCardStepVariant[] = [
     {
       id: "kotlin",
-      label: "Kotlin DSL",
+      label: raw("Kotlin DSL"),
       icon: gradleIcon,
       code: { lang: "kotlin", filename: "build.gradle.kts", raw: gradleKts },
       note: "The session-replay dependency is optional — drop that line if you do not need screen recording.",
     },
     {
       id: "groovy",
-      label: "Groovy",
+      label: raw("Groovy"),
       icon: gradleIcon,
       code: { lang: "groovy", filename: "build.gradle", raw: gradleGroovy },
       note: "The session-replay dependency is optional — drop that line if you do not need screen recording.",
@@ -186,21 +187,25 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
       // next to it already says which guide you are on, so the heading stays
       // stable across platforms instead of rewriting itself on every click.
       name: "Real User Monitoring",
-      tagline:
-        "Capture sessions, views, user actions, crashes and session replay from your native Android app — your RUM token is already filled in below.",
+      tagline: gt("ingestion.setupCard.rumAndroidTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
       runtime: "Android",
       setupTime: "~5 min",
-      metaBadges: ["Sessions", "Views", "Errors", "Crashes", "Session Replay"],
+      metaBadges: [
+        gt("rum.sessions"),
+        gt("ingestion.setupCard.pillViews"),
+        gt("rum.errors"),
+        gt("ingestion.setupCard.pillCrashes"),
+        gt("rum.sessionReplay"),
+      ],
     },
     steps: [
       {
         id: "install",
-        title: "Add the Android SDK",
-        description:
-          "Add the RUM and Logs dependencies (and optionally session replay) to your app module's Gradle file, then sync. Artifacts are published under the `ai.openobserve` group.",
-        chip: { kind: "editor", label: "build.gradle" },
+        titleKey: "ingestion.setupCard.installAndroidSdkTitle",
+        descriptionKey: "ingestion.setupCard.installAndroidSdkDesc",
+        chip: { kind: "editor", label: raw("build.gradle") },
         completeOn: "copy",
         required: true,
         variantGroup: "gradle",
@@ -208,10 +213,9 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
       },
       {
         id: "init",
-        title: "Initialize RUM + Logs",
-        description:
-          "Initialize the SDK once in your `Application.onCreate()`. The native SDK appends **nothing** to a custom endpoint, so each feature gets its own full URL — RUM `/rum`, Logs `/logs`. Adjust `applicationId`, `service` and `env` to describe your app. The `clientToken` ships inside your APK by design; it can only write RUM events and you can rotate it from this page's header.",
-        chip: { kind: "editor", label: "Application.kt" },
+        titleKey: "ingestion.setupCard.rumInitTitle",
+        descriptionKey: "ingestion.setupCard.initRumLogsAndroidDesc",
+        chip: { kind: "editor", label: raw("Application.kt") },
         completeOn: "copy",
         required: true,
         code: {
@@ -224,28 +228,36 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
       },
       {
         id: "session-replay",
-        title: "Enable Session Replay (Optional)",
-        description:
-          "Session Replay is enabled **separately** and does **not** inherit the RUM endpoint. It also appends nothing, so it needs the full `/replay` URL below. Getting this wrong is the usual reason RUM events arrive but replays never do.",
-        chip: { kind: "editor", label: "Application.kt" },
+        titleKey: "ingestion.setupCard.enableSessionReplayOptionalTitle",
+        descriptionKey: "ingestion.setupCard.enableSessionReplayNativeDesc",
+        chip: { kind: "editor", label: raw("Application.kt") },
         completeOn: "copy",
         code: {
           lang: "kotlin",
           filename: "SampleApplication.kt",
           raw: replayCode(subs),
         },
-        pills: ["Wireframe capture", "Privacy masking"],
+        pills: [
+          gt("ingestion.setupCard.pillWireframeCapture"),
+          gt("ingestion.setupCard.pillPrivacyMasking"),
+        ],
         note: "Privacy levels default to their strictest setting. Relax `setTextAndInputPrivacy`, `setImagePrivacy` and `setTouchPrivacy` only as far as your privacy policy allows.",
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Run the app on an emulator or device, move between a few screens, then hit Test — native Android events land in the `_rumdata` stream.",
-        chip: { kind: "traces", label: "RUM" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyAndroidRumDesc",
+        chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "Views", "User Actions", "Errors", "Crashes", "Session Replay"],
+        pills: [
+          gt("rum.sessions"),
+          gt("ingestion.setupCard.pillViews"),
+          gt("ingestion.setupCard.pillUserActions"),
+          gt("rum.errors"),
+          gt("ingestion.setupCard.pillCrashes"),
+          gt("rum.sessionReplay"),
+        ],
       },
     ],
     // The SDK stamps `source = 'android'` on every event, so filtering on it

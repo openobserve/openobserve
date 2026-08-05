@@ -36,6 +36,7 @@
 // an SDK flag — so the insecure-HTTP path here is an ATS note rather than a config
 // option (contrast rumAndroid.ts, which has an SDK cleartext toggle).
 
+import { gt, raw } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
@@ -169,14 +170,14 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
   const installVariants: RichCardStepVariant[] = [
     {
       id: "spm",
-      label: "Swift Package Manager",
+      label: raw("Swift Package Manager"),
       icon: appleIcon,
       code: { lang: "swift", filename: "Package.swift", raw: spmCode },
       note: "The session-replay product is optional — drop that line if you do not need screen recording.",
     },
     {
       id: "cocoapods",
-      label: "CocoaPods",
+      label: raw("CocoaPods"),
       icon: appleIcon,
       code: { lang: "ruby", filename: "Podfile", raw: podCode },
       note: "The session-replay pod is optional — drop that line if you do not need screen recording.",
@@ -189,21 +190,25 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
       // next to it already says which guide you are on, so the heading stays
       // stable across platforms instead of rewriting itself on every click.
       name: "Real User Monitoring",
-      tagline:
-        "Capture sessions, views, user actions, crashes and session replay from your native iOS app — your RUM token is already filled in below.",
+      tagline: gt("ingestion.setupCard.rumIosTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
       runtime: "iOS",
       setupTime: "~5 min",
-      metaBadges: ["Sessions", "Views", "Errors", "Crashes", "Session Replay"],
+      metaBadges: [
+        gt("rum.sessions"),
+        gt("ingestion.setupCard.pillViews"),
+        gt("rum.errors"),
+        gt("ingestion.setupCard.pillCrashes"),
+        gt("rum.sessionReplay"),
+      ],
     },
     steps: [
       {
         id: "install",
-        title: "Add the iOS SDK",
-        description:
-          "Add the RUM and Logs products (and optionally session replay) with Swift Package Manager or CocoaPods.",
-        chip: { kind: "editor", label: "Package.swift" },
+        titleKey: "ingestion.setupCard.installIosSdkTitle",
+        descriptionKey: "ingestion.setupCard.installIosSdkDesc",
+        chip: { kind: "editor", label: raw("Package.swift") },
         completeOn: "copy",
         required: true,
         variantGroup: "pkg",
@@ -211,10 +216,9 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
       },
       {
         id: "init",
-        title: "Initialize RUM + Logs",
-        description:
-          "Initialize the SDK once in your `AppDelegate`. The native SDK appends **nothing** to a custom endpoint, so each feature gets its own full URL — RUM `/rum`, Logs `/logs`. Adjust `applicationID`, `service` and `env` to describe your app. The `clientToken` ships inside your app bundle by design; it can only write RUM events and you can rotate it from this page's header.",
-        chip: { kind: "editor", label: "AppDelegate.swift" },
+        titleKey: "ingestion.setupCard.rumInitTitle",
+        descriptionKey: "ingestion.setupCard.initRumLogsIosDesc",
+        chip: { kind: "editor", label: raw("AppDelegate.swift") },
         completeOn: "copy",
         required: true,
         code: {
@@ -229,28 +233,36 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
       },
       {
         id: "session-replay",
-        title: "Enable Session Replay (Optional)",
-        description:
-          "Session Replay is enabled **separately** and does **not** inherit the RUM endpoint. It also appends nothing, so it needs the full `/replay` URL below. Getting this wrong is the usual reason RUM events arrive but replays never do.",
-        chip: { kind: "editor", label: "AppDelegate.swift" },
+        titleKey: "ingestion.setupCard.enableSessionReplayOptionalTitle",
+        descriptionKey: "ingestion.setupCard.enableSessionReplayNativeDesc",
+        chip: { kind: "editor", label: raw("AppDelegate.swift") },
         completeOn: "copy",
         code: {
           lang: "swift",
           filename: "AppDelegate.swift",
           raw: replayCode(subs),
         },
-        pills: ["Wireframe capture", "Privacy masking"],
+        pills: [
+          gt("ingestion.setupCard.pillWireframeCapture"),
+          gt("ingestion.setupCard.pillPrivacyMasking"),
+        ],
         note: "Privacy levels default to their strictest setting (`.maskAll` / `.hide`). Relax `textAndInputPrivacyLevel`, `imagePrivacyLevel` and `touchPrivacyLevel` only as far as your privacy policy allows.",
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Run the app on a simulator or device, move between a few screens, then hit Test — native iOS events land in the `_rumdata` stream.",
-        chip: { kind: "traces", label: "RUM" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyIosRumDesc",
+        chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "Views", "User Actions", "Errors", "Crashes", "Session Replay"],
+        pills: [
+          gt("rum.sessions"),
+          gt("ingestion.setupCard.pillViews"),
+          gt("ingestion.setupCard.pillUserActions"),
+          gt("rum.errors"),
+          gt("ingestion.setupCard.pillCrashes"),
+          gt("rum.sessionReplay"),
+        ],
       },
     ],
     // The SDK stamps `source = 'ios'` on every event, so filtering on it confirms

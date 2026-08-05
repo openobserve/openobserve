@@ -35,6 +35,7 @@ import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import { isMobileReplaySource } from "@/composables/rum/useMobileSessionReplay";
+import { useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const RUM_STREAM = "_rumdata";
@@ -141,7 +142,8 @@ const resultFromSources = (sources: string[], viaFallback: boolean): RumPlatform
 
 const useRumPlatforms = () => {
   const store = useStore();
-  const { getStream } = useStreams();
+  const { t } = useI18nTyped();
+  const { getStream } = useStreams(t);
 
   const buildProbeRequest = (dateTime: RumDateTime) => {
     const sql = `SELECT source, count(*) as cnt FROM "${RUM_STREAM}" GROUP BY source`;

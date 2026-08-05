@@ -37,6 +37,7 @@ import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRumPlatforms from "@/composables/rum/useRumPlatforms";
 import useStreams from "@/composables/useStreams";
+import { useI18nTyped } from "@/types/i18n";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import {
   filterDashboardBySchema,
@@ -84,8 +85,9 @@ const useRumPerformanceTab = (
   rawDashboard: unknown,
   dateTime?: Ref<RumTabDateTime | undefined>,
 ): RumPerformanceTab => {
+  const { t } = useI18nTyped();
   const { performanceState } = usePerformance();
-  const { getStream } = useStreams();
+  const { getStream } = useStreams(t);
   const { hasBrowser, hasMobile, resolvedKey, detectPlatforms } = useRumPlatforms();
 
   // Schema migration runs once; the raw JSON is a module-level import.
