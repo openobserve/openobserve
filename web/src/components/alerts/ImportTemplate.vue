@@ -192,6 +192,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { validateTemplateBody } from "@/utils/templates/validation";
+import { invalidateTemplates } from "@/composables/query/queries/alertMeta";
 
 export default defineComponent({
   name: "ImportTemplate",
@@ -427,6 +428,7 @@ export default defineComponent({
 
     const createTemplate = async (input: any, index: number) => {
       try {
+        invalidateTemplates(store.state.selectedOrganization.identifier);
         await templateService.create({
           org_identifier: store.state.selectedOrganization.identifier,
           template_name: input.name,

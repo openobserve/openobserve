@@ -79,10 +79,9 @@ describe("AddAlertView.vue", () => {
 
     await flushPromises();
 
-    expect(destinationService.list).toHaveBeenCalledWith({
-      org_identifier: "test-org",
-      module: "alert",
-    });
+    expect(destinationService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ org_identifier: "test-org", module: "alert" }),
+    );
   });
 
   it("should not render AddAlert when destinations are empty", async () => {

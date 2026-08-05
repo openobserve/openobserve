@@ -1902,6 +1902,7 @@ import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
+import { invalidateFunctions } from "@/composables/query/queries/functions";
 import searchService from "@/services/search";
 
 import segment from "@/services/segment_analytics";
@@ -3305,6 +3306,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier,
             formData.value,
           );
+          invalidateFunctions(store.state.selectedOrganization.identifier);
           toast({
             variant: "success",
             message: res.data.message,
@@ -3346,6 +3348,7 @@ export default defineComponent({
 
       callTransform
         .then(() => {
+          invalidateFunctions(store.state.selectedOrganization.identifier);
           toast({
             variant: "success",
             message: t("logs.searchBar.functionUpdatedSuccess"),

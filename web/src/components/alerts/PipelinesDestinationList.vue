@@ -198,6 +198,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 
 interface ConformDelete {
   visible: boolean;
@@ -565,6 +566,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           payload,
         );
+        invalidateDestinations(store.state.selectedOrganization.identifier);
 
         dismiss();
 

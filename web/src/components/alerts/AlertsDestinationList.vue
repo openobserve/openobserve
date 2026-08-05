@@ -308,6 +308,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 
 interface ConformDelete {
   visible: boolean;
@@ -722,6 +723,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           payload,
         );
+        invalidateDestinations(store.state.selectedOrganization.identifier);
 
         dismiss();
 

@@ -467,6 +467,7 @@ import DestinationPreview from "./DestinationPreview.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 import {
   makeAddDestinationSchema,
   addDestinationDefaults,
@@ -1037,7 +1038,8 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       );
     }
 
-    emit("get:destinations");
+    invalidateDestinations(store.state.selectedOrganization.identifier);
+        emit("get:destinations");
     emit("cancel:hideform");
   } catch (error) {
     console.error("Failed to save prebuilt destination:", error);
@@ -1096,6 +1098,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       })
       .then(() => {
         dismiss();
+        invalidateDestinations(store.state.selectedOrganization.identifier);
         emit("get:destinations");
         emit("cancel:hideform");
         toast({
@@ -1126,6 +1129,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       })
       .then(() => {
         dismiss();
+        invalidateDestinations(store.state.selectedOrganization.identifier);
         emit("get:destinations");
         emit("cancel:hideform");
         toast({

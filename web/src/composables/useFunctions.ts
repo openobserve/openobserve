@@ -14,28 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from "vuex";
-import TransformService from "@/services/jstransform";
+import { fetchFunctions } from "@/composables/query/queries/functions";
 
 const useFunctions = () => {
   const store = useStore();
 
+  /**
+   * Called on every Logs entry, alert form open and panel editor open. It now
+   * reads the query cache first, so those five call sites share one request
+   * inside the tier's staleTime instead of each issuing their own.
+   */
   const getAllFunctions = async () => {
     try {
-      return await TransformService.list(
-        1,
-        100000,
-        "name",
-        false,
-        "",
-        store.state.selectedOrganization.identifier,
-      )
-        .then((res: any) => {
-          store.dispatch("setFunctions", res.data.list);
-          return;
-        })
-        .catch((e: any) => {
-          throw new Error(e.message);
-        });
+      const list = await fetchFunctions(store.state.selectedOrganization.identifier);
+      // Bridge for consumers still reading `organizationData.functions`.
+      store.dispatch("setFunctions", list);
     } catch (e: any) {
       throw new Error(e.message);
     }

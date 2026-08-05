@@ -411,8 +411,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import pipelinesService from "../../services/pipelines";
 import useStreams from "@/composables/useStreams";
-import destinationService from "@/services/alert_destination";
 import jstransform from "@/services/jstransform";
+import { fetchDestinations } from "@/composables/query/queries/alertMeta";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -635,17 +635,11 @@ export default defineComponent({
     };
 
     const getAlertDestinations = async () => {
-      const destinations = await destinationService.list({
-        page_num: 1,
-        page_size: 100000,
-        sort_by: "name",
-        desc: false,
-        org_identifier: store.state.selectedOrganization.identifier,
-        module: "alert",
-      });
-      alertDestinations.value = destinations.data.map((dest: any) => {
-        return dest.name;
-      });
+      const destinations = await fetchDestinations(
+        store.state.selectedOrganization.identifier,
+        "alert",
+      );
+      alertDestinations.value = destinations.map((dest: any) => dest.name);
     };
 
     const importJson = async ({ jsonStr: jsonString }: any) => {

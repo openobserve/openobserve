@@ -182,6 +182,7 @@ import {
 } from "vue";
 
 import jsTransformService from "../../services/jstransform";
+import { invalidateFunctions } from "@/composables/query/queries/functions";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -442,6 +443,7 @@ export default defineComponent({
         const res = beingUpdated.value
           ? await jsTransformService.update(store.state.selectedOrganization.identifier, payload)
           : await jsTransformService.create(store.state.selectedOrganization.identifier, payload);
+        invalidateFunctions(store.state.selectedOrganization.identifier);
 
         const _formData: any = { ...payload };
         formData.value = { ...defaultValue() };

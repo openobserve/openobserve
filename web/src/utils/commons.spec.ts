@@ -1355,11 +1355,11 @@ describe("Commons Utility Functions", () => {
         },
       };
 
-      (dashboardService.list_Folders as any).mockResolvedValue(mockResponse);
+      (commonService.list_Folders as any).mockResolvedValue(mockResponse);
 
       await getFoldersList(mockStore);
 
-      expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
+      expect(commonService.list_Folders).toHaveBeenCalledWith("test-org", "dashboards");
       expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", [
         { folderId: "default", name: "Default", description: "Default folder" },
         { folderId: "folder1", name: "Folder 1", description: "Folder 1" },
@@ -1373,7 +1373,7 @@ describe("Commons Utility Functions", () => {
         },
       };
 
-      (dashboardService.list_Folders as any).mockResolvedValue(mockResponse);
+      (commonService.list_Folders as any).mockResolvedValue(mockResponse);
 
       await getFoldersList(mockStore);
 
@@ -1525,8 +1525,8 @@ describe("Commons Utility Functions", () => {
         expect(mockStore.dispatch).toHaveBeenCalledWith("setFoldersByType", {
           dashboards: newFolderList.data.list,
         });
-        // …AND the legacy list refreshed for SelectFolderDropdown.
-        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
+        // …AND the legacy list refreshed for SelectFolderDropdown, from the
+        // same cached query rather than a second request.
         expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
       });
 
@@ -1535,7 +1535,6 @@ describe("Commons Utility Functions", () => {
 
         await updateFolderByType(mockStore, "zzzz", { name: "zzzz2" }, "dashboards");
 
-        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
         expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
       });
 
@@ -1544,7 +1543,6 @@ describe("Commons Utility Functions", () => {
 
         await deleteFolderByIdByType(mockStore, "zzzz", "dashboards");
 
-        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
         expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
       });
 

@@ -42,8 +42,8 @@ import {
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { getFoldersListByType } from "@/utils/commons";
+import { fetchDestinations as fetchDestinationsCached } from "@/composables/query/queries/alertMeta";
 import syntheticsService from "@/services/synthetics";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -197,14 +197,8 @@ async function fetchLocations() {
 
 async function fetchDestinations() {
   try {
-    const res = await destinationService.list({
-      org_identifier: store.state.selectedOrganization.identifier,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-    });
-    destinations.value = (res.data ?? []).map((d: any) => d.name as string);
+    const list = await fetchDestinationsCached(store.state.selectedOrganization.identifier);
+    destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
   }

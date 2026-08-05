@@ -69,8 +69,8 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import destinationService from "@/services/alert_destination";
 import CreateDestinationForm from "@/components/pipeline/NodeForm/CreateDestinationForm.vue";
+import { fetchDestinations, invalidateDestinations } from "@/composables/query/queries/alertMeta";
 import {
   makeExternalDestinationSchema,
   type ExternalDestinationForm,
@@ -110,7 +110,9 @@ watch(createNewDestination, async (v) => {
   emit("expand", v);
   if (v) return;
   // Returning from create (either cancelled or just created) — refetch once so a
-  // newly-created destination shows, then apply any pending selection.
+  // newly-created destination shows, then apply any pending selection. Drop the
+  // cached list first so this is a real refetch and not a cache hit.
+  await invalidateDestinations(store.state.selectedOrganization.identifier);
   await getDestinations();
   if (pendingSelection.value) {
     form.setFieldValue("selectedDestination", pendingSelection.value);
@@ -131,15 +133,10 @@ const destinationOptions = computed(() =>
 // Pipeline-module external destinations.
 const getDestinations = async () => {
   try {
-    const res = await destinationService.list({
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      org_identifier: store.state.selectedOrganization.identifier,
-      module: "pipeline",
-    });
-    destinations.value = res.data || [];
+    destinations.value = await fetchDestinations(
+      store.state.selectedOrganization.identifier,
+      "pipeline",
+    );
   } catch (e: any) {
     if (e?.response?.status !== 403) {
       toast({ variant: "error", message: t("flow.destination.loadError") });

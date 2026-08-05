@@ -20,6 +20,8 @@ import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
+import { fetchFoldersByType, invalidateFolders } from "@/composables/query/queries/folders";
+import { dashboardsByFolderQuery } from "@/composables/query/queries/dashboards";
 
 let moment: any;
 let momentInitialized = false;
@@ -117,23 +119,17 @@ export function getConsumableDateTime(dateObj: any) {
 //get all dashboards by folderId
 //api call
 //save to store
-export const getAllDashboards = async (store: any, folderId: any) => {
+export const getAllDashboards = async (store: any, folderId: any, force = false) => {
   //call only if we have folderId
   if (!folderId) return;
-  // api call
-  const res = await dashboardService.list(
-    0,
-    1000,
-    "name",
-    false,
-    "",
-    store.state.selectedOrganization.identifier,
-    folderId,
-    //adding empty string to avoid undefined error as we have added title param in api
-    "",
-  );
+  const org = store.state.selectedOrganization.identifier;
+  // Reads the query cache; `force` is for post-mutation reloads, which must
+  // reach the server.
+  const dashboards = force
+    ? await dashboardsByFolderQuery.refetchList(org, folderId)
+    : await dashboardsByFolderQuery.fetchList(org, folderId);
 
-  const migratedDashboards = res.data.dashboards.map((dashboard: any) => ({
+  const migratedDashboards = dashboards.map((dashboard: any) => ({
     dashboard: {
       version: dashboard.version,
       folderId: dashboard.folder_id,
@@ -148,34 +144,27 @@ export const getAllDashboards = async (store: any, folderId: any) => {
     hash: dashboard.hash.toString(),
   }));
 
+  const sorted = migratedDashboards
+    .map((dashboard: any) => dashboard.dashboard)
+    .sort((a: any, b: any) => b.created.localeCompare(a.created));
+
   // save to store
   store.dispatch("setAllDashboardList", {
     ...store.state.organizationData.allDashboardList,
-    [folderId]: migratedDashboards
-      .map((dashboard: any) => dashboard.dashboard)
-      .sort((a: any, b: any) => b.created.localeCompare(a.created)),
+    [folderId]: sorted,
   });
+
+  // Returned as well as stored: Dashboards.vue assigns the result straight to
+  // its table rows.
+  return sorted;
 };
 export const getFoldersListByType = async (store: any, type: any) => {
-  let folders = (
-    await commonService.list_Folders(store.state.selectedOrganization.identifier, type)
-  ).data.list;
+  // Reads the query cache: within the tier's staleTime a remount is a cache hit
+  // instead of a request, and concurrent callers share one in-flight fetch.
+  const folders = await fetchFoldersByType(store.state.selectedOrganization.identifier, type);
 
-  // get default folder and append it to top
-  let defaultFolder = folders.find((it: any) => it.folderId == "default");
-  folders = folders.filter((it: any) => it.folderId != "default");
-
-  if (!defaultFolder) {
-    defaultFolder = {
-      name: "default",
-      folderId: "default",
-      description: "default",
-    };
-  }
-
-  store.dispatch("setFoldersByType", {
-    [type]: [defaultFolder, ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name))],
-  });
+  // Bridge for consumers still reading Vuex directly. Deleted with the last one.
+  store.dispatch("setFoldersByType", { [type]: folders });
 
   return store.state.organizationData.foldersByType[type];
 };
@@ -511,7 +500,7 @@ export const updateDashboard = async (
   );
 
   await retrieveAndStoreDashboardData(store, dashboardId, folderId, apiResponse);
-  await getAllDashboards(store, folderId);
+  await getAllDashboards(store, folderId, true);
 
   return res;
 };
@@ -851,26 +840,18 @@ export const movePanelToAnotherTab = async (
   );
 };
 
+/**
+ * Legacy `organizationData.folders` list. Same endpoint and same ordering as
+ * `getFoldersListByType(store, "dashboards")`, so it shares that query key —
+ * loading the dashboards page no longer issues the request twice.
+ */
 export const getFoldersList = async (store: any) => {
-  let folders = (await dashboardService.list_Folders(store.state.selectedOrganization.identifier))
-    .data.list;
+  const folders = await fetchFoldersByType(
+    store.state.selectedOrganization.identifier,
+    "dashboards",
+  );
 
-  // get default folder and append it to top
-  let defaultFolder = folders.find((it: any) => it.folderId == "default");
-  folders = folders.filter((it: any) => it.folderId != "default");
-
-  if (!defaultFolder) {
-    defaultFolder = {
-      name: "default",
-      folderId: "default",
-      description: "default",
-    };
-  }
-
-  store.dispatch("setFolders", [
-    defaultFolder,
-    ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
-  ]);
+  store.dispatch("setFolders", folders);
 
   return store.state.organizationData.folders;
 };
@@ -880,11 +861,16 @@ export const deleteFolderById = async (store: any, folderId: any) => {
   await getFoldersList(store);
 };
 
-const refreshFolderLists = (store: any, type: any) =>
-  Promise.all([
+const refreshFolderLists = async (store: any, type: any) => {
+  // The list just changed on the server, so drop the cached copy first —
+  // `getFoldersListByType` reads the query cache and would otherwise return the
+  // still-fresh pre-mutation entry.
+  await invalidateFolders(store.state.selectedOrganization.identifier, type);
+  return Promise.all([
     getFoldersListByType(store, type),
     ...(type === "dashboards" ? [getFoldersList(store)] : []),
   ]);
+};
 
 export const deleteFolderByIdByType = async (store: any, folderId: any, type: any) => {
   await commonService.delete_Folder(store.state.selectedOrganization.identifier, type, folderId);
@@ -896,7 +882,7 @@ export const createFolder = async (store: any, data: any) => {
     store.state.selectedOrganization.identifier,
     data,
   );
-  await Promise.all([getFoldersList(store), getFoldersListByType(store, "dashboards")]);
+  await refreshFolderLists(store, "dashboards");
   return newFolder;
 };
 
@@ -912,7 +898,7 @@ export const createFolderByType = async (store: any, data: any, type: any) => {
 
 export const updateFolder = async (store: any, folderId: any, data: any) => {
   await dashboardService.edit_Folder(store.state.selectedOrganization.identifier, folderId, data);
-  await Promise.all([getFoldersList(store), getFoldersListByType(store, "dashboards")]);
+  await refreshFolderLists(store, "dashboards");
 };
 
 export const updateFolderByType = async (store: any, folderId: any, data: any, type: any) => {
@@ -944,8 +930,8 @@ export const moveDashboardToAnotherFolder = async (
   );
 
   //update both folders dashboard
-  await getAllDashboards(store, to);
-  await getAllDashboards(store, from);
+  await getAllDashboards(store, to, true);
+  await getAllDashboards(store, from, true);
 };
 
 export const moveModuleToAnotherFolder = async (

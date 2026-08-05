@@ -30,7 +30,7 @@ import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
+import { fetchDestinations } from "@/composables/query/queries/alertMeta";
 
 export default defineComponent({
   name: "AppAlerts",
@@ -53,12 +53,9 @@ export default defineComponent({
     };
     const getDestinations = () => {
       // if (store.state.selectedOrganization.status == "active") {
-      destinationService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
-        })
-        .then((res) => (destinations.value = res.data));
+      return fetchDestinations(store.state.selectedOrganization.identifier, "alert").then(
+        (list) => (destinations.value = list as any),
+      );
       // }
     };
 

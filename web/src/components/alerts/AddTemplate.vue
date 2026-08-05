@@ -195,6 +195,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import { invalidateTemplates } from "@/composables/query/queries/alertMeta";
 import {
   makeAddTemplateSchema,
   addTemplateDefaults,
@@ -380,6 +381,7 @@ async function saveTemplate(value: AddTemplateForm) {
   };
 
   const onSuccess = () => {
+    invalidateTemplates(store.state.selectedOrganization.identifier);
     dismiss();
     emit("get:templates");
     emit("cancel:hideform");

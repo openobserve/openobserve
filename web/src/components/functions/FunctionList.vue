@@ -232,6 +232,7 @@ import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
+import { invalidateFunctions } from "@/composables/query/queries/functions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
@@ -623,6 +624,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           payload,
         );
+        invalidateFunctions(store.state.selectedOrganization.identifier);
 
         dismiss();
 

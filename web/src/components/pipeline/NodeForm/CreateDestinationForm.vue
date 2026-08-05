@@ -434,6 +434,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeDestinationSchema, type DestinationForm } from "./CreateDestinationForm.schema";
+import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 
 // Props
 const props = defineProps<{
@@ -1134,6 +1135,7 @@ const createDestination = (value?: DestinationForm) => {
         module: "pipeline",
       })
       .then(() => {
+        invalidateDestinations(store.state.selectedOrganization.identifier);
         dismiss();
         emit("updated", name);
       })
@@ -1157,6 +1159,7 @@ const createDestination = (value?: DestinationForm) => {
         module: "pipeline",
       })
       .then(() => {
+        invalidateDestinations(store.state.selectedOrganization.identifier);
         dismiss();
         emit("created", name);
       })
