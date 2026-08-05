@@ -23,13 +23,13 @@ use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::{
         annotation_queues::{
-            AnnotationQueueItemResponseBody, AnnotationQueueItemSelectionRequestBody,
-            AnnotationQueueResponseBody, ArchiveAnnotationQueueItemsResponseBody,
-            ClearAnnotationQueueItemsResponseBody, CreateAnnotationQueueRequestBody,
-            EnqueueAnnotationQueueItemRequestBody, ListAnnotationQueueItemsQuery,
-            ListAnnotationQueueItemsResponseBody, ListAnnotationQueuesResponseBody,
-            ListQueueReviewsResponseBody, ReviewAnnotationQueueItemRequestBody,
-            UpdateAnnotationQueueRequestBody,
+            AnnotationQueueItemDetailResponseBody, AnnotationQueueItemResponseBody,
+            AnnotationQueueItemSelectionRequestBody, AnnotationQueueResponseBody,
+            ArchiveAnnotationQueueItemsResponseBody, ClearAnnotationQueueItemsResponseBody,
+            CreateAnnotationQueueRequestBody, EnqueueAnnotationQueueItemRequestBody,
+            ListAnnotationQueueItemsQuery, ListAnnotationQueueItemsResponseBody,
+            ListAnnotationQueuesResponseBody, ListQueueReviewsResponseBody,
+            ReviewAnnotationQueueItemRequestBody, UpdateAnnotationQueueRequestBody,
         },
         annotations::AnnotateResponseBody,
     },
@@ -46,12 +46,28 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
             MetaHttpResponse::internal_error("Failed to publish review Scores")
         }
         AnnotationQueueError::Search(err) => {
-            log::error!("[AnnotationQueue] failed to query review Scores: {err}");
-            MetaHttpResponse::internal_error("Failed to query review Scores")
+            log::error!("[AnnotationQueue] failed to query Workbench Scores: {err}");
+            MetaHttpResponse::internal_error("Failed to query Workbench Scores")
         }
         AnnotationQueueError::MalformedReviewScore(err) => {
             log::error!("[AnnotationQueue] malformed review Score: {err}");
             MetaHttpResponse::internal_error("Malformed review Score")
+        }
+        AnnotationQueueError::MalformedMachineScore(err) => {
+            log::error!("[AnnotationQueue] malformed machine Score: {err}");
+            MetaHttpResponse::internal_error("Malformed machine Score")
+        }
+        AnnotationQueueError::QueueItemSourceStreamNotFound => {
+            log::error!("[AnnotationQueue] Queue Item has no machine Score source stream");
+            MetaHttpResponse::internal_error("Queue Item source stream not found")
+        }
+        AnnotationQueueError::AmbiguousQueueItemSourceStream => {
+            log::error!("[AnnotationQueue] Queue Item resolves to multiple source streams");
+            MetaHttpResponse::internal_error("Queue Item source stream is ambiguous")
+        }
+        AnnotationQueueError::Hydration(err) => {
+            log::error!("[AnnotationQueue] failed to hydrate Queue Item: {err}");
+            MetaHttpResponse::internal_error("Failed to hydrate Queue Item")
         }
         error @ (AnnotationQueueError::MissingName
         | AnnotationQueueError::MissingScoreConfigs
@@ -59,6 +75,7 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
         | AnnotationQueueError::TargetDatasetNotFound
         | AnnotationQueueError::InvalidQueueItemStatus(_)
         | AnnotationQueueError::InvalidQueueItemScope(_)
+        | AnnotationQueueError::InvalidQueueId
         | AnnotationQueueError::InvalidQueueItemReference(_)
         | AnnotationQueueError::QueueItemRefTypeNotAllowed(_)
         | AnnotationQueueError::MissingQueueItemIds
@@ -111,6 +128,37 @@ pub async fn enqueue_annotation_queue_item(
 ) -> Response {
     match annotation_queues::enqueue_item(&org_id, &queue_id, body.into()).await {
         Ok(item) => MetaHttpResponse::json(AnnotationQueueItemResponseBody::from(item)),
+        Err(err) => annotation_queue_error_response(err),
+    }
+}
+
+/// GetAnnotationQueueItem
+#[utoipa::path(
+    get,
+    path = "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
+    context_path = "/api",
+    tag = "AnnotationQueues",
+    operation_id = "GetAnnotationQueueItem",
+    summary = "Get one hydrated Annotation Queue Item",
+    description = "Uses the Queue Item's stored trace start time through now to load its latest machine Scores, resolve the source trace stream, and hydrate its business input, output, and trace context.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("queue_id" = String, Path, description = "Annotation Queue ID"),
+        ("queue_item_id" = String, Path, description = "Annotation Queue Item ID"),
+    ),
+    responses(
+        (status = 200, body = inline(AnnotationQueueItemDetailResponseBody)),
+        (status = 404, description = "Queue or Queue Item not found", body = ()),
+        (status = 500, description = "Score lookup or source hydration failed", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "get"}))),
+)]
+pub async fn get_annotation_queue_item(
+    Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,
+) -> Response {
+    match annotation_queues::get_item_detail(&org_id, &queue_id, &queue_item_id).await {
+        Ok(item) => MetaHttpResponse::json(AnnotationQueueItemDetailResponseBody::from(item)),
         Err(err) => annotation_queue_error_response(err),
     }
 }
@@ -284,7 +332,11 @@ pub async fn list_annotation_queue_items(
     Headers(user): Headers<UserEmail>,
     Query(query): Query<ListAnnotationQueueItemsQuery>,
 ) -> Response {
-    let filter = match ListAnnotationQueueItemsFilter::try_from((query.queue_status, query.scope)) {
+    let filter = match ListAnnotationQueueItemsFilter::try_from((
+        query.queue_id,
+        query.queue_status,
+        query.scope,
+    )) {
         Ok(filter) => filter,
         Err(err) => return annotation_queue_error_response(err),
     };

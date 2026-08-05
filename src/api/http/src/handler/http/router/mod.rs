@@ -1039,6 +1039,10 @@ pub fn service_routes() -> Router {
                         .delete(annotation_queues::clear_annotation_queue_items),
                 )
                 .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
+                    get(annotation_queues::get_annotation_queue_item),
+                )
+                .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
                     get(annotation_queues::list_annotation_queue_item_reviews)
                         .post(annotation_queues::review_annotation_queue_item),
