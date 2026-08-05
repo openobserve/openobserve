@@ -921,7 +921,9 @@ const computedTableWidth = computed<string | undefined>(() => {
 // virtualizer for nothing — a real per-row scroll tax on long lists. Skip it.
 const hasVariableRowHeight = computed(() => expansion.isEnabled.value || !!props.wrap);
 function measureElement(el: any) {
-  if (el && props.virtualScroll && hasVariableRowHeight.value) {
+  // Not in dynamic mode: `measureRowElement` measures each row there, and measure()
+  // wipes the whole size cache — per row mount that loops until the tab locks up.
+  if (el && props.virtualScroll && hasVariableRowHeight.value && !useDynamicRowHeight.value) {
     virtualMeasure();
   }
 }
