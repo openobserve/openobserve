@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="addStreamDialog.show"
       :is-in-pipeline="false"
       @close="addStreamDialog.show = false"
-      @streamAdded="getLogStream"
+      @streamAdded="refreshStreams"
     />
 
     <ODialog
@@ -410,6 +410,11 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import {
+  fetchStreamPage,
+  prefetchStreamPage,
+  refetchStreamPage,
+} from "@/composables/query/queries/streams";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -466,7 +471,7 @@ export default defineComponent({
     );
 
     const streamTabs: never[] = [];
-    const { removeStream, getStream, getPaginatedStreams, addNewStreams } = useStreams();
+    const { removeStream, getStream, addNewStreams } = useStreams();
 
     // Stats are absent until the ingester has flushed a stream, so "no number
     // yet" renders as a muted em dash rather than a misleading "0 MB".
@@ -655,24 +660,22 @@ export default defineComponent({
           message: "Please wait while loading streams...",
           timeout: 0,
         });
-        logStream.value = [];
-
+        // The previous page's rows stay on screen while the next one loads —
+        // clearing here is what made every page change flash an empty table.
         const offset = (currentPage.value - 1) * pageSize.value;
-        let streamResponse;
-        // if(selectedStreamType.value == "all") {
-        //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
-        // } else {
-        streamResponse = getPaginatedStreams(
-          selectedStreamType.value || "",
-          false,
-          false,
-          offset < 0 ? 0 : offset,
-          pageSize.value,
-          filterQuery.value,
-          sortBy.value,
-          sortOrder.value === "asc",
-        );
-        // }
+        const org = store.state.selectedOrganization.identifier;
+        const type = selectedStreamType.value || "";
+        const params = {
+          offset: offset < 0 ? 0 : offset,
+          limit: pageSize.value,
+          keyword: filterQuery.value,
+          sort: sortBy.value,
+          asc: sortOrder.value === "asc",
+        };
+
+        const streamResponse = _refresh
+          ? refetchStreamPage(org, type, params)
+          : fetchStreamPage(org, type, params);
 
         streamResponse
           .then((res: any) => {
@@ -713,6 +716,11 @@ export default defineComponent({
             loadingState.value = false;
 
             addNewStreams(selectedStreamType.value, res.list);
+
+            // Warm the next page so paging forward is a cache hit.
+            if (params.offset + params.limit < res.total) {
+              prefetchStreamPage(org, type, { ...params, offset: params.offset + params.limit });
+            }
 
             dismiss();
           })
@@ -1110,7 +1118,9 @@ export default defineComponent({
 
     const onChangeStreamFilter = (value: string) => {
       selectedStreamType.value = value;
-      getLogStream(true);
+      // The type is part of the cache key, so switching back to a type already
+      // loaded is a cache hit — no forced refetch.
+      getLogStream();
       // logStream.value = filterData(
       //   duplicateStreamList.value,
       //   filterQuery.value.toLowerCase(),

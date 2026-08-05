@@ -26,6 +26,7 @@ import useStreams from "@/composables/useStreams";
 vi.mock("@/services/stream", () => ({
   default: {
     list: vi.fn(),
+    nameList: vi.fn(),
     delete: vi.fn(),
     get: vi.fn(),
   },
@@ -216,6 +217,26 @@ describe("LogStream Component", () => {
           list: [],
         },
       }),
+      nameList: vi.fn().mockResolvedValue({
+        data: {
+          list: [
+            {
+              name: "test_stream",
+              stream_type: "logs",
+              stats: {
+                doc_num: 100,
+                storage_size: 50,
+                compressed_size: 25,
+                index_size: 10,
+              },
+              schema: [],
+              storage_type: "local",
+            },
+          ],
+          total: 1,
+        },
+      }),
+
       delete: vi.fn().mockResolvedValue({
         data: { code: 200 },
       }),
@@ -295,11 +316,11 @@ describe("LogStream Component", () => {
   });
 
   describe("API Interactions", () => {
-    it("should call getPaginatedStreams on component mount", async () => {
+    it("should request the first stream page on component mount", async () => {
       await flushPromises();
-      expect(mockUseStreams.getPaginatedStreams).toHaveBeenCalledWith(
+      expect(mockStreamService.nameList).toHaveBeenCalledWith(
+        "default",
         "logs",
-        false,
         false,
         0,
         20,
@@ -319,10 +340,10 @@ describe("LogStream Component", () => {
     it("should handle API errors gracefully", async () => {
       mockNotify.mockClear();
 
-      mockUseStreams.getPaginatedStreams.mockRejectedValue(new Error("API Error"));
+      mockStreamService.nameList.mockRejectedValue(new Error("API Error"));
 
       // Trigger refresh
-      await wrapper.vm.getLogStream();
+      await wrapper.vm.getLogStream(true);
       await flushPromises();
 
       // Error notification should use variant "error"
@@ -341,7 +362,7 @@ describe("LogStream Component", () => {
       await refreshBtn.trigger("click");
       await flushPromises();
 
-      expect(mockUseStreams.getPaginatedStreams).toHaveBeenCalled();
+      expect(mockStreamService.nameList).toHaveBeenCalled();
     });
 
     it("should handle stream type filter change", () => {
@@ -586,14 +607,14 @@ describe("LogStream Component", () => {
     it("should handle stream loading errors", async () => {
       mockNotify.mockClear();
 
-      mockUseStreams.getPaginatedStreams.mockRejectedValue({
+      mockStreamService.nameList.mockRejectedValue({
         response: {
           status: 500,
           data: { message: "Server Error" },
         },
       });
 
-      await wrapper.vm.getLogStream();
+      await wrapper.vm.getLogStream(true);
       await flushPromises();
 
       // Component uses variant: "error" for error toasts
@@ -633,7 +654,7 @@ describe("LogStream Component", () => {
       const testWrapper = mountLogStream();
 
       // Mock 403 response after component is mounted
-      mockUseStreams.getPaginatedStreams.mockRejectedValue({
+      mockStreamService.nameList.mockRejectedValue({
         response: { status: 403 },
       });
 
@@ -877,12 +898,12 @@ describe("LogStream Component", () => {
     it("should handle network timeout errors", async () => {
       mockNotify.mockClear();
 
-      mockUseStreams.getPaginatedStreams.mockRejectedValue({
+      mockStreamService.nameList.mockRejectedValue({
         code: "NETWORK_ERROR",
         message: "Request timeout",
       });
 
-      await wrapper.vm.getLogStream();
+      await wrapper.vm.getLogStream(true);
       await flushPromises();
 
       expect(mockNotify).toHaveBeenCalledWith(
@@ -1051,11 +1072,11 @@ describe("LogStream Component", () => {
     it("should handle unauthorized access gracefully", async () => {
       mockNotify.mockClear();
 
-      mockUseStreams.getPaginatedStreams.mockRejectedValue({
+      mockStreamService.nameList.mockRejectedValue({
         response: { status: 401, data: { message: "Unauthorized" } },
       });
 
-      await wrapper.vm.getLogStream();
+      await wrapper.vm.getLogStream(true);
       await flushPromises();
 
       // Should handle 401 gracefully
@@ -1107,7 +1128,7 @@ describe("LogStream Component", () => {
       store.state.selectedOrganization = org2;
       await wrapper.vm.getLogStream();
 
-      expect(mockUseStreams.getPaginatedStreams).toHaveBeenCalled();
+      expect(mockStreamService.nameList).toHaveBeenCalled();
     });
 
     it("should support internationalization", () => {

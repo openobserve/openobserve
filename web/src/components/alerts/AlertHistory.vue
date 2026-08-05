@@ -475,6 +475,11 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
+import {
+  fetchAlertHistoryPage,
+  refetchAlertHistory,
+  prefetchAlertHistoryPage,
+} from "@/composables/query/queries/alertHistory";
 
 const { t } = useI18n();
 const store = useStore();
@@ -696,10 +701,12 @@ const clearSearch = () => {
 
 const manualSearch = () => {
   currentPage.value = 1;
-  fetchAlertHistory();
+  // The user explicitly asked for results, so this always hits the server even
+  // when the filter shape is unchanged.
+  fetchAlertHistory(true);
 };
 
-const fetchAlertHistory = async () => {
+const fetchAlertHistory = async (force = false) => {
   loading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
@@ -723,16 +730,23 @@ const fetchAlertHistory = async () => {
       query.sort_order = sortOrder.value;
     }
 
-    const response = await alertsService.getHistory(org, query);
-    if (response.data) {
-      const historyData = response.data;
-
+    // Cached per query shape (range + page + sort + filter), so paging back to
+    // a page already seen renders from cache instead of blanking the table.
+    const historyData = force
+      ? await refetchAlertHistory(org, query)
+      : await fetchAlertHistoryPage(org, query);
+    {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
       }));
 
       totalCount.value = historyData.total || 0;
+
+      const nextFrom = currentPage.value * pageSize.value;
+      if (nextFrom < totalCount.value) {
+        prefetchAlertHistoryPage(org, { ...query, from: nextFrom.toString() });
+      }
 
       if (rows.value.length === 0) {
         console.warn("No alert history found for the selected time range");
@@ -786,7 +800,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const refreshData = () => {
-  fetchAlertHistory();
+  fetchAlertHistory(true);
 };
 
 const formatHistoryDate = (timestamp: number) => {
