@@ -326,12 +326,11 @@ export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelN
   testLogger.info("PromQL line panel with config ready", { dashboardName, panelName });
 }
 
-// PromQL metric chart panel, config sidebar ready; "or vector(0)" keeps the query non-empty even if the single ingested sample goes stale late in the suite. Caller's beforeAll must call ensureMetricsIngested().
 export async function setupPromQLMetricPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
   await buildPromQLPanel(page, pm, dashboardName, {
     chartType: "metric",
     panelName,
-    query: "memory_usage or vector(0)",
+    query: "sum(cpu_usage)",
   });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL metric panel with config ready", { dashboardName, panelName });
