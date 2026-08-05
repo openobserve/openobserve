@@ -214,23 +214,20 @@ onMounted(() => {
 });
 
 const formatReports = () => {
-  props.reports.length > 0 &&
-    props.reports.forEach((report: any) => {
-      scheduledReports.value.push({
-        name: report.name,
-        tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
-        time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
-        frequency: getFrequencyValue(report.frequency),
-        last_triggered_at_raw: report.last_triggered_at || null,
-        last_triggered_at: report.last_triggered_at
-          ? convertUnixToDateFormat(report.last_triggered_at)
-          : "-",
-        created_at_raw: report.created_at || null,
-        created_at: convertUnixToDateFormat(report.created_at),
-        orgId: report.org_id,
-        isCached: !report?.destinations?.length,
-      });
-    });
+  scheduledReports.value = props.reports.map((report: any) => ({
+    name: report.name,
+    tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
+    time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
+    frequency: getFrequencyValue(report.frequency),
+    last_triggered_at_raw: report.last_triggered_at || null,
+    last_triggered_at: report.last_triggered_at
+      ? convertUnixToDateFormat(report.last_triggered_at)
+      : "-",
+    created_at_raw: report.created_at || null,
+    created_at: convertUnixToDateFormat(report.created_at),
+    orgId: report.org_id,
+    isCached: !report?.destinations?.length,
+  }));
 
   filterReports();
 };

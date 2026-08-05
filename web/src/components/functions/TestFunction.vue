@@ -96,6 +96,7 @@
             language="sql"
             :keywords="effectiveKeywords"
             :suggestions="effectiveSuggestions"
+            :field-value-resolver="resolveFieldValues"
             @focus="onQueryEditorFocus"
             @blur="onQueryEditorBlur"
           />
@@ -397,6 +398,7 @@ const {
   getSuggestions,
   updateFieldKeywords,
   updateStreamKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 // ─── Query editor typewriter placeholder ─────────────────────────────

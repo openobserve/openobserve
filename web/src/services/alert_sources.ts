@@ -31,6 +31,13 @@ const alertSources = {
   rotate: (org_identifier: string, integration_id: string) => {
     return http().post(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}/rotate`);
   },
+  update: (
+    org_identifier: string,
+    integration_id: string,
+    data: { name?: string; destinations?: string[] },
+  ) => {
+    return http().patch(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}`, data);
+  },
   listSenders: (org_identifier: string, integration_id: string) => {
     return http().get(`/api/v2/${org_identifier}/incidents/integrations/${integration_id}/senders`);
   },

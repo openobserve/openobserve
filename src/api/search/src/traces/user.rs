@@ -622,7 +622,6 @@ mod tests {
                 end_time: 2000,
                 gen_ai_usage_total_tokens: 150,
                 gen_ai_usage_cost: 0.01,
-                ..Default::default()
             },
         );
         trace_details.insert(
@@ -632,7 +631,6 @@ mod tests {
                 end_time: 3000,
                 gen_ai_usage_total_tokens: 300,
                 gen_ai_usage_cost: 0.02,
-                ..Default::default()
             },
         );
 
@@ -661,7 +659,6 @@ mod tests {
                 end_time: 200,
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
-                ..Default::default()
             },
         );
         trace_details.insert(
@@ -671,7 +668,6 @@ mod tests {
                 end_time: 9000,
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
-                ..Default::default()
             },
         );
 
@@ -709,7 +705,6 @@ mod tests {
                     end_time: start + 50,
                     gen_ai_usage_total_tokens: 0,
                     gen_ai_usage_cost: 0.0,
-                    ..Default::default()
                 },
             );
         }
@@ -737,7 +732,6 @@ mod tests {
             end_time: 2000,
             gen_ai_usage_total_tokens: 100,
             gen_ai_usage_cost: 0.05,
-            ..Default::default()
         }];
         let user = UserResponseItem::from_trace_details("user-1".to_string(), 1, &details);
         assert_eq!(user.user_id, "user-1");
@@ -756,14 +750,12 @@ mod tests {
                 end_time: 1500,
                 gen_ai_usage_total_tokens: 100,
                 gen_ai_usage_cost: 0.01,
-                ..Default::default()
             },
             TraceDetail {
                 start_time: 1000,
                 end_time: 3000,
                 gen_ai_usage_total_tokens: 200,
                 gen_ai_usage_cost: 0.02,
-                ..Default::default()
             },
         ];
         let user = UserResponseItem::from_trace_details("user-1".to_string(), 2, &details);

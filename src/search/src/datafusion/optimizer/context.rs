@@ -16,15 +16,12 @@
 use std::sync::Arc;
 
 use config::{datafusion::request::Request, meta::cluster::NodeInfo};
-use datafusion::sql::TableReference;
+use datafusion::{physical_optimizer::PhysicalOptimizerRule, sql::TableReference};
 use hashbrown::HashMap;
 use infra::errors::Error;
 use parking_lot::Mutex;
-#[cfg(feature = "enterprise")]
-use {
-    datafusion::physical_optimizer::PhysicalOptimizerRule,
-    o2_enterprise::enterprise::search::datafusion::optimizer::stream_aggregate::StreamingAggsRule,
-};
+
+use crate::datafusion::optimizer::stream_aggregate::StreamingAggsRule;
 
 pub enum PhysicalOptimizerContext {
     RemoteScan(RemoteScanContext),
@@ -39,7 +36,6 @@ pub struct RemoteScanContext {
     pub is_leader: bool,
 }
 
-#[cfg(feature = "enterprise")]
 pub struct StreamingAggregationContext {
     pub streaming_id: String,
     pub start_time: i64,
@@ -48,7 +44,6 @@ pub struct StreamingAggregationContext {
     pub overwrite_cache: bool,
 }
 
-#[cfg(feature = "enterprise")]
 impl StreamingAggregationContext {
     pub async fn new(
         request: &Request,
@@ -75,7 +70,6 @@ impl StreamingAggregationContext {
     }
 }
 
-#[cfg(feature = "enterprise")]
 pub fn generate_streaming_agg_rules(
     context: StreamingAggregationContext,
 ) -> Arc<dyn PhysicalOptimizerRule + Send + Sync> {
@@ -88,24 +82,10 @@ pub fn generate_streaming_agg_rules(
     )) as _
 }
 
-#[cfg(not(feature = "enterprise"))]
-pub struct StreamingAggregationContext {}
-
-#[cfg(not(feature = "enterprise"))]
-impl StreamingAggregationContext {
-    pub async fn new(
-        _request: &Request,
-        _is_complete_cache_hit: Arc<Mutex<bool>>,
-    ) -> Result<Option<Self>, Error> {
-        Ok(None)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn test_streaming_aggregation_context_new_returns_none() {
         let request = Request::default();
@@ -121,7 +101,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "enterprise"))]
     fn test_physical_optimizer_context_streaming_aggregation_none() {
         let ctx = PhysicalOptimizerContext::StreamingAggregation(None);
         assert!(matches!(

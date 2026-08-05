@@ -146,13 +146,30 @@ async function navigateToBase(page) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
   }
   
-  const isAuthenticated = await verifyAuthentication(page);
-  
+  let isAuthenticated = await verifyAuthentication(page);
+
+  // Self-heal on cloud: the shared session token is minted once at the start of the run
+  // and reused by every shard, so on long runs (or when shards sharing an org contend on
+  // the same credential) it can expire/invalidate mid-run — surfacing as this auth check
+  // failing. Rather than fail the test, re-authenticate (fresh Dex login + org switch +
+  // passcode refresh) in this context and resume.
+  if (!isAuthenticated && isCloudEnvironment()) {
+    testLogger.warn('Auth check failed — attempting re-authentication and resume');
+    const { reauthenticateAlpha1 } = require('./reauth-alpha1.js');
+    const recovered = await reauthenticateAlpha1(page);
+    if (recovered) {
+      await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      isAuthenticated = await verifyAuthentication(page);
+    }
+  }
+
   if (!isAuthenticated) {
-    testLogger.error('User not authenticated - global setup might have failed');
+    testLogger.error('User not authenticated - global setup might have failed (re-auth also failed or unavailable)');
     throw new Error('User not authenticated. Global setup might have failed.');
   }
-  
+
   testLogger.info('Successfully navigated to base URL with authentication');
 }
 

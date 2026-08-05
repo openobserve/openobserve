@@ -68,8 +68,10 @@ const syntheticsService = {
     return http().put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload);
   },
 
-  // folderId is the check's folder (name), passed as ?folder= so RBAC can
-  // resolve folder-scoped grants — mirrors alerts' per-item routes.
+  // folderId is the check's folder ID (KSUID, or "default"), passed as ?folder=
+  // so RBAC can resolve folder-scoped grants — mirrors alerts' per-item routes.
+  // Never the display name: the server documents this param as "Current folder
+  // ID of the synthetic (for RBAC)" and treats it as authoritative.
   get: (orgIdentifier: string, id: string, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : "";
     return http().get(`/api/${orgIdentifier}/synthetics/${id}${params}`);

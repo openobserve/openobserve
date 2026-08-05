@@ -1554,10 +1554,12 @@ mod tests {
     fn test_default_disappearance_multiplier_tolerates_a_missed_run() {
         // K must exceed 1: at K=1 a single slow evaluation resolves every group
         // and re-fires it on the next pass — an alert storm from a hiccup.
-        assert!(
-            DEFAULT_DISAPPEARANCE_K > 1,
-            "K=1 turns one missed evaluation into a full resolve/re-fire cycle"
-        );
+        const {
+            assert!(
+                DEFAULT_DISAPPEARANCE_K > 1,
+                "K=1 turns one missed evaluation into a full resolve/re-fire cycle"
+            );
+        }
         assert_eq!(DEFAULT_DISAPPEARANCE_K, 3);
     }
 

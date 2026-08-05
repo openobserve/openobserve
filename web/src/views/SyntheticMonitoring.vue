@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :mode="monitorTableMode"
           :data="filteredMonitors"
           :loading="loading"
+          :timezone="store.state.timezone"
           :footer-title="footerTitle"
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
@@ -124,6 +125,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @empty-action="onEmptyAction"
         >
+          <!-- Health strip: the status facet, attention-first (failing → degrading
+               → passing → unknown), with Total last. It replaces the status dropdown
+               that used to hide these same counts inside its option labels. -->
+          <template #subheader>
+            <div
+              class="px-page-edge border-table-row-divider border-b py-1.5"
+              data-test="synthetic-monitoring-summary"
+            >
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :selected-key="statusFilter === 'all' ? null : statusFilter"
+                @select="onStatSelect"
+              />
+            </div>
+          </template>
+
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
             <div class="flex min-w-0 flex-1 items-center gap-2">
@@ -184,8 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OInput>
               </div>
 
-              <!-- Status filter -->
-              <OSelect v-model="statusFilter" :options="statusOpts" size="md" class="w-35!" />
+              <!-- Status is faceted by the summary strip below, not by a dropdown -
+                   the counts belong on screen, not hidden inside option labels. -->
             </div>
           </template>
 
@@ -330,7 +349,6 @@ import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -360,8 +378,15 @@ import {
 } from "@/types/synthetics";
 import { CHECK_TYPE_CARDS } from "@/constants/synthetics";
 import { useI18n } from "vue-i18n";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import {
+  syntheticsCreateRoute,
+  syntheticsEditRoute,
+  syntheticsResultsRoute,
+} from "@/utils/synthetics/routes";
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -440,6 +465,8 @@ function mapMonitor(m: ApiMonitor) {
     responseTime: m.last_response_ms !== null ? `${m.last_response_ms}ms` : null,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
+    // Raw microsecond epoch — drives the relative Last Check cell.
+    lastCheckAt: m.last_check_at,
     enabled: m.enabled,
     uptime: null as number | null,
     history: [] as unknown[],
@@ -494,7 +521,10 @@ async function loadMonitors(folderId?: string) {
           ? undefined
           : activeFolderId.value;
     const res = await syntheticsService.listByFolderId(orgIdentifier.value, targetFolder);
-    monitors.value = ((res.data as any).monitors ?? []).map(mapMonitor);
+    // The API field was renamed `monitors` -> `checks`. Both are read so a
+    // bundle and a server on opposite sides of that rename still render.
+    const rows = (res.data as any).checks ?? (res.data as any).monitors ?? [];
+    monitors.value = rows.map(mapMonitor);
   } finally {
     loading.value = false;
   }
@@ -669,15 +699,15 @@ const onMoveUpdated = async () => {
 
 // ── Row click → Monitor Results page ───────────────────────────────────
 const openDetail = (monitor: any) => {
-  const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name };
-  if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt);
-  const orgIdentifier = route.query.org_identifier;
-  if (typeof orgIdentifier === "string" && orgIdentifier) query.org_identifier = orgIdentifier;
-  router.push({
-    name: "synthetic-monitor-results",
-    params: { id: String(monitor.id) },
-    query,
-  });
+  // `folderId`, not `folder_name` — the server gates RBAC on the folder ID, and
+  // the display name degrades to "—" before the folder list has loaded.
+  router.push(
+    syntheticsResultsRoute(
+      { orgIdentifier: orgIdentifier.value, folderId: monitor.folderId ?? activeFolderId.value },
+      String(monitor.id),
+      { name: monitor.name, lastTriggeredAt: monitor.lastTriggeredAt },
+    ),
+  );
 };
 
 const typeTabs = computed(() => [
@@ -813,39 +843,73 @@ const filteredStatusMonitors = computed(() =>
   ),
 );
 
-const statusTabs = computed(() => {
+// Attention-first order, matching every other strip in the app. Counts come from
+// `filteredStatusMonitors` (everything except the status facet itself), so the
+// tiles keep their totals while a status is selected.
+const summaryStats = computed<StatItem[]>(() => {
   const ms = filteredStatusMonitors.value;
-  const tabs = [
-    { filter: "all", label: t("synthetics.filters.allStatuses"), count: ms.length },
+  const total = ms.length;
+  const count = (status: string) => ms.filter((m) => m.status === status).length;
+  const v = (n: number): string | number => (total > 0 ? n : "—");
+  const share = total > 0 ? total : undefined;
+  const tiles: StatItem[] = [
     {
-      filter: "passed",
-      label: t("synthetics.filters.passed"),
-      count: ms.filter((m) => m.status === "passed").length,
-    },
-    {
-      filter: "warning",
-      label: t("synthetics.filters.warning"),
-      count: ms.filter((m) => m.status === "warning").length,
-    },
-    {
-      filter: "failed",
+      key: "failed",
       label: t("synthetics.filters.failed"),
-      count: ms.filter((m) => m.status === "failed").length,
+      value: v(count("failed")),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "synthetics-summary-failed",
+    },
+    {
+      key: "warning",
+      label: t("synthetics.filters.warning"),
+      value: v(count("warning")),
+      icon: "warning-amber",
+      tone: "warning",
+      max: share,
+      dataTest: "synthetics-summary-warning",
+    },
+    {
+      key: "passed",
+      label: t("synthetics.filters.passed"),
+      value: v(count("passed")),
+      icon: "check-circle",
+      tone: "success",
+      max: share,
+      dataTest: "synthetics-summary-passed",
     },
   ];
-  const unknownCount = ms.filter((m) => m.status === "unknown").length;
-  if (unknownCount > 0) {
-    tabs.push({ filter: "unknown", label: t("synthetics.labels.unknown"), count: unknownCount });
+  // "Unknown" only means something once a monitor has never reported.
+  if (count("unknown") > 0) {
+    tiles.push({
+      key: "unknown",
+      label: t("synthetics.labels.unknown"),
+      value: v(count("unknown")),
+      icon: "help-outline",
+      tone: "neutral",
+      max: share,
+      dataTest: "synthetics-summary-unknown",
+    });
   }
-  return tabs;
+  tiles.push({
+    key: "all",
+    // "All", not "All Statuses": the tile sits in a row of statuses, so the noun is
+    // already established, and its job is simply "clear the facet".
+    label: t("synthetics.filters.all"),
+    value: v(total),
+    icon: "monitor-heart",
+    tone: "primary",
+    dataTest: "synthetics-summary-total",
+  });
+  return tiles;
 });
 
-const statusOpts = computed(() =>
-  statusTabs.value.map((s) => ({
-    label: `${s.label} (${s.count})`,
-    value: s.filter,
-  })),
-);
+// Selecting the active tile clears back to "all", like every other strip.
+const onStatSelect = (key: string) => {
+  statusFilter.value = key === "all" || statusFilter.value === key ? "all" : key;
+};
 
 const filteredMonitors = computed(() =>
   enrichedMonitors.value.filter(
@@ -901,12 +965,7 @@ async function bulkPauseMonitors() {
   });
   const results = await Promise.allSettled(
     toPause.map((m) =>
-      syntheticsService.enable(
-        orgIdentifier.value,
-        String(m.id),
-        { enabled: false },
-        m.folder_name,
-      ),
+      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: false }, m.folderId),
     ),
   );
   dismiss();
@@ -944,7 +1003,7 @@ async function bulkEnableMonitors() {
   });
   const results = await Promise.allSettled(
     toEnable.map((m) =>
-      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }, m.folder_name),
+      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }, m.folderId),
     ),
   );
   dismiss();
@@ -981,9 +1040,7 @@ async function bulkTriggerMonitors() {
     timeout: 0,
   });
   const results = await Promise.allSettled(
-    toTrigger.map((m) =>
-      syntheticsService.run(orgIdentifier.value, String(m.id), {}, m.folder_name),
-    ),
+    toTrigger.map((m) => syntheticsService.run(orgIdentifier.value, String(m.id), {}, m.folderId)),
   );
   dismiss();
   const failed = results.filter((r) => r.status === "rejected").length;
@@ -1017,7 +1074,12 @@ const onEmptyAction = (actionId: string) => {
 };
 
 const openCreate = (type: SyntheticCheckType = "browser") =>
-  router.push({ name: "synthetics-add", query: { folder: activeFolderId.value, type } });
+  router.push(
+    syntheticsCreateRoute(
+      { orgIdentifier: orgIdentifier.value, folderId: activeFolderId.value },
+      type,
+    ),
+  );
 
 const onTypeSelected = (type: SyntheticCheckType) => {
   showTypePicker.value = false;
@@ -1025,11 +1087,14 @@ const onTypeSelected = (type: SyntheticCheckType) => {
 };
 
 const openEdit = (m: any) => {
-  router.push({
-    name: "synthetics-edit",
-    params: { id: String(m.id) },
-    query: { folder: activeFolderId.value },
-  });
+  // The monitor's own folder, not the active tab: with "search across folders"
+  // on, the two differ and the RBAC gate needs the folder the check lives in.
+  router.push(
+    syntheticsEditRoute(
+      { orgIdentifier: orgIdentifier.value, folderId: m.folderId ?? activeFolderId.value },
+      String(m.id),
+    ),
+  );
 };
 
 const toggleLoadingMap = ref<Record<string, boolean>>({});
@@ -1049,7 +1114,7 @@ async function toggleEnabled(m: any) {
     timeout: 0,
   });
   try {
-    await syntheticsService.enable(org, id, { enabled: newEnabled }, m.folder_name);
+    await syntheticsService.enable(org, id, { enabled: newEnabled }, m.folderId);
     const found = monitors.value.find((mon) => String(mon.id) === id);
     if (found) found.enabled = newEnabled;
     dismiss();
@@ -1205,7 +1270,7 @@ async function runMonitor(m: any) {
     timeout: 0,
   });
   try {
-    await syntheticsService.run(org, id, {}, m.folder_name);
+    await syntheticsService.run(org, id, {}, m.folderId);
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.triggerSuccessSingle", { name }) });
   } catch (err: any) {

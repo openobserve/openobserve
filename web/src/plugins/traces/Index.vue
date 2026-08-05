@@ -290,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 // @ts-nocheck
+import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
   defineComponent,
   ref,
@@ -464,14 +465,9 @@ function getQueryTransform() {
     TransformService.list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
       .then((res) => {
         res.data.list.map((data: any) => {
-          let args: any = [];
-          for (let i = 0; i < parseInt(data.num_args); i++) {
-            args.push("'${1:value}'");
-          }
-
           let itemObj = {
             name: data.name,
-            args: "(" + args.join(",") + ")",
+            args: buildFunctionArgs(data.num_args),
           };
           if (!data.stream_name) {
             searchObj.data.stream.functions.push(itemObj);
@@ -2249,7 +2245,7 @@ useShortcuts([
     handler: () => {
       // The traces query editor is Monaco — focus its inner textarea.
       const el = document.querySelector<HTMLElement>(
-        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea, [data-test="logs-search-bar"] .cm-editor',
+        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
       );
       el?.focus();
     },

@@ -49,7 +49,18 @@ test.describe("Sanity Test Cases", () => {
     } catch (error) {
       testLogger.warn('Stream selection failed, continuing test', { error: error.message });
     }
-    
+
+    // Query over the last hour, not the default "Past 15 Minutes". On shared/cloud envs
+    // ingestion to e2e_automate is bursty, so the last 15 min is frequently EMPTY — the
+    // result-summary/pagination tests then find no rows and time out on the result table.
+    // The last hour reliably contains data, making these tests deterministic.
+    try {
+      await pm.logsPage.setDateTimeToPast1Hour();
+      testLogger.info('Time range set to Past 1 Hour');
+    } catch (error) {
+      testLogger.warn('Setting time range failed, continuing test', { error: error.message });
+    }
+
     testLogger.info('Test setup completed');
   });
 

@@ -164,7 +164,8 @@ const { t } = useI18n();
 
 // Get fetchPromQLLabels from composable
 const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
+const { fetchPromQLLabels, fetchPromQLLabelValues } =
+  useDashboardPanelData(dashboardPanelDataPageKey);
 
 const availableLabels = computed<string[]>(
   () => props.dashboardPanelData?.meta?.promql?.availableLabels || [],
@@ -195,19 +196,38 @@ const computedLabel = (label: PromqlLabelMatcher): string => {
   return `${label.label} ${label.op} ${label.value}`;
 };
 
-// Watch for metric OR selected time range changes to (re)fetch available labels.
+// Watch the metric, and only the metric. The label list is read from the
+// stream SCHEMA, which has no time dimension, so the panel's selected range
+// cannot change the answer — watching it bought a request per range change and
+// nothing else. The range mattered when labels were derived from the series in
+// that window; see tmp/code.md D11 for what changed and what it costs.
 watch(
-  () => [
-    props.metric,
-    props.dashboardPanelData?.meta?.dateTime?.start_time,
-    props.dashboardPanelData?.meta?.dateTime?.end_time,
-  ],
+  () => props.metric,
   async () => {
     if (props.metric) {
       await fetchPromQLLabels(props.metric);
     }
     // When metric is cleared, the computed properties will handle empty state
     // No need to mutate props.dashboardData
+  },
+  { immediate: true },
+);
+
+// Values are fetched for the labels a user has actually chosen, one at a time.
+// They used to arrive with the label NAMES, derived from every series of the
+// metric; asking for all of them up front costs a distinct-value aggregation
+// per label, for labels most queries never filter on.
+watch(
+  () => props.labels.map((label) => label.label).join(","),
+  () => {
+    // Read into a local: the narrowing from the guard does not survive into the
+    // callback, where TypeScript has to assume the prop may have changed.
+    const metric = props.metric;
+    if (!metric) return;
+    props.labels
+      .map((label) => label.label)
+      .filter(Boolean)
+      .forEach((label) => void fetchPromQLLabelValues(metric, label));
   },
   { immediate: true },
 );

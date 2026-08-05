@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="currentRun.timestamp"
         :back="{
           label: t('synthetics.results.monitors'),
-          to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
+          to: backTo,
           dataTest: 'synthetics-run-detail-back-btn',
         }"
       >
@@ -605,6 +605,7 @@ import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -710,9 +711,24 @@ const runIdParam = computed(() =>
 const executionIdParam = computed(() =>
   props.drawerMode ? props.overrideExecutionId : String(route.params.executionId ?? ""),
 );
-// The check's folder (name), carried on the results-page route as ?folder=.
+// The check's folder ID, carried on the results-page route as ?folder=.
 // Passed to per-check API calls so RBAC can resolve folder-scoped grants.
-const folderName = computed(() => String(route.query.folder ?? ""));
+const folderId = computed(() => String(route.query.folder ?? ""));
+
+/**
+ * Back to this run's monitor, keeping the params the results page needs.
+ *
+ * Previously only `params.id` was carried, so the results page it returned to
+ * had no org, no folder (breaking its own RBAC-scoped fetch and its Trigger Run)
+ * and no `?name=`, leaving the header untitled.
+ */
+const backTo = computed(() =>
+  syntheticsResultsRoute(
+    { orgIdentifier: store.state.selectedOrganization?.identifier, folderId: folderId.value },
+    monitorId.value,
+    { name: displayMonitorName.value },
+  ),
+);
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults();
@@ -729,7 +745,7 @@ const monitorType = ref<string | null>(
 async function resolveMonitorType() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, monitorId.value, folderName.value);
+    const res = await syntheticsService.get(org, monitorId.value, folderId.value);
     monitorType.value = (res.data as any)?.type ?? "browser";
   } catch {
     monitorType.value = "browser";
@@ -934,7 +950,7 @@ async function presignRunArtifacts() {
       orgId,
       monitorId.value,
       keys,
-      folderName.value,
+      folderId.value,
     );
     const map: Record<string, string> = {};
     for (const entry of data.urls ?? []) {
@@ -961,7 +977,7 @@ function screenshotUrl(key: string | null): string {
   const signed = artifactUrls.value[key];
   if (signed) return signed;
   const orgId = store.state.selectedOrganization.identifier;
-  return syntheticsService.artifactUrl(orgId, key, folderName.value);
+  return syntheticsService.artifactUrl(orgId, key, folderId.value);
 }
 
 // ── Evidence tab ──────────────────────────────────────────────────────────

@@ -294,7 +294,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { captureFromValuesApi } from "@/composables/useFieldValueStore";
+import { captureFromValuesApi } from "@/composables/fieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";

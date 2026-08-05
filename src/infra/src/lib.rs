@@ -89,61 +89,6 @@ fn is_sqlite_cantopen_fresh_install(msg: &str, db_file_exists: bool) -> bool {
     msg.contains("unable to open database file") && !db_file_exists
 }
 
-#[cfg(test)]
-mod schema_version_tests {
-    use super::*;
-
-    #[test]
-    fn test_missing_version_key_is_fresh_install() {
-        let e = errors::Error::DbError(errors::DbError::KeyNotExists("/meta/kv/version".into()));
-        assert!(is_db_schema_version_missing(&e));
-    }
-
-    #[test]
-    fn test_missing_meta_table_is_fresh_install() {
-        // sqlite and postgres Db::get() wrap the table-missing error into
-        // DBOperError with the sqlx message text
-        let e = errors::Error::DbError(errors::DbError::DBOperError(
-            "error returned from database: (code: 1) no such table: meta".to_string(),
-            "/meta/kv/version".to_string(),
-        ));
-        assert!(is_db_schema_version_missing(&e));
-        let e = errors::Error::DbError(errors::DbError::DBOperError(
-            "error returned from database: relation \"meta\" does not exist".to_string(),
-            "/meta/kv/version".to_string(),
-        ));
-        assert!(is_db_schema_version_missing(&e));
-    }
-
-    #[test]
-    fn test_sqlite_cantopen_fresh_install_depends_on_db_file() {
-        let msg = "error returned from database: (code: 14) unable to open database file";
-        // fresh install: the metadata file does not exist yet
-        assert!(is_sqlite_cantopen_fresh_install(msg, false));
-        // existing file: permission/disk problem, must keep failing startup
-        assert!(!is_sqlite_cantopen_fresh_install(msg, true));
-        assert!(!is_sqlite_cantopen_fresh_install(
-            "connection refused",
-            false
-        ));
-    }
-
-    #[test]
-    fn test_other_errors_are_not_fresh_install() {
-        let e = errors::Error::Message("connection refused".to_string());
-        assert!(!is_db_schema_version_missing(&e));
-        let e = errors::Error::SqlxError(sqlx::Error::PoolTimedOut);
-        assert!(!is_db_schema_version_missing(&e));
-        // a db-level operation error that is not table-missing must not be
-        // treated as a fresh install
-        let e = errors::Error::DbError(errors::DbError::DBOperError(
-            "connection reset by peer".to_string(),
-            "/meta/kv/version".to_string(),
-        ));
-        assert!(!is_db_schema_version_missing(&e));
-    }
-}
-
 pub async fn set_db_schema_version() -> Result<(), anyhow::Error> {
     let db = db::get_db().await;
     let s = config::DB_SCHEMA_VERSION.to_string();
@@ -210,4 +155,59 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod schema_version_tests {
+    use super::*;
+
+    #[test]
+    fn test_missing_version_key_is_fresh_install() {
+        let e = errors::Error::DbError(errors::DbError::KeyNotExists("/meta/kv/version".into()));
+        assert!(is_db_schema_version_missing(&e));
+    }
+
+    #[test]
+    fn test_missing_meta_table_is_fresh_install() {
+        // sqlite and postgres Db::get() wrap the table-missing error into
+        // DBOperError with the sqlx message text
+        let e = errors::Error::DbError(errors::DbError::DBOperError(
+            "error returned from database: (code: 1) no such table: meta".to_string(),
+            "/meta/kv/version".to_string(),
+        ));
+        assert!(is_db_schema_version_missing(&e));
+        let e = errors::Error::DbError(errors::DbError::DBOperError(
+            "error returned from database: relation \"meta\" does not exist".to_string(),
+            "/meta/kv/version".to_string(),
+        ));
+        assert!(is_db_schema_version_missing(&e));
+    }
+
+    #[test]
+    fn test_sqlite_cantopen_fresh_install_depends_on_db_file() {
+        let msg = "error returned from database: (code: 14) unable to open database file";
+        // fresh install: the metadata file does not exist yet
+        assert!(is_sqlite_cantopen_fresh_install(msg, false));
+        // existing file: permission/disk problem, must keep failing startup
+        assert!(!is_sqlite_cantopen_fresh_install(msg, true));
+        assert!(!is_sqlite_cantopen_fresh_install(
+            "connection refused",
+            false
+        ));
+    }
+
+    #[test]
+    fn test_other_errors_are_not_fresh_install() {
+        let e = errors::Error::Message("connection refused".to_string());
+        assert!(!is_db_schema_version_missing(&e));
+        let e = errors::Error::SqlxError(sqlx::Error::PoolTimedOut);
+        assert!(!is_db_schema_version_missing(&e));
+        // a db-level operation error that is not table-missing must not be
+        // treated as a fresh install
+        let e = errors::Error::DbError(errors::DbError::DBOperError(
+            "connection reset by peer".to_string(),
+            "/meta/kv/version".to_string(),
+        ));
+        assert!(!is_db_schema_version_missing(&e));
+    }
 }

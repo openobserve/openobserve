@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="location-on"
     :back="{
       label: t('synthetics.privateLocations.detail.back'),
-      to: { name: 'synthetics', query: { section: 'private' } },
+      to: backTo,
     }"
     bleed
   >
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.checks")
             }}</span>
-            <span class="font-medium">{{ detail.monitors_count }}</span>
+            <span class="font-medium">{{ detail.checks_count ?? detail.monitors_count ?? 0 }}</span>
           </div>
           <div class="flex flex-col">
             <span class="text-text-muted text-xs">{{
@@ -237,11 +237,26 @@ import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer
 import syntheticsService from "@/services/synthetics";
 import type { AgentSetup, SyntheticLocationDetail } from "@/types/synthetics";
 import { formatTimeAgoUs, formatIntervalSecs } from "@/utils/synthetics/format";
+import { syntheticsListRoute, syntheticsResultsRoute } from "@/utils/synthetics/routes";
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
+
+/**
+ * Ambient params to forward on the way out. Prefers the store over the URL —
+ * the inbound link used to omit `org_identifier`, which made the URL-only read
+ * that used to live here permanently empty.
+ */
+const navContext = computed(() => ({
+  orgIdentifier:
+    store.state.selectedOrganization?.identifier ||
+    (typeof route.query.org_identifier === "string" ? route.query.org_identifier : ""),
+}));
+
+/** Back to the Private Locations tab, not the Checks tab. */
+const backTo = computed(() => syntheticsListRoute(navContext.value, { section: "private" }));
 
 const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
@@ -290,17 +305,9 @@ async function load() {
 onMounted(load);
 
 const openMonitor = (row: { id: string; name: string }) => {
-  const orgIdentifier = route.query.org_identifier;
-  router.push({
-    name: "synthetic-monitor-results",
-    params: { id: row.id },
-    query: {
-      name: row.name,
-      ...(typeof orgIdentifier === "string" && orgIdentifier
-        ? { org_identifier: orgIdentifier }
-        : {}),
-    },
-  });
+  // No folder to forward: this list is location-scoped, so the results page
+  // resolves the check's folder itself rather than inheriting a wrong one.
+  router.push(syntheticsResultsRoute(navContext.value, row.id, { name: row.name }));
 };
 
 const agentColumns = computed<OTableColumnDef[]>(() => [

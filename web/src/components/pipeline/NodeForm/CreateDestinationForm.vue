@@ -28,9 +28,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            footer below stays full-width so its top border lines up with the
            full-width page header (matching the other destination forms). -->
       <div class="w-full max-w-[50vw]">
-        <OStepper v-model="step" ref="stepper" animated>
-          <!-- Step 1: Choose Destination Type -->
-          <OStep :name="1" title="Choose Type" icon="edit" :done="step > 1" :navigable="step > 1">
+        <!-- When the type is forced (step 1 skipped), the stepper is effectively a
+             single step, so hide its header — the progress bar would just be noise. -->
+        <OStepper v-model="step" ref="stepper" animated :hide-header="!!forcedType">
+          <!-- Step 1: Choose Destination Type. When the type is forced, it stays in
+               the header as a done step but is NOT navigable — there's no going back. -->
+          <OStep
+            :name="1"
+            title="Choose Type"
+            icon="edit"
+            :done="step > 1"
+            :navigable="forcedType ? false : step > 1"
+          >
             <div class="mb-3 text-sm font-medium">
               Select Destination Type <span class="text-status-error-text">*</span>
             </div>
@@ -382,6 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-if="step > 1" class="flex gap-2">
           <OButton
+            v-if="!forcedType"
             data-test="step3-back-btn"
             variant="outline"
             size="sm-action"
@@ -438,6 +448,11 @@ import { makeDestinationSchema, type DestinationForm } from "./CreateDestination
 // Props
 const props = defineProps<{
   destination?: DestinationData | null;
+  // When set, the type-selection step (step 1) is skipped: the form opens directly
+  // on the Connection step locked to this destination type, and there's no way back
+  // to step 1. Used by the workflow destination node, which only supports Custom
+  // HTTP destinations for now.
+  forcedType?: string;
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
@@ -506,7 +521,9 @@ const destinationTypes = [
   },
 ];
 
-const step = ref(1);
+// Skip straight to the Connection step when the type is forced (step 1 is the type
+// picker, which is bypassed).
+const step = ref(props.forcedType ? 2 : 1);
 
 // A single Headers row. Matches the schema's `headerRowSchema` ({ key, value }).
 // No `uuid` — the dynamic array-field keys rows by index and add/remove operate
@@ -588,26 +605,27 @@ const endpointForType = (type: string): string => {
 // defaulting) run in a single `{ flush: "sync" }` watch on the form's
 // destination_type. Edit-prefill seeds the form via `form.reset(record)`.
 
-// Build the create-mode default record. OpenObserve is the default type, so seed
-// the OpenObserve endpoint + default headers.
-const buildCreateDefaults = (): DestinationForm => ({
-  name: "",
-  url: "",
-  skip_tls_verify: false,
-  headers: getDefaultHeaders("openobserve").map((h) => ({
-    key: h.key,
-    value: h.value,
-  })),
-  metadata: {},
-  destination_type: "openobserve",
-  url_endpoint: "/api/default/default/_json", // Default endpoint for OpenObserve
-  method: "post",
-  output_format: "json",
-  esbulk_index: "",
-  separator: "",
-  org: "default",
-  stream: "default",
-});
+// Build the create-mode default record. Defaults to OpenObserve, unless a
+// `forcedType` is supplied (workflow node → "custom"), in which case the record is
+// seeded for that type instead — so the skipped step-1 selection is still applied.
+const buildCreateDefaults = (): DestinationForm => {
+  const type = props.forcedType ?? "openobserve";
+  return {
+    name: "",
+    url: "",
+    skip_tls_verify: false,
+    headers: getDefaultHeaders(type).map((h) => ({ key: h.key, value: h.value })),
+    metadata: {},
+    destination_type: type,
+    url_endpoint: type === "openobserve" ? "/api/default/default/_json" : endpointForType(type),
+    method: "post",
+    output_format: type === "splunk" ? "nestedevent" : type === "elasticsearch" ? "esbulk" : "json",
+    esbulk_index: type === "elasticsearch" ? "default" : "",
+    separator: "",
+    org: "default",
+    stream: "default",
+  };
+};
 
 const form = useOForm<DestinationForm>({
   defaultValues: buildCreateDefaults(),
@@ -1200,7 +1218,7 @@ const deleteApiHeader = (index: number) => {
 // field, including the default headers.
 const resetForm = () => {
   form.reset(buildCreateDefaults());
-  step.value = 1;
+  step.value = props.forcedType ? 2 : 1;
 };
 
 // Expose functions for testing. `form` is the single source of truth — tests

@@ -54,8 +54,25 @@ const CHROME_USE = {
   ...devices['Desktop Chrome'],
   viewport: { width: 1500, height: 1024 },
   permissions: ['clipboard-read', 'clipboard-write'],
-  // Reuse auth state from global setup (Dex email login)
+  // Reuse auth state from global setup (Dex email login). Filename is canonical;
+  // multi-user splitting happens at the CI layer (each shard downloads its own
+  // user's artifact into this path). See global-setup-alpha1.js AUTH_FILE.
   storageState: path.join(__dirname, 'playwright-tests/utils/auth/user.json'),
+  // Chromium launch flags for the EKS (Kubernetes) runners. --disable-dev-shm-usage
+  // is the critical one: containers default to a 64MB /dev/shm, which Chromium
+  // exhausts under parallel load (5 workers) on long/heavy shards — the renderer
+  // then crashes and the pod hits memory pressure, surfacing as "runner lost
+  // communication" (OOMKill/eviction) with a frozen step + 404 logs. Routing shared
+  // memory to /tmp (disk) instead is the standard fix. The sandbox/gpu flags are the
+  // usual container-safe defaults (no user namespaces / no GPU on the runners).
+  launchOptions: {
+    args: [
+      '--disable-dev-shm-usage',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-gpu',
+    ],
+  },
 };
 
 module.exports = defineConfig({
