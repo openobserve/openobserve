@@ -292,6 +292,10 @@ considering the UI done:
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.
+- [ ] **Comments are one or two lines** — the *why* of a non-obvious choice, not
+      a re-telling of the code or the history of the PR that added it (no ticket
+      ids, "review finding", "as discussed"). Same in specs. See
+      [conventions § Comments stay short](references/conventions.md).
 - [ ] `cd web && npm run lint && npm run type-check` pass.
 
 ## When a rule can't be satisfied
