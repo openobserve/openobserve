@@ -45,8 +45,28 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   },
 }));
 
+// The dashboard must carry at least one panel: the capability filter reports "every panel
+// dropped" for a zero-panel dashboard, which flips the component into its browser-only
+// empty state. The panel's SQL references a gated web-vital column so it survives a
+// browser schema and is dropped by a mobile-only one — exactly the gate under test.
 vi.mock("@/utils/rum/web_vitals.json", () => ({
-  default: { title: "Web Vitals Dashboard", panels: [], variables: { list: [] } },
+  default: {
+    title: "Web Vitals Dashboard",
+    panels: [
+      {
+        id: "lcp-panel",
+        title: "Largest Contentful Paint",
+        layout: { x: 0, y: 0, w: 12, h: 4, i: 1 },
+        queries: [
+          {
+            query:
+              'SELECT histogram(_timestamp) as x_axis, avg(view_largest_contentful_paint) as y_axis FROM "_rumdata"',
+          },
+        ],
+      },
+    ],
+    variables: { list: [] },
+  },
 }));
 
 vi.mock("../../../utils/dashboard/convertDashboardSchemaVersion", () => ({
@@ -256,13 +276,12 @@ describe("WebVitalsDashboard", () => {
       expect(wrapper.vm.refreshInterval).toBe(0);
     });
 
-    it("initializes currentDashboardData with a data property", () => {
+    it("exposes the capability-filtered dashboard as dashboardData", () => {
       // Arrange + Act
       wrapper = createWrapper();
 
       // Assert
-      expect(wrapper.vm.currentDashboardData).toBeTruthy();
-      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
+      expect(wrapper.vm.dashboardData).toMatchObject({ title: "Web Vitals Dashboard" });
     });
 
     it("handles empty dateTime prop gracefully", () => {
@@ -347,12 +366,12 @@ describe("WebVitalsDashboard", () => {
       expect(charts.props("currentTimeObj")).toEqual(defaultProps.dateTime);
     });
 
-    it("passes currentDashboardData.data as dashboardData to RenderDashboardCharts", () => {
+    it("passes the capability-filtered dashboardData to RenderDashboardCharts", () => {
       // Act
       const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
 
       // Assert
-      expect(charts.props("dashboardData")).toBe(wrapper.vm.currentDashboardData.data);
+      expect(charts.props("dashboardData")).toEqual(wrapper.vm.dashboardData);
     });
 
     it("renders loading spinner when isLoading has items", async () => {
@@ -375,34 +394,42 @@ describe("WebVitalsDashboard", () => {
   });
 
   describe("dashboard loading", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("exposes loadDashboard as a function", () => {
-      // Assert
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-    });
-
-    it("sets currentDashboardData.data after mount", () => {
-      // Assert
-      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
-    });
-
-    it("keeps the converted dashboard data untouched when it already has variables", async () => {
+    it("resolves the schema gate after mount so the dashboard renders", async () => {
       // Arrange
-      const dashboardWithVariables = {
-        title: "Web Vitals Dashboard",
-        panels: [],
-        variables: { list: [{ name: "service" }] },
-      };
-      vi.mocked(mockConvertDashboardSchemaVersion).mockReturnValueOnce(dashboardWithVariables);
+      seedRumSchema(browserSchemaMap);
 
       // Act
-      await wrapper.vm.loadDashboard();
+      wrapper = createWrapper();
+      await flushPromises();
 
       // Assert
-      expect(wrapper.vm.currentDashboardData.data).toEqual(dashboardWithVariables);
+      expect(wrapper.vm.schemaResolved).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+    });
+
+    it("keeps the converted dashboard untouched when no panel is dropped", async () => {
+      // Arrange — the conversion runs once while the composable is created, so the
+      // return value has to be queued before mount.
+      const convertedDashboard = {
+        title: "Web Vitals Dashboard",
+        panels: [
+          {
+            id: "lcp-panel",
+            layout: { x: 0, y: 0, w: 12, h: 4, i: 1 },
+            queries: [{ query: 'SELECT avg(view_largest_contentful_paint) FROM "_rumdata"' }],
+          },
+        ],
+        variables: { list: [{ name: "service" }] },
+      };
+      vi.mocked(mockConvertDashboardSchemaVersion).mockReturnValueOnce(convertedDashboard);
+      seedRumSchema(browserSchemaMap);
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.vm.dashboardData).toEqual(convertedDashboard);
     });
   });
 
