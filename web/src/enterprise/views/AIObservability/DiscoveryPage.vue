@@ -417,7 +417,9 @@ function onInQueueFilterChange(v: unknown) {
 
 function onDateChange(value: any) {
   onDateStateChange(value);
-  fetchItems();
+  // The DateTime picker fires a programmatic date-change on mount (window replay);
+  // only a genuine user pick should re-fetch, else we double-load with onMounted.
+  if (value?.userChangedValue === true) fetchItems();
 }
 
 // ── Add to queue (single or bulk) ──
