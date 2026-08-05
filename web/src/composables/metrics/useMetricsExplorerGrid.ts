@@ -1225,7 +1225,8 @@ export function useMetricsExplorerGrid() {
 
   /* -------------------------------------------------- persistent card cache */
 
-  const cacheFor = (card: MetricCard) => usePanelCache(EXPLORER_CACHE_FOLDER, org.value, card.name);
+  const cacheFor = (card: MetricCard) =>
+    usePanelCache(EXPLORER_CACHE_FOLDER, org.value, card.name, org.value);
 
   /**
    * What the cached result is a result OF. A mismatch means re-query.

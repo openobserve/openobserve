@@ -17,9 +17,11 @@ const createMockRequest = (result: any = null) => ({
 
 const mockObjectStore = {
   put: (value: any) => {
-    const request = createMockRequest(value.id);
+    const request = createMockRequest(value.key);
     if (!shouldThrowError) {
-      mockData.set(value.id, value);
+      // Real IndexedDB structured-clones on write; the store relies on that for
+      // isolation now that it no longer JSON round-trips.
+      mockData.set(value.key, structuredClone(value));
     }
     // Use microtask to simulate async behavior
     queueMicrotask(() => {
@@ -201,8 +203,8 @@ describe("usePanelCache", () => {
 
       await cache.savePanelCache(key, data, cacheTimeRange);
 
-      // Retrieve it
-      const result = await cache.getPanelCache();
+      // Retrieve it — the same key selects the entry it was saved under.
+      const result = await cache.getPanelCache(key);
 
       expect(result).toBeDefined();
       expect(result.key).toEqual(key);
@@ -231,9 +233,9 @@ describe("usePanelCache", () => {
       await cache2.savePanelCache("key2", data2, {});
       await cache3.savePanelCache("key3", data3, {});
 
-      const result1 = await cache1.getPanelCache();
-      const result2 = await cache2.getPanelCache();
-      const result3 = await cache3.getPanelCache();
+      const result1 = await cache1.getPanelCache("key1");
+      const result2 = await cache2.getPanelCache("key2");
+      const result3 = await cache3.getPanelCache("key3");
 
       expect(result1.value).toEqual(data1);
       expect(result2.value).toEqual(data2);
@@ -253,8 +255,9 @@ describe("usePanelCache", () => {
       data.nested.value = 99;
       cacheTimeRange.start = 99;
 
-      // Retrieved data should not be affected
-      const result = await cache.getPanelCache();
+      // Retrieved data should not be affected. The key is read back with its
+      // pre-mutation shape, which is also what the digest was built from.
+      const result = await cache.getPanelCache({ query: "test", nested: { value: 1 } });
       expect(result.key.nested.value).toBe(1);
       expect(result.value.nested.value).toBe(2);
       expect(result.cacheTimeRange.start).toBe(1000);
@@ -266,7 +269,7 @@ describe("usePanelCache", () => {
       await cache.savePanelCache("key1", { value: 1 }, {});
       await cache.savePanelCache("key2", { value: 2 }, {});
 
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache("key2");
       expect(result.key).toBe("key2");
       expect(result.value).toEqual({ value: 2 });
     });
@@ -337,14 +340,14 @@ describe("usePanelCache", () => {
 
           const cache: any = {};
           (allRecords as any[]).forEach((record: any) => {
-            const [folderId, dashboardId, panelId] = record.id.split(":");
+            const [, , folderId, dashboardId, panelId] = record.key.split("|");
             if (!cache[folderId]) cache[folderId] = {};
             if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
             cache[folderId][dashboardId][panelId] = {
-              key: record.key,
-              value: record.value,
-              cacheTimeRange: record.cacheTimeRange,
-              timestamp: record.timestamp,
+              key: record.value.key,
+              value: record.value.value,
+              cacheTimeRange: record.value.cacheTimeRange,
+              timestamp: record.value.timestamp,
             };
           });
           return cache;
@@ -368,7 +371,7 @@ describe("usePanelCache", () => {
 
       await window._o2_removeDashboardCache();
 
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache("key");
       expect(result).toBeNull();
     });
 
@@ -429,8 +432,8 @@ describe("usePanelCache", () => {
       await cache2.savePanelCache("key", "data2", {});
 
       // Should overwrite since same cache key
-      const result1 = await cache1.getPanelCache();
-      const result2 = await cache2.getPanelCache();
+      const result1 = await cache1.getPanelCache("key");
+      const result2 = await cache2.getPanelCache("key");
 
       expect(result1.value).toBe("data2");
       expect(result2.value).toBe("data2");
@@ -440,7 +443,7 @@ describe("usePanelCache", () => {
       const cache = usePanelCache("folder:1", "dashboard:1", "panel:1");
 
       await cache.savePanelCache("key", "data", {});
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache("key");
 
       expect(result.value).toBe("data");
     });
@@ -462,7 +465,7 @@ describe("usePanelCache", () => {
       };
 
       await cache.savePanelCache("", complexData, "");
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache("");
 
       expect(result.key).toBe("");
       expect(result.value).toEqual(complexData);
@@ -474,13 +477,15 @@ describe("usePanelCache", () => {
 
       // Test with undefined/null values
       await cache.savePanelCache(undefined, null, undefined);
-      const result = await cache.getPanelCache();
+      const result = await cache.getPanelCache(undefined);
 
       // When result is successful, it should have the stored data
       if (result) {
-        expect(result.key).toBe(null); // JSON.parse(JSON.stringify(undefined)) = null
+        // structuredClone preserves undefined, where the old JSON round-trip
+        // turned it into null.
+        expect(result.key).toBeUndefined();
         expect(result.value).toBe(null);
-        expect(result.cacheTimeRange).toBe(null);
+        expect(result.cacheTimeRange).toBeUndefined();
       } else {
         // If result is null, it means the cache returned null for undefined key
         expect(result).toBeNull();
@@ -495,7 +500,11 @@ describe("usePanelCache", () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
       await cache.savePanelCache("test", "data", {});
 
-      expect(mockData.has("folder1:dashboard1:panel1")).toBe(true);
+      // Namespaced and org-scoped: two orgs can no longer collide on one
+      // dashboard id, and the org-switch purge can find these records.
+      expect([...mockData.keys()].some((k) => k.includes("|folder1|dashboard1|panel1|"))).toBe(
+        true,
+      );
     });
 
     it("should handle database upgrade path", () => {
