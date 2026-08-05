@@ -174,6 +174,32 @@ describe("ValueMappingPopUp", () => {
         wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-drag"]').exists(),
       ).toBe(true);
     });
+
+    it("shows the empty state (and no draggable) when all rows are deleted", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.removeValueMappingByIndex(0);
+      await wrapper.vm.$nextTick();
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-empty"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-drag"]').exists(),
+      ).toBe(false);
+    });
+
+    it("hides the empty state again when a mapping is added back", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.removeValueMappingByIndex(0);
+      await wrapper.vm.$nextTick();
+      wrapper.vm.addValueMapping();
+      await wrapper.vm.$nextTick();
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-empty"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-drag"]').exists(),
+      ).toBe(true);
+    });
   });
 
   describe("Props Handling", () => {

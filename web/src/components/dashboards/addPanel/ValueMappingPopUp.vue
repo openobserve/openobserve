@@ -32,7 +32,16 @@
     data-test="dashboard-value-mapping-popup"
   >
     <div class="mb-4">
+      <OEmptyState
+        v-if="editedValueMapping.length === 0"
+        size="inline"
+        icon="swap-horiz"
+        :title="t('dashboard.valueMappingEmptyTitle')"
+        :description="t('dashboard.valueMappingEmptyDescription')"
+        data-test="dashboard-addpanel-config-value-mapping-empty"
+      />
       <draggable
+        v-else
         v-model="editedValueMapping"
         :options="dragOptions"
         @mousedown.stop="() => {}"
@@ -163,6 +172,7 @@ import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -175,6 +185,7 @@ export default defineComponent({
   components: {
     draggable: VueDraggableNext as any,
     OButton,
+    OEmptyState,
     OInput,
     OSelect,
     ColorSwatchPicker,

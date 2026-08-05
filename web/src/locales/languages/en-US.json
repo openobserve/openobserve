@@ -3428,6 +3428,8 @@
     "valueMappingTypeLt": "Less than",
     "valueMappingTypeGte": "Greater than or equal",
     "valueMappingTypeLte": "Less than or equal",
+    "valueMappingEmptyTitle": "No value mappings",
+    "valueMappingEmptyDescription": "Map values, ranges, or patterns to display text and colors.",
     "configSectionFieldOverrides": "Column Formatting",
     "configSectionFieldOverridesTooltip": "Configure cell types, colors, units, and conditional rules per column.",
     "addFieldOverride": "Configure column formatting",
