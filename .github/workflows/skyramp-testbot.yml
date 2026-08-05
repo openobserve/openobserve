@@ -1,0 +1,98 @@
+name: Skyramp Testbot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.actor != 'skyramp-testbot[bot]' }}
+
+jobs:
+  testbot:
+    # Only run for pull_request events or issue_comment on PRs mentioning @skyramp-testbot
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@skyramp-testbot') && github.event.comment.user.login != 'skyramp-testbot[bot]')
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
+
+    env:
+      COLUMNS: 150
+
+    steps:
+      - name: Generate GitHub App Token
+        id: skyramp-testbot-app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.SKYRAMP_TESTBOT_APP_ID }}
+          private-key: ${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
+          persist-credentials: false
+
+      # --- SUT pre-steps (Pattern B): the app is built from PR source here so the
+      # ~15-45 min Rust + frontend build runs as an ordinary GHA step, off the
+      # agent-timed fix-loop path. targetSetupCommand below only LAUNCHES the
+      # already-built binary. Steps replicate build_binary in playwright.yml. ---
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: skyramp-testbot
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend (embedded into the binary via RustEmbed)
+        run: cd web && npm ci && npm run build
+
+      - name: Build OpenObserve debug binary
+        # Debug (not release-ci): far faster to compile, and this SUT is used
+        # for functional API/UI testing, not performance — matches the
+        # profile already used by api-testing.yml / db-testing.yml. web/dist
+        # exists by now, so the frontend is embedded the same as a release build.
+        run: cargo build --features mimalloc
+
+      - uses: skyramp/testbot@0fa71719e66159ba7a3186cdcc5bcc671a2e0b03 # v0.11.2
+        with:
+          skyrampLicenseFile: ${{ secrets.SKYRAMP_LICENSE_FILE }}
+          anthropicApiKey: ${{ secrets.SKYRAMP_TESTBOT_API_KEY }}
+          githubToken: ${{ steps.skyramp-testbot-app-token.outputs.token }}
+          githubAppId: ${{ secrets.SKYRAMP_TESTBOT_APP_ID }}
+          githubAppPrivateKey: ${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}
+          sutSetupMode: 'none'
+          sutSourceWorkflowFile: '.github/workflows/playwright.yml'
+          targetSetupCommand: 'bash .skyramp/sut/setup.sh'
+          targetReadyCheckCommand: 'curl -sf http://localhost:5080/healthz && curl -sf http://localhost:5080/web/login'
+          targetReadyCheckDiagnosticsCommand: 'tail -n 200 .skyramp/sut/logs/openobserve.log; docker ps -a --filter name=skyramp-db-testing-postgres'
+          targetReadyCheckTimeout: '300'
+          targetTeardownCommand: 'bash .skyramp/sut/teardown.sh'
+          authTokenCommand: 'bash .skyramp/sut/get-auth-token.sh'
+          uiCredentials: 'root@example.com:Complexpass#123'
