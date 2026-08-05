@@ -98,7 +98,10 @@ import {
   getDefaultDashboardPanelData,
   withCompositeGroupLabel,
 } from "@/utils/alerts/aggregationPreviewQuery";
-import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
+import {
+  buildThresholdMarkLines,
+  thresholdAxisBounds,
+} from "@/utils/alerts/thresholdMarkLines";
 
 const props = defineProps<{ alert: any }>();
 
@@ -168,6 +171,7 @@ const build = async () => {
       queryCondition.value?.promql_condition?.value,
       queryCondition.value?.promql_warning_value,
     );
+    Object.assign(panel.data.config, thresholdAxisBounds(panel.data.config.mark_line));
     chartData.value = panel.data;
     return;
   }
@@ -286,6 +290,11 @@ const build = async () => {
         props.alert?.trigger_condition?.threshold,
         props.alert?.trigger_condition?.warning_threshold,
       );
+  // Widen the axis to reach the thresholds. Without this the chart scales to
+  // the DATA, so an alert that has not fired — every value below its threshold
+  // — draws no threshold line at all, which is the one thing the reader came
+  // for. Only ever widens; data above a threshold still scales normally.
+  Object.assign(panel.data.config, thresholdAxisBounds(panel.data.config.mark_line));
 
   setTimeRange();
   chartData.value = panel.data;

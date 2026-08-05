@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
+import {
+  buildThresholdMarkLines,
+  thresholdAxisBounds,
+} from "@/utils/alerts/thresholdMarkLines";
 
 // Marklines for the alert preview chart. One helper feeds every query mode
 // (builder/aggregation, SQL, custom SQL, PromQL) so Critical and Warning are
@@ -49,5 +52,66 @@ describe("buildThresholdMarkLines", () => {
     expect(critical.color).toBeTruthy();
     expect(warning.color).toBeTruthy();
     expect(critical.color).not.toBe(warning.color);
+  });
+});
+
+describe("thresholdAxisBounds", () => {
+  const line = (value: string | number) => ({
+    name: "Critical" as const,
+    type: "yAxis" as const,
+    value: String(value),
+    color: "#f00",
+    show_label: false as const,
+  });
+
+  it("reaches past the highest threshold so the line is not drawn on the edge", () => {
+    // The reported bug: every value below the threshold, so the chart scaled to
+    // the data and the threshold line fell outside the plot area entirely.
+    const bounds = thresholdAxisBounds([line(100)]);
+
+    expect(bounds.y_axis_max).toBeGreaterThan(100);
+  });
+
+  it("reaches below the lowest threshold too", () => {
+    // The mirror case: a below-threshold alert whose data all sits above it.
+    const bounds = thresholdAxisBounds([line(-20)]);
+
+    expect(bounds.y_axis_min).toBeLessThan(-20);
+  });
+
+  it("spans both levels when critical and warning are set", () => {
+    const bounds = thresholdAxisBounds([line(100), { ...line(40), name: "Warning" }]);
+
+    expect(bounds.y_axis_max).toBeGreaterThan(100);
+    expect(bounds.y_axis_min).toBeLessThan(40);
+  });
+
+  it("pads a zero threshold by an absolute amount, not by zero percent", () => {
+    const bounds = thresholdAxisBounds([line(0)]);
+
+    expect(bounds.y_axis_max).toBeGreaterThan(0);
+    expect(bounds.y_axis_min).toBeLessThan(0);
+  });
+
+  it("returns nothing to apply when there are no thresholds", () => {
+    expect(thresholdAxisBounds([])).toEqual({});
+  });
+
+  it("ignores a non-numeric threshold rather than poisoning the axis with NaN", () => {
+    expect(thresholdAxisBounds([line("not-a-number")])).toEqual({});
+  });
+
+  it("keeps usable bounds when only one of two thresholds parses", () => {
+    const bounds = thresholdAxisBounds([line(100), { ...line("oops"), name: "Warning" }]);
+
+    expect(Number.isFinite(bounds.y_axis_max)).toBe(true);
+    expect(bounds.y_axis_max).toBeGreaterThan(100);
+  });
+
+  it("pairs with buildThresholdMarkLines end to end", () => {
+    const bounds = thresholdAxisBounds(buildThresholdMarkLines(500, 250));
+
+    expect(bounds.y_axis_max).toBeGreaterThan(500);
+    expect(bounds.y_axis_min).toBeLessThan(250);
   });
 });
