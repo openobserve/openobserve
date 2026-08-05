@@ -52,6 +52,11 @@ unzip protoc-21.12-linux-x86_64.zip -d protoc
 sudo cp protoc/bin/protoc /usr/local/bin/
 sudo cp -r protoc/include/google /usr/local/include/
 
+# Set environment variable for protobuf include path (Linux)
+export PROTOC_INCLUDE=/usr/local/include
+# Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.) to make it permanent
+# You could also set it in your .env file
+
 # Windows
 curl -L -o protoc-21.12-win64.zip https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-win64.zip
 unzip protoc-21.12-win64.zip -d protoc
