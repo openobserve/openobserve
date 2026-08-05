@@ -360,20 +360,22 @@ const selectedLocations = computed({
               </OTooltip>
             </p>
           </template>
-          <OCheckbox
-            v-for="location in filteredPublicLocations"
-            :key="location.id"
-            :value="location.id"
-            :data-test="`synthetics-check-locations-option-${location.id}`"
-            class="pb-2"
-          >
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <OIcon :name="locationIcon(location.provider)" size="sm" />
-                {{ locationDisplayName(location) }}
-              </span>
-            </template>
-          </OCheckbox>
+          <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+            <OCheckbox
+              v-for="location in filteredPublicLocations"
+              :key="location.id"
+              :value="location.id"
+              :data-test="`synthetics-check-locations-option-${location.id}`"
+              class="min-w-0 pb-2"
+            >
+              <template #label>
+                <span class="flex items-center gap-1.5">
+                  <OIcon :name="locationIcon(location.provider)" size="sm" />
+                  {{ locationDisplayName(location) }}
+                </span>
+              </template>
+            </OCheckbox>
+          </div>
 
           <!-- ── Search matched no public locations (private still has hits) ── -->
           <OEmptyState
@@ -406,11 +408,11 @@ const selectedLocations = computed({
             </div>
 
             <!-- ── Private location rows ─────────────────────────────────── -->
-            <template v-if="privateRows.length">
+            <div v-if="privateRows.length" class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
               <div
                 v-for="{ location, status, agents } in privateRows"
                 :key="location.id"
-                class="flex items-start gap-2 pb-2"
+                class="flex min-w-0 items-start gap-2 pb-2"
               >
                 <OCheckbox
                   :value="location.id"
@@ -474,7 +476,7 @@ const selectedLocations = computed({
                   {{ status.actionLabel }}
                 </OButton>
               </div>
-            </template>
+            </div>
 
             <!-- ── Search matched no private locations (public still has hits) ── -->
             <OEmptyState
