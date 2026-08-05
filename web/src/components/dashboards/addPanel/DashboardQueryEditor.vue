@@ -95,7 +95,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OTooltip :content="t('dashboard.renameQuery')" />
               </span>
-              <span class="relative inline-flex items-center">
+              <!-- Hiding the only query would leave the panel with nothing to
+                   draw, so the eye appears from the second query onwards. -->
+              <span
+                v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
+                class="relative inline-flex items-center"
+              >
                 <OIcon
                   :name="
                     (dashboardPanelData.layout.hiddenQueries || []).includes(index)
