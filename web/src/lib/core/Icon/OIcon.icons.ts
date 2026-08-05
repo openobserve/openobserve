@@ -58,6 +58,8 @@ import Event from "~icons/material-symbols/event-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
 import FormatListBulleted from "~icons/material-symbols/format-list-bulleted";
+import FormatBold from "~icons/material-symbols/format-bold";
+import FormatItalic from "~icons/material-symbols/format-italic";
 import Fullscreen from "~icons/material-symbols/fullscreen";
 import GroupWork from "~icons/material-symbols/group-work-outline";
 import Groups from "~icons/material-symbols/groups-outline";
@@ -265,6 +267,7 @@ import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
+import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
 import StopIcon from "~icons/material-symbols/stop-outline";
 import SwapHorizIcon from "~icons/material-symbols/swap-horiz";
 import SwapVertIcon from "~icons/material-symbols/swap-vert";
@@ -393,6 +396,8 @@ export const iconRegistry = {
   "expand-more": ExpandMore,
   "upload-file": UploadFile,
   "format-list-bulleted": FormatListBulleted,
+  "format-bold": FormatBold,
+  "format-italic": FormatItalic,
   fullscreen: Fullscreen,
   "group-work": GroupWork,
   "group-add": GroupAdd,
@@ -628,6 +633,7 @@ export const iconRegistry = {
   "search-off": SearchOffIcon,
   security: SecurityIcon,
   "sentiment-very-dissatisfied": SentimentVeryDissatisfiedIcon,
+  "add-reaction": AddReactionIcon,
   stop: StopIcon,
   "swap-horiz": SwapHorizIcon,
   "swap-vert": SwapVertIcon,
