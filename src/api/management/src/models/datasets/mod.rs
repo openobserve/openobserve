@@ -21,13 +21,13 @@
 //! queue provenance are server-owned on every entry path.
 
 use openobserve_core::llm_evaluations::datasets::{
-    CreateDataset, CreateDatasetItem, Dataset, DatasetItem, DatasetItemSource,
-    PushDatasetItemResult, PushQueueItemToDataset, TelemetryDatasetItemRefType as ServiceRefType,
-    UpdateDataset,
+    CreateDataset, CreateDatasetItem, Dataset, DatasetItem, DatasetItemPage, DatasetItemSource,
+    ListDatasetItems, PushDatasetItemResult, PushQueueItemToDataset,
+    TelemetryDatasetItemRefType as ServiceRefType, UpdateDataset, UpdateDatasetItem,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -61,6 +61,30 @@ pub struct DatasetResponseBody {
 #[serde(rename_all = "camelCase")]
 pub struct ListDatasetsResponseBody {
     pub list: Vec<DatasetResponseBody>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(deny_unknown_fields)]
+pub struct ListDatasetItemsQuery {
+    /// Include the latest tombstone for deleted logical items. Defaults to false.
+    #[serde(rename = "includeDeleted", alias = "include_deleted")]
+    pub include_deleted: Option<bool>,
+    /// Zero-based result offset. Defaults to 0.
+    pub from: Option<usize>,
+    /// Page size from 1 through 100. Defaults to 20.
+    pub size: Option<usize>,
+}
+
+impl From<ListDatasetItemsQuery> for ListDatasetItems {
+    fn from(value: ListDatasetItemsQuery) -> Self {
+        let defaults = ListDatasetItems::default();
+        Self {
+            include_deleted: value.include_deleted.unwrap_or(defaults.include_deleted),
+            from: value.from.unwrap_or(defaults.from),
+            size: value.size.unwrap_or(defaults.size),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, ToSchema)]
@@ -103,6 +127,17 @@ pub enum PushDatasetItemRequestBody {
         #[serde(default)]
         tags: Vec<String>,
     },
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UpdateDatasetItemRequestBody {
+    pub input: Value,
+    pub expected_output: Value,
+    #[serde(default)]
+    pub metadata: Option<Value>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
@@ -151,6 +186,16 @@ pub struct DatasetItemResponseBody {
     pub import_filename: Option<String>,
     pub updated_by: String,
     pub updated_at: i64,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ListDatasetItemsResponseBody {
+    pub list: Vec<DatasetItemResponseBody>,
+    pub total: u64,
+    pub from: usize,
+    pub size: usize,
+    pub has_more: bool,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -255,6 +300,17 @@ impl From<PushDatasetItemRequestBody> for CreateDatasetItem {
     }
 }
 
+impl From<UpdateDatasetItemRequestBody> for UpdateDatasetItem {
+    fn from(value: UpdateDatasetItemRequestBody) -> Self {
+        Self {
+            input: value.input,
+            expected_output: value.expected_output,
+            metadata: value.metadata,
+            tags: value.tags,
+        }
+    }
+}
+
 impl From<PushAnnotationQueueItemToDatasetRequestBody> for PushQueueItemToDataset {
     fn from(value: PushAnnotationQueueItemToDatasetRequestBody) -> Self {
         Self {
@@ -304,6 +360,22 @@ impl From<DatasetItem> for DatasetItemResponseBody {
     }
 }
 
+impl From<DatasetItemPage> for ListDatasetItemsResponseBody {
+    fn from(value: DatasetItemPage) -> Self {
+        Self {
+            list: value
+                .items
+                .into_iter()
+                .map(DatasetItemResponseBody::from)
+                .collect(),
+            total: value.total,
+            from: value.from,
+            size: value.size,
+            has_more: value.has_more,
+        }
+    }
+}
+
 impl From<PushDatasetItemResult> for PushDatasetItemResponseBody {
     fn from(value: PushDatasetItemResult) -> Self {
         Self {
@@ -316,6 +388,44 @@ impl From<PushDatasetItemResult> for PushDatasetItemResponseBody {
 #[cfg(test)]
 mod dataset_item_contract_tests {
     use super::*;
+
+    #[test]
+    fn list_query_defaults_to_live_current_items() {
+        let request: ListDatasetItems = ListDatasetItemsQuery::default().into();
+        assert!(!request.include_deleted);
+        assert_eq!(request.from, 0);
+        assert_eq!(request.size, 20);
+
+        let request: ListDatasetItems = serde_json::from_value::<ListDatasetItemsQuery>(
+            serde_json::json!({"includeDeleted": true, "from": 20, "size": 50}),
+        )
+        .unwrap()
+        .into();
+        assert!(request.include_deleted);
+        assert_eq!(request.from, 20);
+        assert_eq!(request.size, 50);
+    }
+
+    #[test]
+    fn update_accepts_only_replaceable_item_fields() {
+        let body: UpdateDatasetItemRequestBody = serde_json::from_value(serde_json::json!({
+            "input": "question",
+            "expectedOutput": "answer",
+            "metadata": {"difficulty": "hard"},
+            "tags": ["regression"]
+        }))
+        .unwrap();
+        let command: UpdateDatasetItem = body.into();
+        assert_eq!(command.expected_output, "answer");
+
+        let spoofed: Result<UpdateDatasetItemRequestBody, _> =
+            serde_json::from_value(serde_json::json!({
+                "input": "question",
+                "expectedOutput": "answer",
+                "source": "manual"
+            }));
+        assert!(spoofed.is_err());
+    }
 
     #[test]
     fn manual_entry_accepts_only_user_owned_golden_fields() {

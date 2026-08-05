@@ -6,7 +6,7 @@
 // (at your option) any later version.
 
 use axum::{
-    extract::{Multipart, Path},
+    extract::{Multipart, Path, Query},
     response::Response,
 };
 use db::authz::{remove_ownership, set_ownership};
@@ -19,9 +19,11 @@ use openobserve_core::{
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::datasets::{
-        CreateDatasetRequestBody, DatasetResponseBody, ImportDatasetItemsResponseBody,
+        CreateDatasetRequestBody, DatasetItemResponseBody, DatasetResponseBody,
+        ImportDatasetItemsResponseBody, ListDatasetItemsQuery, ListDatasetItemsResponseBody,
         ListDatasetsResponseBody, PushAnnotationQueueItemToDatasetRequestBody,
-        PushDatasetItemRequestBody, PushDatasetItemResponseBody, UpdateDatasetRequestBody,
+        PushDatasetItemRequestBody, PushDatasetItemResponseBody, UpdateDatasetItemRequestBody,
+        UpdateDatasetRequestBody,
     },
 };
 
@@ -45,11 +47,13 @@ fn dataset_error_response(value: DatasetError) -> Response {
         | DatasetError::MissingExpectedOutput
         | DatasetError::MissingSourceStream
         | DatasetError::InvalidTraceStartTime
+        | DatasetError::InvalidPageSize
         | DatasetError::InvalidTelemetryReference(_)
         | DatasetError::UnsupportedQueueItemScope) => {
             MetaHttpResponse::bad_request(error.to_string())
         }
         DatasetError::NotFound => MetaHttpResponse::not_found("Dataset not found"),
+        DatasetError::ItemNotFound => MetaHttpResponse::not_found("Dataset Item not found"),
         DatasetError::QueueNotFound => MetaHttpResponse::not_found("Annotation Queue not found"),
         DatasetError::QueueItemNotFound => {
             MetaHttpResponse::not_found("Annotation Queue Item not found")
@@ -63,6 +67,38 @@ fn dataset_error_response(value: DatasetError) -> Response {
         error @ (DatasetError::QueueItemNotReviewed | DatasetError::InconsistentReviewSource) => {
             MetaHttpResponse::conflict(error)
         }
+    }
+}
+
+/// ListDatasetItems
+#[utoipa::path(
+    get,
+    path = "/{org_id}/datasets/{dataset_id}/items",
+    context_path = "/api",
+    tag = "Datasets",
+    operation_id = "ListDatasetItems",
+    summary = "List the current Dataset Item snapshot",
+    description = "Returns the latest immutable row for every logical Dataset Item, excluding soft-deleted items unless include_deleted=true.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dataset_id" = String, Path, description = "Dataset ID"),
+        ListDatasetItemsQuery,
+    ),
+    responses(
+        (status = 200, body = inline(ListDatasetItemsResponseBody)),
+        (status = 400, description = "Invalid page size", body = ()),
+        (status = 404, description = "Dataset not found", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "list"}))),
+)]
+pub async fn list_dataset_items(
+    Path((org_id, dataset_id)): Path<(String, String)>,
+    Query(query): Query<ListDatasetItemsQuery>,
+) -> Response {
+    match datasets::list_items(&org_id, &dataset_id, query.into()).await {
+        Ok(page) => MetaHttpResponse::json(ListDatasetItemsResponseBody::from(page)),
+        Err(err) => dataset_error_response(err),
     }
 }
 
@@ -262,6 +298,71 @@ pub async fn push_dataset_item(
 ) -> Response {
     match datasets::push_item(&org_id, &dataset_id, &user.user_id, body.into()).await {
         Ok(result) => MetaHttpResponse::json(PushDatasetItemResponseBody::from(result)),
+        Err(err) => dataset_error_response(err),
+    }
+}
+
+/// UpdateDatasetItem
+#[utoipa::path(
+    put,
+    path = "/{org_id}/datasets/{dataset_id}/items/{item_id}",
+    context_path = "/api",
+    tag = "Datasets",
+    operation_id = "UpdateDatasetItem",
+    summary = "Append a new Dataset Item version",
+    description = "Replaces the user-authored fields by appending an immutable row with the same logical Item ID and the next Dataset global version. Source provenance is preserved.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dataset_id" = String, Path, description = "Dataset ID"),
+        ("item_id" = String, Path, description = "Logical Dataset Item ID"),
+    ),
+    request_body(content = inline(UpdateDatasetItemRequestBody), description = "Replacement Dataset Item fields"),
+    responses(
+        (status = 200, body = inline(DatasetItemResponseBody)),
+        (status = 400, description = "Invalid Dataset Item", body = ()),
+        (status = 404, description = "Dataset or Dataset Item not found", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "update"}))),
+)]
+pub async fn update_dataset_item(
+    Path((org_id, dataset_id, item_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+    axum::Json(body): axum::Json<UpdateDatasetItemRequestBody>,
+) -> Response {
+    match datasets::update_item(&org_id, &dataset_id, &item_id, &user.user_id, body.into()).await {
+        Ok(item) => MetaHttpResponse::json(DatasetItemResponseBody::from(item)),
+        Err(err) => dataset_error_response(err),
+    }
+}
+
+/// DeleteDatasetItem
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/datasets/{dataset_id}/items/{item_id}",
+    context_path = "/api",
+    tag = "Datasets",
+    operation_id = "DeleteDatasetItem",
+    summary = "Soft-delete a Dataset Item",
+    description = "Appends an immutable tombstone with the same logical Item ID and the next Dataset global version.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dataset_id" = String, Path, description = "Dataset ID"),
+        ("item_id" = String, Path, description = "Logical Dataset Item ID"),
+    ),
+    responses(
+        (status = 200, body = inline(DatasetItemResponseBody)),
+        (status = 404, description = "Dataset or Dataset Item not found", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "delete"}))),
+)]
+pub async fn delete_dataset_item(
+    Path((org_id, dataset_id, item_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match datasets::delete_item(&org_id, &dataset_id, &item_id, &user.user_id).await {
+        Ok(item) => MetaHttpResponse::json(DatasetItemResponseBody::from(item)),
         Err(err) => dataset_error_response(err),
     }
 }
@@ -511,6 +612,18 @@ mod tests {
                 .status()
                 .as_u16(),
             409
+        );
+        assert_eq!(
+            dataset_error_response(DatasetError::InvalidPageSize)
+                .status()
+                .as_u16(),
+            400
+        );
+        assert_eq!(
+            dataset_error_response(DatasetError::ItemNotFound)
+                .status()
+                .as_u16(),
+            404
         );
     }
 
