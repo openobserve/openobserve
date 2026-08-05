@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="error"
       preset="load-error"
       size="hero"
-      :description="error"
+      :description="raw(error)"
       :action-label="t('dashboard.addDashboardFromGitHub.retry')"
       @action="loadDashboards"
     />
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import dashboardsService from "@/services/dashboards";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -223,7 +223,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 interface GitHubDashboard {
   name: string;
   displayName: string;
-  description?: string;
+  description?: I18nText;
   folderPath: string;
   jsonFiles: string[];
 }
@@ -252,7 +252,7 @@ export default defineComponent({
   emits: ["update:modelValue", "added"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const show = computed({
       get: () => props.modelValue,
@@ -266,7 +266,7 @@ export default defineComponent({
     const selectedDashboards = ref<GitHubDashboard[]>([]);
     const showFolderSelection = ref(false);
     const selectedFolderObj = ref<string | null>(null);
-    const folderOptions = ref<{ label: string; value: string }[]>([]);
+    const folderOptions = ref<{ label: I18nText; value: string }[]>([]);
     const importing = ref(false);
     const preparing = ref(false);
     const showAddFolderDialog = ref(false);
@@ -434,7 +434,7 @@ export default defineComponent({
         ];
 
         folderOptions.value = sorted.map((f: any) => ({
-          label: f.name,
+          label: raw(f.name),
           value: f.folderId,
         }));
 
@@ -656,6 +656,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       show,
       loading,

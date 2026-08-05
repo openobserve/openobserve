@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import AWSQuickSetup from "./AWSQuickSetup.vue";
 
@@ -76,7 +75,6 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
@@ -98,7 +96,7 @@ describe("AWSQuickSetup.vue", () => {
   const createWrapper = () =>
     mount(AWSQuickSetup, {
       global: {
-        plugins: [mockI18n, mockRouter],
+        plugins: [mockRouter],
         provide: { store: mockStore },
         stubs: {
           OToggleGroup: {

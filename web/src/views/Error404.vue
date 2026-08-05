@@ -33,15 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             font-size="56"
             class="fill-accent font-[inherit] font-bold"
           >
-            404
+            {{ "404" }}
           </text>
         </svg>
       </div>
 
-      <h1 class="text-text-heading m-0 mb-3 text-2xl font-semibold">Page not found</h1>
+      <h1 class="text-text-heading m-0 mb-3 text-2xl font-semibold">
+        {{ t("common.pageNotFound") }}
+      </h1>
 
       <p class="text-text-secondary m-0 mb-8 text-sm leading-normal">
-        The page you're looking for doesn't exist or has been moved.
+        {{ t("common.pageNotFoundDescription") }}
       </p>
 
       <div class="mb-8 flex gap-3">
@@ -67,10 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const countdown = ref(10);
 let timer: ReturnType<typeof setInterval>;

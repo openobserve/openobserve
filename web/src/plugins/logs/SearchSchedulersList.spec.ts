@@ -455,7 +455,7 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should copy text to clipboard successfully", async () => {
-      await wrapper.vm.copyToClipboard("test text", {
+      await wrapper.vm.copyToClipboard("test text", i18n.global.t, {
         successMessage: "Query Copied Successfully!",
         timeout: 5000,
       });
@@ -471,7 +471,7 @@ describe("SearchSchedulersList Component", () => {
     it("should handle clipboard error", async () => {
       navigator.clipboard.writeText.mockRejectedValueOnce(new Error("Failed"));
 
-      await wrapper.vm.copyToClipboard("test text", "Query");
+      await wrapper.vm.copyToClipboard("test text", i18n.global.t);
 
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
@@ -481,7 +481,7 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should handle different content types", async () => {
-      await wrapper.vm.copyToClipboard("function code", {
+      await wrapper.vm.copyToClipboard("function code", i18n.global.t, {
         successMessage: "Function Copied Successfully!",
         timeout: 5000,
       });
@@ -600,7 +600,7 @@ describe("SearchSchedulersList Component", () => {
       store.state.zoConfig.usage_publish_interval = 180;
 
       const delayMsg = wrapper.vm.delayMessage;
-      expect(delayMsg).toBe("3 minute(s)");
+      expect(delayMsg).toBe("3 minutes");
     });
 
     it("should handle exactly 60 seconds", () => {
@@ -614,7 +614,7 @@ describe("SearchSchedulersList Component", () => {
       store.state.zoConfig.usage_publish_interval = 7200;
 
       const delayMsg = wrapper.vm.delayMessage;
-      expect(delayMsg).toBe("120 minute(s)");
+      expect(delayMsg).toBe("120 minutes");
     });
   });
 

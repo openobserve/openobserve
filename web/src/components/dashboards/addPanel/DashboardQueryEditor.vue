@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
                 class="cursor-pointer px-0.5 text-sm whitespace-nowrap select-none"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
-                >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
+                >{{ tab.tabName || t("common.queryNumber", { index: Number(index) + 1 }) }}</span
               >
               <!-- xs matches the tick it swaps with, so the tab keeps its width. -->
               <span v-if="editingQueryIndex !== index" class="relative inline-flex items-center">
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :hide-nl-toggle="false"
                     :disable-ai="false"
-                    :disable-ai-reason="''"
+                    :disable-ai-reason="raw('')"
                     :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                     :ai-tooltip="t('function.enterFunctionPrompt')"
                     editor-height="100%"
@@ -309,7 +309,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
 import { defineComponent, ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
@@ -373,7 +373,7 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification, showPositiveNotification } = useNotifications();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
@@ -444,7 +444,7 @@ export default defineComponent({
       addQuery,
       removeQuery,
       selectedStreamFieldsBasedOnUserDefinedSchema,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const splitterModel = ref(
       promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70,
@@ -910,7 +910,7 @@ export default defineComponent({
     const startEditQueryName = (rawIndex: string | number, tab: any) => {
       const index = Number(rawIndex);
       editingQueryIndex.value = index;
-      editingQueryName.value = tab.tabName || "Query " + (index + 1);
+      editingQueryName.value = tab.tabName || t("common.queryNumber", { index: index + 1 });
       // Caret at the end, not select-all: the first keystroke must not wipe
       // the whole name.
       nextTick(() => {
@@ -938,6 +938,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       router,
       onDropDownClick,

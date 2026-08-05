@@ -422,7 +422,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
@@ -496,7 +496,7 @@ interface SessionInsight {
   count: number;
   target?: string;
   view?: string;
-  message?: string;
+  message?: I18nText;
   rate?: number;
 }
 
@@ -515,7 +515,7 @@ const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { sessionState } = useSession();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -570,7 +570,7 @@ const onQueryEditorBlur = async () => {
 };
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 // Autosuggestions — field names, operators, filter values
 const {
@@ -641,7 +641,7 @@ const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("rum-s
 const tableColumns = [
   {
     id: "action_play",
-    header: "",
+    header: raw(""),
     accessorKey: "action_play",
     sortable: false,
     size: 56,
@@ -881,7 +881,7 @@ const getSessions = () => {
     streamName: "_rumdata",
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
 
   // Build optional fields based on schema
   let geoFields = "";

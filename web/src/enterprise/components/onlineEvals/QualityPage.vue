@@ -32,7 +32,11 @@
     </div>
 
     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
-    <KpiCardRow v-else class="quality-page__kpis px-page-edge" aria-label="Tier 1 KPIs">
+    <KpiCardRow
+      v-else
+      class="quality-page__kpis px-page-edge"
+      :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
+    >
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
@@ -63,7 +67,7 @@
       v-model:open="detailDrawerOpen"
       side="right"
       :width="70"
-      :title="selectedConfig?.name || ''"
+      :title="raw(selectedConfig?.name || '')"
       data-test="quality-config-detail-drawer"
     >
       <!-- Type badge + version pulled out of the inner panel header so
@@ -78,7 +82,7 @@
           "
           type="evalDataType"
           :value="detailDataType"
-          :label="shortType(detailDataType)"
+          :label="raw(shortType(detailDataType))"
           size="xs"
           data-test="quality-detail-type-badge"
         />
@@ -86,7 +90,7 @@
           v-if="selectedConfig?.version"
           class="qpd-version text-2xs text-text-secondary ml-1.5 [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
-          >v{{ selectedConfig.version }}</span
+          >{{ t("onlineEvals.versionPrefix") }}{{ selectedConfig.version }}</span
         >
       </template>
 
@@ -127,7 +131,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
@@ -163,7 +167,7 @@ const props = defineProps<{
   // list + derives `agentFilter`); QualityPage just renders the control and
   // emits the selected key back via v-model.
   agentKey?: string;
-  agentOptions?: { label: string; value: string }[];
+  agentOptions?: { label: I18nText; value: string }[];
   // True while OnlineEvals is still fetching the score-configs list. Until that
   // resolves `scoreConfigs` is empty, so the table would otherwise flash "No
   // Data" before its own skeleton kicks in. OR-ing this into the table's
@@ -189,7 +193,7 @@ const agentModel = computed<string>({
   set: (value) => emit("update:agentKey", value),
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 
@@ -246,7 +250,7 @@ const {
   booleanTrend,
   booleanTrendSeries,
   refresh: refreshCharts,
-} = useQualityDetailCharts(selectedConfig, dateWindowRef, agentFilterRef, detailScope);
+} = useQualityDetailCharts(selectedConfig, dateWindowRef, agentFilterRef, detailScope, t);
 
 const {
   runs: qualityRuns,

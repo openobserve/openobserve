@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import PerformanceSummary from "./PerformanceSummary.vue";
-import { createI18n } from "vue-i18n";
 import { createStore } from "vuex";
 import { nextTick } from "vue";
 
@@ -103,24 +102,10 @@ const mockRouter = {
   replace: vi.fn(),
 };
 
-const mockI18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {
-      rum: {
-        webVitalsLabel: "Web Vitals",
-        errorLabel: "Errors",
-        sessionLabel: "Sessions",
-      },
-    },
-  },
-});
-
 function mountComponent(routeQuery: Record<string, any> = {}, props: Record<string, any> = {}) {
   return mount(PerformanceSummary, {
     props,
     global: {
-      plugins: [mockI18n],
       provide: { store: mockStore },
       mocks: {
         $store: mockStore,

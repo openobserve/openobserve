@@ -16,12 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
     <IngestionDocLink
       href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"
     >
-      to explore the process of sending logs from Kubernetes to OpenObserve using
-      FluentBit.</IngestionDocLink
+      {{ t("ingestion.fluentBitDocLinkText") }}</IngestionDocLink
     >
   </IngestionContent>
 </template>
@@ -34,6 +33,7 @@ import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincut
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 export default defineComponent({
   name: "fluentbit-mechanism",
   props: {
@@ -46,6 +46,7 @@ export default defineComponent({
   },
   components: { CopyContent, IngestionContent, IngestionDocLink },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -71,6 +72,8 @@ export default defineComponent({
   HTTP_Passwd [PASSCODE]
   compress gzip`;
     return {
+      raw,
+      t,
       store,
       config,
       endpoint,

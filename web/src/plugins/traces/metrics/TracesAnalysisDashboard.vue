@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     v-model:open="isOpen"
     :width="80"
-    :title="drawerTitle"
+    :title="raw(drawerTitle)"
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start
           }}</span>
-          <span class="text-3xs opacity-60">→</span>
+          <span class="text-3xs opacity-60">{{ t("latencyInsights.arrowSeparator") }}</span>
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end
           }}</span>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selectedTimeRangeDisplay!.endTime,
             ).start
           }}</span>
-          <span class="text-3xs opacity-70">→</span>
+          <span class="text-3xs opacity-70">{{ t("latencyInsights.arrowSeparator") }}</span>
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay!.startTime,
@@ -306,7 +306,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import {
   useLatencyInsightsAnalysis,
@@ -381,7 +381,7 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { isDark } = useTheme();
 const chipColors = computed(() =>
   isDark.value ? COMPARISON_COLORS.dark : COMPARISON_COLORS.light,

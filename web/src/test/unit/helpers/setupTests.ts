@@ -17,8 +17,16 @@
 import { beforeAll, afterEach, afterAll, vi } from "vitest";
 
 import { setupServer } from "msw/node";
+import { config } from "@vue/test-utils";
 
 import "../../__mocks__/index";
+
+// Install i18n globally so every component's useI18n() resolves in tests (mirrors main.ts).
+// NOTE: this preloads @/locales' import graph (utils/cookies, constants/key, js-cookie,
+// vue-i18n) into the module cache before every spec, so specs cannot vi.mock() those
+// modules — vi.spyOn() the shared instance instead (see utils/cookies.spec.ts).
+import i18n from "@/locales";
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 import { restHandlers } from "./handlers";
 

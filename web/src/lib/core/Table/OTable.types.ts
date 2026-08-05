@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
 
@@ -119,8 +121,8 @@ export interface OTableColumnMeta {
 export interface OTableColumnDef<TData = any> {
   /** Unique column identifier (used as accessorKey when accessorKey not explicitly set) */
   id: string;
-  /** Header display text or render function */
-  header: string | Component;
+  /** Header display text or render function. `raw()` for a glyph or empty header. */
+  header: I18nText | Component;
   /** Key in the data row object */
   accessorKey?: string;
   /** Custom accessor function (receives the full row) */
@@ -238,7 +240,7 @@ export interface OTableProps<TData = any> {
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
   /** Label shown bold in the footer as "N footerTitle" (e.g. "2 Dashboards") */
-  footerTitle?: string;
+  footerTitle?: I18nText;
 
   // ── Selection ──
   selection?: OTableSelectionMode;
@@ -333,7 +335,7 @@ export interface OTableProps<TData = any> {
   streaming?: boolean;
   error?: string | null;
   /** Text shown when data is empty and not loading */
-  emptyMessage?: string;
+  emptyMessage?: I18nText;
   dense?: boolean;
   bordered?: boolean;
   /**

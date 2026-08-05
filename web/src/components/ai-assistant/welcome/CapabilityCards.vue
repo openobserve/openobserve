@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { CAPABILITY_CARDS } from "./welcomeContent";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const emit = defineEmits<{ (e: "select", prompt: string): void }>();
 </script>

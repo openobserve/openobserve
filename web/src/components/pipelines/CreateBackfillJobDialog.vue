@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="show"
     :width="47"
-    title="Create Backfill Job for"
-    secondary-button-label="Cancel"
-    primary-button-label="Create Backfill Job"
+    :title="t('pipeline.createBackfillJobTitle')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('pipeline.createBackfillJob')"
     form-id="create-backfill-form"
     @click:secondary="onCancel"
     data-test="create-backfill-job-dialog"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="rounded-default text-badge-blue-soft-text bg-badge-blue-soft-bg inline-block px-2 py-1 font-semibold"
       >
         {{ pipelineName }}
-        <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="pipelineName" />
+        <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="raw(pipelineName)" />
       </span>
     </template>
 
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="flex items-center gap-4">
             <div class="text-sm font-medium whitespace-nowrap">
-              Time Range <span class="text-status-error-text">*</span>
+              {{ t("pipeline.timeRange") }} <span class="text-status-error-text">*</span>
             </div>
             <OFormDateTimeRange
               name="timerange"
@@ -72,12 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex items-center gap-2">
               <OIcon name="settings" size="md" />
-              <span class="text-sm font-semibold">Advanced Options</span>
+              <span class="text-sm font-semibold">{{ t("pipeline.advancedOptions") }}</span>
             </div>
             <OButton
               variant="ghost-muted"
               size="icon-xs-sq"
-              :title="showAdvanced ? 'Collapse' : 'Expand'"
+              :title="showAdvanced ? t('common.collapse') : t('common.expand')"
               :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
               @click.stop="showAdvanced = !showAdvanced"
               class="opacity-50 transition-all duration-200 hover:opacity-100"
@@ -88,19 +88,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Chunk Period -->
               <div class="grid grid-cols-12 items-start gap-4">
                 <div class="col-span-5">
-                  <div class="mb-1 text-sm font-medium">Chunk Period (minutes)</div>
-                  <div class="text-text-secondary text-xs">Size of each processing chunk</div>
+                  <div class="mb-1 text-sm font-medium">
+                    {{ t("pipeline.chunkPeriodMinutesLabel") }}
+                  </div>
+                  <div class="text-text-secondary text-xs">
+                    {{ t("pipeline.chunkPeriodDescription") }}
+                  </div>
                 </div>
                 <div class="col-span-7">
                   <OFormInput
                     name="chunkPeriodMinutes"
                     type="number"
-                    :placeholder="String(scheduleFrequency || 60)"
+                    :placeholder="raw(String(scheduleFrequency || 60))"
                     data-test="chunk-period-input"
                   >
                     <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
-                      <OTooltip content="Default: {{ scheduleFrequency || 60 }} minutes" />
+                      <OTooltip
+                        :content="
+                          t('pipeline.defaultChunkPeriodTooltip', {
+                            minutes: scheduleFrequency || 60,
+                          })
+                        "
+                      />
                     </template>
                   </OFormInput>
                 </div>
@@ -109,19 +119,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Delay Between Chunks -->
               <div class="grid grid-cols-12 items-start gap-4">
                 <div class="col-span-5">
-                  <div class="mb-1 text-sm font-medium">Delay Between Chunks (seconds)</div>
-                  <div class="text-text-secondary text-xs">Wait time between processing chunks</div>
+                  <div class="mb-1 text-sm font-medium">
+                    {{ t("pipeline.delayBetweenChunksLabel") }}
+                  </div>
+                  <div class="text-text-secondary text-xs">
+                    {{ t("pipeline.delayBetweenChunksDescription") }}
+                  </div>
                 </div>
                 <div class="col-span-7">
                   <OFormInput
                     name="delayBetweenChunks"
                     type="number"
-                    placeholder="5"
+                    :placeholder="t('pipeline.defaultDelaySecondsPlaceholder')"
                     data-test="delay-between-chunks-input"
                   >
                     <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
-                      <OTooltip content="Default: 5 seconds" />
+                      <OTooltip :content="t('pipeline.defaultDelayTooltip')" />
                     </template>
                   </OFormInput>
                 </div>
@@ -131,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="pt-2">
                 <OFormCheckbox
                   name="deleteBeforeBackfill"
-                  label="Delete existing data before backfill"
+                  :label="t('pipeline.deleteDataBeforeBackfill')"
                   data-test="delete-before-backfill-checkbox"
                   class="font-medium"
                 />
@@ -143,24 +157,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="warning" size="md" class="text-banner-warning-text mt-0.5" />
                     <div>
                       <div class="text-banner-warning-text mb-2 font-semibold">
-                        Warning: Irreversible Data Deletion
+                        {{ t("pipeline.irreversibleDeletionWarning") }}
                       </div>
                       <div class="text-banner-warning-text mb-3 text-xs">
-                        This will permanently delete all data in the destination stream for the
-                        specified time range before running the backfill. This action cannot be
-                        undone.
+                        {{ t("pipeline.deleteBackfillWarningMessage") }}
                       </div>
                       <div class="text-banner-warning-text mb-1 text-sm font-semibold">
-                        Time Alignment Requirements (UTC):
+                        {{ t("pipeline.timeAlignmentRequirements") }}
                       </div>
                       <ul class="text-banner-warning-text ml-5 list-disc space-y-1 text-xs">
                         <li>
-                          <strong>Logs</strong> streams: Times must align to hour boundaries in UTC
-                          (e.g., 10:00:00, not 10:15:00)
+                          <strong>{{ t("common.logs") }}</strong>
+                          {{ t("pipeline.logsHourBoundaryNote") }}
                         </li>
                         <li>
-                          <strong>Metrics/Traces</strong> streams: Times must align to day
-                          boundaries in UTC (e.g., 00:00:00)
+                          <strong>{{ t("pipeline.metricsTracesLabel") }}</strong>
+                          {{ t("pipeline.dayBoundaryNote") }}
                         </li>
                       </ul>
                     </div>
@@ -179,10 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-banner-info-text">
             <div class="mb-1 flex items-center gap-2 font-medium">
               <OIcon name="schedule" size="sm" />
-              <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>
+              <span>{{ t("pipeline.estimatedProcessingTime") }} {{ estimatedInfo.time }}</span>
             </div>
             <div v-if="estimatedInfo.chunks" class="ml-6 text-xs">
-              Estimated Chunks: {{ estimatedInfo.chunks }}
+              {{ t("pipeline.estimatedChunks") }} {{ estimatedInfo.chunks }}
             </div>
           </div>
         </div>
@@ -202,29 +214,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showDeleteConfirmation"
     persistent
     size="sm"
-    title="Confirm Data Deletion"
-    secondary-button-label="Cancel"
-    primary-button-label="Yes, Delete and Backfill"
+    :title="t('pipeline.confirmDataDeletion')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('pipeline.yesDeleteAndBackfill')"
     primary-button-variant="destructive"
     :primary-button-loading="loading"
     @click:secondary="showDeleteConfirmation = false"
     @click:primary="confirmDelete"
   >
     <p class="mb-4">
-      You have selected to delete existing data before backfill. This will permanently delete all
-      data in the destination stream for the specified time range.
+      {{ t("pipeline.deleteBackfillConfirmMessage") }}
     </p>
     <p class="text-status-error-text font-semibold">
-      This action CANNOT be undone or cancelled once the job is created.
+      {{ t("pipeline.actionCannotBeUndone") }}
     </p>
-    <p class="mt-4">Are you sure you want to proceed?</p>
+    <p class="mt-4">{{ t("pipeline.areYouSureProceed") }}</p>
   </ODialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -256,7 +267,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const show = computed({
   get: () => props.modelValue,
@@ -423,7 +434,7 @@ const createBackfillJobRequest = async (value: BackfillForm) => {
 
     toast({
       variant: "success",
-      message: "Backfill job created successfully",
+      message: t("toastMessages.pipelines.backfillJobCreatedSuccessfully"),
     });
 
     emit("success", response.job_id);
@@ -436,7 +447,7 @@ const createBackfillJobRequest = async (value: BackfillForm) => {
 
     toast({
       variant: "error",
-      message: errorMessage.value,
+      message: raw(errorMessage.value),
       timeout: 5000,
     });
   }

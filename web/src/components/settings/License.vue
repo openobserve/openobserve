@@ -15,7 +15,7 @@
               <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
               <div class="mt-2 text-sm">
                 {{ t("about.installation_id") }}:
-                <strong>{{ licenseData.installation_id || "N/A" }}</strong>
+                <strong>{{ licenseData.installation_id || t("common.notAvailable") }}</strong>
               </div>
               <div
                 class="mt-3 text-sm"
@@ -466,7 +466,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
@@ -507,7 +507,7 @@ export default defineComponent({
     OCardSection,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
     const licenseData = ref<any>({});
@@ -585,10 +585,11 @@ export default defineComponent({
         console.error("Error updating license:", error);
         toast({
           variant: "error",
-          message:
+          message: raw(
             t("about.failed_to_update_license") +
-            " : " +
-            (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+              " : " +
+              (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+          ),
         });
       }
     };
@@ -617,10 +618,11 @@ export default defineComponent({
         console.error("Error refreshing license:", error);
         toast({
           variant: "error",
-          message:
+          message: raw(
             t("about.failed_to_refresh_license") +
-            " : " +
-            (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+              " : " +
+              (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+          ),
         });
       }
     };
@@ -641,7 +643,7 @@ export default defineComponent({
 
     const copyLicenseKey = async () => {
       if (!licenseData.value.key) return;
-      const success = await copyToClipboard(licenseData.value.key, {
+      const success = await copyToClipboard(licenseData.value.key, t, {
         successMessage: t("about.license_key_copied"),
         errorMessage: t("about.failed_to_copy_license"),
       });

@@ -53,9 +53,12 @@ import {
   setActiveOverlay,
   clearActiveOverlay,
 } from "@/lib/overlay/Dropdown/ODropdown.context";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 type NormalizedOption = {
-  label: string;
+  label: I18nText;
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
@@ -64,7 +67,7 @@ type NormalizedOption = {
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
   /** Secondary description text shown below the label in the dropdown item. */
-  subLabel?: string;
+  subLabel?: I18nText;
   /** When true, renders subLabel on the same line as the label (name – url style). */
   subLabelInline?: boolean;
   /** Array of CSS color strings used to render a gradient swatch below the label. */
@@ -97,7 +100,6 @@ const props = withDefaults(defineProps<SelectProps>(), {
   hideSelected: false,
   collapsibleGroups: false,
   creatable: false,
-  searchPlaceholder: "Search...",
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
   iconKey: undefined,
@@ -161,26 +163,26 @@ function toRekaString(v: SelectPrimitiveValue): string {
   return String(v);
 }
 
-function normalizeOption(raw: unknown): NormalizedOption | null {
-  if (isPrimitiveSelectValue(raw)) {
+function normalizeOption(input: unknown): NormalizedOption | null {
+  if (isPrimitiveSelectValue(input)) {
     return {
-      label: String(raw),
-      value: raw,
+      label: raw(String(input)),
+      value: input,
       disabled: false,
       header: false,
     };
   }
 
-  if (!raw || typeof raw !== "object") return null;
+  if (!input || typeof input !== "object") return null;
 
-  const option = raw as Record<string, unknown>;
+  const option = input as Record<string, unknown>;
   const rawLabel = option[props.labelKey];
 
   // Group header: items with header:true or isTab:true are non-selectable labels
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
     return {
-      label: rawLabel === undefined || rawLabel === null ? "" : String(rawLabel),
+      label: raw(rawLabel === undefined || rawLabel === null ? "" : String(rawLabel)),
       value: `__header__${String(rawLabel)}`,
       disabled: true,
       header: true,
@@ -199,13 +201,13 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   const rawSubLabelInline = option["subLabelInline"];
   const rawColorPalette = option["colorPalette"];
   return {
-    label: rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel),
+    label: raw(rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel)),
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
     icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
     iconComponent: rawIconComponent ?? undefined,
-    subLabel: typeof rawSubLabel === "string" ? rawSubLabel : undefined,
+    subLabel: typeof rawSubLabel === "string" ? raw(rawSubLabel) : undefined,
     subLabelInline: rawSubLabelInline === true,
     colorPalette: Array.isArray(rawColorPalette) ? (rawColorPalette as string[]) : undefined,
     badge: typeof option["badge"] === "string" ? (option["badge"] as string) : undefined,
@@ -221,7 +223,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
 const normalizedOptions = computed<NormalizedOption[]>(() => {
   if (!props.options?.length) return [];
   return props.options
-    .map((raw) => normalizeOption(raw))
+    .map((option) => normalizeOption(option))
     .filter((opt): opt is NormalizedOption => opt !== null);
 });
 
@@ -246,6 +248,12 @@ const filterDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 const pinnedSelected = ref<Set<string>>(new Set());
 
 const inputEnabled = computed(() => props.searchable);
+
+// Not a `withDefaults` default: that is evaluated once at module scope, which
+// would freeze the placeholder in whatever locale was active at first load.
+const resolvedSearchPlaceholder = computed(
+  () => props.searchPlaceholder ?? t("common.searchEllipsis"),
+);
 
 const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;
@@ -1158,7 +1166,7 @@ const fieldWidthClass = computed(() => {
                       class="rounded-default bg-select-item-hover-bg text-select-text inline-flex shrink-0 items-center px-2 py-0.5 text-xs"
                       data-test="o-select-overflow-chip"
                     >
-                      +{{ overflowSelectedCount }} more
+                      +{{ overflowSelectedCount }} {{ t("components.select.more") }}
                     </span>
                   </div>
                 </template>
@@ -1203,7 +1211,7 @@ const fieldWidthClass = computed(() => {
               v-if="clearable && hasSelection && !isInlineAppearance"
               type="button"
               tabindex="-1"
-              aria-label="Clear selection"
+              :aria-label="t('components.select.clearSelection')"
               :class="[
                 'flex size-3.5 items-center justify-center',
                 'text-input-clear-btn hover:text-input-clear-btn-hover',
@@ -1296,7 +1304,7 @@ const fieldWidthClass = computed(() => {
                     'border-input-border border-b',
                     heightClasses[size ?? 'md'],
                   ]"
-                  :placeholder="searchPlaceholder"
+                  :placeholder="resolvedSearchPlaceholder"
                   @keydown="handleDropdownKeydown"
                 />
 
@@ -1311,7 +1319,7 @@ const fieldWidthClass = computed(() => {
                   v-if="selectAll && multiple && selectableOptions.length > 0"
                   role="button"
                   tabindex="0"
-                  aria-label="Toggle all options"
+                  :aria-label="t('components.select.toggleAllOptions')"
                   :aria-checked="allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'"
                   :class="[
                     'relative flex w-full shrink-0 items-center gap-2',
@@ -1352,7 +1360,9 @@ const fieldWidthClass = computed(() => {
                       <polyline points="2,6 5,9 10,3" />
                     </svg>
                   </span>
-                  <span class="truncate font-medium">Select all</span>
+                  <span class="truncate font-medium">{{
+                    t("components.select.selectAllLabel")
+                  }}</span>
                 </div>
 
                 <!-- Consumer-supplied rows rendered above the option list -->
@@ -1371,7 +1381,7 @@ const fieldWidthClass = computed(() => {
                     v-if="filteredOptions.length === 0"
                     class="text-select-placeholder px-3 py-2 text-sm"
                   >
-                    <slot name="empty">No options found</slot>
+                    <slot name="empty">{{ t("components.select.noOptionsFound") }}</slot>
                   </div>
 
                   <!-- Virtualised list — spacer div with absolutely positioned rows -->
@@ -1636,7 +1646,7 @@ const fieldWidthClass = computed(() => {
                           <polyline points="1.5,5 4,8 8.5,2" />
                         </svg>
                       </span>
-                      <span>Multi select</span>
+                      <span>{{ t("components.select.multiSelect") }}</span>
                     </span>
 
                     <span class="bg-input-border h-3.5 w-px shrink-0" aria-hidden="true" />
@@ -1657,7 +1667,7 @@ const fieldWidthClass = computed(() => {
                       >
                         <path d="M4 2h6M4 5h6M4 8h3" />
                       </svg>
-                      <span>Single select</span>
+                      <span>{{ t("components.select.singleSelect") }}</span>
                     </span>
                   </div>
                 </template>
@@ -1755,7 +1765,7 @@ const fieldWidthClass = computed(() => {
             v-if="clearable && hasSelection && !isInlineAppearance"
             type="button"
             tabindex="-1"
-            aria-label="Clear selection"
+            :aria-label="t('components.select.clearSelection')"
             :class="[
               'flex size-3.5 items-center justify-center',
               'text-input-clear-btn hover:text-input-clear-btn-hover',

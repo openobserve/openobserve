@@ -50,13 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 defineProps<{
   icon: IconName | (string & {});
-  label: string;
-  sublabel?: string;
+  label: I18nText;
+  sublabel?: I18nText;
   hideChevron?: boolean;
 }>();
 </script>

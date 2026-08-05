@@ -24,6 +24,7 @@ import { ref } from "vue";
 import MacOSConfig from "./MacOSConfig.vue";
 import macosCard from "@/components/ingestion/setupCard/content/macos";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import enUS from "@/locales/languages/en-US.json";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -102,7 +103,8 @@ describe("macosCard builder", () => {
     expect(uninstall?.code.lang).toBe("bash");
     // Takes no arguments, so there is no token to mask.
     expect(uninstall?.code.masked).toBeUndefined();
-    expect(uninstall?.description).toContain("launchd");
+    expect(uninstall?.descriptionKey).toBe("ingestion.setupCard.uninstallAgentDescMac");
+    expect(enUS.ingestion.setupCard.uninstallAgentDescMac).toContain("launchd");
   });
 
   it("covers the unified log bridge and drops the EC2-only row", () => {

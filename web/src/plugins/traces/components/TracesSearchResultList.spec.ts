@@ -476,7 +476,7 @@ describe("TracesSearchResultList", () => {
 
   // ─── copyToClipboard — span_kind translation ──────────────────────────────
   // The component's @copy handler is an inline expression:
-  //   @copy="copyToClipboard(column.id, row[column.id])"
+  //   @copy="copyToClipboard(column.id, t, row[column.id])"
   // It uses column.id and row[column.id] from the slot scope — it does NOT
   // forward the args emitted by CellActions.  Each test therefore:
   //   1. Sets cellActionsColumnRef.id to the target field before mounting
@@ -493,7 +493,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("Server");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("Server", expect.any(Function));
     });
 
     it("should copy the raw value when field is span_kind and value is not in the map", async () => {
@@ -506,7 +506,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("99");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("99", expect.any(Function));
     });
 
     it("should copy the raw value without translation when field is not span_kind", async () => {
@@ -519,7 +519,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("2");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("2", expect.any(Function));
     });
   });
 

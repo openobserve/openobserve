@@ -16,7 +16,7 @@ describe("badgeGroups", () => {
     expect(r.variant).toBe("blue-soft");
     expect(r.icon).toBe("bolt");
     expect(r.dot).toBe(false);
-    expect(r.label).toBe("Real-time");
+    expect(r.labelKey).toBe("components.badge.alertType.realtime");
   });
 
   it("resolves alertStatus to dot mode (no icon)", () => {
@@ -79,10 +79,10 @@ describe("badgeGroups", () => {
   it("resolves normalizeState boolean → primary/Normalized, default/Not Normalized", () => {
     const t = resolveBadge("normalizeState", true);
     expect(t.variant).toBe("primary");
-    expect(t.label).toBe("Normalized");
+    expect(t.labelKey).toBe("components.badge.normalizeState.true");
     const f = resolveBadge("normalizeState", false);
     expect(f.variant).toBe("default");
-    expect(f.label).toBe("Not Normalized");
+    expect(f.labelKey).toBe("components.badge.normalizeState.false");
   });
 
   it("resolves fieldDiffStatus (new→success, existing→default, sm)", () => {
@@ -184,10 +184,15 @@ describe("badgeGroups", () => {
   // Legacy `condition_not_satisfied` and current `normal` are the same state,
   // so they must render with the same word — otherwise history rows read
   // differently depending on whether they predate the RunOutcome rename.
+  // `normal` carries no explicit label: it falls back to the humanised value,
+  // which is the same word the `.normal` key holds.
   it("alert 'condition_not_satisfied' resolves to the Normal label", () => {
-    expect(resolveBadge("alertState", "condition_not_satisfied").label).toBe("Normal");
-    expect(resolveBadge("alertState", "Condition Not Satisfied").label).toBe("Normal");
-    expect(resolveBadge("alertState", "normal").label).toBe("Normal");
+    expect(resolveBadge("alertState", "condition_not_satisfied").labelKey).toBe(
+      "components.badge.alertState.normal",
+    );
+    expect(resolveBadge("alertState", "Condition Not Satisfied").labelKey).toBe(
+      "components.badge.alertState.normal",
+    );
   });
 
   // The backend's `completed` meant "the alert fired". Rendering it green
@@ -195,13 +200,13 @@ describe("badgeGroups", () => {
   it("alert 'completed' is a FIRING state, not a success state", () => {
     const r = resolveBadge("alertState", "completed");
     expect(r.variant).toBe("error-soft");
-    expect(r.label).toBe("Firing");
+    expect(r.labelKey).toBe("components.badge.alertState.firing");
   });
 
   it("alert 'notify_failed' renders as a firing state", () => {
     const r = resolveBadge("alertState", "notify_failed");
     expect(r.variant).toBe("error-soft");
-    expect(r.label).toBe("Notify Failed");
+    expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
   });
 
   it("alert 'firing' and 'normal' resolve to opposite tones", () => {
