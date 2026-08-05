@@ -866,7 +866,7 @@ export const convertPromQLData = async (
               {
                 name: seriesName,
                 // taking first value for gauge
-                value: values[0][1],
+                value: values?.[0]?.[1] ?? 0,
                 detail: {
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(
