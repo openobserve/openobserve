@@ -391,6 +391,58 @@ export async function setupPromQLMapsPanelWithConfig(page, pm, dashboardName, pa
 }
 
 /**
+ * Snapshot of what a panel actually put on screen, for assertion failure messages.
+ *
+ * A metric panel that "renders nothing" looks identical from the outside in three
+ * very different situations, and the distinction is what tells you where to look:
+ *   - noData=true            → the results never reached the converter (load path)
+ *   - canvas>0               → ECharts is on the wrong renderer; metric needs svg,
+ *                              and a value painted on canvas leaves no DOM text
+ *   - svg>0 but paths/text 0 → options were built but carry nothing to draw
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<string>} one-line summary, safe to embed in an expect() message
+ */
+export async function describePanelRender(page) {
+  const snapshot = await page
+    .evaluate(() => {
+      const el = document.querySelector('[data-test="chart-renderer"]');
+      return {
+        chartRenderer: !!el,
+        noData: !!document.querySelector('[data-test="no-data"]'),
+        panelError:
+          document.querySelector('[data-test="panel-schema-renderer-error-message"]')?.textContent?.trim() ?? null,
+        canvas: el ? el.querySelectorAll("canvas").length : 0,
+        svg: el ? el.querySelectorAll("svg").length : 0,
+        svgPaths: el ? el.querySelectorAll("svg path").length : 0,
+        svgTexts: el ? el.querySelectorAll("svg text").length : 0,
+        text: el ? (el.textContent ?? "").trim().slice(0, 120) : null,
+      };
+    })
+    .catch((e) => ({ evaluateFailed: e.message }));
+  return `panel render state: ${JSON.stringify(snapshot)}`;
+}
+
+/**
+ * Waits until the panel has finished loading and settled on a final render.
+ * The metric assertions below are only meaningful once streaming has completed —
+ * mid-stream the panel legitimately shows the previous chart or the empty state.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} pm - PageManager instance
+ */
+export async function waitForPanelRenderSettled(page, pm) {
+  // The Apply button is disabled (or swapped for Cancel) for the whole streaming
+  // run, so it covers every chunk — unlike waiting on the first query response,
+  // which returns while later chunks are still arriving.
+  await pm.dashboardPanelActions
+    .waitForChartToRender()
+    .catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+  // One frame for the final setOption to reach the DOM.
+  await page.waitForTimeout(300);
+}
+
+/**
  * Creates a destination dashboard (bar panel) and adds a second tab named `secondTabName`.
  * Leaves the browser on the dashboard view page — caller should call backToDashboardList() next.
  *

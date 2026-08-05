@@ -15,6 +15,8 @@ import {
   setupPromQLGeomapPanelWithConfig,
   setupPromQLMapsPanelWithConfig,
   reopenPanelConfig,
+  describePanelRender,
+  waitForPanelRenderSettled,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
@@ -795,6 +797,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     expect(promqlResponse, `captured /api/ calls: ${JSON.stringify(allCalls)}`).not.toBeNull();
     testLogger.info("PromQL sparkline Apply fired exactly 1 query_range (no histogram)");
 
+    // The captured response resolves on the FIRST query_range; the panel keeps
+    // streaming chunks after it, so settle before asserting on the rendered DOM.
+    await waitForPanelRenderSettled(page, pm);
+
     // Metric renders as SVG; the sparkline trend draws at least one path.
     const chart = page.locator('[data-test="chart-renderer"]');
     const errorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
@@ -805,13 +811,19 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const errText = await errorMessage.textContent().catch(() => null);
     expect(errText, `chart-renderer did not appear; panel error. ${rawBodyDiag}`).toBeNull();
     await expect(chart).toBeVisible();
+    // The panel must have results before the trend can exist — assert that first
+    // so a load-path failure doesn't masquerade as a rendering failure.
+    await expect(page.locator('[data-test="no-data"]'), rawBodyDiag).toBeHidden();
     const svgPathAppeared = await chart
       .locator("svg path")
       .first()
       .waitFor({ state: "attached", timeout: 10000 })
       .then(() => true)
       .catch(() => false);
-    expect(svgPathAppeared, `no sparkline <path> rendered. ${rawBodyDiag}`).toBe(true);
+    expect(
+      svgPathAppeared,
+      `no sparkline <path> rendered. ${await describePanelRender(page)}. ${rawBodyDiag}`,
+    ).toBe(true);
     expect(await chart.locator("svg path").count()).toBeGreaterThan(0);
     testLogger.info("PromQL sparkline trend rendered on the metric SVG");
 
@@ -861,6 +873,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     const rawBodyDiag = `promql response body: ${promqlBody?.slice(0, 1000)}`;
 
+    // The captured response resolves on the FIRST query_range; the panel keeps
+    // streaming chunks after it, so settle before asserting on the rendered DOM.
+    await waitForPanelRenderSettled(page, pm);
+
     // The mapped text replaces the metric value on the SVG renderer
     const chart = page.locator('[data-test="chart-renderer"]');
     const errorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
@@ -871,7 +887,20 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     const errText = await errorMessage.textContent().catch(() => null);
     expect(errText, `chart-renderer did not appear; panel error. Failed calls: ${JSON.stringify(failedCalls)}. ${rawBodyDiag}`).toBeNull();
     await expect(chart).toBeVisible();
-    await expect(chart, rawBodyDiag).toContainText("PROMQL_MAPPED");
+    // A value has to exist before a mapping can replace it — assert that first so
+    // a load-path failure doesn't masquerade as a value-mapping failure.
+    await expect(page.locator('[data-test="no-data"]'), rawBodyDiag).toBeHidden();
+    const mappedTextAppeared = await chart
+      .getByText("PROMQL_MAPPED")
+      .first()
+      .waitFor({ state: "attached", timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    expect(
+      mappedTextAppeared,
+      `mapped text not rendered. ${await describePanelRender(page)}. ${rawBodyDiag}`,
+    ).toBe(true);
+    await expect(chart).toContainText("PROMQL_MAPPED");
     testLogger.info("Mapped text reflected in the PromQL metric chart");
 
     await pm.dashboardPanelActions.savePanel();
