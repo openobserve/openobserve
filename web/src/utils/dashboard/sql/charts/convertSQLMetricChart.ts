@@ -97,9 +97,11 @@ export const buildMetricSparkline = (
   const layout = spark.layout === "background" ? "background" : "bottom";
   const faint = layout === "background";
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const pad = (max - min) * 0.1 || Math.abs(max) * 0.1 || 1;
+  const rawMin = Math.min(...data);
+  const rawMax = Math.max(...data);
+  const pad = (rawMax - rawMin) * 0.1 || Math.abs(rawMax) * 0.1 || 1;
+  const min = faint ? rawMin : rawMin - pad;
+  const max = faint ? rawMax : rawMax + pad;
 
   const series: any = {
     type: type === "bar" ? "bar" : "line",
@@ -125,16 +127,16 @@ export const buildMetricSparkline = (
 
   return {
     grid: {
-      left: "3%",
-      right: "3%",
-      top: faint ? "0%" : `${METRIC_SPARKLINE.bottomBandTopPct}%`,
-      bottom: "0%",
+      left: "2%",
+      right: "2%",
+      top: faint ? "2%" : `${METRIC_SPARKLINE.bottomBandTopPct}%`,
+      bottom: faint ? "2%" : "0%",
       containLabel: false,
     },
     xAxis: [
       { type: "category", show: false, boundaryGap: type === "bar", data: data.map((_, i) => i) },
     ],
-    yAxis: [{ type: "value", show: false, scale: true, min: min - pad, max: max + pad }],
+    yAxis: [{ type: "value", show: false, scale: true, min, max }],
     series,
     polarCenterY: faint ? "50%" : "30%",
     valueBandFactor: faint ? 1 : 0.6,

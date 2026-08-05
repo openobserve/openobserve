@@ -365,16 +365,17 @@ export const convertMultiSQLData = async (
       const min = Math.min(...data);
       const max = Math.max(...data);
       const range = max - min || 1;
-      const hpad = width * 0.06;
+      const hpad = width * 0.02;
       const bandTop = sparkBackground
         ? top
         : top + height * (METRIC_SPARKLINE.bottomBandTopPct / 100);
       // Band height is intentionally cell-specific (not shared with the series path).
       const bandH = sparkBackground ? height : height * 0.33;
-      const bottomGap = sparkBackground ? bandH * 0.08 : 0;
-      const floorY = bandTop + bandH - bottomGap;
+      const vGap = sparkBackground ? bandH * 0.02 : 0;
+      const ceilY = bandTop + vGap;
+      const floorY = bandTop + bandH - vGap;
       const xAt = (i: number) => left + hpad + (i / (n - 1)) * (width - 2 * hpad);
-      const yAt = (v: number) => floorY - ((v - min) / range) * (bandH - bottomGap);
+      const yAt = (v: number) => floorY - ((v - min) / range) * (floorY - ceilY);
       const color = cfg?.color || chartColor("--color-chart-metric-text");
       const opacity = sparkBackground ? METRIC_SPARKLINE.faintOpacity : 1;
       const out: any[] = [];
