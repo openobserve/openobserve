@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import EvidenceEvents from "./EvidenceEvents.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -76,7 +76,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: "view-all", stepId: string): void; (e: "retry"): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const shown = computed(() => props.events.slice(0, INLINE_EVIDENCE_LIMIT));
 const hasMore = computed(() => props.events.length > INLINE_EVIDENCE_LIMIT);

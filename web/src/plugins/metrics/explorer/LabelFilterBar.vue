@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- The chip truncates its value; the tooltip is where the whole matcher
              stays readable. -->
-        <OTooltip :content="`${filter.label} ${filter.operator || '='} ${filter.value}`" />
+        <OTooltip :content="raw(`${filter.label} ${filter.operator || '='} ${filter.value}`)" />
         <span class="truncate font-mono text-xs"
           >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</span
         >
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="labelOptions"
             :loading="labelNamesLoading"
             :error="!!labelError"
-            :error-message="labelError"
+            :error-message="raw(labelError)"
             @update:model-value="onLabelPicked"
             @close="onDropdownClosed"
           />
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -318,10 +318,10 @@ const LABEL_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 /** The four PromQL label matchers. `buildSelector` validates against this set. */
 const operatorOptions = [
-  { label: "=", value: "=" },
-  { label: "!=", value: "!=" },
-  { label: "=~", value: "=~" },
-  { label: "!~", value: "!~" },
+  { label: raw("="), value: "=" },
+  { label: raw("!="), value: "!=" },
+  { label: raw("=~"), value: "=~" },
+  { label: raw("!~"), value: "!~" },
 ];
 
 const props = defineProps<{
@@ -341,7 +341,7 @@ const emit = defineEmits<{
   (e: "focus-picker"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /* ------------------------------------------------------ chip overflow */
 
@@ -463,11 +463,13 @@ const { placeholder: filterHint } = useFilterHint(
   hintEnabled,
 );
 
-const valueOptions = ref<{ label: string; value: string }[]>([]);
+const valueOptions = ref<{ label: I18nText; value: string }[]>([]);
 const valuesLoading = ref(false);
 const suggestionsUnavailable = ref(false);
 
-const labelOptions = computed(() => props.labelNames.map((name) => ({ label: name, value: name })));
+const labelOptions = computed(() =>
+  props.labelNames.map((name) => ({ label: raw(name), value: name })),
+);
 
 /**
  * Opens a freshly-rendered OSelect.
@@ -544,7 +546,7 @@ const onLabelPicked = async (value: unknown) => {
     // label, or cancelled. A slow answer for label A must not overwrite the
     // picker that is now showing label B.
     if (draftLabel.value !== label) return;
-    valueOptions.value = (values ?? []).map((v) => ({ label: v, value: v }));
+    valueOptions.value = (values ?? []).map((v) => ({ label: raw(v), value: v }));
     suggestionsUnavailable.value = valueOptions.value.length === 0;
   } catch {
     if (draftLabel.value !== label) return;
@@ -561,7 +563,7 @@ const commit = (value: string) => {
   if (!LABEL_NAME_RE.test(label) || !trimmed) return;
 
   emit("add", {
-    label,
+    label: raw(label),
     value: trimmed,
     operator: draftOperator.value || "=",
   });

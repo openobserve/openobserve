@@ -47,7 +47,7 @@ vi.mock("@/services/service_streams", () => ({
   buildChipDimensionsFromFilters: vi.fn().mockReturnValue({}),
 }));
 
-// resolveStreamSchema calls useStreams().getStream() to fetch and cache the
+// resolveStreamSchema calls useStreams(t).getStream() to fetch and cache the
 // stream schema. Mock it so those calls complete instantly instead of making
 // real HTTP requests that hang in tests.
 const { getStreamMock } = vi.hoisted(() => ({
@@ -724,8 +724,8 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should have the expected id and label for each top-level group", () => {
       const groups = wrapper.vm.metricGroupResources;
-      expect(groups[0]).toMatchObject({ id: "pods", label: "Pods" });
-      expect(groups[1]).toMatchObject({ id: "nodes", label: "Nodes" });
+      expect(groups[0]).toMatchObject({ id: "pods", labelKey: "metrics.groups.pods" });
+      expect(groups[1]).toMatchObject({ id: "nodes", labelKey: "metrics.groups.nodes" });
     });
 
     it("should nest compute/memory/network/storage/others under each top-level group", () => {

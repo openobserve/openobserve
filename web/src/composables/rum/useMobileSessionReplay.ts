@@ -30,6 +30,8 @@
  *   shape | text | image | placeholder | webview.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 export interface Wireframe {
   id: number;
   x: number;
@@ -38,7 +40,7 @@ export interface Wireframe {
   height: number;
   type: string;
   text?: string;
-  label?: string;
+  label?: I18nText;
   base64?: string;
   resourceId?: string;
   shapeStyle?: {

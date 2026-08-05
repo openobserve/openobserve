@@ -3,6 +3,7 @@
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
@@ -13,7 +14,7 @@ import { withChartFont } from "@/utils/fonts";
 const props = defineProps<{
   buckets: DistributionBucket[];
   threshold: { value: number; direction: "gte" | "lte" } | null;
-  legendHealthy: string;
+  legendHealthy: I18nText;
   legendUnhealthy: string;
 }>();
 

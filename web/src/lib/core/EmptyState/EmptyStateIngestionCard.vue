@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -53,8 +54,8 @@ type IconVariant = "default" | "blue" | "teal" | "purple" | "amber" | "orange";
 const props = withDefaults(
   defineProps<{
     icon: IconName;
-    label: string;
-    sublabel?: string;
+    label: I18nText;
+    sublabel?: I18nText;
     iconVariant?: IconVariant;
   }>(),
   { iconVariant: "default" },

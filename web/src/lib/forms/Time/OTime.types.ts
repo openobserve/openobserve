@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type TimeSize = "sm" | "md";
 
 export interface TimeProps {
@@ -14,13 +16,13 @@ export interface TimeProps {
   /** Step in seconds — default 60 (one minute) */
   step?: number;
   /** Label rendered above the field */
-  label?: string;
+  label?: I18nText;
   /** Placeholder shown when empty */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Helper text below the field */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in error state without a message */
   error?: boolean;
   /** Whether the user can clear the value */

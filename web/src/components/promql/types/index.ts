@@ -29,8 +29,10 @@
  */
 
 /** A single `label="value"` matcher inside the selector braces. */
+import type { I18nKey, I18nText } from "@/types/i18n";
+
 export interface PromqlLabelMatcher {
-  label: string;
+  label: I18nText;
   /** The four matchers PromQL defines: equal, not-equal, regex, negated regex. */
   op: "=" | "!=" | "=~" | "!~";
   value: string;
@@ -56,8 +58,16 @@ export interface PromqlStepArgSpec {
    */
   options?: Array<string | number> | boolean;
   optional?: boolean;
-  placeholder?: string;
-  description?: string;
+  /** Example-value placeholder only (`"5m"`, `"0.95"`) — a code token, so untranslated. */
+  placeholder?: I18nText;
+  /**
+   * Prose placeholder ("Select labels"), translated by `OperationsList.vue` at
+   * render time — the catalog is built at import, so it cannot call `t()`.
+   * Wins over {@link placeholder} when both are set.
+   */
+  placeholderKey?: I18nKey;
+  /** i18n KEY for the argument's help text. Stored as data — see `placeholderKey`. */
+  descriptionKey?: I18nKey;
 }
 
 /** The catalog entry for a step: what it is called, and what it takes. */

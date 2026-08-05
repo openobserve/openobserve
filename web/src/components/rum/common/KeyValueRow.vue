@@ -28,8 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 interface Props {
-  label: string;
+  label: I18nText;
   value?: string | number;
   showBorder?: boolean;
   valueClass?: string;

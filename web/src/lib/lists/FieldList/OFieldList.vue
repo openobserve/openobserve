@@ -16,7 +16,7 @@
       <OInput
         :model-value="searchModel"
         data-test="o-field-list-search"
-        :placeholder="searchPlaceholder"
+        :placeholder="searchPlaceholder ?? t('common.searchFields')"
         clearable
         @update:model-value="onSearchChange"
       >
@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { computed, ref, watch } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -138,7 +139,7 @@ const props = withDefaults(
   defineProps<{
     fields: FieldItem[];
     search?: string;
-    searchPlaceholder?: string;
+    searchPlaceholder?: I18nText;
     /** Extra classes for the search block — see the template note on gutters. */
     searchClass?: string;
     loading?: boolean;
@@ -155,7 +156,8 @@ const props = withDefaults(
   }>(),
   {
     search: "",
-    searchPlaceholder: "Search fields",
+    // No default here — a withDefaults default is evaluated at module scope, which
+    // would freeze the locale. The template falls back to t() at render time.
     searchClass: "",
     loading: false,
     currentPage: 1,
@@ -181,6 +183,8 @@ const emit = defineEmits<{
   "drag-start": [row: FieldItem, event: DragEvent];
   "drag-end": [row: FieldItem, event: DragEvent];
 }>();
+
+const { t } = useI18nTyped();
 
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const searchModel = ref(props.search);

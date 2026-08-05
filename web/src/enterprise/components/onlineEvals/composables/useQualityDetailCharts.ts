@@ -2,6 +2,8 @@
 // One query per chart family. Each query is scoped to a single
 // score_config_id and the active time window.
 
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+
 import { ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
@@ -26,7 +28,7 @@ export interface TrendPoint {
 export interface DistributionBucket {
   rangeStart: number;
   rangeEnd: number;
-  label: string;
+  label: I18nText;
   count: number;
   healthy: boolean;
 }
@@ -41,7 +43,7 @@ export interface BooleanTrendSeries {
   /** Stable id derived from the group-by key (e.g. scorer_id, source_type, or "default"). */
   id: string;
   /** Display label shown in the legend / tooltip. */
-  label: string;
+  label: I18nText;
   points: BooleanTrendPoint[];
 }
 
@@ -108,6 +110,7 @@ export function useQualityDetailCharts(
   dateWindow: Ref<DateWindow>,
   agentFilter: Ref<AgentFilterSelection | null | undefined>,
   qualityScope: Ref<QualityScope>,
+  t: TranslateFn,
 ) {
   const { executeQuery } = useLLMStreamQuery();
   const isLoading = ref(false);
@@ -168,7 +171,7 @@ export function useQualityDetailCharts(
       return {
         rangeStart: start,
         rangeEnd: end,
-        label: `${start.toFixed(decimals)}–${end.toFixed(decimals)}`,
+        label: raw(`${start.toFixed(decimals)}–${end.toFixed(decimals)}`),
         count: c,
         healthy,
       };
@@ -276,7 +279,12 @@ export function useQualityDetailCharts(
         const series: BooleanTrendSeries[] = Array.from(groupedByKey.entries()).map(
           ([key, points]) => ({
             id: key,
-            label: key === "__default__" ? (expected == null ? "True rate" : "Healthy rate") : key,
+            label:
+              key === "__default__"
+                ? expected == null
+                  ? t("onlineEvals.quality.detail.legendTrueRate")
+                  : t("onlineEvals.quality.detail.legendHealthyRate")
+                : raw(key),
             points: points.sort((a, b) => a.t - b.t),
           }),
         );

@@ -479,8 +479,8 @@ describe("JourneySteps", () => {
       const table = wrapper.findComponent({ name: "OTable" });
       expect(table.props("showHeader")).toBe(true);
       // The window is what makes a bar's position mean anything. Read from the
-      // column definition, not the rendered text: this suite's i18n catalogue is
-      // a stub, so `t()` echoes the key and never interpolates.
+      // column definition, not the rendered text; setupTests installs the real
+      // en-US catalogue, so `t()` interpolates the window instead of echoing the key.
       const cols = table.props("columns") as Array<{ id: string; header: string }>;
       expect(cols.map((c) => c.id)).toEqual([
         "step",
@@ -489,9 +489,7 @@ describe("JourneySteps", () => {
         "progress",
         "duration",
       ]);
-      expect(cols.find((c) => c.id === "progress")?.header).toContain(
-        "synthetics.journey.timelineHeaderWindow",
-      );
+      expect(cols.find((c) => c.id === "progress")?.header).toContain("35.8s");
 
       wrapper = mount(JourneySteps, {
         props: { data, mode: "editor" },

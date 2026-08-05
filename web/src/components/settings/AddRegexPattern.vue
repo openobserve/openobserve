@@ -96,13 +96,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-xs leading-4.5 font-normal">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
-                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs"
-                  >(?=openobserve)\w+</code
-                >
+                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs">{{
+                  raw("(?=openobserve)\\w+")
+                }}</code>
                 <OIcon name="arrow-right-alt" size="xs" class="mx-1 inline-block align-middle" />
-                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs"
-                  >openobserve\w*</code
-                >
+                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs">{{
+                  raw("openobserve\\w*")
+                }}</code>
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { computed } from "vue";
 import useTheme from "@/composables/useTheme";
@@ -292,7 +292,7 @@ export default defineComponent({
     OFormTextarea,
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const store = useStore();
     const { isDark } = useTheme();
@@ -441,7 +441,7 @@ export default defineComponent({
       const payload = {
         name: value.name,
         pattern: value.pattern,
-        description: value.description ?? "",
+        description: raw(value.description ?? ""),
       };
       try {
         const response = props.isEdit
@@ -466,7 +466,7 @@ export default defineComponent({
         if (e.response.status != 403) {
           toast({
             message:
-              e.response?.data?.message ||
+              raw(e.response?.data?.message) ||
               (props.isEdit
                 ? t("settings.addRegexPattern.updateFailed")
                 : t("settings.addRegexPattern.createFailed")),
@@ -495,7 +495,7 @@ export default defineComponent({
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         toast({
-          message: e.response?.data?.message || t("settings.addRegexPattern.testFailed"),
+          message: raw(e.response?.data?.message || t("settings.addRegexPattern.testFailed")),
           variant: "error",
         });
       } finally {
@@ -513,6 +513,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       config,

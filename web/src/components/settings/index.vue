@@ -30,9 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          header above a centered reading column. -->
     <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
-        :title="activeSectionItem?.label || ''"
+        :title="raw(activeSectionItem?.label || '')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
-        :subtitle="activeSectionItem?.description || ''"
+        :subtitle="raw(activeSectionItem?.description || '')"
         :icon="activeSectionItem?.icon as any"
         class="border-border-default shrink-0 border-b"
       />
@@ -57,7 +57,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
 import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
@@ -74,7 +74,7 @@ export default defineComponent({
     SectionRail,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const router: any = useRouter();
@@ -378,7 +378,7 @@ export default defineComponent({
       };
       // Internal group keys stay English (used for bucketing + rank); only the
       // displayed label is translated so sorting/ranking is unaffected.
-      const groupLabels: Record<string, string> = {
+      const groupLabels: Record<string, I18nText> = {
         General: t("settings.groupGeneral"),
         "Access & Security": t("settings.groupAccessSecurity"),
         Destinations: t("settings.groupDestinations"),
@@ -389,10 +389,11 @@ export default defineComponent({
       };
       return [...buckets.keys()]
         .sort((a, b) => rank(a) - rank(b))
-        .map((label) => ({ label: groupLabels[label] ?? label, items: buckets.get(label)! }));
+        .map((label) => ({ label: groupLabels[label] ?? raw(label), items: buckets.get(label)! }));
     });
 
     return {
+      raw,
       t,
       store,
       router,

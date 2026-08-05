@@ -292,7 +292,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
 import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
@@ -335,7 +335,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -638,7 +638,7 @@ export default defineComponent({
       const tiles: StatItem[] = visibleRoles.value.map((role) => ({
         key: role.key,
         // The label is the role name itself — data, not a translatable string.
-        label: role.label,
+        label: raw(role.label),
         value: v(role.count),
         icon: roleIcon(role.key),
         tone: roleTone(role.key),
@@ -684,7 +684,7 @@ export default defineComponent({
     });
 
     const userEmail: any = ref("");
-    const options = ref<{ label: string; value: string }[]>([]);
+    const options = ref<{ label: I18nText; value: string }[]>([]);
     const customRoles = ref<string[]>([]);
     const selectedRole = ref();
     const currentUserRole = ref("");

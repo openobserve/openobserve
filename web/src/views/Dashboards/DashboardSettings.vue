@@ -88,7 +88,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import GeneralSettings from "../../components/dashboards/settings/GeneralSettings.vue";
 import VariableSettings from "../../components/dashboards/settings/VariableSettings.vue";
 import TabsSettings from "../../components/dashboards/settings/TabsSettings.vue";
@@ -116,7 +116,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const activeTab: any = ref("generalSettings");
     const templates = ref([]);

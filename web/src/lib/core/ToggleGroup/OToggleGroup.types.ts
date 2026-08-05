@@ -2,6 +2,8 @@
  * OToggleGroup.types.ts — public types for OToggleGroup.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { AcceptableValue } from "reka-ui";
 import type { ComputedRef, InjectionKey } from "vue";
 
@@ -35,7 +37,7 @@ export interface ToggleGroupProps {
   /** Visual variant — use 'primary' when the toggle sits on a primary-colored bar */
   variant?: ToggleGroupVariant;
   /** Label text rendered next to the toggle bar. For richer content use the `label` slot. */
-  label?: string;
+  label?: I18nText;
   /** Position of the label relative to the toggle bar */
   labelPosition?: "left" | "right" | "top";
   /**

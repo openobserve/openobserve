@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export interface FieldItem {
   name: string;
   type?: string;
@@ -11,7 +13,7 @@ export interface FieldItem {
 export interface OFieldListProps {
   fields: FieldItem[];
   search?: string;
-  searchPlaceholder?: string;
+  searchPlaceholder?: I18nText;
   loading?: boolean;
   currentPage?: number;
   pageSize?: number;

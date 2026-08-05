@@ -582,18 +582,26 @@ describe("WorkflowStepResultDrawer", () => {
       const wrapper = mountDrawer();
       const btn = wrapper.find(`[title="${t("workflow.test.stepResult.copyInput")}"]`);
       await btn.trigger("click");
-      expect(mockCopy).toHaveBeenCalledWith(JSON.stringify([rec(2)], null, 2), {
-        successMessage: t("workflow.test.stepResult.copiedInput"),
-      });
+      expect(mockCopy).toHaveBeenCalledWith(
+        JSON.stringify([rec(2)], null, 2),
+        expect.any(Function),
+        {
+          successMessage: t("workflow.test.stepResult.copiedInput"),
+        },
+      );
     });
 
     it("copies the output records", async () => {
       const wrapper = mountDrawer();
       const btn = wrapper.find(`[title="${t("workflow.test.stepResult.copyOutput")}"]`);
       await btn.trigger("click");
-      expect(mockCopy).toHaveBeenCalledWith(JSON.stringify([rec(3)], null, 2), {
-        successMessage: t("workflow.test.stepResult.copiedOutput"),
-      });
+      expect(mockCopy).toHaveBeenCalledWith(
+        JSON.stringify([rec(3)], null, 2),
+        expect.any(Function),
+        {
+          successMessage: t("workflow.test.stepResult.copiedOutput"),
+        },
+      );
     });
 
     it("copies error + forwarded together for an errored node", async () => {

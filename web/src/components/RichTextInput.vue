@@ -14,7 +14,7 @@
       class="rich-text-input text-text-body relative max-h-75 min-h-10 overflow-y-auto text-sm leading-[1.6] break-words whitespace-pre-wrap outline-none"
       :class="disabled ? 'cursor-not-allowed' : ''"
       contenteditable="true"
-      :data-placeholder="placeholder"
+      :data-placeholder="resolvedPlaceholder"
       @input="handleInput"
       @keydown="handleKeyDown"
       @paste="handlePaste"
@@ -42,7 +42,8 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, nextTick, PropType } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { computed, defineComponent, ref, onMounted, watch, nextTick, PropType } from "vue";
 
 export interface ReferenceChip {
   id: string;
@@ -63,8 +64,9 @@ export default defineComponent({
       default: "",
     },
     placeholder: {
-      type: String,
-      default: "Write your prompt",
+      type: String as unknown as PropType<I18nText>,
+      // Resolved in setup so the fallback is translated, not frozen at load.
+      default: undefined,
     },
     disabled: {
       type: Boolean,
@@ -87,6 +89,8 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "keydown", "submit", "focus", "blur", "update:references"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
+    const resolvedPlaceholder = computed(() => props.placeholder ?? t("common.writeYourPrompt"));
     const editableDiv = ref<HTMLDivElement | null>(null);
     const isFocused = ref(false);
     const localReferences = ref<ReferenceChip[]>([...props.references]);
@@ -614,6 +618,7 @@ export default defineComponent({
     });
 
     return {
+      resolvedPlaceholder,
       editableDiv,
       isFocused,
       handleInput,

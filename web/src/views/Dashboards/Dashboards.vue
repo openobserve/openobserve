@@ -505,7 +505,7 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 
 import dashboardService from "../../services/dashboards";
@@ -563,7 +563,7 @@ interface DashboardRow {
   folder_id?: string;
   name: string;
   identifier: string;
-  description: string;
+  description: I18nText;
   owner: string;
   created_raw: string;
   created: string;
@@ -580,7 +580,7 @@ interface DashboardSearchResult {
 // Narrows a caught `unknown` to the axios-style error shape this view reads.
 interface CaughtError {
   name?: string;
-  message?: string;
+  message?: I18nText;
   status?: number;
   response?: { status?: number; data?: { message?: string } };
 }
@@ -613,7 +613,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
@@ -677,11 +677,16 @@ export default defineComponent({
       // the Favorites pseudo-folder as a real folder id.
       const folderId =
         row.folder_id || (showFavoritesOnly.value ? "default" : activeFolderId.value) || "default";
-      toggleFavoriteSetting(org, userId, {
-        dashboardId: row.id,
-        folderId,
-        label: row.name,
-      });
+      toggleFavoriteSetting(
+        org,
+        userId,
+        {
+          dashboardId: row.id,
+          folderId,
+          label: row.name,
+        },
+        t,
+      );
     };
     const openHomeDashboard = async () => {
       if (!homeDashboard.value) return;
@@ -913,7 +918,7 @@ export default defineComponent({
         } catch (error) {
           console.error("Error loading dashboards:", error);
           showErrorNotification(
-            asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder"),
+            raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
           );
         } finally {
           loading.value = false;
@@ -1118,7 +1123,7 @@ export default defineComponent({
         showPositiveNotification(t("dashboard.dashboards.duplicatedSuccessfully"));
       } catch (err) {
         showErrorNotification(
-          asCaughtError(err).message ?? t("dashboard.dashboards.duplicationFailed"),
+          raw(asCaughtError(err).message ?? t("dashboard.dashboards.duplicationFailed")),
         );
       }
 
@@ -1184,7 +1189,9 @@ export default defineComponent({
           dashboardList.value = response ?? [];
         }
       } catch (err) {
-        showErrorNotification(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad"));
+        showErrorNotification(
+          raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
+        );
       } finally {
         dismiss();
         loading.value = false;
@@ -1305,7 +1312,7 @@ export default defineComponent({
           }
         } catch (err) {
           showErrorNotification(
-            asCaughtError(err).message ?? t("dashboard.dashboards.deletionFailed"),
+            raw(asCaughtError(err).message ?? t("dashboard.dashboards.deletionFailed")),
             {},
           );
         }
@@ -1356,8 +1363,8 @@ export default defineComponent({
           showPositiveNotification(t("dashboard.dashboards.folderDeletedSuccessfully"), {});
         } catch (err) {
           showErrorNotification(
-            asCaughtError(err).response?.data?.message ||
-              asCaughtError(err).message ||
+            raw(asCaughtError(err).response?.data?.message) ||
+              raw(asCaughtError(err).message) ||
               t("dashboard.dashboards.folderDeletionFailed"),
             {},
           );
@@ -1408,7 +1415,7 @@ export default defineComponent({
         return migratedDashboards;
       } catch (error) {
         showErrorNotification(
-          asCaughtError(error).message ?? t("dashboard.dashboards.errorFetchingSearch"),
+          raw(asCaughtError(error).message ?? t("dashboard.dashboards.errorFetchingSearch")),
         );
       }
     });
@@ -1485,7 +1492,7 @@ export default defineComponent({
         selectedIds.value = [];
       } catch (error) {
         showErrorNotification(
-          asCaughtError(error).message ?? t("dashboard.dashboards.errorExporting"),
+          raw(asCaughtError(error).message ?? t("dashboard.dashboards.errorExporting")),
         );
       }
     };
@@ -1575,14 +1582,17 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: t("dashboard.dashboards.partialDeleteResult", { successCount, failCount }),
+              message: t("dashboard.dashboards.partialDeleteResult", {
+                count: successCount,
+                failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: t("dashboard.dashboards.failedToDeleteCount", { failCount }),
+              message: t("dashboard.dashboards.failedToDeleteCount", { count: failCount }),
             });
           } else {
             // All successful
@@ -1646,7 +1656,7 @@ export default defineComponent({
         if (caught.response?.status != 403 || caught.status != 403) {
           toast({
             variant: "error",
-            message: errorMessage,
+            message: raw(errorMessage),
           });
         }
       } finally {

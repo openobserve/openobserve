@@ -176,6 +176,8 @@ import useMetricsExplorerGrid, {
 } from "./useMetricsExplorerGrid";
 import StreamService from "@/services/stream";
 import metricsService from "@/services/metrics";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 const SERIES = {
   resultType: "matrix",
@@ -221,7 +223,7 @@ describe("useMetricsExplorerGrid", () => {
   });
 
   const setup = async () => {
-    const grid = useMetricsExplorerGrid();
+    const grid = useMetricsExplorerGrid(t);
     grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
     await grid.loadStreams();
     return grid;
@@ -656,7 +658,7 @@ describe("useMetricsExplorerGrid", () => {
     it("never renders more than the page size, however many come back empty", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
 
-      const grid = useMetricsExplorerGrid();
+      const grid = useMetricsExplorerGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -723,7 +725,7 @@ describe("useMetricsExplorerGrid", () => {
 
     it("showMore is how the user asks to spend more budget", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
-      const grid = useMetricsExplorerGrid();
+      const grid = useMetricsExplorerGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -741,7 +743,7 @@ describe("useMetricsExplorerGrid", () => {
     // grid has grown by a full increment, stepping over the no-data run.
     it("Show more steps over no-data cards so a click reveals a full page", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
-      const grid = useMetricsExplorerGrid();
+      const grid = useMetricsExplorerGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -1293,7 +1295,7 @@ describe("useMetricsExplorerGrid", () => {
           },
         ],
       });
-      const grid = useMetricsExplorerGrid();
+      const grid = useMetricsExplorerGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
