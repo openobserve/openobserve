@@ -551,9 +551,7 @@ describe("CheckLocations", () => {
     it("should not show a guidance message for online locations", () => {
       wrapper = mountWithPrivate();
       expect(
-        wrapper
-          .find('[data-test="synthetics-check-locations-warning-private-mumbai-1"]')
-          .exists(),
+        wrapper.find('[data-test="synthetics-check-locations-warning-private-mumbai-1"]').exists(),
       ).toBe(false);
     });
   });
@@ -608,9 +606,7 @@ describe("CheckLocations", () => {
       };
       wrapper = mountWithPrivate({ locations: [neverSeen] });
 
-      const row = wrapper.find(
-        '[data-test="synthetics-check-locations-option-private-never-1"]',
-      );
+      const row = wrapper.find('[data-test="synthetics-check-locations-option-private-never-1"]');
       expect(row.exists()).toBe(true);
       expect(row.text()).toContain("synthetics.locations.pendingAgent");
     });
@@ -669,9 +665,7 @@ describe("CheckLocations", () => {
 
     it("should filter the location list by the search query", async () => {
       wrapper = mountCheckLocations();
-      await wrapper
-        .find('[data-test="synthetics-check-locations-search"]')
-        .setValue("us east");
+      await wrapper.find('[data-test="synthetics-check-locations-search"]').setValue("us east");
 
       // mockLocations: "US East" matches, the others don't
       expect(
@@ -711,9 +705,9 @@ describe("CheckLocations", () => {
       expect(
         wrapper.find('[data-test="synthetics-check-locations-private-no-results"]').exists(),
       ).toBe(false);
-      expect(
-        wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists()).toBe(
+        false,
+      );
 
       // Its action button creates a private location
       const action = noResults.find("button.empty-state-action");
@@ -738,9 +732,7 @@ describe("CheckLocations", () => {
       wrapper = mountWithPrivate();
       await wrapper.find('[data-test="synthetics-check-locations-search"]').setValue("mumbai");
 
-      const publicMiss = wrapper.find(
-        '[data-test="synthetics-check-locations-public-no-results"]',
-      );
+      const publicMiss = wrapper.find('[data-test="synthetics-check-locations-public-no-results"]');
       expect(publicMiss.exists()).toBe(true);
       expect(publicMiss.text()).toContain("synthetics.locations.noPublicMatches");
       expect(wrapper.find('[data-test="synthetics-check-locations-no-results"]').exists()).toBe(
@@ -771,9 +763,9 @@ describe("CheckLocations", () => {
       expect(
         wrapper.find('[data-test="synthetics-check-locations-option-eu-west-1"]').exists(),
       ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should clear the no-results state when the query is emptied", async () => {

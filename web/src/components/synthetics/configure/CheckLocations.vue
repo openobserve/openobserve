@@ -255,7 +255,9 @@ const hasSearch = computed(() => searchQuery.value.trim().length > 0);
  *  creation empty state never masquerades as a "no results" state. */
 const publicNoMatches = computed(
   () =>
-    hasSearch.value && publicLocations.value.length > 0 && filteredPublicLocations.value.length === 0,
+    hasSearch.value &&
+    publicLocations.value.length > 0 &&
+    filteredPublicLocations.value.length === 0,
 );
 const privateNoMatches = computed(
   () =>
