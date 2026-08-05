@@ -121,12 +121,11 @@ export interface LlmQueuePayload {
   autoRouting?: AutoRouting | null;
 }
 
-// Shares the annotation-area mock flag with llm-datasets.service.ts. Default ON
-// until the HTTP API ships; set VITE_LLM_ANNOTATION_MOCK="false" to go live.
-const USE_MOCK = import.meta.env.VITE_LLM_ANNOTATION_MOCK !== "false";
+const base = (org: string) => `/api/${org}/annotation_queues`;
 
-// TODO(BE): confirm the real path when the queues API lands.
-const base = (org: string) => `/api/${org}/llm/annotation_queues`;
+// (entityId@version) → score-config ROW id. Populated by listScoreConfigOptions
+// and read by create() to send `scoreConfigRowIds` (what the API binds by).
+const rowIdIndex = new Map<string, string>();
 
 /** Fold the API's snake_case (or already-camel) row into the normalized shape. */
 function normalize(q: any): LlmQueue {
@@ -142,7 +141,8 @@ function normalize(q: any): LlmQueue {
       : [],
     scoreConfigs: Array.isArray(q.score_configs ?? q.scoreConfigs)
       ? (q.score_configs ?? q.scoreConfigs).map((b: any) => ({
-          scoreConfigId: b.score_config_id ?? b.scoreConfigId,
+          // Real binding = PinnedScoreConfigResponseBody{rowId, entityId, name, version, dataType}.
+          scoreConfigId: b.entity_id ?? b.entityId ?? b.score_config_id ?? b.scoreConfigId,
           name: b.name,
           version: b.version ?? 1,
           latestVersion: b.latest_version ?? b.latestVersion,
@@ -158,212 +158,102 @@ function normalize(q: any): LlmQueue {
   };
 }
 
-// ─── Mock backend (removed the day VITE_LLM_ANNOTATION_MOCK flips to false) ──
-// The Score Config catalog the create form binds from. In production these come
-// from `/api/{org}/score_configs` (deduped to logical id + versions).
-const MOCK_SCORE_CONFIGS: LlmScoreConfigOption[] = [
-  { id: "sc_faith", name: "faithfulness", dataType: "numeric", versions: [1, 2], latestVersion: 2 },
-  {
-    id: "sc_hall",
-    name: "hallucination_severity",
-    dataType: "categorical",
-    categories: ["none", "minor", "major", "critical"],
-    versions: [1],
-    latestVersion: 1,
-  },
-  {
-    id: "sc_ground",
-    name: "grounded_in_context",
-    dataType: "boolean",
-    versions: [1],
-    latestVersion: 1,
-  },
-  { id: "sc_pii", name: "pii_leak", dataType: "boolean", versions: [1], latestVersion: 1 },
-  {
-    id: "sc_policy",
-    name: "policy_violation",
-    dataType: "categorical",
-    categories: ["none", "minor", "major"],
-    versions: [1, 2],
-    latestVersion: 2,
-  },
-  {
-    id: "sc_recall",
-    name: "context_recall",
-    dataType: "numeric",
-    versions: [1],
-    latestVersion: 1,
-  },
-  { id: "sc_chunk", name: "missing_chunk", dataType: "boolean", versions: [1], latestVersion: 1 },
-  {
-    id: "sc_tone",
-    name: "tone_appropriateness",
-    dataType: "categorical",
-    categories: ["poor", "ok", "good"],
-    versions: [1],
-    latestVersion: 1,
-  },
-];
-
-let mockSeq = 3;
-const mockQueues: LlmQueue[] = [
-  {
-    id: "q_mock_1",
-    name: "Hallucination queue",
-    description: "Faithfulness failures surfaced from Discovery — RAG answers drifting from retrieved context.",
-    targetDatasetId: "ds_mock_3",
-    targetDatasetName: "Hallucination goldens",
-    allowedRefTypes: ["trace", "span"],
-    scoreConfigs: [
-      { scoreConfigId: "sc_faith", name: "faithfulness", version: 2, latestVersion: 2 },
-      { scoreConfigId: "sc_hall", name: "hallucination_severity", version: 1, latestVersion: 1 },
-      { scoreConfigId: "sc_ground", name: "grounded_in_context", version: 1, latestVersion: 1 },
-    ],
-    reviewedCount: 8,
-    totalCount: 47,
-    createdBy: "priya@openobserve.ai",
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 14,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 2,
-  },
-  {
-    id: "q_mock_2",
-    name: "Compliance queue",
-    description: "Regulated-content sessions flagged for human compliance review before release.",
-    targetDatasetId: "ds_mock_2",
-    targetDatasetName: "Refund-policy goldens",
-    allowedRefTypes: ["session"],
-    scoreConfigs: [
-      { scoreConfigId: "sc_pii", name: "pii_leak", version: 1, latestVersion: 1 },
-      { scoreConfigId: "sc_policy", name: "policy_violation", version: 1, latestVersion: 2 },
-    ],
-    reviewedCount: 21,
-    totalCount: 35,
-    createdBy: "sam@openobserve.ai",
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 20,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-  },
-  {
-    id: "q_mock_3",
-    name: "RAG-recall queue",
-    description: "Retrieval spans where recall looked low — checking the chunks actually fed to the model.",
-    targetDatasetId: "ds_mock_1",
-    targetDatasetName: "RAG regression set",
-    allowedRefTypes: ["span"],
-    scoreConfigs: [
-      { scoreConfigId: "sc_recall", name: "context_recall", version: 1, latestVersion: 1 },
-      { scoreConfigId: "sc_chunk", name: "missing_chunk", version: 1, latestVersion: 1 },
-    ],
-    reviewedCount: 64,
-    totalCount: 64,
-    createdBy: "you@openobserve.ai",
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 30,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 7,
-  },
-];
 
 const withLatency = <T>(value: T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), 250));
 
 const llmQueuesService = {
+  // Queue list/get/create bound to the real API. The response has no progress
+  // counts (reviewedCount/totalCount) — normalize defaults them to 0 (TODO(BE)).
   async list(orgId: string): Promise<LlmQueue[]> {
-    if (USE_MOCK) return withLatency(mockQueues.map(normalize));
     const res = await http().get(base(orgId));
     const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
     return rows.map(normalize);
   },
 
-  /** Score Configs available to bind in the create form (id + versions). */
+  /**
+   * Score Configs available to bind in the create form. The API returns one flat
+   * row per (entity, version); we group by logical entity id and remember each
+   * version's ROW id (`scoreConfigRowIds` is what create/update actually send).
+   */
   async listScoreConfigOptions(orgId: string): Promise<LlmScoreConfigOption[]> {
-    if (USE_MOCK) return withLatency(MOCK_SCORE_CONFIGS.map((c) => ({ ...c })));
-    // TODO(BE): dedupe `/api/{org}/score_configs` rows to logical id + versions.
     const res = await http().get(`/api/${orgId}/score_configs`);
     const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-    return rows.map((r: any) => ({
-      id: r.entity_id ?? r.id,
-      name: r.name,
-      versions: [r.version ?? 1],
-      latestVersion: r.version ?? 1,
-    }));
+    rowIdIndex.clear();
+    const byEntity = new Map<string, LlmScoreConfigOption>();
+    for (const r of rows) {
+      const entityId = r.entity_id ?? r.entityId ?? r.id;
+      const version = r.version ?? 1;
+      rowIdIndex.set(`${entityId}@${version}`, r.id);
+      const cats = Array.isArray(r.categories) ? r.categories : undefined;
+      let opt = byEntity.get(entityId);
+      if (!opt) {
+        opt = {
+          id: entityId,
+          name: r.name,
+          dataType: (r.data_type ?? r.dataType ?? "numeric") as ScoreConfigDataType,
+          categories: cats,
+          versions: [],
+          latestVersion: version,
+        };
+        byEntity.set(entityId, opt);
+      }
+      opt.versions.push(version);
+      if (version > opt.latestVersion) opt.latestVersion = version;
+    }
+    const options = [...byEntity.values()];
+    options.forEach((o) => o.versions.sort((a, b) => a - b));
+    return options;
   },
 
   async get(orgId: string, queueId: string): Promise<LlmQueue | null> {
-    if (USE_MOCK) {
-      const found = mockQueues.find((q) => q.id === queueId) ?? null;
-      return withLatency(found ? normalize(found) : null);
-    }
     const res = await http().get(`${base(orgId)}/${queueId}`);
     return res.data ? normalize(res.data) : null;
   },
 
-  /** The queue's review pool. Pending items are ordered first (the to-do). */
-  async listItems(orgId: string, queueId: string): Promise<LlmQueueItem[]> {
-    if (USE_MOCK) {
-      const q = mockQueues.find((x) => x.id === queueId);
-      if (!q) return withLatency([]);
-      const refType = (q.allowedRefTypes[0] as QueueRefType) ?? "trace";
-      const pendingCount = q.totalCount - q.reviewedCount;
-      const hex = (n: number, len: number) => n.toString(16).padStart(len, "0");
-      const items: LlmQueueItem[] = Array.from({ length: q.totalCount }, (_, i) => {
-        const reviewed = i >= pendingCount; // last `reviewedCount` are reviewed
-        return {
-          id: `${queueId}_item_${i + 1}`,
-          queueId,
-          refType,
-          refId: `${refType}-${hex(i + 1, 6)}`,
-          refTraceId: `trace-${hex(i + 1, 8)}`,
-          status: reviewed ? "reviewed" : "pending",
-          reviewedAt: reviewed ? Date.now() - (q.totalCount - i) * 3_600_000 : null,
-          archivedAt: null,
-          createdAt: Date.now() - (q.totalCount - i) * 7_200_000,
-        };
-      });
-      return withLatency(items);
-    }
-    const res = await http().get(`${base(orgId)}/${queueId}/items`);
-    const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-    return rows.map((r: any) => ({
-      id: r.id,
-      queueId: r.queue_id ?? r.queueId ?? queueId,
-      refType: r.ref_type ?? r.refType,
-      refId: r.ref_id ?? r.refId,
-      refTraceId: r.ref_trace_id ?? r.refTraceId ?? null,
-      status: r.status,
-      reviewedAt: r.reviewed_at ?? r.reviewedAt ?? null,
-      archivedAt: r.archived_at ?? r.archivedAt ?? null,
-      createdAt: r.created_at ?? r.createdAt ?? 0,
-    }));
+  /**
+   * The queue's review pool. KEPT ON MOCK: the backend items endpoint is global
+   * (no queue_id filter) and the review-submit path isn't wired yet, so the
+   * Workbench runs on a self-contained mock pool (TODO(BE)).
+   */
+  async listItems(_orgId: string, queueId: string): Promise<LlmQueueItem[]> {
+    const total = 47;
+    const reviewedCount = 8;
+    const pendingCount = total - reviewedCount;
+    const hex = (n: number, len: number) => n.toString(16).padStart(len, "0");
+    const items: LlmQueueItem[] = Array.from({ length: total }, (_, i) => {
+      const reviewed = i >= pendingCount; // last `reviewedCount` are reviewed
+      return {
+        id: `${queueId}_item_${i + 1}`,
+        queueId,
+        refType: "trace" as QueueRefType,
+        refId: `trace-${hex(i + 1, 6)}`,
+        refTraceId: `trace-${hex(i + 1, 8)}`,
+        status: reviewed ? "reviewed" : "pending",
+        reviewedAt: reviewed ? Date.now() - (total - i) * 3_600_000 : null,
+        archivedAt: null,
+        createdAt: Date.now() - (total - i) * 7_200_000,
+      };
+    });
+    return withLatency(items);
   },
 
+  /**
+   * Create a queue. The API binds Score Configs by their pinned-version ROW ids;
+   * we resolve `{scoreConfigId(entityId), version}` → rowId via the cache
+   * populated by listScoreConfigOptions (the create form always loads it first).
+   * autoRouting/targetDatasetName are UI-only and dropped (deny_unknown_fields).
+   */
   async create(orgId: string, payload: LlmQueuePayload): Promise<LlmQueue> {
-    if (USE_MOCK) {
-      const now = Date.now();
-      const row: LlmQueue = {
-        id: `q_mock_${++mockSeq}`,
-        name: payload.name,
-        description: payload.description?.trim() ? payload.description.trim() : null,
-        targetDatasetId: payload.targetDatasetId ?? null,
-        targetDatasetName: payload.targetDatasetName ?? null,
-        allowedRefTypes: [],
-        scoreConfigs: (payload.scoreConfigs ?? []).map((b) => {
-          const cat = MOCK_SCORE_CONFIGS.find((c) => c.id === b.scoreConfigId);
-          return {
-            scoreConfigId: b.scoreConfigId,
-            name: cat?.name ?? b.scoreConfigId,
-            version: b.version,
-            latestVersion: cat?.latestVersion,
-          };
-        }),
-        autoRouting: payload.autoRouting ?? null,
-        reviewedCount: 0,
-        totalCount: 0,
-        createdBy: "you@openobserve.ai",
-        createdAt: now,
-        updatedAt: now,
-      };
-      mockQueues.unshift(row);
-      return withLatency(row);
-    }
-    const res = await http().post(base(orgId), payload);
+    const scoreConfigRowIds = (payload.scoreConfigs ?? [])
+      .map((c) => rowIdIndex.get(`${c.scoreConfigId}@${c.version}`))
+      .filter((id): id is string => Boolean(id));
+    const res = await http().post(base(orgId), {
+      name: payload.name,
+      description: payload.description ?? null,
+      targetDatasetId: payload.targetDatasetId ?? null,
+      scoreConfigRowIds,
+    });
     return normalize(res.data);
   },
 };
