@@ -197,7 +197,10 @@ jobs:
             http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // .rum_token // .token // empty')
           [ -z "$TOKEN" ] && TOKEN="ci-rum-token"   # ingestion tolerates a static token; refine after first run
           {
-            echo "O2_RUM_HOST=http://localhost:5080"
+            # The app runs INSIDE the emulator; 10.0.2.2 is the emulator's alias for the runner host
+            # (the standard emulator→host route on reactivecircus/android-emulator-runner). The suite
+            # (on the host) still queries localhost. NB: not yet confirmed to carry the SDK's uploads.
+            echo "O2_RUM_HOST=http://10.0.2.2:5080"
             echo "O2_RUM_ORG=default"
             echo "O2_RUM_TOKEN=$TOKEN"
             echo "O2_RUM_ENV=testing"
