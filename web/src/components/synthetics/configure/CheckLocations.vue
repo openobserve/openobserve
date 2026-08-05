@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsLocation } from "@/types/synthetics";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
@@ -452,7 +452,11 @@ const selectedLocations = computed({
                           ·
                           <span class="text-text-secondary">{{ agents.firstAgent }}</span>
                         </template>
-                        <OTooltip v-if="agents.extra > 0" :content="agents.allNames.join(', ')">
+                        <!-- Agent machine names, not prose — deliberately untranslated. -->
+                        <OTooltip
+                          v-if="agents.extra > 0"
+                          :content="raw(agents.allNames.join(', '))"
+                        >
                           <OBadge
                             variant="default"
                             size="xs"
