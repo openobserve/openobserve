@@ -187,10 +187,20 @@ export class AlertManagement {
      */
     async deleteAlertByRow(alertName) {
         const kebabButton = this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).first();
-        // 5s was too tight under alpha load — the just-created alert's row (and its
-        // more-options kebab) can take longer to render in the list, failing cleanup
-        // (alerts-ui-operations:131). Give it room and scroll it into view before clicking.
-        await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
+        // Under parallel load the just-created alert's row can be slow to render, or sit below the
+        // fold in a long/unrefreshed list, so a bare wait for its more-options kebab times out
+        // (alerts-ui-operations:71/131). Filter the list to this alert first so its row is
+        // guaranteed rendered at the top, and re-search once if the kebab still hasn't appeared.
+        if (!(await kebabButton.isVisible({ timeout: 3000 }).catch(() => false))) {
+            await this.searchAlert(alertName).catch(() => {});
+        }
+        try {
+            await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
+        } catch (e) {
+            testLogger.warn('Alert kebab not visible after search; re-searching before delete', { alertName });
+            await this.searchAlert(alertName).catch(() => {});
+            await kebabButton.waitFor({ state: 'visible', timeout: 20000 });
+        }
         await kebabButton.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
         await kebabButton.click();
 
