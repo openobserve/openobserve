@@ -279,6 +279,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { orgUsersQuery } from "@/composables/query/queries/iamLists";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -527,7 +528,7 @@ export default defineComponent({
     };
 
     const loading = ref(false);
-    const getOrgMembers = () => {
+    const getOrgMembers = (force = false) => {
       const dismiss = toast({
         variant: "loading",
         message: t("iam.user.pleaseWaitLoadingUsers"),
@@ -535,15 +536,15 @@ export default defineComponent({
       });
 
       loading.value = true;
+      const org = store.state.selectedOrganization.identifier;
       return new Promise((resolve, reject) => {
-        usersService
-          .orgUsers(store.state.selectedOrganization.identifier)
-          .then(async (res) => {
-            let users = [...res.data.data];
+        (force ? orgUsersQuery.refetchList(org) : orgUsersQuery.fetchList(org))
+          .then(async (orgUsers: any[]) => {
+            let users = [...orgUsers];
 
             if (config.isCloud == "true") {
               const invitedMembers: any = await getInvitedMembers();
-              users = [...res.data.data, ...invitedMembers];
+              users = [...orgUsers, ...invitedMembers];
             }
 
             currentUserRole.value = "";
@@ -691,7 +692,7 @@ export default defineComponent({
     // mirrors the onBeforeMount sequence).
     const refreshUsers = async () => {
       try {
-        await getOrgMembers();
+        await getOrgMembers(true);
       } finally {
         updateUserActions();
       }
@@ -877,7 +878,7 @@ export default defineComponent({
     const updateMember = async (data: any) => {
       if (data.data != undefined) {
         try {
-          await getOrgMembers();
+          await getOrgMembers(true);
         } catch (error) {
           toast({
             message: t("iam.user.failedToRefreshUserList"),
@@ -908,7 +909,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-        await getOrgMembers();
+        await getOrgMembers(true);
         updateUserActions();
         if (operationType == "created") {
           toast({
@@ -977,7 +978,7 @@ export default defineComponent({
               message: t("iam.user.userDeletedSuccess"),
               variant: "success",
             });
-            await getOrgMembers();
+            await getOrgMembers(true);
             updateUserActions();
           }
         })
@@ -1013,7 +1014,7 @@ export default defineComponent({
             message: t("iam.user.invitationRevokedSuccess"),
             variant: "success",
           });
-          await getOrgMembers();
+          await getOrgMembers(true);
           updateUserActions();
 
           segment.track("Button Click", {
@@ -1033,7 +1034,7 @@ export default defineComponent({
     };
 
     const handleInviteSent = async () => {
-      await getOrgMembers();
+      await getOrgMembers(true);
       updateUserActions();
     };
 
@@ -1073,7 +1074,7 @@ export default defineComponent({
 
         selectedUsers.value = [];
         confirmBulkDelete.value = false;
-        await getOrgMembers();
+        await getOrgMembers(true);
         updateUserActions();
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {

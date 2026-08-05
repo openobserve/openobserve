@@ -229,6 +229,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import type { AlertSourceIntegration } from "@/ts/interfaces/alertSources";
+import { alertSourcesQuery } from "@/composables/query/queries/alertSources";
 
 interface SourceStatusRow {
   displayName: string;
@@ -381,8 +382,8 @@ export default defineComponent({
     this.fetchAll();
   },
   methods: {
-    async fetchAll() {
-      await this.fetchIntegrations();
+    async fetchAll(force = false) {
+      await this.fetchIntegrations(force);
       const fetches: Promise<void>[] = [];
       if (this.defaultSource) {
         fetches.push(this.fetchSenders(this.defaultSource.id));
@@ -392,11 +393,12 @@ export default defineComponent({
       }
       await Promise.all(fetches);
     },
-    async fetchIntegrations() {
+    async fetchIntegrations(force = false) {
       this.loading = true;
       try {
-        const res = await alertSources.list(this.orgIdentifier);
-        this.integrations = res.data.integrations;
+        this.integrations = force
+          ? await alertSourcesQuery.refetchList(this.orgIdentifier)
+          : await alertSourcesQuery.fetchList(this.orgIdentifier);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       } finally {
@@ -493,7 +495,7 @@ export default defineComponent({
         toast({ variant: "success", message: this.t("alert_sources.deletedSuccess") });
         this.revealedIds = this.revealedIds.filter((id) => id !== this.deleteTarget?.id);
         this.deleteTarget = undefined;
-        await this.fetchAll();
+        await this.fetchAll(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }
@@ -507,7 +509,7 @@ export default defineComponent({
             ? this.t("alert_sources.disabledSuccess")
             : this.t("alert_sources.enabledSuccess"),
         });
-        await this.fetchIntegrations();
+        await this.fetchIntegrations(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }

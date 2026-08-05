@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="cipher-keys-list-refresh-btn"
-              @click="getData"
+              @click="refreshData"
             >
               <OTooltip
                 side="bottom"
@@ -164,6 +164,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { cipherKeysQuery } from "@/composables/query/queries/settingsLists";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -291,7 +292,12 @@ export default defineComponent({
       });
     };
 
-    const getData = () => {
+    // `force` is for the refresh shortcut and post-mutation reloads: those must
+    // reach the server. A plain call is a cache hit when the list is still fresh.
+    // Bound to refresh / "list changed" events: always hits the server.
+    const refreshData = () => getData(true);
+
+    const getData = (force = false) => {
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
@@ -299,10 +305,10 @@ export default defineComponent({
         timeout: 0,
       });
 
-      CipherKeysService.list(store.state.selectedOrganization.identifier)
-        .then((response) => {
+      const org = store.state.selectedOrganization.identifier;
+      (force ? cipherKeysQuery.refetchList(org) : cipherKeysQuery.fetchList(org))
+        .then((responseData: any[]) => {
           const data = [];
-          const responseData = response.data.keys;
           for (let i = 0; i < responseData.length; i++) {
             data.push({
               name: responseData[i].name,
@@ -333,7 +339,7 @@ export default defineComponent({
 
     const hideAddDialog = async () => {
       showAddDialog.value = !showAddDialog.value;
-      await getData();
+      await getData(true);
       router.push({
         name: "cipherKeys",
         query: {
@@ -360,7 +366,7 @@ export default defineComponent({
               message: t("settings.cipherKeysPage.deleteSuccess"),
             });
 
-            getData();
+            getData(true);
           })
           .catch((err) => {
             dismiss();
@@ -449,7 +455,7 @@ export default defineComponent({
 
           selectedKeys.value = [];
           confirmBulkDelete.value = false;
-          getData();
+          getData(true);
         })
         .catch((err: any) => {
           if (err.response?.status != 403 || err?.status != 403) {
@@ -471,12 +477,13 @@ export default defineComponent({
       {
         id: "cipherKeysRefresh",
         handler: () => {
-          if (!isInputFocused()) getData();
+          if (!isInputFocused()) getData(true);
         },
       },
     ]);
 
     return {
+      refreshData,
       t,
       store,
       router,

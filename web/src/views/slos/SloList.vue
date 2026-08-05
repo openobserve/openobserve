@@ -122,7 +122,7 @@
           icon-left="refresh"
           :loading="loading"
           data-test="slos-slolist-refresh"
-          @click="load"
+          @click="refresh"
         >
           <OTooltip side="bottom" :content="t('slos.refresh')" />
         </OButton>
@@ -363,6 +363,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
+import { slosQuery } from "@/composables/query/queries/slos";
 import {
   ABSENT,
   compareByUrgency,
@@ -607,13 +608,17 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
-async function load() {
+// Bound to the refresh button: always hits the server.
+const refresh = () => load(true);
+
+async function load(force = false) {
   if (!org.value) return;
   loading.value = true;
   error.value = null;
   try {
-    const res = await sloService.list(org.value, activeFolderId.value);
-    rows.value = res.data?.list ?? [];
+    rows.value = force
+      ? await slosQuery.refetchList(org.value, activeFolderId.value)
+      : await slosQuery.fetchList(org.value, activeFolderId.value);
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
     selectedIds.value = [];
@@ -658,6 +663,7 @@ async function doMove() {
     // They left the folder being shown, so drop them rather than re-fetching.
     const moved = new Set(targets.map((r) => r.id));
     rows.value = rows.value.filter((r) => !moved.has(r.id));
+    slosQuery.invalidateList(org.value);
     selectedIds.value = selectedIds.value.filter((id) => !moved.has(id));
     toast({
       variant: "success",
@@ -692,6 +698,7 @@ async function toggleEnabled(row: SloListItem) {
   try {
     await sloService.setEnabled(org.value, row.id, !row.enabled);
     row.enabled = !row.enabled;
+    slosQuery.invalidateList(org.value);
     toast({
       variant: "success",
       message: row.enabled ? t("slos.resumed") : t("slos.pausedNotice"),
@@ -713,6 +720,7 @@ async function doDelete() {
   try {
     await sloService.delete(org.value, row.id);
     rows.value = rows.value.filter((r) => r.id !== row.id);
+    slosQuery.invalidateList(org.value);
     toast({ variant: "success", message: t("slos.deleted") });
   } catch (e: any) {
     toast({ variant: "error", message: e?.response?.data?.message || t("slos.deleteFailed") });

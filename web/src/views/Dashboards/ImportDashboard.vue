@@ -473,7 +473,7 @@ export default defineComponent({
       );
 
       //update store
-      await getAllDashboards(store, selectedFolder.value);
+      await getAllDashboards(store, selectedFolder.value, true);
 
       //return new dashboard
       return newDashboard;

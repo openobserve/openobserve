@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="refresh"
                 :loading="listLoading"
                 data-test="regex-pattern-list-refresh-btn"
-                @click="getRegexPatterns"
+                @click="refreshRegexPatterns"
               >
                 <OTooltip
                   side="bottom"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ImportRegexPattern
       v-else-if="showImportRegexPatternDialog"
       @cancel:hideform="showImportRegexPatternDialog = false"
-      @update:list="getRegexPatterns"
+      @update:list="refreshRegexPatterns"
       :regex-patterns="regexPatterns.map((pattern) => pattern.name)"
     />
     <ConfirmDialog
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showAddRegexPatternDialog.show"
       :data="showAddRegexPatternDialog.data"
       :is-edit="showAddRegexPatternDialog.isEdit"
-      @update:list="getRegexPatterns"
+      @update:list="refreshRegexPatterns"
       @close="closeAddRegexPatternDialog"
     />
   </div>
@@ -221,6 +221,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { regexPatternsQuery } from "@/composables/query/queries/settingsLists";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -357,13 +358,19 @@ export default defineComponent({
       showAddRegexPatternDialog.value.data = {};
     };
 
-    const getRegexPatterns = async () => {
+    // `force` for the refresh shortcut and post-mutation reloads — those must
+    // reach the server; a plain call is a cache hit while the list is fresh.
+    // Bound to refresh / "list changed" events: always hits the server.
+    const refreshRegexPatterns = () => getRegexPatterns(true);
+
+    const getRegexPatterns = async (force = false) => {
       listLoading.value = true;
       try {
-        const response = await regexPatternsService.list(
-          store.state.selectedOrganization.identifier,
-        );
-        regexPatterns.value = response.data.patterns.map((pattern: any) => ({
+        const org = store.state.selectedOrganization.identifier;
+        const patterns = force
+          ? await regexPatternsQuery.refetchList(org)
+          : await regexPatternsQuery.fetchList(org);
+        regexPatterns.value = patterns.map((pattern: any) => ({
           ...pattern,
           created_at: convertUnixToDateFormat(pattern.created_at),
           updated_at: convertUnixToDateFormat(pattern.updated_at),
@@ -397,7 +404,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           deleteDialog.value.data,
         );
-        getRegexPatterns();
+        getRegexPatterns(true);
         toast({
           message: t("settings.regexPatternList.deletedSuccess"),
           variant: "success",
@@ -511,7 +518,7 @@ export default defineComponent({
 
         selectedPatterns.value = [];
         confirmBulkDelete.value = false;
-        await getRegexPatterns();
+        await getRegexPatterns(true);
       } catch (error: any) {
         const errorMessage =
           error?.data?.message ||
@@ -532,12 +539,13 @@ export default defineComponent({
       {
         id: "regexPatternsRefresh",
         handler: () => {
-          if (!isInputFocused()) getRegexPatterns();
+          if (!isInputFocused()) getRegexPatterns(true);
         },
       },
     ]);
 
     return {
+      refreshRegexPatterns,
       t,
       store,
       router,

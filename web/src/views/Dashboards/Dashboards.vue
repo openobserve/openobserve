@@ -745,11 +745,9 @@ export default defineComponent({
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const folderId = event.folderId || activeFolderId.value;
       if (folderId) {
-        // Clear cached data so getAllDashboardsByFolderId re-fetches from API
-        store.dispatch("setAllDashboardList", {
-          ...store.state.organizationData.allDashboardList,
-          [folderId]: undefined,
-        });
+        // The AI agent just changed this folder, so refetch rather than serving
+        // the cached list.
+        await getAllDashboards(store, folderId, true);
         const response = await getAllDashboardsByFolderId(store, folderId);
         dashboardList.value = response || [];
       }
@@ -1157,7 +1155,7 @@ export default defineComponent({
           const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
           const fetched = await Promise.all(
             favFolders.map((fid) =>
-              getAllDashboards(store, fid)
+              getAllDashboards(store, fid, true)
                 .then(() => fid)
                 .catch(() => null),
             ),

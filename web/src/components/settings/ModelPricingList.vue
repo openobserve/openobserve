@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showImportModelPricingPage"
       :existing-models="models.filter((m: any) => !isReadOnly(m)).map((m: any) => m.name)"
       @cancel:hideform="showImportModelPricingPage = false"
-      @update:list="fetchModels"
+      @update:list="refreshModels"
     />
 
     <!-- Test Match Dialog -->
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="model-pricing-list-refresh-btn"
-              @click="fetchModels"
+              @click="refreshModels"
             >
               <OTooltip
                 side="bottom"
@@ -497,6 +497,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { modelPricingQuery } from "@/composables/query/queries/settingsLists";
 
 const { t } = useI18n();
 const store = useStore();
@@ -748,11 +749,16 @@ function notifyError(prefix: string, e: any) {
   });
 }
 
-async function fetchModels() {
+// Bound to the refresh button and to child "list changed" events: both must
+// reach the server, and a named handler keeps the event payload out of `force`.
+const refreshModels = () => fetchModels(true);
+
+async function fetchModels(force = false) {
   loading.value = true;
   try {
-    const res = await modelPricingService.list(orgIdentifier.value);
-    models.value = res.data || [];
+    models.value = force
+      ? await modelPricingQuery.refetchList(orgIdentifier.value)
+      : await modelPricingQuery.fetchList(orgIdentifier.value);
   } catch (e: any) {
     notifyError(t("modelPricing.errLoadModels"), e);
   } finally {
@@ -779,7 +785,7 @@ async function toggleEnabled(model: any, enabled: boolean) {
     const { __sectionStart, ...clean } = model;
     const updated = { ...clean, enabled };
     await modelPricingService.update(orgIdentifier.value, model.id, updated);
-    await fetchModels();
+    await fetchModels(true);
     const displayName = model.name.length > 30 ? model.name.slice(0, 30) + "…" : model.name;
     const message = enabled
       ? t("modelPricing.modelEnabledNotif", { name: displayName })
@@ -813,7 +819,7 @@ function confirmDelete(model: any) {
           variant: "success",
           message: t("modelPricing.modelPricingDeleted"),
         });
-        await fetchModels();
+        await fetchModels(true);
       } catch (e: any) {
         notifyError(t("modelPricing.errDelete"), e);
       }
@@ -840,7 +846,7 @@ async function refreshBuiltIn() {
       variant: "success",
       message: t("modelPricing.builtInRefreshed"),
     });
-    await fetchModels();
+    await fetchModels(true);
   } catch (e: any) {
     notifyError(t("modelPricing.errRefresh"), e);
   } finally {
@@ -904,7 +910,7 @@ function confirmDeleteSelected() {
             }),
           });
           selectedIds.value = [];
-          await fetchModels();
+          await fetchModels(true);
         }
       } finally {
         bulkDeleteLoading.value = false;
@@ -931,7 +937,7 @@ useShortcuts([
   {
     id: "modelPricingRefresh",
     handler: () => {
-      if (!isInputFocused()) fetchModels();
+      if (!isInputFocused()) fetchModels(true);
     },
   },
 ]);

@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="pipeline-list-refresh-btn"
-              @click="getPipelines"
+              @click="refreshPipelines"
             >
               <OTooltip
                 side="bottom"
@@ -522,6 +522,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { pipelinesQuery } from "@/composables/query/queries/pipelines";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -778,7 +779,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         message: message,
         variant: "success",
       });
-      await getPipelines();
+      await getPipelines(true);
     })
     .catch((error) => {
       if (error.response.status != 403) {
@@ -944,15 +945,18 @@ const goToImportPipeline = () => {
 };
 
 const loading = ref(true);
-const getPipelines = async () => {
+// Bound to the refresh button: always hits the server.
+const refreshPipelines = () => getPipelines(true);
+
+const getPipelines = async (force = false) => {
   loading.value = true;
   try {
-    const response = await pipelineService.getPipelines(
-      store.state.selectedOrganization.identifier,
-    );
+    const org = store.state.selectedOrganization.identifier;
+    const list = force
+      ? await pipelinesQuery.refetchList(org)
+      : await pipelinesQuery.fetchList(org);
     pipelines.value = [];
-    // resultTotal.value = response.data.list.length;
-    pipelines.value = response.data.list.map((pipeline: any) => {
+    pipelines.value = list.map((pipeline: any) => {
       const updatedEdges = pipeline.edges.map((edge: any) => ({
         ...edge,
         markerEnd: {
@@ -1037,7 +1041,7 @@ const savePipeline = (data: any) => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then(() => {
-      getPipelines();
+      getPipelines(true);
       dismiss();
       showCreatePipeline.value = false;
       toast({
@@ -1085,7 +1089,7 @@ const deletePipeline = async () => {
     })
     .finally(async () => {
       selectedPipelineIds.value = [];
-      await getPipelines();
+      await getPipelines(true);
       updateActiveTab();
       dismiss();
     });
@@ -1221,7 +1225,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     }
 
     selectedPipelineIds.value = [];
-    await getPipelines();
+    await getPipelines(true);
     updateActiveTab();
   } catch (error) {
     dismiss();
@@ -1306,7 +1310,7 @@ const bulkDeletePipelines = async () => {
     }
 
     selectedPipelineIds.value = [];
-    await getPipelines();
+    await getPipelines(true);
     updateActiveTab();
   } catch (error: any) {
     dismiss();
@@ -1363,7 +1367,7 @@ useShortcuts([
   {
     id: "pipelinesRefresh",
     handler: () => {
-      if (!isInputFocused()) getPipelines();
+      if (!isInputFocused()) getPipelines(true);
     },
   },
   {

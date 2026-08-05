@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
 import * as vueRouter from "vue-router";
+import { reportsQuery } from "@/composables/query/queries/reports";
 
 // Mock vue-router
 vi.mock("vue-router", async () => {
@@ -279,8 +280,9 @@ describe("ReportList Component", () => {
         }),
       );
 
-      // Clear cache so this mount actually calls the API (not served from beforeEach cache)
-      store.state.organizationData.allReportsListByFolderId = {};
+      // Mark the shared reports query stale so this mount really calls the API
+      // instead of being served from an earlier test's cached result.
+      reportsQuery.invalidateList(store.state.selectedOrganization.identifier);
 
       const newWrapper = mount(ReportList, {
         global: {

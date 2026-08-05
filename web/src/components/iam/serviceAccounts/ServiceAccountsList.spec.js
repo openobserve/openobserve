@@ -1405,7 +1405,8 @@ describe("ServiceAccountsList Component", () => {
       vi.mocked(service_accounts.list).mockResolvedValueOnce({
         data: { data: [] },
       });
-      await wrapper.vm.getServiceAccountsUsers();
+      // Forced: a plain reload would be served from the cache the mount warmed.
+      await wrapper.vm.getServiceAccountsUsers(true);
       await flushPromises();
 
       // The service accounts list should be empty

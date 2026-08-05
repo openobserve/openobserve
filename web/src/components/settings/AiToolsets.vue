@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="ai-toolsets-list-refresh-btn"
-              @click="getData"
+              @click="refreshData"
             >
               <OTooltip
                 side="bottom"
@@ -144,9 +144,9 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
-import aiToolsetsService from "@/services/ai_toolsets";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { aiToolsetsQuery } from "@/composables/query/queries/settingsLists";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -242,7 +242,10 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Data loading
     // -----------------------------------------------------------------------
-    const getData = () => {
+    // Bound to refresh / "list changed" events: always hits the server.
+    const refreshData = () => getData(true);
+
+    const getData = (force = false) => {
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
@@ -250,10 +253,9 @@ export default defineComponent({
         timeout: 0,
       });
 
-      aiToolsetsService
-        .list(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          const items = res.data?.toolsets ?? [];
+      const org = store.state.selectedOrganization.identifier;
+      (force ? aiToolsetsQuery.refetchList(org) : aiToolsetsQuery.fetchList(org))
+        .then((items: any[]) => {
           tabledata.value = items.map((item: any) => ({
             id: item.id,
             name: item.name,
@@ -305,7 +307,7 @@ export default defineComponent({
       {
         id: "aiToolsetsRefresh",
         handler: () => {
-          if (!isInputFocused()) getData();
+          if (!isInputFocused()) getData(true);
         },
       },
     ]);
@@ -334,7 +336,7 @@ export default defineComponent({
 
     const hideAddDialog = async () => {
       showAddDialog.value = false;
-      await getData();
+      await getData(true);
       router.push({
         name: "aiToolsets",
         query: { org_identifier: store.state.selectedOrganization.identifier },
@@ -366,7 +368,7 @@ export default defineComponent({
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
-          getData();
+          getData(true);
         })
         .catch((err) => {
           if (err?.status !== 403) {
@@ -383,6 +385,7 @@ export default defineComponent({
     };
 
     return {
+      refreshData,
       t,
       store,
       loading,

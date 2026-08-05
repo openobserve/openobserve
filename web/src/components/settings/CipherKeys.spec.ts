@@ -263,8 +263,8 @@ describe("CipherKeys", () => {
   describe("Data loading", () => {
     it("should populate table data after successful fetch", async () => {
       const wrapper = createWrapper();
-      await nextTick();
-      await wrapper.vm.$nextTick();
+      // The read resolves through the query cache, which needs more than one tick.
+      await flushPromises();
 
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
