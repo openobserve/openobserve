@@ -275,6 +275,7 @@ pub struct ExecutableNode {
     id: String,
     node_data: NodeData,
     children: Vec<String>,
+    is_disabled: bool,
 }
 
 impl MemorySize for ExecutableNode {
@@ -283,6 +284,7 @@ impl MemorySize for ExecutableNode {
             + self.id.mem_size()
             + self.node_data.mem_size()
             + self.children.mem_size()
+            + self.is_disabled.mem_size()
     }
 }
 
@@ -316,6 +318,7 @@ impl ExecutablePipeline {
                             .filter(|edge| edge.source == node.id)
                             .map(|edge| edge.target.clone())
                             .collect(),
+                        is_disabled: false, // for pipelines, we do not support disabling nodes
                     },
                 )
             })
@@ -389,6 +392,7 @@ impl ExecutablePipeline {
                             .filter(|edge| edge.source == node.id)
                             .map(|edge| edge.target.clone())
                             .collect(),
+                        is_disabled: node.is_disabled,
                     },
                 )
             })
@@ -1216,6 +1220,21 @@ async fn process_node(
     // wall time spent doing CPU work inside this node's loop (flatten + fn/eval),
     // excluding time blocked on `recv().await` from upstream.
     let mut busy = Duration::ZERO;
+
+    // let the workflow trigger node always fired even if disabled, as it is the first node and must
+    // run
+    if node.is_disabled && !matches!(node.node_data, NodeData::WorkflowTrigger) {
+        let mut count: usize = 0;
+        while let Some(item) = channels.receiver.recv().await {
+            send_to_children(&mut channels.child_senders, item, &node.to_string()).await;
+            count += 1;
+        }
+        log::info!(
+            "[Pipeline] {pl_name} [inv={inv_id}]: node {node_idx} disabled passed {count} records to children, ({:?}) task returning",
+            node.node_data
+        );
+        return Ok(());
+    }
 
     let count = match &node.node_data {
         NodeData::WorkflowTrigger => {
@@ -2739,6 +2758,7 @@ mod tests {
                     },
                 ),
                 children: Vec::new(),
+                is_disabled: false,
             },
         );
         let pipeline = ExecutablePipeline {
@@ -2939,6 +2959,7 @@ mod tests {
             id: "test_id".to_string(),
             node_data: NodeData::Stream(StreamParams::new("org1", "stream1", StreamType::Logs)),
             children: vec![],
+            is_disabled: false,
         };
         assert_eq!(node.to_string(), "stream");
         assert_eq!(node.node_type(), "stream");
@@ -2954,6 +2975,7 @@ mod tests {
                 num_args: 1,
             }),
             children: vec![],
+            is_disabled: false,
         };
         assert_eq!(node.to_string(), "function");
         assert_eq!(node.node_type(), "function");
@@ -2971,6 +2993,7 @@ mod tests {
                 id: "A".to_string(),
                 node_data: NodeData::Stream(StreamParams::new("org1", "stream1", StreamType::Logs)),
                 children: vec!["B".to_string()],
+                is_disabled: false,
             },
         );
 
@@ -2984,6 +3007,7 @@ mod tests {
                     num_args: 0,
                 }),
                 children: vec!["C".to_string()],
+                is_disabled: false,
             },
         );
 
@@ -2993,6 +3017,7 @@ mod tests {
                 id: "C".to_string(),
                 node_data: NodeData::Stream(StreamParams::new("org1", "stream2", StreamType::Logs)),
                 children: vec![],
+                is_disabled: false,
             },
         );
 
@@ -3020,6 +3045,7 @@ mod tests {
                 id: "A".to_string(),
                 node_data: NodeData::Stream(StreamParams::new("org1", "stream1", StreamType::Logs)),
                 children: vec![],
+                is_disabled: false,
             },
         );
 
