@@ -385,9 +385,9 @@ describe("CheckLocations", () => {
       expect(wrapper.find('[data-test="synthetics-check-locations-group"]').exists()).toBe(false);
     });
 
-    it("should show loading text", () => {
+    it("should not show loading text — the skeleton rows carry the state alone", () => {
       wrapper = mountCheckLocations({ loadingLocations: true });
-      expect(wrapper.text()).toContain("synthetics.locations.loadingLocations");
+      expect(wrapper.text()).not.toContain("synthetics.locations.loadingLocations");
     });
 
     it("should not show empty state while loading", () => {

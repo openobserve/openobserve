@@ -10664,7 +10664,6 @@
       "offlineMessage": "Agent recently dropped — the check won't run from here until it reconnects.",
       "downMessage": "No agent for over a day — this location won't run the check until an agent reconnects.",
       "lastAgentSeen": "Last agent seen {ago}",
-      "loadingLocations": "Loading available locations…",
       "noSearchResults": "No locations match your search",
       "noPublicMatches": "No public locations match your search",
       "noPrivateMatches": "No private locations match your search",

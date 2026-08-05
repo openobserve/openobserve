@@ -318,9 +318,6 @@ const selectedLocations = computed({
         class="flex flex-col gap-2"
         data-test="synthetics-check-locations-loading"
       >
-        <p class="text-text-secondary text-xs">
-          {{ t("synthetics.locations.loadingLocations") }}
-        </p>
         <div v-for="i in 4" :key="'skel-' + i" class="flex items-center gap-2 py-1">
           <SkeletonBox width="1rem" height="1rem" variant="custom" :rounded="true" />
           <SkeletonBox width="60%" height="0.875rem" variant="text" />
