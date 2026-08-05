@@ -308,8 +308,7 @@ pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 pub async fn save_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
     db::workflows::save_draft_record(workflow.clone()).await?;
     set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
-    // TODO YJDoc2 add SC sync for workflow drafts
-    // db::workflows::notify_workflow_upsert(&workflow).await?;
+    db::workflows::notify_draft_upsert(&workflow).await?;
     Ok(())
 }
 
@@ -322,16 +321,16 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 
 pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
     db::workflows::update_draft_record(workflow.clone()).await?;
-    // TODO YJDoc2: add SC sync for drafts
-    // db::workflows::notify_workflow_upsert(&workflow).await?;
+    db::workflows::notify_draft_upsert(&workflow).await?;
     Ok(())
 }
 
 pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow).await?;
-    db::workflows::promote_draft(org_id, workflow).await?;
-    // TODO YJDoc2: add SC sync for promotion
-    // db::workflows::notify_workflow_upsert(&workflow).await?;
+    let id = workflow.id.clone();
+    db::workflows::promote_draft(org_id, workflow.clone()).await?;
+    db::workflows::notify_workflow_upsert(&workflow).await?;
+    db::workflows::notify_draft_delete(&id).await?;
     Ok(())
 }
 
@@ -425,8 +424,7 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
 pub async fn delete_draft(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
     db::workflows::delete_draft_record(id).await?;
     remove_ownership(org_id, "workflows", Authz::new(id)).await;
-    // TODO YJDoc2 add SC sync for workflow drafts
-    // db::workflows::notify_workflow_delete(id).await?;
+    db::workflows::notify_draft_delete(id).await?;
     Ok(())
 }
 

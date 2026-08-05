@@ -201,6 +201,50 @@ pub async fn notify_workflow_delete(id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn notify_draft_upsert(workflow: &Workflow) -> Result<(), anyhow::Error> {
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::add_workflow_draft(workflow.clone())
+            .await
+        {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow draft upsert notification to super cluster queue for {}/{}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow draft upsert notification to super cluster queue for {}/{} : {e}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn notify_draft_delete(id: &str) -> Result<(), anyhow::Error> {
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::delete_workflow_draft(id).await {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow draft delete notification to super cluster queue for {id}"
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow draft delete notification to super cluster queue for {id} : {e}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn save_workflow_errors(mut errors: WorkflowRunErrors) -> Result<(), anyhow::Error> {
     infra::table::workflows::save_workflow_errors(errors.clone()).await?;
 
