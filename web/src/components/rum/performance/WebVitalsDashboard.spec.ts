@@ -747,9 +747,7 @@ describe("WebVitalsDashboard", () => {
       // Real en-US.json copy — i18n is installed globally in setupTests, so the rendered
       // text is the shipped string rather than a spec-local stub.
       expect(emptyState.text()).toContain("Web Vitals need the Browser RUM SDK");
-      expect(emptyState.text()).toContain(
-        "are collected only by the Browser RUM SDK",
-      );
+      expect(emptyState.text()).toContain("are collected only by the Browser RUM SDK");
       expect(wrapper.find('[data-test="learn-web-vitals-link"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
     });
