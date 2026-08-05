@@ -1416,18 +1416,22 @@ export class PipelinesPage {
 
         // Navigate and explore
         await this.navigateToStreams();
-        // The just-ingested source stream may not be listed immediately (stream-stats/index
-        // lag on loaded envs), so the row's Explore action is absent and clickExplore()
-        // 45s-timed-out. Poll: refresh stats + re-search until the Explore button appears.
-        // Non-masking: if the stream never lists, the poll times out and we fail.
+        // The just-ingested source stream (data ingested 200) may not appear in the streams
+        // LIST immediately — on cloud the stream-stats/list is cached from initial load and
+        // lags behind ingestion, so its Explore action is absent and clickExplore() timed out.
+        // refreshStreamStats() alone only recomputes stats; the list must be RE-FETCHED to pick
+        // up a new stream — so reload the page each iteration, then refresh stats + re-search
+        // until the Explore button appears. Non-masking: times out and fails if it never lists.
         await expect.poll(async () => {
+            await this.page.reload().catch(() => {});
+            await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
             await this.refreshStreamStats().catch(() => {});
             await this.searchStream(streamName).catch(() => {});
             await this.page.waitForTimeout(1000);
             return await this.exploreButton.first().isVisible({ timeout: 2000 }).catch(() => false);
         }, {
-            intervals: [2000, 3000, 5000, 5000, 10000, 10000],
-            timeout: 90000,
+            intervals: [3000, 5000, 10000, 15000, 20000, 20000],
+            timeout: 150000,
         }).toBe(true);
         await this.clickExplore();
         await this.openTimestampMenu();
