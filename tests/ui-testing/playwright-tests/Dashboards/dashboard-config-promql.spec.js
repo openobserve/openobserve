@@ -17,6 +17,7 @@ import {
   reopenPanelConfig,
   describePanelRender,
   waitForPanelRenderSettled,
+  collectConsoleErrors,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
@@ -769,6 +770,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
   }, async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
+    // ChartRenderer swallows a failing setOption with console.error only.
+    const consoleLog = collectConsoleErrors(page);
 
     await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.enableSparkline();
@@ -799,7 +802,11 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // The captured response resolves on the FIRST query_range; the panel keeps
     // streaming chunks after it, so settle before asserting on the rendered DOM.
-    await waitForPanelRenderSettled(page, pm);
+    const settled = await waitForPanelRenderSettled(page, pm);
+    expect(
+      settled,
+      `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
+    ).toBe(true);
 
     // Metric renders as SVG; the sparkline trend draws at least one path.
     const chart = page.locator('[data-test="chart-renderer"]');
@@ -822,7 +829,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       .catch(() => false);
     expect(
       svgPathAppeared,
-      `no sparkline <path> rendered. ${await describePanelRender(page)}. ${rawBodyDiag}`,
+      `no sparkline <path> rendered. ${await describePanelRender(page)}. ${consoleLog.describe()}. ${rawBodyDiag}`,
     ).toBe(true);
     expect(await chart.locator("svg path").count()).toBeGreaterThan(0);
     testLogger.info("PromQL sparkline trend rendered on the metric SVG");
@@ -836,6 +843,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
   }, async ({ page }) => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
+    // ChartRenderer swallows a failing setOption with console.error only.
+    const consoleLog = collectConsoleErrors(page);
 
     await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
 
@@ -875,7 +884,11 @@ test.describe("ConfigPanel — PromQL Settings", () => {
 
     // The captured response resolves on the FIRST query_range; the panel keeps
     // streaming chunks after it, so settle before asserting on the rendered DOM.
-    await waitForPanelRenderSettled(page, pm);
+    const settled = await waitForPanelRenderSettled(page, pm);
+    expect(
+      settled,
+      `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
+    ).toBe(true);
 
     // The mapped text replaces the metric value on the SVG renderer
     const chart = page.locator('[data-test="chart-renderer"]');
@@ -898,7 +911,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       .catch(() => false);
     expect(
       mappedTextAppeared,
-      `mapped text not rendered. ${await describePanelRender(page)}. ${rawBodyDiag}`,
+      `mapped text not rendered. ${await describePanelRender(page)}. ${consoleLog.describe()}. ${rawBodyDiag}`,
     ).toBe(true);
     await expect(chart).toContainText("PROMQL_MAPPED");
     testLogger.info("Mapped text reflected in the PromQL metric chart");

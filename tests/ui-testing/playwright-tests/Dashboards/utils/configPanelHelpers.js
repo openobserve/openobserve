@@ -392,14 +392,6 @@ export async function setupPromQLMapsPanelWithConfig(page, pm, dashboardName, pa
 
 /**
  * Snapshot of what a panel actually put on screen, for assertion failure messages.
- *
- * A metric panel that "renders nothing" looks identical from the outside in three
- * very different situations, and the distinction is what tells you where to look:
- *   - noData=true            → the results never reached the converter (load path)
- *   - canvas>0               → ECharts is on the wrong renderer; metric needs svg,
- *                              and a value painted on canvas leaves no DOM text
- *   - svg>0 but paths/text 0 → options were built but carry nothing to draw
- *
  * @param {import('@playwright/test').Page} page
  * @returns {Promise<string>} one-line summary, safe to embed in an expect() message
  */
@@ -407,11 +399,17 @@ export async function describePanelRender(page) {
   const snapshot = await page
     .evaluate(() => {
       const el = document.querySelector('[data-test="chart-renderer"]');
+      const applyBtn = document.querySelector('[data-test="dashboard-apply"]');
+      // Apply is disabled (non-enterprise) or swapped for Cancel (enterprise)
+      // for the whole query run, so this is the panel's own "still loading" flag.
+      const cancelBtn = document.querySelector('[data-test="dashboard-cancel"]');
       return {
         chartRenderer: !!el,
         noData: !!document.querySelector('[data-test="no-data"]'),
         panelError:
           document.querySelector('[data-test="panel-schema-renderer-error-message"]')?.textContent?.trim() ?? null,
+        stillLoading: !!cancelBtn || (!!applyBtn && applyBtn.disabled === true),
+        applyPresent: !!applyBtn,
         canvas: el ? el.querySelectorAll("canvas").length : 0,
         svg: el ? el.querySelectorAll("svg").length : 0,
         svgPaths: el ? el.querySelectorAll("svg path").length : 0,
@@ -424,22 +422,56 @@ export async function describePanelRender(page) {
 }
 
 /**
+ * Collects browser console errors/warnings for the rest of the test.
+ *
+ * ChartRenderer swallows a failing `setOption` with a bare `console.error`, so a
+ * chart that silently draws nothing leaves no trace in the DOM — only here.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {{messages: string[], describe: () => string}}
+ */
+export function collectConsoleErrors(page) {
+  const messages = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error" || msg.type() === "warning") {
+      messages.push(`[${msg.type()}] ${msg.text()}`.slice(0, 300));
+    }
+  });
+  page.on("pageerror", (err) => {
+    messages.push(`[pageerror] ${err.message}`.slice(0, 300));
+  });
+  return {
+    messages,
+    describe: () => `console: ${JSON.stringify(messages.slice(-15))}`,
+  };
+}
+
+/**
  * Waits until the panel has finished loading and settled on a final render.
- * The metric assertions below are only meaningful once streaming has completed —
- * mid-stream the panel legitimately shows the previous chart or the empty state.
+ * The metric assertions are only meaningful once streaming has completed —
+ * mid-stream the panel legitimately shows the previous chart or nothing at all.
+ *
+ * Returns whether it actually settled: a panel stuck loading forever is a real
+ * failure mode here, and swallowing the timeout would hide it.
  *
  * @param {import('@playwright/test').Page} page
  * @param {object} pm - PageManager instance
+ * @returns {Promise<boolean>} true if the panel finished loading in time
  */
 export async function waitForPanelRenderSettled(page, pm) {
   // The Apply button is disabled (or swapped for Cancel) for the whole streaming
   // run, so it covers every chunk — unlike waiting on the first query response,
   // which returns while later chunks are still arriving.
-  await pm.dashboardPanelActions
+  const settled = await pm.dashboardPanelActions
     .waitForChartToRender()
-    .catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+    .then(() => true)
+    .catch((e) => {
+      testLogger.warn("waitForChartToRender:", e.message);
+      return false;
+    });
   // One frame for the final setOption to reach the DOM.
   await page.waitForTimeout(300);
+  return settled;
 }
 
 /**
