@@ -243,9 +243,6 @@ export const escapeForMatchAll = (str: string): string => {
     .replace(/\t/g, "\\t");
 };
 
-/** Maximum patterns one alert may be built from — keeps the SQL comprehensible. */
-export const MAX_PATTERNS_PER_ALERT = 10;
-
 /**
  * One pattern's clause: every invariant constant must be present, so the
  * constants are ANDed. A pattern with no constants has nothing that identifies

@@ -23,20 +23,32 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   extractConstantsFromPattern,
   escapeForMatchAll,
-  MAX_PATTERNS_PER_ALERT,
+  patternSeverityKeyForPattern,
+  type PatternSeverityKey,
 } from "./patternUtils";
 import { buildPrefillFromPatterns } from "@/utils/alerts/prefill/fromPatterns";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 
-/** Tri-state per pattern: unselected → include → exclude → unselected. */
-export type PatternSelection = "include" | "exclude";
+
 
 /**
- * Module-scoped so every caller of usePatternActions() sees the same selection.
- * The pattern list, the selection bar, and the detail drawer are separate
- * call sites; a per-call ref would let them disagree about what is selected.
+ * The severity chips' state, module-scoped so it is shared between the pattern
+ * list that owns the chips and the alert builder that has to know which
+ * patterns are actually on screen. A per-call ref would let the two disagree.
  * Mirrors how searchState keeps searchObj a singleton.
  */
-const patternSelection = ref(new Map<string, PatternSelection>());
+const activeSeverities = ref<PatternSeverityKey[]>([]);
+
+const setActiveSeverities = (next: PatternSeverityKey[]) => {
+  activeSeverities.value = next;
+};
+
+/** The patterns the user can currently see — the chips narrow this set. */
+const visiblePatterns = (all: any[]): any[] => {
+  if (!activeSeverities.value.length) return all;
+  const active = new Set(activeSeverities.value);
+  return all.filter((p) => active.has(patternSeverityKeyForPattern(p)));
+};
 
 export const usePatternActions = () => {
   const store = useStore();
@@ -126,101 +138,35 @@ export const usePatternActions = () => {
     searchObj.meta.logsVisualizeToggle = "logs";
   };
 
-  // ── Alert selection (include / exclude) ─────────────────────────────────
-  //
-  // Distinct from addPatternToSearch above: those actions filter the SEARCH,
-  // these build an ALERT. Tri-state per pattern, keyed by pattern_id.
-
-  const selectionOf = (pattern: any): PatternSelection | null =>
-    patternSelection.value.get(pattern?.pattern_id) ?? null;
-
-  /** A pattern with no invariant constants cannot be expressed as a filter. */
-  const isPatternSelectable = (pattern: any): boolean =>
-    extractConstantsFromPattern(pattern?.template ?? "").length > 0;
-
-  const cycleSelection = (pattern: any) => {
-    if (!isPatternSelectable(pattern)) {
-      toast({ variant: "warning", message: t("logs.patternList.noMatchTerms") });
-      return;
-    }
-
-    const id = pattern.pattern_id;
-    const next = new Map(patternSelection.value);
-    const current = next.get(id) ?? null;
-
-    if (current === null) {
-      if (next.size >= MAX_PATTERNS_PER_ALERT) {
-        toast({
-          variant: "warning",
-          message: t("logs.patternList.alertPatternLimit", { max: MAX_PATTERNS_PER_ALERT }),
-        });
-        return;
-      }
-      next.set(id, "include");
-    } else if (current === "include") {
-      next.set(id, "exclude");
-    } else {
-      next.delete(id);
-    }
-
-    patternSelection.value = next;
-  };
-
-  const clearSelection = () => {
-    patternSelection.value = new Map();
-  };
-
-  const templatesFor = (kind: PatternSelection): string[] => {
-    const all = patternsState.value.patterns?.patterns ?? [];
-    return all
-      .filter((p: any) => patternSelection.value.get(p.pattern_id) === kind)
-      .map((p: any) => p.template);
-  };
-
-  const includedCount = computed(
-    () => [...patternSelection.value.values()].filter((v) => v === "include").length,
-  );
-  const excludedCount = computed(
-    () => [...patternSelection.value.values()].filter((v) => v === "exclude").length,
-  );
-  const hasSelection = computed(() => patternSelection.value.size > 0);
-
-  // pattern_ids are not stable across runs, so a stale selection would point at
-  // patterns that no longer exist. Drop it when the result set is replaced.
-  watch(
-    () => patternsState.value.patterns?.patterns,
-    (next, previous) => {
-      if (previous && next !== previous && patternSelection.value.size) {
-        clearSelection();
-        toast({ variant: "info", message: t("logs.patternList.alertSelectionCleared") });
-      }
-    },
-  );
-
-  const alertDisabledReason = computed(() => {
-    if (!searchObj.data.stream.selectedStream?.[0]) {
-      return t("logs.patternList.noStreamSelected");
-    }
-    if (!hasSelection.value) return t("logs.patternList.alertNoSelection");
-    return null;
-  });
+  // ── Alert creation from the visible patterns ────────────────────────────
 
   /**
-   * The patterns tab's contribution to alert creation. In SQL mode the editor
-   * holds a whole statement rather than a WHERE fragment, so it cannot be
-   * spliced in front of the pattern terms — we say so instead of silently
-   * dropping the user's query.
+   * The patterns tab's contribution to alert creation: fold the patterns the
+   * user can currently see into the alert's filter.
+   *
+   * `mode` comes from the confirm dialog, which re-invokes this builder when the
+   * user switches between including and ignoring — the dialog never rewrites SQL
+   * itself, so it stays ignorant of what a pattern is.
+   *
+   * In SQL mode the editor holds a whole statement rather than a WHERE fragment,
+   * so it cannot be spliced in front of the pattern terms; we say so instead of
+   * silently dropping the user's query.
    */
-  const buildPatternsAlertPrefill = () => {
+  const buildPatternsAlertPrefill = (options: AlertBuildOptions = {}) => {
     const dt = (searchObj.data as any).datetime;
     const sqlMode = !!searchObj.meta.sqlMode;
     const rawQuery = (searchObj.data.query ?? "").trim();
 
+    const all = patternsState.value.patterns?.patterns ?? [];
+    const visible = visiblePatterns(all);
+
     return buildPrefillFromPatterns({
       streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
       streamType: searchObj.data.stream.streamType,
-      includes: templatesFor("include"),
-      excludes: templatesFor("exclude"),
+      templates: visible.map((p: any) => p.template),
+      totalCount: all.length,
+      filtered: visible.length !== all.length,
+      mode: options.patternMode ?? "exclude",
       baseFilter: sqlMode ? undefined : rawQuery,
       baseFilterDropped: sqlMode && !!rawQuery,
       datetime: dt
@@ -242,8 +188,12 @@ export const usePatternActions = () => {
     return buildPrefillFromPatterns({
       streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
       streamType: searchObj.data.stream.streamType,
-      includes: [pattern?.template ?? ""],
-      excludes: [],
+      templates: [pattern?.template ?? ""],
+      totalCount: 1,
+      mode: "include",
+      // The user named this pattern; falling back to an alert on the whole
+      // stream would not be what they asked for.
+      requirePatterns: true,
       datetime: dt
         ? {
             type: dt.type,
@@ -264,15 +214,8 @@ export const usePatternActions = () => {
     navTotal,
     addPatternToSearch,
     addWildcardValueToSearch,
-    patternSelection,
-    selectionOf,
-    isPatternSelectable,
-    cycleSelection,
-    clearSelection,
-    includedCount,
-    excludedCount,
-    hasSelection,
-    alertDisabledReason,
+    activeSeverities,
+    setActiveSeverities,
     buildPatternsAlertPrefill,
     buildSinglePatternAlertPrefill,
   };

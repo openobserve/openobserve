@@ -63,6 +63,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ORadioGroup>
       </div>
 
+      <!-- Patterns. Shown only when the surface declares it can fold patterns
+           into the query. The dialog never touches SQL itself — it asks the
+           surface to rebuild with the chosen mode, which is what lets this stay
+           ignorant of what a pattern actually is. -->
+      <div v-if="prefill.patternFilter" class="flex flex-col gap-2">
+        <span class="text-text-secondary text-xs font-medium">
+          {{ t("alerts.prefill.dialog.patternsLabel") }}
+        </span>
+        <OToggleGroup
+          :model-value="patternMode"
+          type="single"
+          data-test="create-alert-pattern-mode"
+          @update:model-value="onPatternModeChange"
+        >
+          <OToggleGroupItem value="none" size="xs" data-test="create-alert-patterns-none">
+            {{ t("alerts.prefill.dialog.patternsNone") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="include" size="xs" data-test="create-alert-patterns-include">
+            {{ t("alerts.prefill.dialog.patternsIncludeAll") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="exclude" size="xs" data-test="create-alert-patterns-exclude">
+            {{ t("alerts.prefill.dialog.patternsExcludeAll") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+
+        <!-- The severity chips narrow which patterns are used. Stating it here
+             keeps the alert from depending on a view filter invisibly. -->
+        <span class="text-text-secondary text-xs" data-test="create-alert-pattern-scope">
+          {{
+            prefill.patternFilter.filtered
+              ? t("alerts.prefill.dialog.patternsScopeFiltered", {
+                  visible: prefill.patternFilter.visibleCount,
+                  total: prefill.patternFilter.totalCount,
+                })
+              : t("alerts.prefill.dialog.patternsScopeAll", {
+                  total: prefill.patternFilter.totalCount,
+                })
+          }}
+        </span>
+      </div>
+
       <!-- How the alert counts what the query returns. -->
       <div class="flex flex-col gap-2">
         <span class="text-text-secondary text-xs font-medium">
@@ -98,6 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.prefill.dialog.queryLabel") }}
         </span>
         <OCodeBlock
+          wrap
+          :max-lines="10"
           :code="previewQuery"
           :lang="prefill.queryType === 'promql' ? 'promql' : 'sql'"
           :copy-message="t('alerts.prefill.dialog.queryCopied')"
@@ -131,6 +174,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type {
+  AlertBuildOptions,
+  AlertPatternMode,
   AlertPrefill,
   AlertPrefillThresholdShape,
   AlertPrefillWarning,
@@ -138,6 +183,7 @@ import type {
 } from "@/ts/interfaces/alertPrefill";
 import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import { formatSqlForDisplay } from "@/utils/query/formatSql";
 
 const props = defineProps<{
   open: boolean;
@@ -149,6 +195,8 @@ const emit = defineEmits<{
   /** The prefill with the user's dialog choices folded in. */
   (e: "confirm", prefill: AlertPrefill): void;
   (e: "cancel"): void;
+  /** Ask the source to rebuild its prefill with different options. */
+  (e: "rebuild", options: AlertBuildOptions): void;
 }>();
 
 const { t } = useI18n();
@@ -165,14 +213,30 @@ const isBlocked = computed(() => (props.prefill ? isPrefillBlocked(props.prefill
 
 const hasStreamChoice = computed(() => (props.prefill?.streamCandidates?.length ?? 0) > 1);
 
+const patternMode = computed<AlertPatternMode>(() => props.prefill?.patternFilter?.mode ?? "none");
+
+const onPatternModeChange = (value: unknown) => {
+  if (!value || value === patternMode.value) return;
+  emit("rebuild", { patternMode: value as AlertPatternMode });
+};
+
 const showQuery = computed(() => {
   if (!props.prefill) return false;
   return getAlertSource(props.prefill.source).showQueryPreview && !!previewQuery.value;
 });
 
-const previewQuery = computed(
-  () => (props.prefill?.queryType === "promql" ? props.prefill?.promql : props.prefill?.sql) ?? "",
-);
+/**
+ * Formatted for reading only — the prefill still carries the query verbatim, so
+ * what gets saved is exactly what the surface produced.
+ */
+const previewQuery = computed(() => {
+  const prefill = props.prefill;
+  if (!prefill) return "";
+
+  return prefill.queryType === "promql"
+    ? (prefill.promql ?? "")
+    : formatSqlForDisplay(prefill.sql);
+});
 
 // Seed the controls from the incoming prefill each time the dialog opens, so a
 // second run never inherits the previous run's answers.

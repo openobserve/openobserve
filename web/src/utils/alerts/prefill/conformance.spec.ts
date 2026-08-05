@@ -84,10 +84,12 @@ const ADAPTERS: AdapterCase[] = [
       buildPrefillFromPatterns({
         streamName: "k8s_logs",
         streamType: "logs",
-        includes: ["Connection refused to upstream <*>"],
+        templates: ["Connection refused to upstream <*>"],
+        totalCount: 1,
+        mode: "exclude",
         datetime: { type: "relative", relativeTimePeriod: "15m" },
       }),
-    degenerate: () => buildPrefillFromPatterns({ streamName: "", includes: [], excludes: [] }),
+    degenerate: () => buildPrefillFromPatterns({ streamName: "", templates: [] }),
   },
 ];
 
