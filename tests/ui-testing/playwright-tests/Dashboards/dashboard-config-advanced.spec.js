@@ -328,23 +328,29 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await expect(fillOpacity).toBeVisible();
     testLogger.info("Area type shows line width + fill opacity");
 
-    // Enabling the sparkline adds an independent trend query: Apply must fire
-    // EXACTLY two data queries in parallel — the metric value + the sparkline
-    // histogram (is_ui_histogram) — and nothing else. Listen on 'response' (not
-    // 'request') to match this suite's proven-working network-assertion pattern.
+    // fetchSparklineHistogram (usePanelSQLExecutor.ts) is a fire-and-forget 2nd
+    // fetch — the main query alone flips loading=false, so waitForChartToRender
+    // (which polls the Apply button's disabled state) can resolve BEFORE the
+    // histogram response arrives. Wait on the actual network event instead of
+    // that UI proxy signal, or the count gets read too early.
+    const allCalls = [];
     const searchCalls = [];
-    const isDataQuery = (url) => /\/_search(_multi)?(_stream)?\?/.test(url);
+    const isDataQuery = (url) => /_search|query_range|prometheus\/api/.test(url);
     const onResponse = (res) => {
       const url = res.url();
-      if (isDataQuery(url)) searchCalls.push({ isHistogram: url.includes("is_ui_histogram") });
+      if (url.includes("/api/")) allCalls.push({ url, status: res.status() });
+      if (isDataQuery(url)) searchCalls.push({ url, isHistogram: url.includes("is_ui_histogram") });
     };
     page.on("response", onResponse);
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+    await page
+      .waitForResponse((res) => isDataQuery(res.url()) && res.url().includes("is_ui_histogram"), { timeout: 20000 })
+      .catch((e) => testLogger.warn("histogram response wait:", e.message));
     page.off("response", onResponse);
 
-    expect(searchCalls.length).toBe(2);
+    testLogger.info("Network activity during Apply", { allCalls, searchCalls });
+    expect(searchCalls.length, `captured /api/ calls: ${JSON.stringify(allCalls)}`).toBe(2);
     expect(searchCalls.some((c) => c.isHistogram)).toBe(true);
     testLogger.info("Apply fired exactly 2 data queries (metric value + sparkline histogram)");
 
@@ -407,18 +413,18 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
     const rows = pm.dashboardPanelConfigs.valueMappingRows(popup);
-
     await rows.first().waitFor({ state: "visible", timeout: 10000 });
-    const baseline = await rows.count();
-    expect(baseline).toBeGreaterThanOrEqual(1);
+    const beforeAdd = await rows.count();
+    expect(beforeAdd).toBeGreaterThanOrEqual(1);
     await pm.dashboardPanelConfigs.fillValueMappingRow(popup, 0, { value: "ok", text: "OK" });
 
     // Add a row, then delete the last one via the relocated per-row delete button
     await pm.dashboardPanelConfigs.addValueMappingRow(popup);
-    await expect(rows).toHaveCount(baseline + 1);
-    await pm.dashboardPanelConfigs.deleteValueMappingRow(popup, baseline);
-    await expect(rows).toHaveCount(baseline);
-    testLogger.info("Value mapping row added then removed", { baseline });
+    await expect(rows).toHaveCount(beforeAdd + 1);
+    const beforeDelete = await rows.count();
+    await pm.dashboardPanelConfigs.deleteValueMappingRow(popup, beforeDelete - 1);
+    await expect(rows).toHaveCount(beforeDelete - 1);
+    testLogger.info("Value mapping row added then removed", { beforeAdd, beforeDelete });
 
     await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
     await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();

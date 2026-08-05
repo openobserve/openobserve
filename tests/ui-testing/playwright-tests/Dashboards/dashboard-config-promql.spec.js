@@ -772,18 +772,29 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.enableSparkline();
     expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
 
+    // Track ALL network activity (not just the expected pattern) so a mismatch
+    // is diagnosable. Wait on the actual query_range response rather than
+    // waitForChartToRender's button-disabled polling — see the SQL sparkline
+    // test for why that UI proxy signal can resolve before the fetch lands.
+    const allCalls = [];
     const promqlCalls = [];
+    const isPromQLQuery = (url) => url.includes("/prometheus/api/v1/query");
     const onResponse = (res) => {
+      const url = res.url();
+      if (url.includes("/api/")) allCalls.push({ url, status: res.status() });
       // matches /prometheus/api/v1/query and .../query_range, not .../format_query
-      if (res.url().includes("/prometheus/api/v1/query")) promqlCalls.push(res.url());
+      if (isPromQLQuery(url)) promqlCalls.push(url);
     };
     page.on("response", onResponse);
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+    await page
+      .waitForResponse((res) => isPromQLQuery(res.url()), { timeout: 20000 })
+      .catch((e) => testLogger.warn("query_range response wait:", e.message));
     page.off("response", onResponse);
 
-    expect(promqlCalls.length).toBe(1);
+    testLogger.info("Network activity during Apply", { allCalls, promqlCalls });
+    expect(promqlCalls.length, `captured /api/ calls: ${JSON.stringify(allCalls)}`).toBe(1);
     testLogger.info("PromQL sparkline Apply fired exactly 1 query_range (no histogram)");
 
     // Metric renders as SVG; the sparkline trend draws at least one path. Wait
@@ -823,8 +834,22 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
     testLogger.info("Between-range value mapping configured on PromQL metric panel");
 
+    // Capture any failed backend call so a panel error is diagnosable — the
+    // UI only ever shows a generic "Error Loading Data" for non-4xx errors
+    // (see PanelSchemaRenderer.vue), hiding the real backend reason.
+    const failedCalls = [];
+    const onResponse = async (res) => {
+      const url = res.url();
+      if (url.includes("/api/") && res.status() >= 400) {
+        const body = await res.text().catch(() => "<unreadable>");
+        failedCalls.push({ url, status: res.status(), body: body.slice(0, 500) });
+      }
+    };
+    page.on("response", onResponse);
+
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+    page.off("response", onResponse);
 
     // The mapped text replaces the metric value on the SVG renderer
     const chart = page.locator('[data-test="chart-renderer"]');
@@ -834,7 +859,8 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       errorMessage.waitFor({ state: "visible", timeout: 15000 }),
     ]).catch(() => {});
     const errText = await errorMessage.textContent().catch(() => null);
-    expect(errText, "chart-renderer did not appear; panel error").toBeNull();
+    if (errText) testLogger.error("Panel error — failed backend calls", { errText, failedCalls });
+    expect(errText, `chart-renderer did not appear; panel error. Failed calls: ${JSON.stringify(failedCalls)}`).toBeNull();
     await expect(chart).toBeVisible();
     await expect(chart).toContainText("PROMQL_MAPPED");
     testLogger.info("Mapped text reflected in the PromQL metric chart");
