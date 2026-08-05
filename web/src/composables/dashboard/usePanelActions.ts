@@ -18,6 +18,9 @@ import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
 import { toast } from "@/lib/feedback/Toast/useToast";
+// `gt`, not useI18nTyped: this composable takes router/store as injected deps
+// so it can be constructed outside a component, and useI18n() throws there.
+import { gt } from "@/types/i18n";
 
 // Helper function to properly wrap CSV values
 export const wrapCsvValue = (val: any): string => {
@@ -186,7 +189,7 @@ export function usePanelAlertCreation({
     if (!launched) {
       toast({
         variant: "error",
-        message: "This panel's query has no stream to alert on.",
+        message: gt("toastMessages.dashboard.panelQueryHasNoStreamToAlertOn"),
       });
     }
   };

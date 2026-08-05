@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="isOpen"
     size="md"
     :title="t('alerts.prefill.dialog.title')"
-    :sub-title="prefill?.sourceLabel"
+    :sub-title="raw(prefill?.sourceLabel)"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('alerts.prefill.dialog.continue')"
     :primary-button-disabled="isBlocked"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="candidate in prefill.streamCandidates"
             :key="candidate.name"
             :value="candidate.name"
-            :label="candidate.name"
+            :label="raw(candidate.name)"
             :data-test="`create-alert-stream-option-${candidate.name}`"
           />
         </ORadioGroup>
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -199,7 +199,7 @@ const emit = defineEmits<{
   (e: "rebuild", options: AlertBuildOptions): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const selectedStream = ref("");
 const thresholdShape = ref<AlertPrefillThresholdShape>("matching-rows");

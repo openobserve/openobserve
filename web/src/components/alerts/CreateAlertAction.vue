@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -96,7 +96,7 @@ const props = withDefaults(
     build: (options?: AlertBuildOptions) => AlertPrefill;
     variant?: "menu-item" | "button" | "icon";
     /** Non-null disables the control and is shown as the tooltip reason. */
-    disabledReason?: string | null;
+    disabledReason?: I18nText | null;
     /** Folder the alert lands in. */
     folder?: string;
     buttonVariant?: "primary" | "secondary" | "outline" | "ghost";
@@ -110,7 +110,7 @@ const props = withDefaults(
   },
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { openAlertCreation } = useAlertCreation();
 
 const source_ = computed(() => getAlertSource(props.source));
