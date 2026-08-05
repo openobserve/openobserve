@@ -19,8 +19,6 @@
 // a toast `message`), because deciding "is this user-facing?" from the string alone
 // is guesswork. Declaring the field `I18nText` moves that decision to the author.
 // Nothing here is hand-maintained: `I18nKey` derives from en-US.json at compile time.
-//
-// See I18N_ENFORCEMENT_GUIDE.md for the full design.
 
 import type { JsonPaths } from "@intlify/core-base";
 import { useI18n } from "vue-i18n";

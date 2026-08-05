@@ -79,7 +79,7 @@ const noLegacyO2Tokens = {
 // so it is a last resort — only for a token that recurs AND sits in a bare text
 // node, where there is no declaration to annotate. Everything else has a better
 // home: a union type if code branches on it, otherwise `raw("…")` at the call
-// site. Never add real UI text. See I18N_ENFORCEMENT_GUIDE.md §2.
+// site. Never add real UI text.
 //
 // Matching is whole-text, so "s" allows a bare `s` node, not the "s" in "settings".
 const GLYPHS_AND_UNITS = [

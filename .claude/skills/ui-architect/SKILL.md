@@ -157,18 +157,22 @@ read it once, it is the backbone of everything below.
    > | `v-text` / `v-html` literal | `local/no-bare-bound-text-props` |
    > | Component prop — `label="Save"` **or** `:label="'Save'"` | **`I18nText` type** |
    > | Any string in `<script>` / `.ts` | **`I18nText` type** |
+   > | Native HTML/ARIA attr — `<input placeholder="Search">` | `vue/no-bare-strings-in-template` |
    > | `t('x.y')` key exists | `@intlify/vue-i18n/no-missing-keys` |
    > | A key stored as data (`titleKey`) | **`I18nKey` type** |
    >
    > Two consequences worth internalising:
-   > - **The lint rules do NOT check attributes.** `attributes: {}` in the rule config
-   >   switches that off deliberately — a text-carrying prop is caught by its
-   >   `I18nText` declaration instead, which is strictly stronger (it also rejects a
-   >   plain `string` variable, which no lint rule could). There is no `TEXT_ATTRS`
-   >   list any more; **declare the prop `I18nText` and you are done.**
-   > - **A NATIVE HTML attribute is currently checked by nothing** — `title=`,
-   >   `placeholder=`, `alt=` on a plain `<div>`/`<input>` are `string`, not
-   >   `I18nText`. There are no offenders today; don't add the first one.
+   > - **Lint does NOT check component props** — that is deliberate. A text-carrying
+   >   prop is caught by its `I18nText` declaration, which is strictly stronger (it
+   >   also rejects a plain `string` variable, which no lint rule could see). There
+   >   is no `TEXT_ATTRS` list any more; **declare the prop `I18nText` and you are
+   >   done.**
+   > - **Native HTML/ARIA text attributes ARE linted** — `title`, `alt`, `aria-label`
+   >   (+ `aria-placeholder` / `aria-roledescription` / `aria-valuetext`) on any
+   >   element, and `placeholder` on `<input>` / `<textarea>`. They get lint rather
+   >   than the type because a native element has no prop to annotate. Residual gap:
+   >   only the STATIC form is covered, so `:title="'Delete'"` still slips through —
+   >   don't reach for it to dodge the error.
    >
    > **Non-translatable text — the ladder.** Decide in this order:
    >
@@ -431,11 +435,13 @@ considering the UI done:
       a text node, a static prop `label="…"`, a bound prop `:label="'…'"`, a
       `{{ '…' }}` mustache, or `v-text`) uses
       `t()` with the key added to `web/src/locales/languages/en-US.json` in the same
-      change. Text NODES, `{{ '…' }}` mustaches and `v-text`/`v-html` are caught by
-      ESLint (`no-missing-keys`, `vue/no-bare-strings-in-template`,
-      `local/no-bare-bound-text-props` — all **error**); PROPS (static or bound) are
-      caught by declaring them `I18nText`, not by any lint rule. New text-carrying
-      component prop → type it `I18nText`; there is no `TEXT_ATTRS` list any more.
+      change. Text NODES, `{{ '…' }}` mustaches, `v-text`/`v-html`, and native
+      HTML/ARIA attributes (`title`, `alt`, `aria-label`, `placeholder`) are caught
+      by ESLint (`no-missing-keys`, `vue/no-bare-strings-in-template`,
+      `local/no-bare-bound-text-props` — all **error**); COMPONENT props (static or
+      bound) are caught by declaring them `I18nText`, not by any lint rule. New
+      text-carrying component prop → type it `I18nText`; there is no `TEXT_ATTRS`
+      list any more.
       Non-translatable strings use `raw("…")` — **never** an `eslint-disable`.
 - [ ] Any **new type / interface / `*.types.ts`** field that carries UI text or an
       i18n key is declared `I18nText` / `I18nKey` (from `@/types/i18n`), not bare
