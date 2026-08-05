@@ -827,7 +827,7 @@ export const convertPromQLData = async (
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
         const series = it?.result?.map((metric: any) => {
-          const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+          const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
 
           const seriesName = getPromqlLegendName(
@@ -949,10 +949,9 @@ export const convertPromQLData = async (
 
         switch (it?.resultType) {
           case "matrix": {
-            // take first result
             const metric = it?.result?.[0];
 
-            const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+            const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
             const latestValue = values[values.length - 1]?.[1] ?? 0;
 
             const metricStyle = resolveMetricValueStyle(latestValue, {
