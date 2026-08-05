@@ -2395,7 +2395,19 @@ export class AlertsPage {
             };
         });
 
-        await this.page.locator(this.locators.alertExportButton).click();
+        // The Export button is disabled until at least one alert is selected. The select-all
+        // click above can race the row render (nothing ends up selected), so the button never
+        // becomes actionable and a plain click 45s-timed-out. Ensure the selection took and the
+        // button is ready (re-selecting if needed) before clicking.
+        const exportBtn = this.page.locator(this.locators.alertExportButton);
+        await expect(async () => {
+            if (!(await exportBtn.isEnabled().catch(() => false))) {
+                await headerCheckbox.click().catch(() => {});
+            }
+            await expect(exportBtn).toBeVisible({ timeout: 3000 });
+            await expect(exportBtn).toBeEnabled({ timeout: 3000 });
+        }).toPass({ timeout: 30000 });
+        await exportBtn.click();
         await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 
