@@ -27,6 +27,7 @@ import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
 
@@ -94,6 +95,8 @@ interface StatusInfo {
   label: string;
   iconClass: string;
   message: string;
+  /** Color of the always-visible message line under the row. */
+  messageClass: string;
   badgeVariant: "success-outline" | "info-outline" | "warning-outline" | "error-outline";
   actionLabel: string;
   actionVariant: "outline";
@@ -109,6 +112,7 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
       label: t("synthetics.locations.statusReady"),
       iconClass: "text-status-success-text",
       message: "",
+      messageClass: "",
       badgeVariant: "success-outline",
       actionLabel: t("synthetics.locations.addAgent"),
       actionVariant: "outline",
@@ -122,6 +126,7 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
       label: t("synthetics.locations.statusConnecting"),
       iconClass: "text-status-info-text",
       message: t("synthetics.locations.connectingMessage"),
+      messageClass: "text-text-secondary",
       badgeVariant: "info-outline",
       actionLabel: t("synthetics.locations.installAgent"),
       actionVariant: "outline",
@@ -140,6 +145,7 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
       label: t("synthetics.locations.statusDown"),
       iconClass: "text-status-error-text",
       message: t("synthetics.locations.downMessage"),
+      messageClass: "text-status-error-text",
       badgeVariant: "error-outline",
       actionLabel: t("synthetics.locations.addAgent"),
       actionVariant: "outline",
@@ -152,6 +158,7 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
     label: t("synthetics.locations.statusOffline"),
     iconClass: "text-status-error-text",
     message: t("synthetics.locations.offlineMessage"),
+    messageClass: "text-status-warning-text",
     badgeVariant: "warning-outline",
     actionLabel: t("synthetics.locations.addAgent"),
     actionVariant: "outline",
@@ -199,17 +206,15 @@ function agentDisplay(location: SyntheticsLocation): AgentDisplay {
     };
   }
 
-  if (location.status === "pending") {
-    return {
-      firstAgent: "",
-      extra: 0,
-      allNames: [],
-      count: 0,
-      statusText: t("synthetics.locations.pendingAgent"),
-    };
-  }
-
-  return { firstAgent: "", extra: 0, allNames: [], count: 0, statusText: "" };
+  // pending, offline without a last-seen timestamp, or an unknown status:
+  // the location has never had an agent report in.
+  return {
+    firstAgent: "",
+    extra: 0,
+    allNames: [],
+    count: 0,
+    statusText: t("synthetics.locations.pendingAgent"),
+  };
 }
 
 // ── Location lists ───────────────────────────────────────────────────────────
@@ -233,6 +238,28 @@ const privateLocations = computed(() => {
 
 const filteredPrivateLocations = computed(() => privateLocations.value.filter(matchesSearch));
 
+/** Private rows with status/agent info resolved once per list change instead of
+ *  on every template access. */
+const privateRows = computed(() =>
+  filteredPrivateLocations.value.map((location) => ({
+    location,
+    status: getStatusInfo(location),
+    agents: agentDisplay(location),
+  })),
+);
+
+const hasSearch = computed(() => searchQuery.value.trim().length > 0);
+
+/** The search matched nothing at all — distinct from having no locations, so
+ *  the private section's creation empty state must not claim "no locations". */
+const noSearchResults = computed(
+  () =>
+    hasSearch.value &&
+    props.locations.length > 0 &&
+    filteredPublicLocations.value.length === 0 &&
+    filteredPrivateLocations.value.length === 0,
+);
+
 const selectedLocations = computed({
   get: () => props.check.locations,
   set: (v: (string | number)[]) =>
@@ -249,12 +276,14 @@ const selectedLocations = computed({
       </h3>
     </div>
     <div class="flex flex-col gap-3 px-3 py-2">
-      <!-- ── Search + refresh ────────────────────────────────────────────────── -->
-      <div v-if="!loadingLocations" class="flex items-center gap-2">
+      <!-- ── Search + refresh — kept mounted during loading so a refresh doesn't
+           flicker the row away and drop the user's query context. -->
+      <div class="flex items-center gap-2">
         <OInput
           v-model="searchQuery"
           type="search"
           :placeholder="t('synthetics.locations.searchPlaceholder')"
+          :disabled="loadingLocations"
           class="flex-1"
           data-test="synthetics-check-locations-search"
         />
@@ -262,6 +291,7 @@ const selectedLocations = computed({
           variant="outline"
           size="sm"
           icon-left="refresh"
+          :loading="loadingLocations"
           data-test="synthetics-check-locations-refresh-btn"
           @click="emit('refresh-locations')"
         />
@@ -320,6 +350,15 @@ const selectedLocations = computed({
             </template>
           </OCheckbox>
 
+          <!-- ── Search matched nothing ───────────────────────────────────── -->
+          <OEmptyState
+            v-if="noSearchResults"
+            size="inline"
+            icon="search-off"
+            :title="t('synthetics.locations.noSearchResults')"
+            data-test="synthetics-check-locations-no-results"
+          />
+
           <!-- ── Private section ──────────────────────────────────────────── -->
           <template v-if="allowPrivate">
             <div class="flex items-center justify-between pt-2 pb-1">
@@ -342,9 +381,9 @@ const selectedLocations = computed({
             </div>
 
             <!-- ── Private location rows ─────────────────────────────────── -->
-            <template v-if="filteredPrivateLocations.length">
+            <template v-if="privateRows.length">
               <div
-                v-for="location in filteredPrivateLocations"
+                v-for="{ location, status, agents } in privateRows"
                 :key="location.id"
                 class="flex items-start gap-2 pb-2"
               >
@@ -357,72 +396,66 @@ const selectedLocations = computed({
                     <span class="flex flex-col gap-0.5">
                       <span class="flex items-center gap-1.5">
                         <OIcon
-                          :name="getStatusInfo(location).icon"
+                          :name="status.icon"
                           size="sm"
-                          :class="getStatusInfo(location).iconClass"
+                          :class="status.iconClass"
                           :data-test="`synthetics-check-locations-status-icon-${location.id}`"
                         />
                         {{ locationDisplayName(location) }}
-                        <OTooltip
-                          v-if="getStatusInfo(location).message"
-                          :content="getStatusInfo(location).message"
-                        >
-                          <OBadge
-                            :variant="getStatusInfo(location).badgeVariant"
-                            size="xs"
-                            :data-test="`synthetics-check-locations-status-badge-${location.id}`"
-                          >
-                            {{ getStatusInfo(location).label }}
-                          </OBadge>
-                        </OTooltip>
                         <OBadge
-                          v-else
-                          :variant="getStatusInfo(location).badgeVariant"
+                          :variant="status.badgeVariant"
                           size="xs"
                           :data-test="`synthetics-check-locations-status-badge-${location.id}`"
                         >
-                          {{ getStatusInfo(location).label }}
+                          {{ status.label }}
                         </OBadge>
                       </span>
                       <span class="text-text-label text-xs">
-                        {{ agentDisplay(location).statusText
-                        }}<template v-if="agentDisplay(location).firstAgent">
+                        {{ agents.statusText
+                        }}<template v-if="agents.firstAgent">
                           ·
-                          <span class="text-text-secondary">{{
-                            agentDisplay(location).firstAgent
-                          }}</span>
+                          <span class="text-text-secondary">{{ agents.firstAgent }}</span>
                         </template>
-                        <OTooltip
-                          v-if="agentDisplay(location).extra > 0"
-                          :content="agentDisplay(location).allNames.join(', ')"
-                        >
+                        <OTooltip v-if="agents.extra > 0" :content="agents.allNames.join(', ')">
                           <OBadge
                             variant="default"
                             size="xs"
                             class="ml-2"
                             :data-test="`synthetics-check-locations-extra-agents-${location.id}`"
                           >
-                            +{{ agentDisplay(location).extra }}
+                            +{{ agents.extra }}
                           </OBadge>
                         </OTooltip>
+                      </span>
+                      <!-- Always-visible guidance for not-ready locations — a
+                           tooltip alone hides it from touch and keyboard users. -->
+                      <span
+                        v-if="status.message"
+                        class="text-xs"
+                        :class="status.messageClass"
+                        :data-test="`synthetics-check-locations-warning-${location.id}`"
+                      >
+                        {{ status.message }}
                       </span>
                     </span>
                   </template>
                 </OCheckbox>
                 <OButton
-                  :variant="getStatusInfo(location).actionVariant"
+                  :variant="status.actionVariant"
                   size="xs"
                   :data-test="`synthetics-check-locations-add-agent-${location.id}`"
                   @click="emit('add-agent', location.id)"
                 >
-                  {{ getStatusInfo(location).actionLabel }}
+                  {{ status.actionLabel }}
                 </OButton>
               </div>
             </template>
 
-            <!-- ── No private locations ──────────────────────────────────── -->
+            <!-- ── No private locations at all — hidden while a search is
+                 filtering them out, so the creation CTA never masquerades as a
+                 "no results" state (that case is the no-results block above). -->
             <div
-              v-else
+              v-else-if="!privateLocations.length"
               class="rounded-default border-border-default text-text-secondary flex flex-col items-center gap-2 border border-dashed px-3 py-4 text-sm"
               data-test="synthetics-check-locations-private-empty"
             >

@@ -137,6 +137,11 @@ const OBadgeStub = {
   template: '<span v-bind="$attrs" :data-variant="variant"><slot /></span>',
 };
 
+const OEmptyStateStub = {
+  props: ["size", "icon", "title", "preset", "filtered"],
+  template: '<div v-bind="$attrs" class="empty-state-stub">{{ title }}</div>',
+};
+
 const STUBS = {
   OCheckboxGroup: OCheckboxGroupStub,
   OCheckbox: OCheckboxStub,
@@ -146,6 +151,7 @@ const STUBS = {
   SkeletonBox: SkeletonBoxStub,
   OTooltip: OTooltipStub,
   OBadge: OBadgeStub,
+  OEmptyState: OEmptyStateStub,
 };
 
 // ── Mount factory ────────────────────────────────────────────────────────────
@@ -516,6 +522,37 @@ describe("CheckLocations", () => {
       expect(offlineBadge.attributes("data-variant")).toBe("warning-outline");
       expect(offlineBadge.text()).toContain("synthetics.locations.statusOffline");
     });
+
+    it("should show a visible guidance message for every not-ready location", () => {
+      wrapper = mountWithPrivate();
+
+      const offlineWarning = wrapper.find(
+        '[data-test="synthetics-check-locations-warning-private-offline-1"]',
+      );
+      expect(offlineWarning.exists()).toBe(true);
+      expect(offlineWarning.text()).toContain("synthetics.locations.offlineMessage");
+
+      const downWarning = wrapper.find(
+        '[data-test="synthetics-check-locations-warning-private-down-1"]',
+      );
+      expect(downWarning.exists()).toBe(true);
+      expect(downWarning.text()).toContain("synthetics.locations.downMessage");
+
+      const pendingWarning = wrapper.find(
+        '[data-test="synthetics-check-locations-warning-private-pending-1"]',
+      );
+      expect(pendingWarning.exists()).toBe(true);
+      expect(pendingWarning.text()).toContain("synthetics.locations.connectingMessage");
+    });
+
+    it("should not show a guidance message for online locations", () => {
+      wrapper = mountWithPrivate();
+      expect(
+        wrapper
+          .find('[data-test="synthetics-check-locations-warning-private-mumbai-1"]')
+          .exists(),
+      ).toBe(false);
+    });
   });
 
   // ── Agent display ───────────────────────────────────────────────────────
@@ -555,6 +592,24 @@ describe("CheckLocations", () => {
           .find('[data-test="synthetics-check-locations-extra-agents-private-offline-1"]')
           .exists(),
       ).toBe(false);
+    });
+
+    it("should fall back to the waiting-for-agent text for offline locations without last_seen_at", () => {
+      const neverSeen: SyntheticsLocation = {
+        id: "private-never-1",
+        label: "never-seen",
+        region: "",
+        provider: "",
+        kind: "private",
+        status: "offline",
+      };
+      wrapper = mountWithPrivate({ locations: [neverSeen] });
+
+      const row = wrapper.find(
+        '[data-test="synthetics-check-locations-option-private-never-1"]',
+      );
+      expect(row.exists()).toBe(true);
+      expect(row.text()).toContain("synthetics.locations.pendingAgent");
     });
   });
 
@@ -599,6 +654,73 @@ describe("CheckLocations", () => {
       }));
       wrapper = mountCheckLocations({ locations: manyLocations });
       expect(wrapper.find('[data-test="synthetics-check-locations-search"]').exists()).toBe(true);
+    });
+
+    it("should keep the search row visible while loading", () => {
+      wrapper = mountCheckLocations({ loadingLocations: true });
+      expect(wrapper.find('[data-test="synthetics-check-locations-search"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-check-locations-refresh-btn"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("should filter the location list by the search query", async () => {
+      wrapper = mountCheckLocations();
+      await wrapper
+        .find('[data-test="synthetics-check-locations-search"]')
+        .setValue("us east");
+
+      // mockLocations: "US East" matches, the others don't
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-option-us-east-1"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-option-eu-west-1"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should show a no-results state when the search matches nothing", async () => {
+      wrapper = mountCheckLocations();
+      await wrapper
+        .find('[data-test="synthetics-check-locations-search"]')
+        .setValue("zzz-no-such-location");
+
+      const noResults = wrapper.find('[data-test="synthetics-check-locations-no-results"]');
+      expect(noResults.exists()).toBe(true);
+      expect(noResults.text()).toContain("synthetics.locations.noSearchResults");
+      // The "no locations at all" empty state must not appear for a filter miss
+      expect(wrapper.find('[data-test="synthetics-check-locations-empty"]').exists()).toBe(false);
+    });
+
+    it("should not show the private creation empty state when search filters out existing private locations", async () => {
+      wrapper = mountWithPrivate();
+      await wrapper
+        .find('[data-test="synthetics-check-locations-search"]')
+        .setValue("zzz-no-such-location");
+
+      expect(wrapper.find('[data-test="synthetics-check-locations-no-results"]').exists()).toBe(
+        true,
+      );
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should clear the no-results state when the query is emptied", async () => {
+      wrapper = mountCheckLocations();
+      const search = wrapper.find('[data-test="synthetics-check-locations-search"]');
+      await search.setValue("zzz-no-such-location");
+      expect(wrapper.find('[data-test="synthetics-check-locations-no-results"]').exists()).toBe(
+        true,
+      );
+
+      await search.setValue("");
+      expect(wrapper.find('[data-test="synthetics-check-locations-no-results"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="synthetics-check-locations-option-us-east-1"]').exists(),
+      ).toBe(true);
     });
   });
 

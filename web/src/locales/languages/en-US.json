@@ -10665,6 +10665,7 @@
       "downMessage": "No agent for over a day — this location won't run the check until an agent reconnects.",
       "lastAgentSeen": "Last agent seen {ago}",
       "loadingLocations": "Loading available locations…",
+      "noSearchResults": "No locations match your search",
       "publicSubtitle": "Cloud regions, always available",
       "privateSubtitle": "Location is ready when at least one of its agents is live",
       "summaryNoneHealthy": "{count} locations selected — none have a live agent. You can save, but the check won't run until an agent connects. | {count} locations selected — none have a live agent. You can save, but the check won't run until an agent connects.",
