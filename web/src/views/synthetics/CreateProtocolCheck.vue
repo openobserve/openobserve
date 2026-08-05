@@ -201,7 +201,7 @@ async function fetchLocations() {
         (l.kind !== "private" || (l.types ?? []).some((t) => t !== "browser")),
     );
   } catch (err: any) {
-    // Enterprise-gated endpoint — community builds return 403; fall back to
+    // A 403 means the endpoint isn't available on this build; fall back to
     // empty silently for those, and only surface real failures.
     locations.value = [];
     if (err?.response?.status !== 403) {

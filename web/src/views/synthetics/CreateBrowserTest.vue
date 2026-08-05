@@ -237,7 +237,7 @@ async function fetchLocations() {
     browsers.value = (data.browsers ?? []) as string[];
     devices.value = (data.devices ?? []) as SyntheticsDevice[];
   } catch (err: any) {
-    // Enterprise-gated endpoint — community builds return 403; fall back to
+    // A 403 means the endpoint isn't available on this build; fall back to
     // empty silently for those, and only surface real failures.
     locations.value = [];
     browsers.value = [];
