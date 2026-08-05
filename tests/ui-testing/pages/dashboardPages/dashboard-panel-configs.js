@@ -744,10 +744,9 @@ export default class DashboardPanelConfigs {
       .click();
   }
 
-  /** Mapping rows locator (every row renders a type-select regardless of its type). */
   valueMappingRows(popup) {
     return popup.locator(
-      '[data-test^="dashboard-addpanel-config-value-mapping-type-select-"]'
+      '[data-test^="dashboard-addpanel-config-value-mapping-type-select-"]:not([data-test$="-trigger"])'
     );
   }
 
