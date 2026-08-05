@@ -381,8 +381,12 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
         <OIcon name="chevron-left" size="md" />
       </button>
 
-      <!-- Overflow-hidden scroll container -->
-      <div ref="scrollRef" class="relative flex-1 overflow-x-hidden pt-0.75">
+      <!-- Scroll container: native wheel/trackpad horizontal scroll with the
+           scrollbar hidden — the arrow buttons remain the visible affordance. -->
+      <div
+        ref="scrollRef"
+        class="relative flex-1 overflow-x-auto pt-0.75 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
