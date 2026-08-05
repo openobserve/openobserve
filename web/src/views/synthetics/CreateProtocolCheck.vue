@@ -429,8 +429,8 @@ async function saveCheck() {
         </OButton>
       </div>
 
-      <!-- Private agent setup drawer; locations reload on close so a freshly
-           registered location becomes selectable without leaving the form. -->
+      <!-- Private agent setup drawer; a freshly registered location appears via
+           the locations card's Refresh button. -->
       <AgentSetupDrawer
         v-model:open="showAgentSetup"
         :token="agentSetup?.token"
@@ -445,7 +445,6 @@ async function saveCheck() {
             if (!open) {
               agentSetupLocationId = null;
               agentSetupLocationName = null;
-              fetchLocations();
             }
           }
         "

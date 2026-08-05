@@ -1093,7 +1093,6 @@ function onClearResults() {
               if (!open) {
                 agentSetupLocationId = null;
                 agentSetupLocationName = null;
-                fetchLocations();
               }
             }
           "
