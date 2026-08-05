@@ -633,6 +633,37 @@ describe("CheckLocations", () => {
       expect(pendingIdx).toBeLessThan(offlineIdx);
       expect(offlineIdx).toBeLessThan(downIdx);
     });
+
+    it("should sort recently-offline locations above long-dead ones regardless of label order", () => {
+      // "aaa-dead" would win an alphabetical tie-break; only a tier-aware sort
+      // ranks the recently-dropped "zzz-recent" above it.
+      const dead: SyntheticsLocation = {
+        id: "p-dead",
+        label: "aaa-dead",
+        region: "",
+        provider: "",
+        kind: "private",
+        status: "offline",
+        last_seen_at: Date.now() * 1000 - 30 * 3600 * 1_000_000, // 30h — down tier
+      };
+      const recent: SyntheticsLocation = {
+        id: "p-recent",
+        label: "zzz-recent",
+        region: "",
+        provider: "",
+        kind: "private",
+        status: "offline",
+        last_seen_at: Date.now() * 1000 - 2 * 3600 * 1_000_000, // 2h — offline tier
+      };
+      wrapper = mountWithPrivate({ locations: [dead, recent] });
+
+      const ids = wrapper
+        .findAll('[data-test^="synthetics-check-locations-option-p-"]')
+        .map((c) => c.attributes("data-test"));
+      expect(ids.indexOf("synthetics-check-locations-option-p-recent")).toBeLessThan(
+        ids.indexOf("synthetics-check-locations-option-p-dead"),
+      );
+    });
   });
 
   // ── Search ─────────────────────────────────────────────────────────────

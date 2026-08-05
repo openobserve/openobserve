@@ -236,11 +236,15 @@ async function fetchLocations() {
     );
     browsers.value = (data.browsers ?? []) as string[];
     devices.value = (data.devices ?? []) as SyntheticsDevice[];
-  } catch {
-    // Enterprise-gated endpoint — community builds return 403; fall back to empty.
+  } catch (err: any) {
+    // Enterprise-gated endpoint — community builds return 403; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
     browsers.value = [];
     devices.value = [];
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
   } finally {
     locationsLoading.value = false;
   }

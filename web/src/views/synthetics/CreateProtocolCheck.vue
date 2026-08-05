@@ -200,9 +200,13 @@ async function fetchLocations() {
         l.enabled !== false &&
         (l.kind !== "private" || (l.types ?? []).some((t) => t !== "browser")),
     );
-  } catch {
+  } catch (err: any) {
+    // Enterprise-gated endpoint — community builds return 403; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
-    toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
   } finally {
     locationsLoading.value = false;
   }

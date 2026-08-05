@@ -89,6 +89,18 @@ function locationDisplayName(location: SyntheticsLocation): string {
 
 type StatusTier = "ready" | "connecting" | "offline" | "down";
 
+/** Resolve the display tier — "down" is offline with no agent for ≥24h, a
+ *  distinction raw `status` can't express. Sorting and display both key off
+ *  this so a dead location never outranks a recently-dropped one. */
+function statusTier(location: SyntheticsLocation): StatusTier {
+  if (location.status === "online") return "ready";
+  if (location.status === "pending") return "connecting";
+  const nowUs = Date.now() * 1000;
+  const lastSeen = location.last_seen_at ?? 0;
+  const isDown = lastSeen > 0 && (nowUs - lastSeen) / 1_000_000 / 3600 >= 24;
+  return isDown ? "down" : "offline";
+}
+
 interface StatusInfo {
   tier: StatusTier;
   icon: string;
@@ -103,9 +115,9 @@ interface StatusInfo {
 }
 
 function getStatusInfo(location: SyntheticsLocation): StatusInfo {
-  const status = location.status;
+  const tier = statusTier(location);
 
-  if (status === "online") {
+  if (tier === "ready") {
     return {
       tier: "ready",
       icon: "check-circle",
@@ -119,7 +131,7 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
     };
   }
 
-  if (status === "pending") {
+  if (tier === "connecting") {
     return {
       tier: "connecting",
       icon: "schedule",
@@ -133,12 +145,7 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
     };
   }
 
-  // offline — determine if it's "down" based on last_seen_at
-  const nowUs = Date.now() * 1000;
-  const lastSeen = location.last_seen_at ?? 0;
-  const isDown = lastSeen > 0 && (nowUs - lastSeen) / 1_000_000 / 3600 >= 24;
-
-  if (isDown) {
+  if (tier === "down") {
     return {
       tier: "down",
       icon: "error-outline",
@@ -219,7 +226,7 @@ function agentDisplay(location: SyntheticsLocation): AgentDisplay {
 
 // ── Location lists ───────────────────────────────────────────────────────────
 
-const STATUS_SORT: Record<string, number> = { online: 0, pending: 1, offline: 2 };
+const TIER_SORT: Record<StatusTier, number> = { ready: 0, connecting: 1, offline: 2, down: 3 };
 
 const publicLocations = computed(() => props.locations.filter((l) => l.kind !== "private"));
 
@@ -227,11 +234,11 @@ const filteredPublicLocations = computed(() => publicLocations.value.filter(matc
 
 const privateLocations = computed(() => {
   const list = props.locations.filter((l) => l.kind === "private");
-  // Sort: online → pending → offline, alphabetical within groups
+  // Sort: ready → connecting → offline → down, alphabetical within groups
   return [...list].sort((a, b) => {
-    const aStatus = STATUS_SORT[a.status ?? "offline"] ?? 99;
-    const bStatus = STATUS_SORT[b.status ?? "offline"] ?? 99;
-    if (aStatus !== bStatus) return aStatus - bStatus;
+    const aTier = TIER_SORT[statusTier(a)];
+    const bTier = TIER_SORT[statusTier(b)];
+    if (aTier !== bTier) return aTier - bTier;
     return a.label.localeCompare(b.label);
   });
 });
