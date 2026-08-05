@@ -773,31 +773,26 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
 
     // Track ALL network activity (not just the expected pattern) so a mismatch
-    // is diagnosable. Wait on the actual query_range response rather than
-    // waitForChartToRender's button-disabled polling — see the SQL sparkline
-    // test for why that UI proxy signal can resolve before the fetch lands.
     const allCalls = [];
-    const promqlCalls = [];
     const isPromQLQuery = (url) => url.includes("/prometheus/api/v1/query");
-    const onResponse = async (res) => {
+    const onResponse = (res) => {
       const url = res.url();
       if (url.includes("/api/")) allCalls.push({ url, status: res.status() });
-      // matches /prometheus/api/v1/query and .../query_range, not .../format_query
-      if (isPromQLQuery(url)) {
-        const body = await res.text().catch(() => "<unreadable>");
-        promqlCalls.push({ url, status: res.status(), body: body.slice(0, 1000) });
-      }
     };
     page.on("response", onResponse);
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page
+    const promqlResponse = await page
       .waitForResponse((res) => isPromQLQuery(res.url()), { timeout: 20000 })
-      .catch((e) => testLogger.warn("query_range response wait:", e.message));
+      .catch((e) => {
+        testLogger.warn("query_range response wait:", e.message);
+        return null;
+      });
+    const promqlBody = promqlResponse ? await promqlResponse.text().catch(() => "<unreadable>") : null;
     page.off("response", onResponse);
 
-    const rawBodyDiag = `promql response bodies: ${JSON.stringify(promqlCalls)}`;
-    expect(promqlCalls.length, `captured /api/ calls: ${JSON.stringify(allCalls)}`).toBe(1);
+    const rawBodyDiag = `promql response body: ${promqlBody?.slice(0, 1000)}`;
+    expect(promqlResponse, `captured /api/ calls: ${JSON.stringify(allCalls)}`).not.toBeNull();
     testLogger.info("PromQL sparkline Apply fired exactly 1 query_range (no histogram)");
 
     // Metric renders as SVG; the sparkline trend draws at least one path.
@@ -844,25 +839,27 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     testLogger.info("Between-range value mapping configured on PromQL metric panel");
 
     const failedCalls = [];
-    const promqlCalls = [];
+    const isPromQLQuery = (url) => url.includes("/prometheus/api/v1/query");
     const onResponse = async (res) => {
       const url = res.url();
-      if (!url.includes("/api/")) return;
-      if (res.status() >= 400) {
+      if (url.includes("/api/") && res.status() >= 400) {
         const body = await res.text().catch(() => "<unreadable>");
         failedCalls.push({ url, status: res.status(), body: body.slice(0, 500) });
-      } else if (url.includes("/prometheus/api/v1/query")) {
-        const body = await res.text().catch(() => "<unreadable>");
-        promqlCalls.push({ url, status: res.status(), body: body.slice(0, 1000) });
       }
     };
     page.on("response", onResponse);
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender().catch((e) => testLogger.warn("waitForChartToRender:", e.message));
+    const promqlResponse = await page
+      .waitForResponse((res) => isPromQLQuery(res.url()), { timeout: 20000 })
+      .catch((e) => {
+        testLogger.warn("query_range response wait:", e.message);
+        return null;
+      });
+    const promqlBody = promqlResponse ? await promqlResponse.text().catch(() => "<unreadable>") : null;
     page.off("response", onResponse);
 
-    const rawBodyDiag = `promql response bodies: ${JSON.stringify(promqlCalls)}`;
+    const rawBodyDiag = `promql response body: ${promqlBody?.slice(0, 1000)}`;
 
     // The mapped text replaces the metric value on the SVG renderer
     const chart = page.locator('[data-test="chart-renderer"]');

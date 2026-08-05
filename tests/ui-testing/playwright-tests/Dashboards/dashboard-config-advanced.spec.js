@@ -445,8 +445,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
           ),
         };
       });
-      testLogger.error("Value mapping row-count mismatch — DOM diagnostic", diag);
-      throw e;
+      throw new Error(`${e.message}\nDOM diagnostic: ${JSON.stringify(diag)}`);
     }
     const beforeDelete = await rows.count();
     await pm.dashboardPanelConfigs.deleteValueMappingRow(popup, beforeDelete - 1);
