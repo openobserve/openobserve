@@ -124,9 +124,8 @@ describe("AlertGroupChart — threshold visibility", () => {
       },
     });
 
-    const query = wrapper
-      .findComponent({ name: "PanelSchemaRenderer" })
-      .props("panelSchema").queries[0];
+    const query = wrapper.findComponent({ name: "PanelSchemaRenderer" }).props("panelSchema")
+      .queries[0];
 
     expect(query.config.promql_legend_fallback).toBe("http_requests");
   });

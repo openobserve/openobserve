@@ -27,7 +27,12 @@ import {
   type AlertPrefill,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
-import { periodMinutesFromRange, sanitizeAlertNamePart, warn, type PrefillTimeRange } from "../alertPrefill";
+import {
+  periodMinutesFromRange,
+  sanitizeAlertNamePart,
+  warn,
+  type PrefillTimeRange,
+} from "../alertPrefill";
 import {
   buildPatternSetSqlQuery,
   extractConstantsFromPattern,

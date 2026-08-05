@@ -343,9 +343,7 @@ describe("AddAlertView.vue", () => {
       await mountEditing("missing");
 
       // An empty form here would save as a NEW alert.
-      expect(replaceSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "alertList" }),
-      );
+      expect(replaceSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
     });
 
     it("still opens the editor when the org has no destinations left", async () => {
@@ -359,9 +357,7 @@ describe("AddAlertView.vue", () => {
       const wrapper = await mountEditing();
 
       expect(wrapper.findComponent(AddAlertStub).exists()).toBe(true);
-      expect(pushSpy).not.toHaveBeenCalledWith(
-        expect.objectContaining({ name: "alertList" }),
-      );
+      expect(pushSpy).not.toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
     });
   });
 });

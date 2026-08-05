@@ -146,7 +146,9 @@ export const buildPrefillFromPanel = (
   const isPromql = input.queryType === "promql";
   const sourceQuery = input.executedQuery || query?.query || "";
 
-  const { minutes, warnings: rangeWarnings } = periodMinutesFromRange(toPrefillRange(input.timeRange));
+  const { minutes, warnings: rangeWarnings } = periodMinutesFromRange(
+    toPrefillRange(input.timeRange),
+  );
   warnings.push(...rangeWarnings);
 
   // A built (non-custom) SQL panel carries structured fields we can lift into

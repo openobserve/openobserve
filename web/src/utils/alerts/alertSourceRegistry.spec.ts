@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import {
-  ALERT_SOURCES,
-  DEFAULT_ALERT_SOURCE,
-  getAlertSource,
-} from "./alertSourceRegistry";
+import { ALERT_SOURCES, DEFAULT_ALERT_SOURCE, getAlertSource } from "./alertSourceRegistry";
 
 describe("alertSourceRegistry", () => {
   afterEach(() => {

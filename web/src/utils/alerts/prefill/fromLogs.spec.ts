@@ -70,7 +70,7 @@ describe("buildPrefillFromLogs", () => {
       const p = buildPrefillFromLogs(
         logs({
           sqlMode: true,
-          rawQuery: 'SELECT histogram(_timestamp, \'10 second\') AS x, count(*) FROM "k8s_logs"',
+          rawQuery: "SELECT histogram(_timestamp, '10 second') AS x, count(*) FROM \"k8s_logs\"",
         }),
       );
       expect(keys(p)).toContain("histogramNotSupported");
@@ -106,9 +106,9 @@ describe("buildPrefillFromLogs", () => {
     });
 
     it("does not cry join for a single-stream query", () => {
-      expect(keys(buildPrefillFromLogs(logs({ sqlMode: true, rawQuery: 'SELECT * FROM "a"' })))).not.toContain(
-        "joinSingleStream",
-      );
+      expect(
+        keys(buildPrefillFromLogs(logs({ sqlMode: true, rawQuery: 'SELECT * FROM "a"' }))),
+      ).not.toContain("joinSingleStream");
     });
 
     it("carries the stream type through for metrics and traces", () => {
@@ -141,7 +141,9 @@ describe("buildPrefillFromLogs", () => {
     it("converts an absolute range and warns", () => {
       const start = 1_700_000_000_000_000;
       const p = buildPrefillFromLogs(
-        logs({ datetime: { type: "absolute", startTime: start, endTime: start + 20 * 60_000_000 } }),
+        logs({
+          datetime: { type: "absolute", startTime: start, endTime: start + 20 * 60_000_000 },
+        }),
       );
       expect(p.periodMinutes).toBe(20);
       expect(keys(p)).toContain("absoluteToRolling");

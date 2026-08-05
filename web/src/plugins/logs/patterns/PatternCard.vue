@@ -190,7 +190,6 @@ const templateTokens = computed(() =>
 
 const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
 
-
 // Window-wide occurrences for this pattern, reported by the volume cell once
 // its lazy query resolves. Until then we show the extraction sample's count.
 //

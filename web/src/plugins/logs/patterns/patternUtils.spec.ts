@@ -277,9 +277,7 @@ describe("buildPatternSetSqlQuery", () => {
       streamName: "k8s_logs",
       includes: [ERROR_PATTERN],
     });
-    expect(sql).toBe(
-      "SELECT * FROM 'k8s_logs' WHERE match_all('Connection refused to upstream')",
-    );
+    expect(sql).toBe("SELECT * FROM 'k8s_logs' WHERE match_all('Connection refused to upstream')");
   });
 
   it("ORs several includes, each bracketed against the surrounding ANDs", () => {

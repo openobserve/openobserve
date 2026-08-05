@@ -27,9 +27,8 @@ vi.mock("@/composables/alerts/useAlertCreation", async (importOriginal) => {
 });
 
 // Imported after the mock so the singleton state is the real one.
-const { alertCreationDialog, requestAlertCreation, closeAlertCreationDialog } = await import(
-  "@/composables/alerts/useAlertCreation"
-);
+const { alertCreationDialog, requestAlertCreation, closeAlertCreationDialog } =
+  await import("@/composables/alerts/useAlertCreation");
 
 const DialogStub = {
   name: "CreateAlertFromSourceDialog",

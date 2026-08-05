@@ -45,7 +45,12 @@ const MICROS_PER_MINUTE = 60_000_000;
  * resolved SQL the backend would run. Invariant 1 — an adapter that leaks one of
  * these produces an alert that silently never matches.
  */
-const UNRESOLVED_QUERY_MARKERS = ["[WHERE_CLAUSE]", "[INDEX_NAME]", "[FIELD_LIST]", "[QUERY_FUNCTIONS]"];
+const UNRESOLVED_QUERY_MARKERS = [
+  "[WHERE_CLAUSE]",
+  "[INDEX_NAME]",
+  "[FIELD_LIST]",
+  "[QUERY_FUNCTIONS]",
+];
 
 export const clampPeriodMinutes = (minutes: number): number =>
   Math.min(MAX_PERIOD_MINUTES, Math.max(MIN_PERIOD_MINUTES, Math.round(minutes)));
@@ -90,7 +95,9 @@ export interface PeriodFromRangeResult {
  * "the last N minutes" — so we convert its *duration* and say so out loud rather
  * than pretending the user's fixed window survived.
  */
-export const periodMinutesFromRange = (range: PrefillTimeRange | null | undefined): PeriodFromRangeResult => {
+export const periodMinutesFromRange = (
+  range: PrefillTimeRange | null | undefined,
+): PeriodFromRangeResult => {
   const warnings: AlertPrefillWarning[] = [];
   const DEFAULT_MINUTES = 15;
 
@@ -199,9 +206,10 @@ export const hasHistogramBucketing = (sql: string): boolean => /\bhistogram\s*\(
  * it rather than the dashboards being the only surface that knows the trick.
  */
 export const firstAggregateAlias = (sql: string): string | null => {
-  const match = /(?:count|sum|avg|min|max|median|approx_percentile_cont)\s*\([^)]*\)\s+as\s+["'`]?([^"'`,\s)]+)["'`]?/i.exec(
-    sql,
-  );
+  const match =
+    /(?:count|sum|avg|min|max|median|approx_percentile_cont)\s*\([^)]*\)\s+as\s+["'`]?([^"'`,\s)]+)["'`]?/i.exec(
+      sql,
+    );
   return match?.[1] ?? null;
 };
 
@@ -290,7 +298,9 @@ export const normalizePrefill = (input: AlertPrefill): AlertPrefill => {
     promql,
     periodMinutes,
     frequencyMinutes:
-      input.frequencyMinutes === undefined ? undefined : Math.max(1, Math.round(input.frequencyMinutes)),
+      input.frequencyMinutes === undefined
+        ? undefined
+        : Math.max(1, Math.round(input.frequencyMinutes)),
     warnings: dedupeWarnings(warnings),
   };
 };

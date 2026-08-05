@@ -152,9 +152,7 @@ describe("usePanelActions", () => {
       api.handleCreateAlert({ condition: "above", threshold: 10 });
 
       expect(args.router.push).not.toHaveBeenCalled();
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("does nothing when query is missing", () => {

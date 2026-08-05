@@ -233,9 +233,7 @@ const previewQuery = computed(() => {
   const prefill = props.prefill;
   if (!prefill) return "";
 
-  return prefill.queryType === "promql"
-    ? (prefill.promql ?? "")
-    : formatSqlForDisplay(prefill.sql);
+  return prefill.queryType === "promql" ? (prefill.promql ?? "") : formatSqlForDisplay(prefill.sql);
 });
 
 // Seed the controls from the incoming prefill each time the dialog opens, so a
@@ -245,7 +243,8 @@ watch(
   ([open, prefill]) => {
     if (!open || !prefill) return;
     selectedStream.value = prefill.streamName;
-    thresholdShape.value = prefill.thresholdShape ?? getAlertSource(prefill.source).defaultThreshold;
+    thresholdShape.value =
+      prefill.thresholdShape ?? getAlertSource(prefill.source).defaultThreshold;
   },
   { immediate: true },
 );

@@ -44,7 +44,11 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<div><slot /></div>`,
   },
-  OToggleGroupItem: { name: "OToggleGroupItem", props: ["value"], template: `<button><slot /></button>` },
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    props: ["value"],
+    template: `<button><slot /></button>`,
+  },
 };
 
 const prefill = (overrides: Partial<AlertPrefill> = {}): AlertPrefill => ({
@@ -133,7 +137,9 @@ describe("CreateAlertFromSourceDialog", () => {
       }),
     );
     expect(wrapper.find('[data-test="create-alert-warning-limitStripped"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="create-alert-warning-absoluteToRolling"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="create-alert-warning-absoluteToRolling"]').exists()).toBe(
+      true,
+    );
   });
 
   it("disables Continue when the prefill is blocked", () => {
@@ -209,7 +215,9 @@ describe("CreateAlertFromSourceDialog", () => {
 
     it("asks the SOURCE to rebuild on mode change rather than editing SQL itself", async () => {
       wrapper = mountDialog(withPatterns());
-      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "include");
+      await wrapper
+        .findComponent({ name: "OToggleGroup" })
+        .vm.$emit("update:modelValue", "include");
 
       expect(wrapper.emitted("rebuild")).toHaveLength(1);
       expect(wrapper.emitted("rebuild")![0][0]).toEqual({ patternMode: "include" });
@@ -217,7 +225,9 @@ describe("CreateAlertFromSourceDialog", () => {
 
     it("does not rebuild when the mode did not actually change", async () => {
       wrapper = mountDialog(withPatterns());
-      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "exclude");
+      await wrapper
+        .findComponent({ name: "OToggleGroup" })
+        .vm.$emit("update:modelValue", "exclude");
 
       expect(wrapper.emitted("rebuild")).toBeUndefined();
     });

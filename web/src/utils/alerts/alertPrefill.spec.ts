@@ -45,16 +45,22 @@ describe("clampPeriodMinutes", () => {
 
 describe("periodMinutesFromRange", () => {
   it("maps relative periods across units", () => {
-    expect(periodMinutesFromRange({ type: "relative", relativeTimePeriod: "15m" }).minutes).toBe(15);
-    expect(periodMinutesFromRange({ type: "relative", relativeTimePeriod: "2h" }).minutes).toBe(120);
-    expect(periodMinutesFromRange({ type: "relative", relativeTimePeriod: "1d" }).minutes).toBe(1440);
+    expect(periodMinutesFromRange({ type: "relative", relativeTimePeriod: "15m" }).minutes).toBe(
+      15,
+    );
+    expect(periodMinutesFromRange({ type: "relative", relativeTimePeriod: "2h" }).minutes).toBe(
+      120,
+    );
+    expect(periodMinutesFromRange({ type: "relative", relativeTimePeriod: "1d" }).minutes).toBe(
+      1440,
+    );
   });
 
   it("defaults to 15 minutes when the range is missing or unparseable", () => {
     expect(periodMinutesFromRange(null).minutes).toBe(15);
-    expect(
-      periodMinutesFromRange({ type: "relative", relativeTimePeriod: "banana" }).minutes,
-    ).toBe(15);
+    expect(periodMinutesFromRange({ type: "relative", relativeTimePeriod: "banana" }).minutes).toBe(
+      15,
+    );
   });
 
   it("converts an absolute range to a rolling window and says so", () => {
@@ -120,7 +126,9 @@ describe("stripDisplayOnlyClauses", () => {
 
 describe("hasHistogramBucketing", () => {
   it("detects histogram()", () => {
-    expect(hasHistogramBucketing('SELECT histogram(_timestamp, \'10 second\') FROM "l"')).toBe(true);
+    expect(hasHistogramBucketing("SELECT histogram(_timestamp, '10 second') FROM \"l\"")).toBe(
+      true,
+    );
     expect(hasHistogramBucketing('SELECT count(*) FROM "l"')).toBe(false);
   });
 });
@@ -149,7 +157,9 @@ describe("sanitizeAlertNamePart", () => {
 
 describe("normalizePrefill — invariants", () => {
   it("stamps the contract version", () => {
-    expect(normalizePrefill(basePrefill({ version: 0 as any })).version).toBe(ALERT_PREFILL_VERSION);
+    expect(normalizePrefill(basePrefill({ version: 0 as any })).version).toBe(
+      ALERT_PREFILL_VERSION,
+    );
   });
 
   it("blocks a query still carrying source-syntax markers", () => {
@@ -294,8 +304,8 @@ describe("needsConfirmation — when the dialog earns its click", () => {
   });
 
   it("always asks when the prefill is blocked, so the reason gets stated", () => {
-    expect(needsConfirmation(basePrefill({ warnings: [{ key: "noStream", level: "blocking" }] }))).toBe(
-      true,
-    );
+    expect(
+      needsConfirmation(basePrefill({ warnings: [{ key: "noStream", level: "blocking" }] })),
+    ).toBe(true);
   });
 });
