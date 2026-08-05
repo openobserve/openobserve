@@ -77,7 +77,8 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
         }
         error @ (AnnotationQueueError::DuplicateName
         | AnnotationQueueError::StaleBindings
-        | AnnotationQueueError::ArchivedQueueItem) => MetaHttpResponse::conflict(error),
+        | AnnotationQueueError::ArchivedQueueItem
+        | AnnotationQueueError::QueueItemAlreadyQueued) => MetaHttpResponse::conflict(error),
     }
 }
 
@@ -89,7 +90,7 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
     tag = "AnnotationQueues",
     operation_id = "EnqueueAnnotationQueueItem",
     summary = "Add a discovered item to an Annotation Queue",
-    description = "Idempotently adds a discovered span, trace, or session to one Annotation Queue. Re-enqueuing the same reference returns the existing QueueItem.",
+    description = "Adds a discovered span, trace, or session to one Annotation Queue. Returns a conflict when the same reference is already in the Queue.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -100,6 +101,7 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
         (status = 200, body = inline(AnnotationQueueItemResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
         (status = 404, description = "Annotation Queue not found", body = ()),
+        (status = 409, description = "Item is already queued in this Annotation Queue", body = ()),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "create"}))),
 )]
@@ -525,6 +527,12 @@ mod tests {
         );
         assert_eq!(
             annotation_queue_error_response(AnnotationQueueError::StaleBindings)
+                .status()
+                .as_u16(),
+            409
+        );
+        assert_eq!(
+            annotation_queue_error_response(AnnotationQueueError::QueueItemAlreadyQueued)
                 .status()
                 .as_u16(),
             409
