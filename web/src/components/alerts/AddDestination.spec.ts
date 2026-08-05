@@ -575,7 +575,9 @@ describe("AddDestination — email recipients are org users", () => {
       data: { data: [...ORG_USERS, { email: "carol@acme.io", role: "member" }] },
     } as any);
 
-    await wrapper.findComponent({ name: "AddUser" }).vm.$emit("updated", { email: "carol@acme.io" });
+    await wrapper
+      .findComponent({ name: "AddUser" })
+      .vm.$emit("updated", { email: "carol@acme.io" });
     await flushPromises();
 
     // The round trip ends where the user was heading: a recipient chosen.
@@ -601,7 +603,9 @@ describe("AddDestination — email recipients are org users", () => {
     const { wrapper, form } = await mountEmailForm();
     form.setFieldValue("emails", ["alice@acme.io"]);
 
-    await wrapper.findComponent({ name: "AddUser" }).vm.$emit("updated", { email: "alice@acme.io" });
+    await wrapper
+      .findComponent({ name: "AddUser" })
+      .vm.$emit("updated", { email: "alice@acme.io" });
     await flushPromises();
 
     expect(form.state.values.emails).toEqual(["alice@acme.io"]);

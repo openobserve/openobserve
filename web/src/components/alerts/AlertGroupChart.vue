@@ -98,10 +98,7 @@ import {
   getDefaultDashboardPanelData,
   withCompositeGroupLabel,
 } from "@/utils/alerts/aggregationPreviewQuery";
-import {
-  buildThresholdMarkLines,
-  thresholdAxisBounds,
-} from "@/utils/alerts/thresholdMarkLines";
+import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 
 const props = defineProps<{ alert: any }>();
 

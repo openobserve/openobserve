@@ -34,22 +34,26 @@ describe("buildPrefillFromPanel", () => {
 
   it("prefers the executed query over the raw one (variables substituted)", () => {
     const p = buildPrefillFromPanel(
-      sqlPanel({ executedQuery: 'SELECT * FROM "k8s_logs" WHERE ns = \'prod\'' }),
+      sqlPanel({ executedQuery: "SELECT * FROM \"k8s_logs\" WHERE ns = 'prod'" }),
       makeId,
     );
-    expect(p.sql).toBe('SELECT * FROM "k8s_logs" WHERE ns = \'prod\'');
+    expect(p.sql).toBe("SELECT * FROM \"k8s_logs\" WHERE ns = 'prod'");
   });
 
   it("maps relative period units", () => {
     expect(
       buildPrefillFromPanel(
-        sqlPanel({ timeRange: { value_type: "relative", relative_value: 2, relative_period: "Hours" } }),
+        sqlPanel({
+          timeRange: { value_type: "relative", relative_value: 2, relative_period: "Hours" },
+        }),
         makeId,
       ).periodMinutes,
     ).toBe(120);
     expect(
       buildPrefillFromPanel(
-        sqlPanel({ timeRange: { value_type: "relative", relative_value: 1, relative_period: "Days" } }),
+        sqlPanel({
+          timeRange: { value_type: "relative", relative_value: 1, relative_period: "Days" },
+        }),
         makeId,
       ).periodMinutes,
     ).toBe(1440);
@@ -123,7 +127,11 @@ describe("buildPrefillFromPanel", () => {
           {
             query: "SELECT …",
             customQuery: false,
-            fields: { stream: "s", stream_type: "logs", y: [{ alias: "t", aggregationFunction: "avg" }] },
+            fields: {
+              stream: "s",
+              stream_type: "logs",
+              y: [{ alias: "t", aggregationFunction: "avg" }],
+            },
           },
         ],
       }),
@@ -204,7 +212,9 @@ describe("buildPrefillFromPanel", () => {
   it("converts an absolute panel range to a rolling window", () => {
     const start = 1_700_000_000_000_000;
     const p = buildPrefillFromPanel(
-      sqlPanel({ timeRange: { value_type: "absolute", startTime: start, endTime: start + 45 * 60_000_000 } }),
+      sqlPanel({
+        timeRange: { value_type: "absolute", startTime: start, endTime: start + 45 * 60_000_000 },
+      }),
       makeId,
     );
     expect(p.periodMinutes).toBe(45);

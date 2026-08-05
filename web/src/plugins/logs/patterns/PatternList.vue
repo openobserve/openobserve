@@ -296,7 +296,6 @@ const openDetails = (pattern: any, index: number) => {
 
 const { hoveredToken, onPopoverEnter, onPopoverLeave } = useWildcardHover();
 
-
 // The severity filter is shared through usePatternActions rather than kept
 // local: "create an alert from the visible patterns" has to know which patterns
 // are visible, and that decision is made here.

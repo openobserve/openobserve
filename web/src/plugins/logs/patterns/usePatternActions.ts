@@ -29,8 +29,6 @@ import {
 import { buildPrefillFromPatterns } from "@/utils/alerts/prefill/fromPatterns";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 
-
-
 /**
  * The severity chips' state, module-scoped so it is shared between the pattern
  * list that owns the chips and the alert builder that has to know which

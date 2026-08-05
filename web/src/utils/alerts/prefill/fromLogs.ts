@@ -93,7 +93,12 @@ const readsMultipleStreams = (sql: string): boolean => {
   const matches = sql.match(/\b(?:from|join)\s+["'`]?[\w.-]+["'`]?/gi);
   if (!matches) return false;
   const streams = new Set(
-    matches.map((m) => m.replace(/^\s*\w+\s+/i, "").replace(/["'`]/g, "").toLowerCase()),
+    matches.map((m) =>
+      m
+        .replace(/^\s*\w+\s+/i, "")
+        .replace(/["'`]/g, "")
+        .toLowerCase(),
+    ),
   );
   return streams.size > 1;
 };
@@ -147,7 +152,7 @@ export const buildPrefillFromLogs = (input: LogsPrefillInput): AlertPrefill => {
     warnings.push(warn("noResults", "info"));
   }
 
-  const vrl = input.transformType === "function" ? (input.vrl?.trim() || null) : null;
+  const vrl = input.transformType === "function" ? input.vrl?.trim() || null : null;
   if (vrl) {
     warnings.push(warn("savedFunctionCopied", "info"));
   }

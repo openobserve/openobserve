@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildThresholdMarkLines,
-  thresholdAxisBounds,
-} from "@/utils/alerts/thresholdMarkLines";
+import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 
 // Marklines for the alert preview chart. One helper feeds every query mode
 // (builder/aggregation, SQL, custom SQL, PromQL) so Critical and Warning are
