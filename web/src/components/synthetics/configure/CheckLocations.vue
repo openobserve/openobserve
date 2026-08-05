@@ -250,13 +250,17 @@ const privateRows = computed(() =>
 
 const hasSearch = computed(() => searchQuery.value.trim().length > 0);
 
-/** The search matched nothing at all — distinct from having no locations, so
- *  the private section's creation empty state must not claim "no locations". */
-const noSearchResults = computed(
+/** A section has locations but the search matched none of them — distinct from
+ *  the section being genuinely empty, so headers stay put and the private
+ *  creation empty state never masquerades as a "no results" state. */
+const publicNoMatches = computed(
+  () =>
+    hasSearch.value && publicLocations.value.length > 0 && filteredPublicLocations.value.length === 0,
+);
+const privateNoMatches = computed(
   () =>
     hasSearch.value &&
-    props.locations.length > 0 &&
-    filteredPublicLocations.value.length === 0 &&
+    privateLocations.value.length > 0 &&
     filteredPrivateLocations.value.length === 0,
 );
 
@@ -324,8 +328,9 @@ const selectedLocations = computed({
           v-model="selectedLocations"
           data-test="synthetics-check-locations-group"
         >
-          <!-- ── Public section ───────────────────────────────────────────── -->
-          <template v-if="allowPrivate && filteredPublicLocations.length">
+          <!-- ── Public section — header keyed to the unfiltered list so a
+               search miss doesn't collapse the section structure. -->
+          <template v-if="allowPrivate && publicLocations.length">
             <p class="text-text-secondary flex items-center gap-1 pb-1 text-xs">
               <span class="font-medium capitalize">{{
                 t("synthetics.locations.publicTitle")
@@ -350,9 +355,9 @@ const selectedLocations = computed({
             </template>
           </OCheckbox>
 
-          <!-- ── Search matched nothing ───────────────────────────────────── -->
+          <!-- ── Search matched no public locations ───────────────────────── -->
           <OEmptyState
-            v-if="noSearchResults"
+            v-if="publicNoMatches"
             size="inline"
             icon="search-off"
             :title="t('synthetics.locations.noSearchResults')"
@@ -451,9 +456,17 @@ const selectedLocations = computed({
               </div>
             </template>
 
-            <!-- ── No private locations at all — hidden while a search is
-                 filtering them out, so the creation CTA never masquerades as a
-                 "no results" state (that case is the no-results block above). -->
+            <!-- ── Search matched no private locations ───────────────────── -->
+            <OEmptyState
+              v-else-if="privateNoMatches"
+              size="inline"
+              icon="search-off"
+              :title="t('synthetics.locations.noSearchResults')"
+              data-test="synthetics-check-locations-private-no-results"
+            />
+
+            <!-- ── No private locations at all — the creation CTA, never shown
+                 for a search miss (that case is the no-results block above). -->
             <div
               v-else-if="!privateLocations.length"
               class="rounded-default border-border-default text-text-secondary flex flex-col items-center gap-2 border border-dashed px-3 py-4 text-sm"

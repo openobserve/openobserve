@@ -692,7 +692,7 @@ describe("CheckLocations", () => {
       expect(wrapper.find('[data-test="synthetics-check-locations-empty"]').exists()).toBe(false);
     });
 
-    it("should not show the private creation empty state when search filters out existing private locations", async () => {
+    it("should show per-section no-results and no creation empty state when search filters out existing private locations", async () => {
       wrapper = mountWithPrivate();
       await wrapper
         .find('[data-test="synthetics-check-locations-search"]')
@@ -702,8 +702,22 @@ describe("CheckLocations", () => {
         true,
       );
       expect(
+        wrapper.find('[data-test="synthetics-check-locations-private-no-results"]').exists(),
+      ).toBe(true);
+      expect(
         wrapper.find('[data-test="synthetics-check-locations-private-empty"]').exists(),
       ).toBe(false);
+    });
+
+    it("should keep the section headers visible when the search matches nothing", async () => {
+      wrapper = mountWithPrivate();
+      await wrapper
+        .find('[data-test="synthetics-check-locations-search"]')
+        .setValue("zzz-no-such-location");
+
+      const text = wrapper.text();
+      expect(text).toContain("synthetics.locations.publicTitle");
+      expect(text).toContain("synthetics.locations.privateTitle");
     });
 
     it("should clear the no-results state when the query is emptied", async () => {
