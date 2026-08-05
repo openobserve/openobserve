@@ -18,11 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   The "Beta" tag. One component so every beta surface (Workflows list / editor /
   runs, the AI assistant, …) looks identical — change the look here and it moves
   everywhere, instead of the badge being re-typed per header.
+
+  `size` only shrinks the padding/type scale for tight hosts (a toggle item,
+  a menu row); the variant and casing stay fixed so the tag reads the same.
 -->
 <template>
   <OBadge
     variant="primary-outline"
-    size="sm"
+    :size="size"
     class="font-semibold tracking-wide uppercase"
     data-test="beta-badge"
   >
@@ -33,6 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { useI18nTyped } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeProps } from "@/lib/core/Badge/OBadge.types";
+
+withDefaults(defineProps<{ size?: BadgeProps["size"] }>(), { size: "sm" });
 
 const { t } = useI18nTyped();
 </script>
