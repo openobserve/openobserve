@@ -26,16 +26,8 @@ vi.mock("@/services/regex_pattern", () => ({
   },
 }));
 
-vi.mock("@/utils/regexPatternCache", () => ({
-  RegexPatternCache: {
-    get: vi.fn().mockReturnValue(null),
-    set: vi.fn(),
-    clear: vi.fn(),
-  },
-}));
-
 import regexPatternsService from "@/services/regex_pattern";
-import { RegexPatternCache } from "@/utils/regexPatternCache";
+import { fetchBuiltInRegexPatterns } from "@/composables/query/queries/regexPatterns";
 
 const mockPatterns = [
   {
@@ -170,7 +162,6 @@ describe("BuiltInPatternsTab", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
-    vi.mocked(RegexPatternCache.get).mockReturnValue(null);
     vi.mocked(regexPatternsService.getBuiltInPatterns).mockResolvedValue({
       data: { patterns: mockPatterns },
     } as any);
@@ -222,7 +213,10 @@ describe("BuiltInPatternsTab", () => {
     });
 
     it("should use cached patterns when cache hit", async () => {
-      vi.mocked(RegexPatternCache.get).mockReturnValue(mockPatterns);
+      // Warm the shared query, as a previous visit to this tab would.
+      await fetchBuiltInRegexPatterns("test-org");
+      vi.mocked(regexPatternsService.getBuiltInPatterns).mockClear();
+
       wrapper = mountComponent();
       await flushPromises();
       expect(regexPatternsService.getBuiltInPatterns).not.toHaveBeenCalled();
@@ -323,7 +317,7 @@ describe("BuiltInPatternsTab", () => {
       wrapper.vm.refreshPatterns();
       await flushPromises();
 
-      expect(RegexPatternCache.clear).toHaveBeenCalledWith("test-org");
+      // The refresh button bypasses the cache and hits the server again.
       expect(regexPatternsService.getBuiltInPatterns).toHaveBeenCalledWith("test-org");
     });
   });
