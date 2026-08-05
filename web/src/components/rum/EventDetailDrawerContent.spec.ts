@@ -915,6 +915,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
+      // Spy is navigator.clipboard.writeText, not our copyToClipboard util — text only.
       expect(copyToClipboardSpy).toHaveBeenCalledWith(expect.stringContaining('"action_type"'));
 
       vi.unstubAllGlobals();

@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSelect
                 :name="`filters[${idx}].field`"
                 :options="filteredStreamFields"
-                :placeholder="filter.field ? '' : t('alerts.anomaly.fieldPlaceholder')"
+                :placeholder="filter.field ? raw('') : t('alerts.anomaly.fieldPlaceholder')"
                 class="alert-v3-select filter-field-select"
                 style="width: 12.5rem"
                 :loading="loadingFields"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Custom SQL mode -->
         <div v-if="queryMode === 'custom_sql'" class="mb-4! flex items-start pb-0!">
           <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
-            SQL <span class="text-status-error-text ml-1">*</span>
+            {{ t("alerts.alertDetails.sql") }} <span class="text-status-error-text ml-1">*</span>
           </div>
           <div style="width: calc(100% - 11.875rem)">
             <div
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :show-auto-complete="true"
                 :disable-ai="!config.stream_name"
                 :disable-ai-reason="
-                  !config.stream_name ? t('alerts.anomaly.selectStreamFirst') : ''
+                  !config.stream_name ? t('alerts.anomaly.selectStreamFirst') : raw('')
                 "
                 editor-height="100%"
                 data-test="anomaly-custom-sql"
@@ -145,15 +145,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    both the column AND time_bucket as params. -->
               <i18n-t keypath="alerts.anomaly.timestampAliasBanned" tag="span">
                 <template #column>
-                  <code>{{ store.state.zoConfig.timestamp_column || "_timestamp" }}</code>
+                  <code>{{ store.state.zoConfig.timestamp_column || raw("_timestamp") }}</code>
                 </template>
-                <template #timeBucket><code>time_bucket</code></template>
+                <template #timeBucket
+                  ><code>{{ raw("time_bucket") }}</code></template
+                >
               </i18n-t>
             </div>
             <div class="mt-1 text-xs" :class="'text-text-secondary'">
               <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
-                <template #timeBucket><code>time_bucket</code></template>
-                <template #valueColumn><code>value</code></template>
+                <template #timeBucket
+                  ><code>{{ raw("time_bucket") }}</code></template
+                >
+                <template #valueColumn
+                  ><code>{{ raw("value") }}</code></template
+                >
               </i18n-t>
             </div>
           </div>
@@ -186,7 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="detectionFunction && detectionFunction !== 'count'"
                 name="detection_function_field"
                 :options="filteredDetectionFields"
-                :placeholder="detectionFunctionField ? '' : t('alerts.anomaly.fieldPlaceholder')"
+                :placeholder="
+                  detectionFunctionField ? raw('') : t('alerts.anomaly.fieldPlaceholder')
+                "
                 :loading="loadingFields"
                 data-test="anomaly-detection-function-field"
                 class="alert-v3-select"
@@ -564,11 +572,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label-always
                     markers
                     :marker-labels="[
-                      { value: 0, label: '0' },
-                      { value: 25, label: '25' },
-                      { value: 50, label: '50' },
-                      { value: 75, label: '75' },
-                      { value: 100, label: '100' },
+                      { value: 0, label: raw('0') },
+                      { value: 25, label: raw('25') },
+                      { value: 50, label: raw('50') },
+                      { value: 75, label: raw('75') },
+                      { value: 100, label: raw('100') },
                     ]"
                     class="sensitivity-range-slider mt-3.5 h-36.25! [--color-slider-thumb-border:white] [--color-slider-thumb:var(--color-accent)] [--color-slider-track-fill:var(--color-accent)] [--color-slider-value:var(--color-text-secondary)]"
                     data-test="anomaly-threshold-range"
@@ -586,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import streamService from "@/services/stream";
 import {
@@ -642,7 +650,7 @@ export default defineComponent({
   },
 
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // Option labels go through t() inside a computed so they re-resolve on a
@@ -650,7 +658,7 @@ export default defineComponent({
     // "SQL" stays a literal — a proper noun, not translatable copy.
     const queryTabOptions = computed(() => [
       { label: t("alerts.queryBuilder"), value: "filters" },
-      { label: "SQL", value: "custom_sql" },
+      { label: raw("SQL"), value: "custom_sql" },
     ]);
 
     const filterOperators = ANOMALY_FILTER_OPERATORS;
@@ -1218,6 +1226,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       store,
       form,

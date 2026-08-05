@@ -145,7 +145,7 @@ import {
   onDeactivated,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -167,7 +167,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
@@ -193,27 +193,27 @@ const resizeObserver = ref<ResizeObserver | null>(null);
 
 const speedOptions = [
   {
-    label: "0.5x",
+    label: raw("0.5x"),
     value: 0.5,
   },
   {
-    label: "1x",
+    label: raw("1x"),
     value: 1,
   },
   {
-    label: "1.5x",
+    label: raw("1.5x"),
     value: 1.5,
   },
   {
-    label: "2x",
+    label: raw("2x"),
     value: 2,
   },
   {
-    label: "3x",
+    label: raw("3x"),
     value: 3,
   },
   {
-    label: "4x",
+    label: raw("4x"),
     value: 4,
   },
 ];

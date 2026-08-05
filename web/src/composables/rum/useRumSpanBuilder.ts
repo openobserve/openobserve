@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { type Ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -23,10 +24,14 @@ import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constant
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
 
-export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: any) {
+export default function useRumSpanBuilder(
+  logStreams: Ref<string[]>,
+  searchObj: any,
+  t: TranslateFn,
+) {
   const store = useStore();
   const router = useRouter();
-  const { getStream } = useStreams();
+  const { getStream } = useStreams(t);
 
   const sanitizeTraceId = (id: string): string => String(id).replace(/['"\\]/g, "");
 

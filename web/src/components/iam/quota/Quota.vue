@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   computed,
   defineComponent,
@@ -444,7 +444,7 @@ export default defineComponent({
     OTable,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const selectedOrganization = ref<any>(null);
     const store = useStore();
     const { isDark } = useTheme();
@@ -501,7 +501,7 @@ export default defineComponent({
         icon: "table-chart",
       },
       {
-        label: "JSON",
+        label: raw("JSON"),
         value: "json",
         icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
@@ -541,7 +541,7 @@ export default defineComponent({
         },
         {
           id: "list",
-          header: `${t("quota.listLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.listLimit")} ${unitLabel}`),
           accessorKey: "list",
           sortable: true,
           resizable: true,
@@ -551,7 +551,7 @@ export default defineComponent({
         },
         {
           id: "get",
-          header: `${t("quota.getLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.getLimit")} ${unitLabel}`),
           accessorKey: "get",
           sortable: true,
           resizable: true,
@@ -561,7 +561,7 @@ export default defineComponent({
         },
         {
           id: "create",
-          header: `${t("quota.createLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.createLimit")} ${unitLabel}`),
           accessorKey: "create",
           sortable: true,
           resizable: true,
@@ -571,7 +571,7 @@ export default defineComponent({
         },
         {
           id: "update",
-          header: `${t("quota.updateLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.updateLimit")} ${unitLabel}`),
           accessorKey: "update",
           sortable: true,
           resizable: true,
@@ -581,7 +581,7 @@ export default defineComponent({
         },
         {
           id: "delete",
-          header: `${t("quota.deleteLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.deleteLimit")} ${unitLabel}`),
           accessorKey: "delete",
           sortable: true,
           resizable: true,
@@ -608,7 +608,7 @@ export default defineComponent({
         },
         {
           id: "list",
-          header: `${t("quota.listLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.listLimit")} ${unitLabel}`),
           accessorKey: "list",
           sortable: true,
           resizable: true,
@@ -618,7 +618,7 @@ export default defineComponent({
         },
         {
           id: "get",
-          header: `${t("quota.getLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.getLimit")} ${unitLabel}`),
           accessorKey: "get",
           sortable: true,
           resizable: true,
@@ -628,7 +628,7 @@ export default defineComponent({
         },
         {
           id: "create",
-          header: `${t("quota.createLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.createLimit")} ${unitLabel}`),
           accessorKey: "create",
           sortable: true,
           resizable: true,
@@ -638,7 +638,7 @@ export default defineComponent({
         },
         {
           id: "update",
-          header: `${t("quota.updateLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.updateLimit")} ${unitLabel}`),
           accessorKey: "update",
           sortable: true,
           resizable: true,
@@ -648,7 +648,7 @@ export default defineComponent({
         },
         {
           id: "delete",
-          header: `${t("quota.deleteLimit")} ${unitLabel}`,
+          header: raw(`${t("quota.deleteLimit")} ${unitLabel}`),
           accessorKey: "delete",
           sortable: true,
           resizable: true,
@@ -810,7 +810,7 @@ export default defineComponent({
             "default",
           );
           organizations.value = response.data.data.map((org: any) => ({
-            label: org.name,
+            label: raw(org.name),
             value: org.identifier,
           }));
           organizations.value.sort((a: any, b: any) => a.label.localeCompare(b.label));
@@ -822,7 +822,7 @@ export default defineComponent({
         }
       } else {
         organizations.value = store.state.organizations.map((org: any) => ({
-          label: org.name,
+          label: raw(org.name),
           value: org.identifier,
         }));
       }
@@ -1484,6 +1484,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       isDark,
       t,
       selectedOrganization,

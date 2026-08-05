@@ -130,7 +130,7 @@
                         class="ml-2"
                         data-test="search-scheduler-copy-sql-btn"
                         @click.stop="
-                          copyToClipboard(row.sql, {
+                          copyToClipboard(row.sql, t, {
                             successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`,
                             timeout: 5000,
                           })
@@ -183,7 +183,7 @@
                         size="icon-chip"
                         class="ml-2"
                         @click.stop="
-                          copyToClipboard(row.function, {
+                          copyToClipboard(row.function, t, {
                             successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`,
                             timeout: 5000,
                           })
@@ -235,7 +235,8 @@
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
               <div class="mr-2 ml-auto">
-                {{ t("search_scheduler_job.max_limit") }} : <b>1000</b>
+                {{ t("search_scheduler_job.max_limit") }} :
+                <b>1000</b>
               </div>
             </div>
           </template>
@@ -277,7 +278,7 @@ import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { convertUnixToDateFormat } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -333,7 +334,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const confirmDelete = ref(false);
     const toBeDeletedJob = ref({});
 
@@ -605,10 +606,10 @@ export default defineComponent({
     const delayMessage = computed(() => {
       const delay = store.state.zoConfig.usage_publish_interval;
       if (delay <= 60) {
-        return "60 seconds";
+        return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return `${minutes} minute(s)`;
+        return t("logs.searchHistory.minutes", { count: minutes });
       }
     });
 

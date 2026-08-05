@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-error-tip-${card.name}`"
         >
           <OTooltip
-            :content="errorTooltip"
+            :content="raw(errorTooltip)"
             content-class="whitespace-pre-line"
             max-width="22.5rem"
             :delay="200"
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("metrics.explorer.card.copyDetails") }}
             <OTooltip
-              :content="errorReport"
+              :content="raw(errorReport)"
               content-class="whitespace-pre-line"
               max-width="22.5rem"
               :delay="400"
@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="inline-flex cursor-help items-center gap-1">
           <OTooltip
-            :content="renderError"
+            :content="raw(renderError)"
             content-class="whitespace-pre-line"
             max-width="22.5rem"
             :delay="200"
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="copyErrorReport"
         >
           <OTooltip
-            :content="staleTooltip"
+            :content="raw(staleTooltip)"
             content-class="whitespace-pre-line"
             max-width="22.5rem"
             :delay="200"
@@ -479,7 +479,7 @@ import {
   watch,
   type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useTheme from "@/composables/useTheme";
 import MetricCardChart from "./MetricCardChart.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
@@ -569,7 +569,7 @@ export default defineComponent({
     "zoom",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const root = ref<HTMLElement | null>(null);
     const { isDark } = useTheme();
 
@@ -659,7 +659,7 @@ export default defineComponent({
     });
 
     const copyErrorReport = () =>
-      copyToClipboard(errorReport.value, {
+      copyToClipboard(errorReport.value, t, {
         successMessage: t("metrics.explorer.card.errorCopied"),
       });
 
@@ -747,6 +747,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       root,
       color,

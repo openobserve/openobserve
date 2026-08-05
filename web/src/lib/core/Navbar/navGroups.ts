@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
+import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
 
 /**
  * Visibility gates — each predicate mirrors the EXACT `visible` condition the
@@ -74,7 +75,7 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
 export interface NavGroupDef {
   key: string;
   /** i18n key for the group tile's label (resolved with t() at render). */
-  titleKey: string;
+  titleKey: I18nKey;
   icon: string;
   /** Where clicking the tile navigates (its first item). */
   parentLink: string;
@@ -225,7 +226,8 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
  */
 export function groupNavLinks(
   links: NavItem[],
-  t: (key: string) => string = (k) => k,
+  // `raw` brands the key unchanged — the identity fallback for callers with no translator.
+  t: TranslateFn = raw,
 ): RailEntry[] {
   const presentNames = new Set(links.map((l) => l.name));
 

@@ -21,6 +21,8 @@
 //! controls (mode, per-kind expand, per-kind hide) driving the behavior. Services
 //! are never collapsed.
 
+import { raw, type I18nText } from "@/types/i18n";
+
 export type CollapseMode = "auto" | "expanded" | "collapsed";
 
 export interface CollapseState {
@@ -42,7 +44,7 @@ export interface CollapseState {
 
 export interface GNode {
   id: string;
-  label: string;
+  label: I18nText;
   requests: number;
   errors: number;
   service_type?: string;
@@ -142,7 +144,7 @@ export function applyGraphCollapse(
     if (!g) {
       g = {
         id: gid,
-        label: "",
+        label: raw(""),
         requests: 0,
         errors: 0,
         service_type: kind,
@@ -219,7 +221,7 @@ export function applyGraphCollapse(
     const isHub = isHubGroup(gid, kind);
     (g as any).is_expanded = isHub;
     // ▾ = expanded (click to collapse), ▸ = collapsed (click to expand).
-    g.label = `${kindLabel} (${g.member_count}) ${isHub ? "▾" : "▸"}`;
+    g.label = raw(`${kindLabel} (${g.member_count}) ${isHub ? "▾" : "▸"}`);
   }
 
   // 4. Which dep member ids are hidden behind a collapsed boundary. A member is

@@ -31,7 +31,13 @@ const mockStore = createStore({
 const mockI18n = createI18n({
   locale: "en",
   messages: {
-    en: {},
+    // Without these keys t() echoes the key path instead of the message.
+    en: {
+      common: {
+        contentCopiedSuccessfully: "Content Copied Successfully!",
+        copyContentError: "Error while copying content.",
+      },
+    },
   },
 });
 
@@ -114,11 +120,15 @@ describe("CopyContent.vue Branch Coverage", () => {
       await nextTick();
       await nextTick();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("Test content test@example.com", {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
-        timeout: 5000,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "Test content test@example.com",
+        expect.any(Function),
+        {
+          successMessage: "Content Copied Successfully!",
+          errorMessage: "Error while copying content.",
+          timeout: 5000,
+        },
+      );
     });
   });
 
@@ -144,11 +154,15 @@ describe("CopyContent.vue Branch Coverage", () => {
       await nextTick();
       await nextTick();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("Test content test@example.com", {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
-        timeout: 5000,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "Test content test@example.com",
+        expect.any(Function),
+        {
+          successMessage: "Content Copied Successfully!",
+          errorMessage: "Error while copying content.",
+          timeout: 5000,
+        },
+      );
     });
   });
 
@@ -310,11 +324,15 @@ describe("CopyContent.vue Branch Coverage", () => {
       const copyButton = wrapper.find('[data-test="rum-copy-btn"]');
       await copyButton.trigger("click");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("Simple content without any patterns", {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
-        timeout: 5000,
-      });
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+        "Simple content without any patterns",
+        expect.any(Function),
+        {
+          successMessage: "Content Copied Successfully!",
+          errorMessage: "Error while copying content.",
+          timeout: 5000,
+        },
+      );
     });
   });
 });

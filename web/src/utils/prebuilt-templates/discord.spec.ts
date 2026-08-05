@@ -149,8 +149,8 @@ describe("discord template", () => {
     });
 
     it("has description", () => {
-      expect(discordDestinationType.description).toBeTruthy();
-      expect(typeof discordDestinationType.description).toBe("string");
+      expect(discordDestinationType.descriptionKey).toBeTruthy();
+      expect(typeof discordDestinationType.descriptionKey).toBe("string");
     });
 
     it("has icon", () => {

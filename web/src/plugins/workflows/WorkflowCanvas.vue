@@ -159,7 +159,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls, ControlButton } from "@vue-flow/controls";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import WorkflowNode from "./WorkflowNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
@@ -170,7 +170,7 @@ import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const {
   workflowObj,
   onNodeChange,
@@ -180,7 +180,7 @@ const {
   onDrop,
   onDragOver,
   openTriggerPicker,
-} = useWorkflowCanvas();
+} = useWorkflowCanvas(t);
 
 const {
   onNodesInitialized,

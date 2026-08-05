@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-status-warning-text border-status-warning-text rounded-default mr-3 flex items-center border px-2"
     >
       <OIcon name="info" class="mr-1" size="sm" />
-      Unsaved changes detected. Click "Save" to preserve your updates.
+      {{ t("pipeline.unsavedChangesDetected") }}
     </div>
 
     <!-- Edge deletion help notification -->
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- eslint-enable local/no-hardcoded-px -->
       <OIcon name="info" class="mr-1" size="sm" />
-      Press Backspace/Delete to remove the edge
+      {{ t("pipeline.edgeDeleteHint") }}
     </div>
   </div>
 
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         transition: 'background-color 0.2s ease',
       }"
     >
-      <p v-if="isDragOver">Drop here</p>
+      <p v-if="isDragOver">{{ t("pipeline.dropHere") }}</p>
     </DropzoneBackground>
     <template #node-input="{ id, data }">
       <CustomNode :id="id" :data="data" io_type="input" />
@@ -184,7 +184,7 @@ import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 /* import the required styles */
 
@@ -202,7 +202,7 @@ export default {
     FlowNodeCard,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const {
       onDragStart,
       onDragOver,
@@ -215,7 +215,7 @@ export default {
       validateConnection,
       openSourcePicker,
       pipelineObj,
-    } = useDragAndDrop();
+    } = useDragAndDrop(t);
     const store = useStore();
 
     // Mirror the hook's drag-over state (pipelineObj.isDragOver) into a local

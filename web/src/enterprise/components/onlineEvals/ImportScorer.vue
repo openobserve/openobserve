@@ -54,7 +54,7 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`scorer-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="Name *"
+                      :label="t('onlineEvals.importNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -70,7 +70,7 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`scorer-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="New Name *"
+                      :label="t('onlineEvals.importNewNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -87,7 +87,7 @@ the Free Software Foundation, either version 3 of the License, or
                       :data-test="`scorer-import-type-select-${err.itemIndex}`"
                       v-model="typeFixers[err.itemIndex]"
                       :options="typeOptions"
-                      label="Type *"
+                      :label="t('onlineEvals.importTypeRequired')"
                       @update:model-value="updateType(err.itemIndex, $event)"
                     />
                   </div>
@@ -104,7 +104,7 @@ the Free Software Foundation, either version 3 of the License, or
                       :data-test="`scorer-import-score-config-select-${err.itemIndex}`"
                       v-model="scoreConfigFixers[err.itemIndex]"
                       :options="scoreConfigOptions"
-                      label="Score Config *"
+                      :label="t('onlineEvals.importScoreConfigRequired')"
                       @update:model-value="updateScoreConfigRef(err.itemIndex, $event)"
                     />
                   </div>
@@ -121,7 +121,7 @@ the Free Software Foundation, either version 3 of the License, or
                       :data-test="`scorer-import-provider-select-${err.itemIndex}`"
                       v-model="providerFixers[err.itemIndex]"
                       :options="providerOptions"
-                      label="Provider *"
+                      :label="t('onlineEvals.importProviderRequired')"
                       @update:model-value="updateProviderRef(err.itemIndex, $event)"
                     />
                   </div>
@@ -166,7 +166,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, reactive, ref, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -199,7 +199,7 @@ const emit = defineEmits<{
   (e: "saved"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const baseImportRef = ref<any>(null);
 const isImporting = ref(false);
@@ -219,19 +219,19 @@ const scoreConfigFixers = reactive<Record<number, string>>({});
 const providerFixers = reactive<Record<number, string>>({});
 
 const typeOptions = [
-  { label: "LLM Judge", value: "llm_judge" },
-  { label: "Remote", value: "remote" },
+  { label: t("onlineEvals.scorer.detail.typeLlmJudge"), value: "llm_judge" },
+  { label: t("onlineEvals.scorer.detail.typeRemote"), value: "remote" },
 ];
 
 const scoreConfigOptions = computed(() =>
   scoreConfigs.value.map((sc) => ({
-    label: sc.name,
+    label: raw(sc.name),
     value: String((sc as any).entityId ?? (sc as any).entity_id ?? sc.id),
   })),
 );
 
 const providerOptions = computed(() =>
-  providers.value.map((p) => ({ label: p.name, value: String(p.id) })),
+  providers.value.map((p) => ({ label: raw(p.name), value: String(p.id) })),
 );
 
 const editorHeights = computed(() => ({
@@ -341,6 +341,7 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     existingScorerNames: existingScorers.value,
     scoreConfigs: scoreConfigs.value,
     providers: providers.value,
+    t,
   });
 
   // Seed inline fixers from the current raw values.
@@ -425,13 +426,16 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
 
   if (successCount === payloads.length) {
     toast({
-      message: `Successfully imported ${successCount} scorer(s)`,
+      message: t("toastMessages.onlineEvals.successfullyImportedScorers", { count: successCount }),
       variant: "success",
     });
     setTimeout(() => emit("saved"), 500);
   } else if (successCount > 0) {
     toast({
-      message: `Imported ${successCount} of ${payloads.length} scorer(s)`,
+      message: t("toastMessages.onlineEvals.importedOfScorers", {
+        imported: successCount,
+        count: payloads.length,
+      }),
       variant: "warning",
     });
     emit("saved");

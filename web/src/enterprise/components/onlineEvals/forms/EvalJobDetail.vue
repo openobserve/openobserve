@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     :width="70"
-    :title="row?.name"
+    :title="raw(row?.name)"
     :title-data-test="'eval-job-detail-name-badge'"
     :sub-title="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
@@ -142,14 +142,15 @@
                   {{ t("onlineEvals.job.detail.idleWindowLabel") }}
                 </dt>
                 <dd class="text-compact text-text-body m-0 wrap-break-word">
-                  {{ completionWindow.idleWindowSecs }}s
+                  {{ completionWindow.idleWindowSecs
+                  }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
                 </dd>
 
                 <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.job.detail.maxAgeLabel") }}
                 </dt>
                 <dd class="text-compact text-text-body m-0 wrap-break-word">
-                  {{ completionWindow.maxAgeSecs }}s
+                  {{ completionWindow.maxAgeSecs }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
                 </dd>
               </template>
             </dl>
@@ -172,7 +173,7 @@
                   size="icon-xs-sq"
                   data-test="eval-job-detail-filter-copy-btn"
                   @click="
-                    copyToClipboard(filterText, {
+                    copyToClipboard(filterText, t, {
                       successMessage: t('common.copySuccess'),
                     })
                   "
@@ -243,7 +244,9 @@
                         type="scorerType"
                         :value="item.scorerType"
                       />
-                      <span class="text-2xs text-text-secondary">v{{ item.version }}</span>
+                      <span class="text-2xs text-text-secondary"
+                        >{{ t("onlineEvals.job.detail.versionPrefix") }}{{ item.version }}</span
+                      >
                     </div>
                     <div
                       v-if="item.scoreConfigName"
@@ -329,7 +332,9 @@
               <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.versionLabel") }}
               </dt>
-              <dd class="text-compact text-text-body m-0 wrap-break-word">v{{ row.version }}</dd>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
+                {{ t("onlineEvals.job.detail.versionPrefix") }}{{ row.version }}
+              </dd>
               <dt v-if="pipelineId" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
@@ -463,7 +468,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -519,7 +524,7 @@ function handleOpenChange(value: boolean) {
   if (!value) emit("close");
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
@@ -742,9 +747,9 @@ const agents = ref<AgentFilterSelection[]>([]);
 const agentKey = ref(ALL_AGENTS_VALUE);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("traces.allAgents"), value: ALL_AGENTS_VALUE },
   ...agents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -836,7 +841,7 @@ async function refreshAll() {
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() => {
+const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(() => {
   const k = kpis.value;
   return [
     {

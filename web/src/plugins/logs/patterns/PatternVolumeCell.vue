@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { compactCount, formatBucketDuration } from "./patternUtils";
 import {
   PATTERN_VOLUME_CACHE,
@@ -97,7 +97,7 @@ const emit = defineEmits<{
   (e: "volume", volume: { total: number; buckets: number[] } | null): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const cache = inject<PatternVolumeCache | null>(PATTERN_VOLUME_CACHE, null);
 
 const rootEl = ref<HTMLElement | null>(null);

@@ -115,7 +115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="bg-surface-base border-t border-(--color-border-default,var(--color-border-default)) p-3"
           >
-            <div class="mb-2 text-sm font-medium">Source Map Files ({{ row.files.length }})</div>
+            <div class="mb-2 text-sm font-medium">
+              {{ t("rum.sourceMapFilesCount", { count: row.files.length }) }}
+            </div>
             <ul
               class="divide-border rounded-default flex flex-col divide-y overflow-y-auto border"
               style="max-height: 25rem"
@@ -127,11 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex items-center gap-2 px-3 py-2"
               >
                 <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-muted-foreground block text-xs">Source File</span>
+                  <span class="text-muted-foreground block text-xs">{{ t("rum.sourceFile") }}</span>
                   <span class="font-mono text-sm break-all">{{ file.source_file_name }}</span>
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col">
-                  <span class="text-muted-foreground block text-xs">Source Map File</span>
+                  <span class="text-muted-foreground block text-xs">{{
+                    t("rum.sourceMapFile")
+                  }}</span>
                   <span class="font-mono text-sm break-all">{{ file.source_map_file_name }}</span>
                 </div>
               </li>
@@ -172,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="deleteDialog.show"
       size="xs"
-      :title="deleteDialog.title"
+      :title="raw(deleteDialog.title)"
       data-test="delete-source-maps-dialog"
       :secondary-button-label="t('common.cancel')"
       :primary-button-label="t('common.ok')"
@@ -194,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 defineOptions({ name: "SourceMaps" });
 
 import { ref, onMounted, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
@@ -213,7 +217,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -420,8 +424,13 @@ const formatTimestamp = (timestamp: number) => {
 const confirmDeleteSourceMap = (sourceMap: any) => {
   deleteDialog.value = {
     show: true,
-    title: "Delete Source Maps",
-    message: `Are you sure you want to delete all source maps for ${sourceMap.service} (${sourceMap.version}) in ${sourceMap.env} environment? This will delete ${sourceMap.fileCount} file(s).`,
+    title: t("rum.deleteSourceMapsTitle"),
+    message: t("rum.deleteSourceMapsConfirm", {
+      service: sourceMap.service,
+      version: sourceMap.version,
+      env: sourceMap.env,
+      count: sourceMap.fileCount,
+    }),
     data: sourceMap,
   };
 };
@@ -440,7 +449,11 @@ const deleteSourceMap = async () => {
 
     toast({
       variant: "success",
-      message: `Source maps deleted successfully for ${sourceMap.service} (${sourceMap.version}) in ${sourceMap.env}`,
+      message: t("toastMessages.RUM.sourceMapsDeletedSuccessfullyForIn", {
+        service: sourceMap.service,
+        version: sourceMap.version,
+        environment: sourceMap.env,
+      }),
     });
 
     // Remove from local list

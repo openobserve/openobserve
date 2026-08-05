@@ -313,7 +313,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -502,7 +502,7 @@ export default defineComponent({
     },
   },
   setup(props: any, { emit }: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const {
@@ -515,7 +515,7 @@ export default defineComponent({
     } = searchState();
     const { getStreamList, updateGridColumns, extractFields } = useStreamFields();
     const { getFunctions, getQueryData, cancelQuery, getRegionInfo, setCommunicationMethod } =
-      useSearchBar();
+      useSearchBar(t);
     let {
       getJobData,
       refreshData,
@@ -528,7 +528,7 @@ export default defineComponent({
       processHttpHistogramResults,
       loadVisualizeData,
       loadPatternsData,
-    } = useLogs();
+    } = useLogs(t);
 
     const {
       getHistogramQueryData,
@@ -537,7 +537,7 @@ export default defineComponent({
       generateHistogramSkeleton,
     } = useHistogram();
 
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
 
     const {
       fnParsedSQL,
@@ -549,7 +549,7 @@ export default defineComponent({
       addTraceId,
     } = logsUtils();
     const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
-      useSearchStream();
+      useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
     const { extractPatterns, patternsState } = usePatterns();
@@ -576,14 +576,14 @@ export default defineComponent({
       resetDashboardPanelData,
       setCustomQueryFields,
       getResultSchema,
-    } = useDashboardPanelData("logs");
+    } = useDashboardPanelData("logs", t);
 
     // Get build page's dashboardPanelData for watching chart type/config changes
     const {
       dashboardPanelData: buildDashboardPanelData,
       removeXYFilters: buildRemoveXYFilters,
       updateXYFieldsForCustomQueryMode: buildUpdateXYFieldsForCustomQueryMode,
-    } = useDashboardPanelData("build");
+    } = useDashboardPanelData("build", t);
 
     const visualizeErrorData: any = reactive({
       errors: [],

@@ -150,7 +150,7 @@
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -175,7 +175,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Alias for the prop; same reference, mutation stays identical.
     const dashboardPanelDataModel = computed(() => props.dashboardPanelData);

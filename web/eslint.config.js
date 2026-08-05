@@ -6,6 +6,7 @@ import vueParser from "vue-eslint-parser";
 import prettier from "eslint-plugin-prettier";
 import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
+import vueI18n from "@intlify/eslint-plugin-vue-i18n";
 import fs from "fs";
 import css from "@eslint/css";
 // The parser behind @eslint/css. Used directly on .vue <style> blocks, which no ESLint
@@ -289,6 +290,164 @@ const noHardcodedPx = {
   },
 };
 
+// Non-translatable tokens, fed to both i18n rules.
+//
+// An entry is a GLOBAL, PERMANENT exemption with no explanation at the call site,
+// so it is a last resort — only for a token that recurs AND sits in a bare text
+// node, where there is no declaration to annotate. Everything else has a better
+// home: a union type if code branches on it, otherwise `raw("…")` at the call
+// site. Never add real UI text.
+//
+// Matching is whole-text, so "s" allows a bare `s` node, not the "s" in "settings".
+const GLYPHS_AND_UNITS = [
+  "px",
+  "s", // SECONDS, not a plural suffix — manual pluralisation is debt, use a pipe plural
+  "ms",
+  "min",
+  "~",
+  "×",
+  "→",
+  "≠",
+  "$",
+  "fx",
+  "x",
+  "●",
+  "…",
+  "🕑",
+  "$_",
+];
+
+/** Defined by an external spec — identical in every locale. */
+const SPEC_IDENTIFIERS = ["GET", "UTC", "SQL", "PromQL", "OK", "ERROR"];
+
+/** Bare text nodes, where `raw()` has no expression to wrap. */
+const TEXT_NODE_LITERALS = ["1000", "./.env", "trace.zip"];
+
+const NON_TRANSLATABLE = [...GLYPHS_AND_UNITS, ...SPEC_IDENTIFIERS, ...TEXT_NODE_LITERALS];
+const NON_TRANSLATABLE_SET = new Set(NON_TRANSLATABLE);
+
+// The built-in rule's DEFAULT allowlist (punctuation it always ignores). Supplying an
+// `allowlist` REPLACES this default, so we spread it back in alongside NON_TRANSLATABLE.
+const BARE_STRING_DEFAULT_ALLOWLIST = [
+  "(",
+  ")",
+  ",",
+  ".",
+  "&",
+  "+",
+  "-",
+  "=",
+  "*",
+  "/",
+  "#",
+  "%",
+  "!",
+  "?",
+  ":",
+  "[",
+  "]",
+  "{",
+  "}",
+  "<",
+  ">",
+  "·",
+  "•",
+  "‐",
+  "–",
+  "—",
+  "−",
+  "|",
+];
+
+// Catches hardcoded template text the built-in `vue/no-bare-strings-in-template`
+// (static attrs + text nodes only) can't see: `{{ 'Save' }}` and v-text/v-html —
+// otherwise the check is dodged by adding two braces. Bound PROPS are not checked
+// here; `I18nText` covers them, and rejects even a plain string variable.
+// Non-<template> files are a no-op.
+noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "Ban hardcoded text in v-text/v-html and {{ }} literals",
+    },
+  },
+  create(context) {
+    const sourceCode = context.sourceCode ?? context.getSourceCode();
+    const ps = sourceCode.parserServices ?? context.parserServices;
+    if (!ps || !ps.defineTemplateBodyVisitor) return {};
+    // Collects hardcoded text from an expression, recursing through the composed
+    // shapes (concatenation, ternary, ||-fallback, template literal) — vue-i18n
+    // handles all of them via named interpolation, so none needs an exemption.
+    //
+    // CallExpression is deliberately absent: that is what makes t() and raw() pass.
+    // MemberExpression too, so `row["exception.type"]` isn't read as display text.
+    const collect = (expr, out) => {
+      if (!expr) return out;
+      switch (expr.type) {
+        case "Literal":
+          if (typeof expr.value === "string") out.push(expr.value);
+          break;
+        case "TemplateLiteral":
+          for (const q of expr.quasis) out.push(q.value.cooked ?? "");
+          for (const e of expr.expressions) collect(e, out);
+          break;
+        case "BinaryExpression":
+          if (expr.operator === "+") {
+            collect(expr.left, out);
+            collect(expr.right, out);
+          }
+          break;
+        case "ConditionalExpression":
+          collect(expr.consequent, out);
+          collect(expr.alternate, out);
+          break;
+        case "LogicalExpression":
+          collect(expr.left, out);
+          collect(expr.right, out);
+          break;
+      }
+      return out;
+    };
+    // → offending text (joined when composed), or null if there is none.
+    const bareText = (expr) => {
+      const parts = collect(expr, []).filter(
+        (t) => t != null && /\p{L}/u.test(t) && !NON_TRANSLATABLE_SET.has(t.trim()),
+      );
+      return parts.length ? parts.join("|") : null;
+    };
+    return ps.defineTemplateBodyVisitor({
+      VAttribute(node) {
+        if (!node.directive) return; // static attrs → handled by no-bare-strings
+        const dir = node.key && node.key.name && node.key.name.name;
+        const text = bareText(node.value && node.value.expression);
+        if (text == null) return;
+        if (dir === "bind") {
+          // Component props → guarded by I18nText. Native `:title` / `:alt` are the
+          // residual gap: the built-in rule covers only their static form.
+          return;
+        } else if (dir === "text" || dir === "html") {
+          context.report({
+            node,
+            message: `Hardcoded text "${text}" in v-${dir} — use t('...') with a key in en-US.json.`,
+          });
+        }
+      },
+      VExpressionContainer(node) {
+        // Text-position {{ }} only — a directive value's container has a VAttribute
+        // parent and is handled above.
+        const p = node.parent;
+        if (!p || (p.type !== "VElement" && p.type !== "VDocumentFragment")) return;
+        const text = bareText(node.expression);
+        if (text == null) return;
+        context.report({
+          node,
+          message: `Hardcoded text "${text}" in {{ }} — use t('...') with a key in en-US.json.`,
+        });
+      },
+    });
+  },
+};
+
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
   ? fs
@@ -342,11 +501,70 @@ export default [
       "@typescript-eslint": typescript,
       prettier,
       local: { rules: { ...noLegacyO2Tokens.rules, ...noHardcodedPx.rules } },
+      "@intlify/vue-i18n": vueI18n,
+    },
+    // en-US only. The other locales are generated from it and lag behind, so
+    // validating against the whole folder would flag every untranslated key.
+    settings: {
+      "vue-i18n": {
+        localeDir: "./src/locales/languages/en-US.json",
+        messageSyntaxVersion: "^11.0.0",
+      },
     },
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
       "local/no-hardcoded-px": ["error"],
 
+      // A missing key is invisible at build time — vue-i18n renders the raw key to
+      // the user. Dynamic keys are skipped by the rule; specs are exempted below.
+      "@intlify/vue-i18n/no-missing-keys": "error",
+      //
+      // Text nodes, plus the native HTML/ARIA attributes below. Component props are
+      // absent on purpose — `I18nText` (src/types/i18n.ts) guards those, and rejects
+      // even `:label="someStringVariable"`, which no lint rule can see. These
+      // attributes have no prop to annotate, so lint is the only gate they get.
+      //
+      // Not the old `TEXT_ATTRS` list returning: that tracked OUR components and went
+      // stale silently. This tracks the web platform, which does not change.
+      // (@intlify's own `no-raw-text` is not used — it counts punctuation and code
+      // tokens, so it stays in the hundreds even fully migrated.)
+      "vue/no-bare-strings-in-template": [
+        "error",
+        {
+          attributes: {
+            "/.+/": [
+              "title",
+              "alt",
+              "aria-label",
+              "aria-placeholder",
+              "aria-roledescription",
+              "aria-valuetext",
+            ],
+            input: ["placeholder"],
+            textarea: ["placeholder"],
+          },
+          allowlist: [...BARE_STRING_DEFAULT_ALLOWLIST, ...NON_TRANSLATABLE],
+        },
+      ],
+      "local/no-bare-bound-text-props": "error",
+      //
+      // Vanilla useI18n().t() returns an unbranded `string`, which would silently
+      // void every I18nText check in the file. useI18nTyped() is the same composer
+      // with a type-level cast — no runtime cost.
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "vue-i18n",
+              importNames: ["useI18n"],
+              message:
+                "Import useI18nTyped from '@/types/i18n' instead (or gt() outside a setup context) — useI18n() returns an unbranded string and defeats the I18nText check.",
+            },
+          ],
+        },
+      ],
+      //
       // Catches components used in <template> but never imported/registered
       // (e.g. <date-time> instead of <DateTime>) — this class of bug is
       // invisible to vue-tsc (unresolved tags aren't a template type error
@@ -470,6 +688,37 @@ export default [
     files: ["src/composables/useTheme.ts", "src/utils/chartTheme.ts"],
     rules: {
       "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Query-syntax cheat-sheets — the "text" is SQL/PromQL, not prose. Add a file
+    // here only when it is genuinely code, with a one-line reason.
+    files: [
+      "src/plugins/logs/SyntaxGuide.vue",
+      "src/plugins/traces/SyntaxGuide.vue",
+      "src/plugins/metrics/SyntaxGuideMetrics.vue",
+    ],
+    rules: {
+      "vue/no-bare-strings-in-template": "off",
+      "local/no-bare-bound-text-props": "off",
+    },
+  },
+  {
+    // The ban can't forbid its own implementation: the wrapper has to import
+    // useI18n to wrap it, and the bootstrap has to call createI18n.
+    files: ["src/types/i18n.ts", "src/locales/**"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Tests build their own i18n instances as fixtures, and use throwaway keys
+    // (`test.key`) that intentionally are not in en-US.json — so neither the
+    // import ban nor the key contract applies to them.
+    files: ["**/*.{spec,test}.{js,ts,jsx,tsx}", "**/__tests__/**", "**/test/**"],
+    rules: {
+      "no-restricted-imports": "off",
+      "@intlify/vue-i18n/no-missing-keys": "off",
     },
   },
   {

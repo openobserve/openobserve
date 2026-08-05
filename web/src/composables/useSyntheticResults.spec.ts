@@ -41,6 +41,8 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 import useSyntheticResults from "./useSyntheticResults";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 describe("useSyntheticResults", () => {
   beforeEach(() => {
@@ -72,7 +74,7 @@ describe("useSyntheticResults", () => {
         },
       ]);
 
-    const { kpi, runs, loading, hasLoadedOnce, fetchAll } = useSyntheticResults();
+    const { kpi, runs, loading, hasLoadedOnce, fetchAll } = useSyntheticResults(t);
 
     await fetchAll("mon-1", 1_700_000_000_000_000, 1_700_003_600_000_000);
 
@@ -89,7 +91,7 @@ describe("useSyntheticResults", () => {
 
   it("issues one query per Overview panel, all against the logs page type", async () => {
     executeQuery.mockResolvedValue([]);
-    const { fetchAll } = useSyntheticResults();
+    const { fetchAll } = useSyntheticResults(t);
     await fetchAll("mon-1", 1, 100);
 
     // KPI, last-run, histogram, runs — and nothing for the Steps tab. The step
@@ -202,7 +204,7 @@ describe("useSyntheticResults", () => {
   });
 
   it("should not query when monitorId or the time range is missing", async () => {
-    const { fetchAll } = useSyntheticResults();
+    const { fetchAll } = useSyntheticResults(t);
     await fetchAll("", 1, 100);
     await fetchAll("mon-1", 0, 0);
     expect(executeQuery).not.toHaveBeenCalled();
@@ -210,7 +212,7 @@ describe("useSyntheticResults", () => {
 
   it("should surface a per-group error and reset state when a query fails", async () => {
     executeQuery.mockRejectedValue(new Error("boom"));
-    const { kpiError, runsError, kpi, runs, fetchAll } = useSyntheticResults();
+    const { kpiError, runsError, kpi, runs, fetchAll } = useSyntheticResults(t);
     await fetchAll("mon-1", 1, 100);
     // Errors are surfaced per-group, not at the top level
     expect(kpiError.value).toBe("boom");

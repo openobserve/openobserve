@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         labelKey="label"
         valueKey="value"
         @update:model-value="onAlertSelected"
-        :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
+        :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
         class="o2-search-input min-w-62.5"
         clearable
@@ -51,7 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon class="o2-search-input-icon" name="search" size="sm" />
         </template>
         <template #empty>
-          <div class="text-muted-foreground px-3 py-2">No alerts found</div>
+          <div class="text-muted-foreground px-3 py-2">
+            {{ t("alerts.noAlertsFound") }}
+          </div>
         </template>
       </OSelect>
       <OButton
@@ -62,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-history-manual-search-btn"
         :disabled="loading"
       >
-        <OTooltip :content="t('common.search') || 'Search'" />
+        <OTooltip :content="t('common.search')" />
       </OButton>
       <OButton
         variant="ghost"
@@ -72,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-history-refresh-btn"
         :loading="loading"
       >
-        <OTooltip :content="t('common.refresh') || 'Refresh'" />
+        <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>
     <div class="min-h-0 flex-1 overflow-hidden">
@@ -113,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -123,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -133,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -169,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="value ? 'text-status-positive' : 'text-text-body'"
               size="xs"
             >
-              <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
+              <OTooltip :content="value ? t('common.realTime') : t('alerts.scheduled')" />
             </OIcon>
           </template>
 
@@ -179,7 +181,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="value ? 'text-text-body' : 'text-status-positive'"
               size="md"
             >
-              <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
+              <OTooltip
+                :content="value ? t('alerts.insights.filters.silenced') : t('common.notSilenced')"
+              />
             </OIcon>
           </template>
 
@@ -193,9 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="block" size="sm">
                 <OTooltip>
                   <template #content>
-                    Suppressed by deduplication
+                    {{ t("alerts.suppressedByDeduplication") }}
                     <div v-if="row.dedup_count">
-                      {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? "s" : "" }}
+                      {{ t("alerts.occurrence", { count: row.dedup_count }, row.dedup_count) }}
                     </div>
                   </template>
                 </OTooltip>
@@ -205,8 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="group-work" size="md">
                 <OTooltip>
                   <template #content>
-                    Grouped notification
-                    <div>{{ row.group_size }} alerts batched together</div>
+                    {{ t("alerts.groupedNotification") }}
+                    <div>{{ row.group_size }} {{ t("alerts.alertsBatchedTogether") }}</div>
                   </template>
                 </OTooltip>
               </OIcon>
@@ -216,9 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="check-circle" size="md">
                 <OTooltip>
                   <template #content>
-                    Notification sent
+                    {{ t("alerts.notificationSent") }}
                     <div v-if="row.dedup_count && row.dedup_count > 1">
-                      {{ row.dedup_count }} occurrences deduplicated
+                      {{ row.dedup_count }} {{ t("alerts.occurrencesDeduplicated") }}
                     </div>
                   </template>
                 </OTooltip>
@@ -237,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
             >
-              <OTooltip content="View Details" />
+              <OTooltip :content="t('alerts.viewDetails')" />
             </OButton>
             <OButton
               v-if="row.error"
@@ -248,7 +252,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="showErrorDialog(row)"
             >
               <OTooltip
-                :content="`Last error: ${new Date(row.timestamp / 1000).toLocaleString()}`"
+                :content="
+                  t('common.lastErrorAt', { time: new Date(row.timestamp / 1000).toLocaleString() })
+                "
               />
             </OButton>
           </template>
@@ -261,8 +267,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="alert-history-details-dialog"
       v-model:open="detailsDialog"
       :width="55"
-      title="Alert Execution Details"
-      primary-button-label="Close"
+      :title="t('alerts.alertExecutionDetails')"
+      :primary-button-label="t('common.close')"
       @click:primary="detailsDialog = false"
     >
       <div v-if="selectedRow" class="gap-2">
@@ -270,13 +276,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Alert Name</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.alertName") }}</div>
               <div class="text-sm font-medium">
                 {{ selectedRow.alert_name }}
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Status</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.status") }}</div>
               <OTag type="alertState" :value="selectedRow.status" />
             </div>
           </div>
@@ -288,13 +294,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Timestamp</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.timestamp") }}</div>
               <div class="text-sm">
                 {{ formatHistoryDate(selectedRow.timestamp) }}
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Duration</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.duration") }}</div>
               <div class="text-sm">
                 {{ formatDuration(selectedRow.end_time - selectedRow.start_time) }}
               </div>
@@ -308,22 +314,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Type</div>
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.type") }}</div>
               <div class="text-sm">
                 <OIcon
                   :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
                   class="mr-1"
                   size="xs"
                 />
-                {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+                {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-text-secondary mb-1 text-xs">Silenced</div>
+              <div class="text-text-secondary mb-1 text-xs">
+                {{ t("alerts.insights.filters.silenced") }}
+              </div>
               <div class="text-sm">
                 <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
                 <OIcon v-else name="volume-up" size="xs" class="mr-1" />
-                {{ selectedRow.is_silenced ? "Yes" : "No" }}
+                {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
               </div>
             </div>
           </div>
@@ -339,15 +347,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="px-0 py-1">
             <div class="flex gap-3">
               <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
-                <div class="text-text-secondary mb-1 text-xs">Evaluation Time</div>
+                <div class="text-text-secondary mb-1 text-xs">
+                  {{ t("alerts.evaluationTime") }}
+                </div>
                 <div class="text-sm">{{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s</div>
               </div>
               <div v-if="selectedRow.query_took" class="w-1/3">
-                <div class="text-text-secondary mb-1 text-xs">Query Time</div>
+                <div class="text-text-secondary mb-1 text-xs">
+                  {{ t("alerts.queryTime") }}
+                </div>
                 <div class="text-sm">{{ (selectedRow.query_took / 1000).toFixed(2) }}ms</div>
               </div>
               <div v-if="selectedRow.retries > 0" class="w-1/3">
-                <div class="text-text-secondary mb-1 text-xs">Retries</div>
+                <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.retries") }}</div>
                 <div class="text-sm">{{ selectedRow.retries }}</div>
               </div>
             </div>
@@ -358,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="selectedRow.source_node">
           <OSeparator class="my-2" />
           <div class="px-0 py-1">
-            <div class="text-text-secondary mb-1 text-xs">Source Node</div>
+            <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.sourceNode") }}</div>
             <div class="font-mono text-sm">
               {{ selectedRow.source_node }}
             </div>
@@ -371,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="px-0 py-1">
             <div class="text-text-secondary mb-1 text-xs">
               <OIcon name="error" size="xs" class="mr-1" />
-              Error Details
+              {{ t("alerts.errorDetails") }}
             </div>
             <div
               class="rounded-default border-negative/30 bg-status-error-bg mt-2 border border-solid p-2"
@@ -397,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="px-0 py-1">
             <div class="text-text-secondary mb-1 text-xs">
               <OIcon name="check-circle" size="xs" class="mr-1" />
-              Response
+              {{ t("alerts.response") }}
             </div>
             <div
               class="rounded-default border-positive/30 bg-status-success-bg mt-2 border border-solid p-2"
@@ -425,7 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="errorDialog"
       size="md"
       :title="errorMessage.alert_name"
-      primary-button-label="Close"
+      :primary-button-label="t('common.close')"
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
@@ -433,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #header-right>
         <div class="text-compact ml-9 flex items-center text-xs opacity-70">
-          <span class="mr-1">Last error:</span>
+          <span class="mr-1">{{ t("alerts.lastError") }}</span>
           <OIcon name="schedule" size="xs" class="mr-1" />
           {{
             errorMessage.last_error_timestamp &&
@@ -443,7 +455,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="mb-4">
-        <div class="mb-2 text-sm font-semibold tracking-[0.02em] opacity-80">Error Summary</div>
+        <div class="mb-2 text-sm font-semibold tracking-[0.02em] opacity-80">
+          {{ t("alerts.errorSummary") }}
+        </div>
         <div
           class="rounded-default text-compact bg-status-error-bg border-status-negative text-status-error-text border border-solid p-4 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
         >
@@ -458,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -478,7 +492,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -527,7 +541,7 @@ const errorMessage = ref<any>("");
 const columns = ref<OTableColumnDef[]>([
   {
     id: "alert_name",
-    header: t("alerts.alertName") || "Alert Name",
+    header: t("alerts.alertName"),
     accessorKey: "alert_name",
     sortable: true,
     size: COL.name,
@@ -535,7 +549,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_realtime",
-    header: t("alerts.type") || "Type",
+    header: t("alerts.type"),
     accessorKey: "is_realtime",
     sortable: true,
     size: 37,
@@ -546,7 +560,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_silenced",
-    header: t("alerts.isSilenced") || "Is Silenced",
+    header: t("alerts.isSilenced"),
     accessorKey: "is_silenced",
     sortable: true,
     size: 37,
@@ -557,7 +571,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "timestamp",
-    header: t("alerts.timestamp") || "Timestamp",
+    header: t("alerts.timestamp"),
     accessorKey: "timestamp",
     sortable: true,
     size: COL.dateAbsolute,
@@ -567,7 +581,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "start_time",
-    header: t("alerts.startTime") || "Start Time",
+    header: t("alerts.startTime"),
     accessorKey: "start_time",
     sortable: true,
     size: COL.dateAbsolute,
@@ -577,7 +591,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "end_time",
-    header: t("alerts.endTime") || "End Time",
+    header: t("alerts.endTime"),
     accessorKey: "end_time",
     sortable: true,
     size: COL.dateAbsolute,
@@ -587,7 +601,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "duration",
-    header: t("alerts.duration") || "Duration",
+    header: t("alerts.duration"),
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: false,
     size: COL.duration,
@@ -597,7 +611,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "status",
-    header: t("alerts.status") || "Status",
+    header: t("alerts.status"),
     accessorKey: "status",
     sortable: true,
     size: COL.status,
@@ -617,7 +631,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "retries",
-    header: t("alerts.retries") || "Retries",
+    header: t("alerts.retries"),
     accessorKey: "retries",
     sortable: true,
     size: 64,
@@ -626,7 +640,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "dedup",
-    header: t("alerts.dedup") || "Dedup",
+    header: t("alerts.dedup"),
     sortable: false,
     size: 80,
     maxSize: 80,
@@ -635,7 +649,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "actions",
-    header: t("common.actions") || "Actions",
+    header: t("common.actions"),
     isAction: true,
     pinned: "right",
     size: 80,

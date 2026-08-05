@@ -76,7 +76,7 @@ import { formatDate } from "@/utils/date";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import ErrorTypeIcons from "./ErrorTypeIcons.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const props = defineProps({
   error: {
@@ -85,7 +85,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const timelineEvents = computed<any[]>(() => props.error.events || []);
 

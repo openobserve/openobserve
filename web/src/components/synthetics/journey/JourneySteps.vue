@@ -35,7 +35,7 @@ export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -44,9 +44,9 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
-import { ACTION_LABELS, ACTION_ICONS } from "@/constants/synthetics";
+import { ACTION_LABEL_KEYS, ACTION_ICONS } from "@/constants/synthetics";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ── Props ──────────────────────────────────────────────────────────
 const props = withDefaults(
@@ -140,7 +140,7 @@ function actionIcon(row: TData): string {
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
   return isStepAction(action)
-    ? ACTION_LABELS[action]
+    ? t(ACTION_LABEL_KEYS[action])
     : action.charAt(0).toUpperCase() + action.slice(1);
 }
 
@@ -210,14 +210,14 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
         size: 200,
         meta: { autoWidth: true },
       },
-      { id: "actions", header: "", size: 128, isAction: true },
+      { id: "actions", header: raw(""), size: 128, isAction: true },
     ];
   }
   // Results mode. Headers are named here because results mode renders them —
   // the run's steps are a table an engineer reads down, and an unlabelled
   // timeline column cannot say what its bars are drawn against.
   return [
-    { id: "step", header: "", size: 44 },
+    { id: "step", header: raw(""), size: 44 },
     { id: "screenshot", header: t("synthetics.journey.shotHeader"), size: 90 },
     {
       id: "details",

@@ -95,7 +95,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import KpiSparkline from "@/plugins/traces/KpiSparkline.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { KpiCard } from "../composables/useQualityData";
@@ -110,7 +110,7 @@ const emit = defineEmits<{
   (event: "activate"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const scopes = ["span", "trace", "session"] as const;
 

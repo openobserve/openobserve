@@ -32,6 +32,7 @@ import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { TranslateFn } from "@/types/i18n";
 
 interface SQLColumn {
   expr?: {
@@ -389,10 +390,10 @@ export const logsUtils = () => {
     return max;
   };
 
-  const showCancelSearchNotification = () => {
+  const showCancelSearchNotification = (t: TranslateFn) => {
     toast({
       variant: "info",
-      message: "Running query cancelled successfully",
+      message: t("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
     });
   };
 

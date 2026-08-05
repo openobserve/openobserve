@@ -85,13 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 withDefaults(
   defineProps<{
-    title?: string;
-    description?: string;
+    title?: I18nText;
+    description?: I18nText;
     /** Optional eyebrow label rendered above the actions (e.g. "Quick start"). */
     actionsLabel?: string;
   }>(),
-  { title: "", description: "", actionsLabel: "" },
+  { title: raw(""), description: raw(""), actionsLabel: "" },
 );
 </script>

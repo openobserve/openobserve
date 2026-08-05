@@ -121,9 +121,9 @@
                   }}</span>
                   <div class="ml-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
-                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
-                        >then</span
-                      >
+                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
+                        t("shortcuts.then")
+                      }}</span>
                       <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                       <kbd
                         v-else
@@ -180,9 +180,9 @@
                   }}</span>
                   <div class="ml-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
-                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
-                        >then</span
-                      >
+                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
+                        t("shortcuts.then")
+                      }}</span>
                       <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                       <kbd
                         v-else
@@ -207,7 +207,7 @@
           <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <kbd
             class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
-            >Esc</kbd
+            >{{ t("shortcuts.escKey") }}</kbd
           >
           <!-- eslint-enable local/no-hardcoded-px -->
           <span>{{ t("shortcuts.footerClose") }}</span>
@@ -228,7 +228,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -253,7 +253,7 @@ const emit = defineEmits<{
   "update:open": [value: boolean];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const open = computed({
   get: () => props.open,
@@ -267,14 +267,14 @@ interface DisplayEntry {
   id: string;
   /** Combo string rendered as keycaps (e.g. "ctrl+enter", "del / ⌫"). */
   display: string;
-  label: string;
+  label: I18nText;
 }
 interface DisplaySection {
-  title: string;
+  title: I18nText;
   entries: DisplayEntry[];
 }
 interface DisplayModule {
-  title: string;
+  title: I18nText;
   sections: DisplaySection[];
 }
 
@@ -422,7 +422,7 @@ useShortcut(
     open.value = !open.value;
   },
   {
-    description: "shortcuts.actions.openCheatsheet",
+    description: raw("shortcuts.actions.openCheatsheet"),
     scope: "global",
   },
 );

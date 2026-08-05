@@ -353,7 +353,7 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import SpanBlock from "./SpanBlock.vue";
 import SpanKindBadge from "./components/SpanKindBadge.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/convertTraceData";
@@ -443,7 +443,7 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     useRouter();
 
     // As there are some UX issues, disabling it for now

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { createFolder, updateFolder } from "@/utils/commons";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -65,7 +65,7 @@ export default defineComponent({
   emits: ["update:modelValue", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const addFolderSchema = makeAddFolderSchema(t);
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const { track } = useReo();

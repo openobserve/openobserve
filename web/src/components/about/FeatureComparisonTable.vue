@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="text-accent m-0 mb-0.5 text-[length:var(--text-xs)] font-semibold tracking-[0.1em] uppercase"
         >
-          EDITIONS
+          {{ t("about.editionsLabel") }}
         </div>
         <div
           class="text-text-heading m-0 text-[length:var(--text-xl)] font-semibold tracking-[-0.015em]"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-3xs bg-accent text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
         >
           <OIcon name="arrow-upward" size="sm" class="mr-1" />
-          Your Plan
+          {{ t("about.yourPlan") }}
         </div>
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="rounded-default mb-4 border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] p-3"
         >
           <div class="text-3xs text-text-label m-0 mb-2 font-bold tracking-[0.12em] uppercase">
-            ALL FIVE PILLARS
+            {{ t("about.allFivePillars") }}
           </div>
           <div class="mb-1.5 flex flex-wrap gap-1.5">
             <span
@@ -189,11 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { FEATURE_REGISTRY, getFeatureNameKey, type FeatureDefinition } from "@/constants/features";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const buildType: string = store.state.zoConfig.build_type;
 

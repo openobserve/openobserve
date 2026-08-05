@@ -14,7 +14,12 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip side="right" align="center" :side-offset="10" :content="sqlQueryErrorMsg" />
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="raw(sqlQueryErrorMsg)"
+            />
           </OIcon>
         </template>
         <template #right>
@@ -69,7 +74,7 @@
           </div>
 
           <DateTime
-            label="Start Time"
+            :label="t('alerts.startTime')"
             class="w-full py-1"
             auto-apply
             :default-type="dateTime.type"
@@ -111,7 +116,7 @@
           </div>
           <div class="text-status-error-text invalid-sql-error min-h-5.5 p-1">
             <span v-show="!!sqlQueryErrorMsg" class="text-compact">
-              Error: {{ sqlQueryErrorMsg }}</span
+              {{ t("function.errorLabel") }} {{ sqlQueryErrorMsg }}</span
             >
           </div>
         </div>
@@ -143,7 +148,12 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip side="right" align="center" :side-offset="10" :content="eventsErrorMsg" />
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="raw(eventsErrorMsg)"
+            />
           </OIcon>
         </template>
         <template #right>
@@ -209,7 +219,7 @@
               side="right"
               align="center"
               :side-offset="10"
-              :content="outputEventsErrorMsg"
+              :content="raw(outputEventsErrorMsg)"
             />
           </OIcon>
         </template>
@@ -256,7 +266,7 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { isJsFunction } from "@/utils/functionLanguage";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
@@ -360,14 +370,15 @@ const selectedStream = ref<{
   type: "logs" | "metrics" | "traces";
 }>({ name: "", type: "logs" });
 
-const { getStreams, getStream } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams, getStream } = useStreams(t);
 
 const { buildQueryPayload } = useQuery();
 
 const streamTypes = [
-  { label: "Logs", value: "logs", icon: "description" },
-  { label: "Metrics", value: "metrics", icon: "bar-chart" },
-  { label: "Traces", value: "traces", icon: "activity" },
+  { label: t("common.logs"), value: "logs", icon: "description" },
+  { label: t("common.metrics"), value: "metrics", icon: "bar-chart" },
+  { label: t("common.traces"), value: "traces", icon: "activity" },
 ];
 
 const isFetchingStreams = ref(false);
@@ -375,8 +386,6 @@ const isFetchingStreams = ref(false);
 const store = useStore();
 
 let parser: any = null;
-
-const { t } = useI18n();
 
 const expandState = ref({
   stream: true,
@@ -553,11 +562,14 @@ const getResults = async () => {
       ? getConsumableRelativeTime(dateTime.value.relativeTimePeriod)
       : dateTime.value;
 
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: selectedStream.value.name,
-    timestamps,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: selectedStream.value.name,
+      timestamps,
+    },
+    t,
+  );
 
   delete query.aggs;
 
@@ -602,7 +614,9 @@ const getResults = async () => {
       // This case happens when user enters invalid query and then switches to real time alert
       toast({
         variant: "error",
-        message: "Invalid SQL Query : " + err.response?.data?.message,
+        message: t("toastMessages.functions.invalidSqlQueryDetail", {
+          error: err.response?.data?.message,
+        }),
       });
     })
     .finally(() => {
@@ -617,7 +631,7 @@ const isInputValid = () => {
     eventsErrorMsg.value = `Invalid events: ${e?.message}`;
     toast({
       variant: "error",
-      message: eventsErrorMsg.value,
+      message: raw(eventsErrorMsg.value),
     });
     return false;
   }

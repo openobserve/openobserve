@@ -284,7 +284,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="isTemplateActive(idx, tpl.keys)"
                         class="ml-0.5 text-sm leading-none opacity-75 hover:opacity-100"
                         @click.stop="clearTemplate(idx, tpl.keys)"
-                        >×</span
+                      >
+                        {{ "×" }}</span
                       >
                     </OButton>
                   </div>
@@ -335,8 +336,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :placeholder="t('modelPricing.pricePlaceholder')"
                           :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
                         >
-                          <template #icon-left
-                            ><span class="price-dollar pb-0.5 text-xs">$</span></template
+                          <template #icon-left>
+                            <span class="price-dollar pb-0.5 text-xs">$</span></template
                           >
                         </OFormInput>
                         <!-- Fixed input-height band keeps the delete button centered
@@ -389,8 +390,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :placeholder="t('modelPricing.pricePlaceholder')"
                           :data-test="`model-pricing-add-price-value-input-${idx}`"
                         >
-                          <template #icon-left
-                            ><span class="price-dollar pb-0.5 text-xs">$</span></template
+                          <template #icon-left>
+                            <span class="price-dollar pb-0.5 text-xs">$</span></template
                           >
                         </OFormInput>
                         <OButton
@@ -445,10 +446,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ entry.key }}
                             </td>
                             <td class="text-text-body px-4 py-2">
-                              ${{ formatPreviewCost(fromPerMillion(entry.value), 1000) }}
+                              {{ "$" + formatPreviewCost(fromPerMillion(entry.value), 1000) }}
                             </td>
                             <td class="text-text-body px-4 py-2">
-                              ${{ formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
+                              {{ "$" + formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
                             </td>
                           </tr>
                         </tbody>
@@ -502,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -523,7 +524,7 @@ import {
   type ModelPricingTier,
 } from "./ModelPricingEditor.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
@@ -534,7 +535,7 @@ const showExamples = ref(false);
 const copiedPattern = ref<string | null>(null);
 
 function copyPattern(pattern: string) {
-  copyToClipboard(pattern, { silent: true }).then((success) => {
+  copyToClipboard(pattern, t, { silent: true }).then((success) => {
     if (success) {
       copiedPattern.value = pattern;
       setTimeout(() => {
@@ -683,12 +684,12 @@ const usageTemplates = [
 ];
 
 const operators = [
-  { label: ">", value: "gt" },
-  { label: ">=", value: "gte" },
-  { label: "<", value: "lt" },
-  { label: "<=", value: "lte" },
-  { label: "=", value: "eq" },
-  { label: "!=", value: "neq" },
+  { label: raw(">"), value: "gt" },
+  { label: raw(">="), value: "gte" },
+  { label: raw("<"), value: "lt" },
+  { label: raw("<="), value: "lte" },
+  { label: raw("="), value: "eq" },
+  { label: raw("!="), value: "neq" },
 ];
 
 // ── Field-array operations (whole-array setFieldValue; `formTiers`
@@ -818,7 +819,7 @@ function goBack() {
 }
 
 function notifyWarn(message: string) {
-  toast({ variant: "error", message });
+  toast({ variant: "error", message: raw(message) });
 }
 
 /** Show error notification only for non-403 errors.
@@ -828,7 +829,7 @@ function notifyError(prefix: string, e: any) {
   const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
   toast({
     variant: "error",
-    message: `${prefix}: ${msg}`,
+    message: t("toastMessages.settings.message", { prefix: prefix, message: msg }),
     timeout: 5000,
   });
 }

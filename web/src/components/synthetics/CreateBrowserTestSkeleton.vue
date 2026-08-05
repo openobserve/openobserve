@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 withDefaults(
   defineProps<{

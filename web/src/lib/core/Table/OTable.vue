@@ -11,6 +11,7 @@ import {
   ref,
   watch,
 } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
@@ -45,6 +46,7 @@ import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
+const { t } = useI18nTyped();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
@@ -77,7 +79,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   globalFilterPlaceholder: "Search...",
   filterMode: "client",
   defaultColumns: true,
-  footerTitle: "",
+  footerTitle: raw(""),
   totalCountExact: true,
   showHeader: true,
   fillHeight: true,
@@ -922,7 +924,9 @@ const computedTableWidth = computed<string | undefined>(() => {
 // virtualizer for nothing — a real per-row scroll tax on long lists. Skip it.
 const hasVariableRowHeight = computed(() => expansion.isEnabled.value || !!props.wrap);
 function measureElement(el: any) {
-  if (el && props.virtualScroll && hasVariableRowHeight.value) {
+  // Not in dynamic mode: `measureRowElement` measures each row there, and measure()
+  // wipes the whole size cache — per row mount that loops until the tab locks up.
+  if (el && props.virtualScroll && hasVariableRowHeight.value && !useDynamicRowHeight.value) {
     virtualMeasure();
   }
 }
@@ -1118,7 +1122,7 @@ defineExpose({
       <OBanner
         v-else-if="props.streaming && displayRows.length > 0"
         variant="info"
-        :content="'Loading...'"
+        :content="t('common.loading')"
         dense
         data-test="o2-table-loading-banner"
       />
@@ -1468,7 +1472,7 @@ defineExpose({
           v-if="showStreaming"
           data-test="o2-table-streaming-bar"
           class="bg-table-streaming-bar sticky bottom-0 z-10 h-1 w-full animate-pulse"
-          aria-label="Data streaming in progress"
+          :aria-label="t('common.dataStreamingInProgress')"
         />
       </div>
 

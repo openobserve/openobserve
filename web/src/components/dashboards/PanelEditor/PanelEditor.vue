@@ -149,10 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="border-banner-warning-border bg-banner-warning-bg rounded-default border p-[1%]"
                     >
-                      <div class="font-bold">Your chart is not up to date</div>
+                      <div class="font-bold">
+                        {{ t("panel.chartNotUpToDate") }}
+                      </div>
                       <div>
-                        Chart Configuration / Variables has been updated, but the chart was not
-                        updated automatically. Click on the "Apply" button to run the query again
+                        {{ t("panel.chartOutdatedMessage") }}
                       </div>
                     </div>
                   </div>
@@ -173,7 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       icon-left="format-list-bulleted"
                       data-test="panel-editor-show-legends-btn"
                     >
-                      <OTooltip content="Show Legends" side="bottom" align="end" />
+                      <OTooltip
+                        :content="t('dashboard.panelContainer.showLegends')"
+                        side="bottom"
+                        align="end"
+                      />
                     </OButton>
 
                     <!-- Add Annotations button -->
@@ -205,8 +210,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip
                         :content="
                           panelSchemaRendererRef?.isAddAnnotationMode
-                            ? 'Exit Annotations Mode'
-                            : 'Add Annotations'
+                            ? t('dashboard.exitAnnotationsMode')
+                            : t('dashboard.addAnnotations')
                         "
                         side="bottom"
                         align="end"
@@ -475,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="custom-chart-type-selector-btn"
                           >
                             <template #icon-left><OIcon name="bar-chart" size="sm" /></template>
-                            Example Charts
+                            {{ t("panel.exampleCharts") }}
                           </OButton>
                           <ODialog
                             data-test="panel-editor-custom-chart-type-selector-dialog"
@@ -615,7 +620,7 @@ import {
   watch,
   type CSSProperties,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import type {
@@ -704,7 +709,7 @@ const emit = defineEmits<PanelEditorEmits>();
 // Setup
 // ============================================================================
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // Resolve configuration (merge props with presets)
@@ -713,7 +718,7 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
 const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
-  useDashboardPanelData(pageKey.value);
+  useDashboardPanelData(pageKey.value, t);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
@@ -779,6 +784,7 @@ const {
   updateDateTime,
 } = usePanelEditor({
   pageType: props.pageType,
+  t,
   config: resolvedConfig.value,
   dashboardPanelData,
   editMode: editModeRef,

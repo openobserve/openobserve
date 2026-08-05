@@ -46,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span :class="['text-xs font-semibold', 'text-text-body']">
             {{
               isAnomaly
-                ? "Anomaly Detection"
+                ? t("alerts.anomalyDetection")
                 : alertDetails.is_real_time
-                  ? "Real-time"
-                  : "Scheduled"
+                  ? t("common.realTime")
+                  : t("alerts.scheduled")
             }}
           </span>
         </div>
@@ -63,13 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left>
               <OIcon name="history" size="sm" />
             </template>
-            History
+            {{ t("alert_list.alert_history") }}
           </OToggleGroupItem>
           <OToggleGroupItem value="condition" size="sm" data-test="alert-history-tab-condition">
             <template #icon-left>
               <OIcon name="code" size="sm" />
             </template>
-            Condition
+            {{ t("common.condition") }}
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -161,7 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
                       <span class="text-2xs text-text-secondary truncate">
-                        {{ row._children.length }} rows · {{ row._duration }}
+                        {{ row._children.length }} {{ t("alerts.alertDetails.rowsSeparator") }}
+                        {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
@@ -264,12 +265,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="'bg-surface-subtle border-border-default'"
                 >
                   <div class="flex items-center gap-1.5">
-                    <span class="text-2xs font-medium" :class="'text-text-secondary'"> SQL </span>
+                    <span class="text-2xs font-medium" :class="'text-text-secondary'">
+                      {{ t("alerts.alertDetails.sql") }}
+                    </span>
                   </div>
                   <OButton
                     v-if="anomalySql"
                     @click="
-                      copyToClipboard(anomalySql, {
+                      copyToClipboard(anomalySql, t, {
                         successMessage: 'SQL Copied Successfully!',
                         timeout: 3000,
                       })
@@ -307,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? "SQL"
                           : alertDetails.type === "promql"
                             ? "PromQL"
-                            : "Conditions"
+                            : t("alerts.alertDetails.conditions")
                       }}
                     </span>
                   </div>
@@ -318,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       alertDetails.conditions !== '--'
                     "
                     @click="
-                      copyToClipboard(alertDetails.conditions, {
+                      copyToClipboard(alertDetails.conditions, t, {
                         successMessage:
                           (alertDetails.type === 'sql'
                             ? t('alerts.alertDetails.sqlQuery')
@@ -343,7 +346,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? alertDetails.type === "sql" || alertDetails.type === "promql"
                         ? alertDetails.conditions
                         : alertDetails.conditions.length !== 2
-                          ? `if ${alertDetails.conditions}`
+                          ? t("alerts.alertDetails.ifCondition", {
+                              condition: alertDetails.conditions,
+                            })
                           : t("alerts.alertDetails.noCondition")
                       : t("alerts.alertDetails.noCondition")
                   }}</pre
@@ -380,7 +385,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { conditionSummary, isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestamp } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -402,7 +407,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // Props & Emits
@@ -637,7 +642,7 @@ const onPaginationChange = async (params: { page: number; size: number }) => {
 const alertHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -697,7 +702,7 @@ const alertHistoryColumns = [
 const anomalyHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -713,7 +718,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "status",
-    header: "Result",
+    header: t("alerts.historyTable.result"),
     accessorKey: "status",
     sortable: false,
     size: 120,
@@ -729,7 +734,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "anomaly_count",
-    header: "Anomalies",
+    header: t("alerts.historyTable.anomalies"),
     accessorKey: "anomaly_count",
     sortable: false,
     size: 120,

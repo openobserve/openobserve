@@ -19,6 +19,9 @@ import {
 } from "reka-ui";
 import type { Color } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -156,7 +159,7 @@ const wrapperClasses = computed(() => [
         <PopoverTrigger
           type="button"
           :disabled="disabled || readonly"
-          :aria-label="label ? `${label} — pick color` : 'Pick color'"
+          :aria-label="label ? t('common.pickColorFor', { label }) : t('common.pickColor')"
           class="ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-s-default flex shrink-0 items-center ps-2 pe-1 ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2"
           :class="disabled || readonly ? 'cursor-not-allowed' : 'cursor-pointer'"
         >
@@ -209,7 +212,7 @@ const wrapperClasses = computed(() => [
               type="text"
               :value="swatchHex"
               maxlength="7"
-              placeholder="#000000"
+              :placeholder="t('components.color.hexPlaceholder')"
               :disabled="disabled"
               class="rounded-default text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border w-full border px-2 py-1 font-mono text-xs outline-none"
               @input="handleText"
@@ -247,7 +250,7 @@ const wrapperClasses = computed(() => [
         v-if="clearable && modelValue"
         type="button"
         tabindex="-1"
-        aria-label="Clear"
+        :aria-label="t('components.color.clear')"
         class="text-datepicker-icon flex items-center pe-2 transition-colors hover:opacity-80"
         @click="handleClear"
       >

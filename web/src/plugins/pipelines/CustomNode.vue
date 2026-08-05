@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import useDragAndDrop from "./useDnD";
 import { ref, computed, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -66,7 +66,7 @@ interface PipelineEdge {
 }
 
 interface NodeType {
-  label: string;
+  label: I18nText;
   icon: string;
   subtype?: string;
   io_type?: string;
@@ -96,8 +96,9 @@ const props = defineProps({
 });
 
 defineEmits(["delete:node"]);
+const { t } = useI18nTyped();
 const { pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode, openStepPicker } =
-  useDragAndDrop();
+  useDragAndDrop(t);
 const showButtons = ref(false);
 let hideButtonsTimeout: number | null = null;
 
@@ -264,8 +265,6 @@ const navigateToFunction = (functionName: string | undefined) => {
 // feature that no longer exists, and were the only writers of the now-deleted
 // userClickedNode/userSelectedNode. Adding a downstream node is done via the
 // hover-`+` step picker (useDnD.addNodeAfter).)
-
-const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
@@ -390,7 +389,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           align="left"
         >
           {{ data.name }} -
-          <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+          <strong>{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
         </div>
 
         <template v-else-if="data.node_type == 'stream'">
@@ -449,7 +448,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           <OTooltip side="top" align="center" :sideOffset="10" max-width="37.5rem">
             <template #content>
               <div class="max-h-75 overflow-y-auto">
-                {{ getNodeErrorInfo || "Error occurred" }}
+                {{ getNodeErrorInfo || t("common.errorOccurred") }}
               </div>
             </template>
           </OTooltip>

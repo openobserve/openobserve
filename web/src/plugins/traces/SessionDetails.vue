@@ -472,7 +472,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             class="text-text-secondary text-right text-xs font-semibold tabular-nums"
                           >
-                            ${{ trace.cost.toFixed(4) }}
+                            {{ t("traces.sessionDetail.currencySymbol")
+                            }}{{ trace.cost.toFixed(4) }}
                           </span>
                           <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
                         </div>
@@ -601,9 +602,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <span>{{ formatTime(trace.startTimeMicros) }}</span>
                             <span>· {{ formatDuration(trace.durationNanos) }}</span>
-                            <span>· ${{ trace.cost.toFixed(4) }}</span>
                             <span
-                              >· {{ formatTokens(trace.inputTokens) }} →
+                              >· {{ t("traces.sessionDetail.currencySymbol")
+                              }}{{ trace.cost.toFixed(4) }}</span
+                            >
+                            <span
+                              >· {{ formatTokens(trace.inputTokens) }}
+                              {{ t("traces.sessionDetail.tokensArrow") }}
                               {{ formatTokens(trace.outputTokens) }}</span
                             >
                             <span v-if="turnDetail(trace.traceId)">
@@ -817,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span class="flex min-w-[3.25rem] flex-col items-end">
                         <span class="text-2xs text-text-secondary font-semibold tabular-nums">
-                          ${{ row.cost.toFixed(4) }}
+                          {{ t("traces.sessionDetail.currencySymbol") }}{{ row.cost.toFixed(4) }}
                         </span>
                         <span
                           v-if="detail && detail.cost > 0"
@@ -906,7 +911,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   useSessions,
   type SessionDetail,
@@ -939,7 +944,7 @@ const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -1090,7 +1095,7 @@ function kpiAccentClass(variant?: "danger"): string {
 /** A turn reference inside a KPI sub-line — rendered as a hover-preview chip. */
 interface TurnChip {
   n: number; // 1-based turn number
-  label: string;
+  label: I18nText;
 }
 
 // Session-level KPI tiles. Each sub-line is split into `subLead` text, optional
@@ -1100,7 +1105,7 @@ interface TurnChip {
 const kpiCards = computed<
   {
     key: string;
-    label: string;
+    label: I18nText;
     /** Material-symbol icon name (OIcon) shown next to the tile label. */
     icon: string;
     value: string;
@@ -1110,7 +1115,7 @@ const kpiCards = computed<
     subTail: string;
     variant?: "danger";
     estimate?: boolean;
-    tooltipRows?: { label: string; value: string }[];
+    tooltipRows?: { label: I18nText; value: string }[];
     /** Errors tile: show a "Filter Errors" button instead of per-turn chips
      *  when there are too many error turns to list as chips. */
     filterErrors?: boolean;
@@ -1161,7 +1166,7 @@ const kpiCards = computed<
               errors: s.errors,
               total: d.turns,
             }),
-      subTurns: s.errors > 3 ? [] : s.errorTurnNums.map((n) => ({ n, label: String(n) })),
+      subTurns: s.errors > 3 ? [] : s.errorTurnNums.map((n) => ({ n, label: raw(String(n)) })),
       filterErrors: s.errors > 3,
       subTail: "",
     },
@@ -1176,7 +1181,7 @@ const kpiCards = computed<
       subLead: t("traces.sessionDetail.kpiSub.latencyLead", {
         slowest: formatDuration(s.slowestLat),
       }),
-      subTurns: [{ n: s.slowestTurn, label: `${turnWord} ${s.slowestTurn}` }],
+      subTurns: [{ n: s.slowestTurn, label: raw(`${turnWord} ${s.slowestTurn}`) }],
       subTail: "",
     },
     {
@@ -1188,7 +1193,7 @@ const kpiCards = computed<
       subLead: t("traces.sessionDetail.kpiSub.costLead", {
         peak: usd4(s.maxCost),
       }),
-      subTurns: [{ n: s.peakTurn, label: `${turnWord} ${s.peakTurn}` }],
+      subTurns: [{ n: s.peakTurn, label: raw(`${turnWord} ${s.peakTurn}`) }],
       subTail: "",
     },
     {
@@ -1290,7 +1295,7 @@ const modelOptions = computed(() => {
   traces.value.forEach((tr) => tr.models.forEach((m) => models.add(m)));
   return [
     { label: t("traces.sessionDetail.filters.all"), value: "all" },
-    ...Array.from(models).map((m) => ({ label: m, value: m })),
+    ...Array.from(models).map((m) => ({ label: raw(m), value: m })),
   ];
 });
 
@@ -1344,7 +1349,7 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
         const inputMsgs = messagesFromInput(sp.gen_ai_input_messages);
         for (let i = inputMsgs.length - 1; i >= 0; i--) {
           if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
-            userMessage = { role: "user", content: inputMsgs[i].content };
+            userMessage = { role: "user", content: raw(inputMsgs[i].content) };
             break;
           }
         }
@@ -1710,7 +1715,7 @@ function copySessionId() {
 
 function copyText(text: string | null | undefined) {
   if (!text) return;
-  copyToClipboard(text, { successMessage: t("traces.sessionDetails.copied"), timeout: 1000 });
+  copyToClipboard(text, t, { successMessage: t("traces.sessionDetails.copied"), timeout: 1000 });
 }
 
 function usd4(v: number): string {

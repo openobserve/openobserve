@@ -383,7 +383,7 @@ import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -461,7 +461,7 @@ export default defineComponent({
     const showDialog = ref(props.modelValue);
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const licenseData = ref<any>(null);
     const isLoadingLicense = ref(false);
     const chartData = ref<any>(null);

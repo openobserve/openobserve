@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bleed
         :title="t('actions.header')"
         icon="code"
-        :subtitle="'Custom automation and scripting'"
+        :subtitle="t('actions.pageSubtitle')"
       >
         <!-- Row 1: standard header — title + actions only. Search moved into the
              table's own toolbar below. -->
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="Never"
+              :empty-label="t('alerts.never')"
             />
           </template>
           <template #cell-last_successful_at="{ row }">
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="Never"
+              :empty-label="t('alerts.never')"
             />
           </template>
           <template #cell-status="{ row }">
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="alertStateLoadingMap[row.uuid]"
               style="display: inline-block; width: 2.07125rem"
               class="ml-1 flex h-auto items-center justify-center"
-              :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+              :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
             >
               <OSpinner size="xs" />
             </div>
@@ -154,7 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
-                  ><OIcon name="delete" size="sm" /><span class="ml-1.5">Delete</span></OButton
+                  ><OIcon name="delete" size="sm" /><span class="ml-1.5">{{
+                    t("common.delete")
+                  }}</span></OButton
                 >
               </div>
             </div>
@@ -173,15 +175,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <ConfirmDialog
-      title="Delete Action"
-      message="Are you sure you want to delete Action?"
+      :title="t('alerts.deleteActionTitle')"
+      :message="t('alerts.deleteActionMessage')"
       @update:ok="deleteAlert"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Bulk Delete Action Scripts"
-      :message="`Are you sure you want to delete ${selectedActionScripts.length} action script(s)?`"
+      :title="t('alerts.bulkDeleteActionScriptsTitle')"
+      :message="
+        t('actionScripts.confirmDeleteActionScripts', { count: selectedActionScripts.length })
+      "
       @update:ok="bulkDeleteActionScripts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -205,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-action-back-btn"
           class="flex cursor-pointer items-center justify-center"
           style="border: 1.5px solid; border-radius: 50%; width: 1.375rem; height: 1.375rem"
-          title="Go Back"
+          :title="t('common.goBack')"
           @click="showForm = false"
         >
           <!-- eslint-enable local/no-hardcoded-px -->
@@ -216,12 +220,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           data-test="to-be-clone-action-name"
           v-model="toBeCloneAlertName"
-          label="Alert Name"
+          :label="t('alerts.alertName')"
         />
         <OSelect
           data-test="to-be-clone-stream-type"
           v-model="toBeClonestreamType"
-          label="Stream Type"
+          :label="t('alerts.streamType')"
           :options="streamTypes"
           @update:model-value="updateStreams()"
         />
@@ -230,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="toBeClonestreamName"
           :loading="isFetchingStreams"
           :disabled="!toBeClonestreamType"
-          label="Stream Name"
+          :label="t('alerts.stream_name')"
           :options="streamNames"
           @update:model-value="updateStreamName"
         />
@@ -247,7 +251,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
@@ -316,7 +320,7 @@ export default defineComponent({
   emits: ["updated:fields", "update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const alerts: Ref<Alert[]> = ref([]);
     const actionsScriptRows: Ref<ActionScriptList[]> = ref([]);
@@ -340,7 +344,7 @@ export default defineComponent({
     const { getAllActions } = useActions();
     const { track } = useReo();
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     // Clone-dialog bindings referenced by the template; nothing opens the dialog yet.
     const showForm = ref(false);
@@ -451,7 +455,7 @@ export default defineComponent({
     const getActionScripts = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading actions...",
+        message: t("toastMessages.actionScripts.pleaseWaitWhileLoadingActions"),
         timeout: 0,
       });
 
@@ -506,7 +510,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "error",
-            message: "Error while pulling Actions.",
+            message: t("toastMessages.actionScripts.errorWhilePullingActions"),
           });
         })
         .finally(() => {
@@ -640,7 +644,7 @@ export default defineComponent({
         if (selectedActionScripts.value.length === 0) {
           toast({
             variant: "warning",
-            message: "No action scripts selected",
+            message: t("toastMessages.actionScripts.noActionScriptsSelected"),
           });
           confirmBulkDelete.value = false;
           return;
@@ -659,17 +663,24 @@ export default defineComponent({
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
             variant: "success",
-            message: `Successfully deleted ${successful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.successfullyDeletedActionScripts", {
+              count: successful.length,
+            }),
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             variant: "warning",
-            message: `Deleted ${successful.length} action script(s). Failed to delete ${unsuccessful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.actionScriptsDeletedWithFailures", {
+              count: successful.length,
+              failed: unsuccessful.length,
+            }),
           });
         } else if (unsuccessful.length > 0) {
           toast({
             variant: "error",
-            message: `Failed to delete ${unsuccessful.length} action script(s)`,
+            message: t("toastMessages.actionScripts.failedToDeleteActionScripts", {
+              count: unsuccessful.length,
+            }),
           });
         }
 

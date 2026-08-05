@@ -154,7 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            collapsing (or formatter re-wrap) can drop it. -->
       <span>
         {{ t("traces.threadView.noLlmTurns") + " " }}
-        <code class="text-text-body font-mono">gen_ai.operation.name = chat</code>.
+        <code class="text-text-body font-mono">{{ raw("gen_ai.operation.name = chat") }}</code
+        >.
       </span>
     </div>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
@@ -203,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="group.historicalUserCount > 0"
           class="thread-prior rounded-default border-border-default text-text-muted mb-2 flex items-center gap-2 border border-dashed px-3 py-[0.4rem] text-xs"
         >
-          <span>↶</span>
+          <span>{{ t("traces.threadView.historicalIcon") }}</span>
           <span>
             {{
               group.historicalUserCount === 1
@@ -225,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="person" size="sm" />
             <OTooltip
               v-if="group.userId"
-              :content="group.userId"
+              :content="raw(group.userId)"
               side="bottom"
               align="center"
               :side-offset="6"
@@ -340,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export interface Props {
@@ -385,7 +386,7 @@ import ThreadToolCalls from "./ThreadToolCalls.vue";
 import { renderMarkdown } from "./markdown";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface ThreadHead {
   systemPrompt: string;

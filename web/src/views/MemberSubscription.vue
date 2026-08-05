@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="rounded-default">
     <!-- eslint-disable-next-line local/no-hardcoded-px -- zero length: 0px is an unscalable zero, identical in every unit -->
     <div class="w-full text-center" style="font-size: var(--text-3xl); margin: 2.5rem 0px">
-      Member Subscription
+      {{ t("billing.memberSubscription.title") }}
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>
     <div v-else-if="status == 'error' && error == ''" class="text-center">
-      Error while processing member subscription request.<br /><br />
+      {{ t("billing.memberSubscription.errorProcessing") }}<br /><br />
     </div>
 
     <SanitizedHtmlRenderer
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mx-auto w-[70%] text-left text-base leading-7.5"
     />
 
-    <div v-else>Thank you for your subscription.</div>
+    <div v-else>{{ t("billing.memberSubscription.thankYou") }}</div>
 
     <!-- <div
       v-if="status == 'error' && error !== ''"
@@ -52,6 +52,7 @@ import { useLocalOrganization, getPath } from "../utils/zincutils";
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "PageUser",
@@ -108,10 +109,12 @@ export default defineComponent({
   setup() {
     const $store = useStore();
     const $router = useRouter();
+    const { t } = useI18nTyped();
 
     return {
       $router,
       $store,
+      t,
     };
   },
 });

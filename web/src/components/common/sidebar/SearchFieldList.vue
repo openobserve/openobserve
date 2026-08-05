@@ -161,7 +161,7 @@
               side="left"
               align="center"
               max-width="18.75rem"
-              :content="`Total Fields: ${bottomProps.totalRows}`"
+              :content="t('common.totalFields', { count: bottomProps.totalRows })"
             />
             <OButton
               variant="ghost-primary"
@@ -199,7 +199,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useFieldGrouping from "@/composables/useFieldGrouping";
@@ -278,7 +278,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);
@@ -676,7 +676,7 @@ const addSearchTerm = (term: string) => {
 };
 
 const copyContentValue = (value: string) => {
-  copyToClipboard(value, { successMessage: "Value copied to clipboard" });
+  copyToClipboard(value, t, { successMessage: t("common.valueCopiedToClipboard") });
 };
 </script>
 

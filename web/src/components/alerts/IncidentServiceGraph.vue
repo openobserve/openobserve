@@ -34,27 +34,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         role="tooltip"
       >
         <!-- eslint-enable local/no-hardcoded-px -->
-        <div class="mb-2.5 text-sm font-semibold">Graph Legend</div>
+        <div class="mb-2.5 text-sm font-semibold">{{ t("alerts.serviceGraphLegendTitle") }}</div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
             class="graph-legend__dot text-status-negative w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
-          Red = Potential Root Cause
+          {{ t("alerts.serviceGraphRootCause") }}
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
             class="graph-legend__dot text-status-warning-text w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
-          Orange = High Frequency
+          {{ t("alerts.serviceGraphHighFrequency") }}
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
             class="graph-legend__dot text-text-link w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
-          Blue = Normal
+          {{ t("alerts.serviceGraphNormal") }}
         </div>
         <div
           class="graph-legend__divider bg-border-default my-2 h-px dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="graph-legend__dot text-badge-purple-ol-text w-3.5 shrink-0 text-center text-sm leading-none"
             >→</span
           >
-          Purple arrows show temporal flow
+          {{ t("alerts.serviceGraphTemporalFlow") }}
         </div>
       </div>
     </span>
@@ -83,9 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            is required because OIcon's own `size-6` default sits in the same layer. -->
       <OIcon name="hub" class="text-text-muted size-12!" />
       <div class="text-center">
-        <div class="text-text-secondary text-sm font-medium">Service Graph Unavailable</div>
+        <div class="text-text-secondary text-sm font-medium">
+          {{ t("alerts.serviceGraphUnavailable") }}
+        </div>
         <div class="text-text-secondary mt-1 text-xs">
-          No topology data available for this incident.
+          {{ t("alerts.serviceGraphNoTopologyData") }}
         </div>
       </div>
     </div>
@@ -103,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import {
   forceSimulation,
@@ -136,6 +139,7 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
+    const { t } = useI18nTyped();
 
     const loading = ref(false);
     const chartRendererRef = ref<any>(null);
@@ -677,6 +681,7 @@ export default defineComponent({
     );
 
     return {
+      t,
       loading,
       graphData,
       chartRendererRef,

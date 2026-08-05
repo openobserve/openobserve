@@ -132,7 +132,7 @@
         </template>
 
         <template #cell-version="{ row }">
-          <span class="tabular-nums">v{{ row.version }}</span>
+          <span class="tabular-nums">{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
@@ -176,7 +176,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -224,7 +224,7 @@ const emit = defineEmits<{
   (e: "refresh"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const typeFilter = ref<ScorerType | null>(null);
 const selectedIds = ref<string[]>([]);
 
@@ -238,7 +238,7 @@ const columns = computed(() =>
   [
     {
       id: "#",
-      header: "#",
+      header: raw("#"),
       accessorKey: "#",
       sortable: false,
       size: 56,

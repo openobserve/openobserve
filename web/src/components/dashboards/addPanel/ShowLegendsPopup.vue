@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left
             ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
           /></template>
-          {{ isAllCopied ? "Copied" : "Copy all" }}
+          {{ isAllCopied ? t("common.copied") : t("common.copyAll") }}
         </OButton>
       </div>
     </template>
@@ -81,7 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'"
                     size="sm"
                 /></template>
-                <OTooltip :content="isLegendCopied(Number(index)) ? 'Copied!' : 'Copy legend'" />
+                <OTooltip
+                  :content="
+                    isLegendCopied(Number(index))
+                      ? t('common.copiedExclaim')
+                      : t('dashboard.copyLegend')
+                  "
+                />
               </OButton>
             </div>
           </div>
@@ -93,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useTheme } from "@/composables/useTheme";
 import { getSeriesColor, getColorPalette } from "@/utils/dashboard/colorPalette";
@@ -121,7 +127,7 @@ export default defineComponent({
   },
   emits: ["update:open"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { isDark } = useTheme();
     const copiedLegendIndices = ref(new Set<number>());
     const isAllCopied = ref(false);
@@ -243,7 +249,7 @@ export default defineComponent({
     };
 
     const copyLegend = (text: string, index: number) => {
-      copyToClipboard(text, { silent: true, timeout: 3000 }).then(() => {
+      copyToClipboard(text, t, { silent: true, timeout: 3000 }).then(() => {
         copiedLegendIndices.value.add(index);
         setTimeout(() => {
           copiedLegendIndices.value.delete(index);
@@ -253,7 +259,7 @@ export default defineComponent({
 
     const copyAllLegends = () => {
       const allLegendsText = legends.value.map((l: any) => l.name).join("\n");
-      copyToClipboard(allLegendsText, { silent: true, timeout: 3000 }).then(() => {
+      copyToClipboard(allLegendsText, t, { silent: true, timeout: 3000 }).then(() => {
         isAllCopied.value = true;
         setTimeout(() => {
           isAllCopied.value = false;

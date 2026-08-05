@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * hoisted, matching how those files do it.
  */
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type {
   FailureDetail,
   StepEvidence as StepEvidenceSummary,
@@ -76,7 +76,7 @@ const props = defineProps<{
   truncated?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const candidates = computed(() => props.detail.candidatesTried ?? []);
 const signals = computed(() => props.detail.settleSignals ?? []);

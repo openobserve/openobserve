@@ -41,14 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <span v-if="skippedCount > 0" class="text-2xs text-text-muted flex items-center gap-1">
           <span class="rounded-default bg-border-default inline-block h-2 w-2" />
-          {{ skippedCount }} Skipped
+          {{ skippedCount }} {{ t("alerts.historyTimeline.skipped") }}
         </span>
         <span
           v-if="hasFlappingZone"
           class="text-2xs text-badge-purple-ol-text flex items-center gap-1 font-semibold brightness-90"
         >
           <span class="rounded-default o2-flap-swatch inline-block h-2 w-2" />
-          Flapping
+          {{ t("alerts.historyTimeline.flapping") }}
         </span>
       </div>
 
@@ -74,8 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="o2-flap-pill text-badge-purple-solid-text bg-badge-purple-solid-bg pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 flex -translate-x-1/2 items-center gap-1.25 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap shadow-md"
             >
-              <span class="font-semibold">⚡ Flapping</span>
-              <span class="font-normal opacity-60">•</span>{{ seg.flips }} flips
+              <span class="font-semibold"
+                >{{ "⚡" }} {{ t("alerts.historyTimeline.flapping") }}</span
+              >
+              <span class="font-normal opacity-60">•</span>{{ seg.flips }}
+              {{ t("alerts.historyTimeline.flipsSuffix") }}
               <span class="font-normal opacity-60">•</span>{{ seg.durationLabel }}
             </div>
             <div
@@ -110,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="mt-0.5 opacity-60">{{ seg.startLabel }}</div>
               <div v-if="seg.count > 1" class="text-3xs opacity-50">
-                {{ seg.count }} evaluations
+                {{ seg.count }} {{ t("alerts.historyTimeline.evaluationsSuffix") }}
               </div>
             </div>
           </div>
@@ -138,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   isErrorOutcome,
   isFiringOutcome,
@@ -145,18 +149,22 @@ import {
   outcomeLabel,
 } from "@/utils/alerts/runOutcome";
 
-const props = withDefaults(
-  defineProps<{
-    history: Array<{ status: string; timestamp: number }>;
-    // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
-    // workflows pass "Failed"/"Success".
-    firingLabel?: string;
-    okLabel?: string;
-    errorLabel?: string;
-  }>(),
-  { firingLabel: "Firing", okLabel: "Ok", errorLabel: "Error" },
-);
-const { firingLabel, okLabel, errorLabel } = props;
+const { t } = useI18nTyped();
+
+const props = defineProps<{
+  history: Array<{ status: string; timestamp: number }>;
+  // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
+  // workflows pass "Failed"/"Success".
+  firingLabel?: I18nText;
+  okLabel?: I18nText;
+  errorLabel?: I18nText;
+}>();
+
+// Not `withDefaults`: a default is evaluated once at module scope, which would
+// freeze the wording in whatever locale was active when the module loaded.
+const firingLabel = computed(() => props.firingLabel ?? t("alerts.historyTimeline.firing"));
+const okLabel = computed(() => props.okLabel ?? t("alerts.historyTimeline.ok"));
+const errorLabel = computed(() => props.errorLabel ?? t("alerts.historyTimeline.error"));
 
 const hoveredIndex = ref<number | null>(null);
 
@@ -178,7 +186,14 @@ function isError(s: string) {
 }
 
 function normalizeStatus(s: string): string {
-  return outcomeLabel(s, firingLabel, okLabel, errorLabel);
+  return outcomeLabel(
+    s,
+    firingLabel.value,
+    okLabel.value,
+    errorLabel.value,
+    t("alerts.historyTimeline.skipped"),
+    t("alerts.historyTimeline.unknown"),
+  );
 }
 
 function blockColor(status: string): string {

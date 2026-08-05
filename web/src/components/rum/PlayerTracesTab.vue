@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           @click="closeTraceDetail"
           data-test="rum-player-traces-tab-back-btn"
-          aria-label="Back"
+          :aria-label="t('common.back')"
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import { rumFieldSql, rumFieldNotNullSql } from "@/utils/rum/fields";
@@ -224,9 +224,9 @@ import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const props = defineProps({
   sessionId: {

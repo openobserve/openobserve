@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     size="lg"
-    :title="row?.name"
+    :title="raw(row?.name)"
     title-data-test="score-config-detail-name-badge"
     :sub-title="t('onlineEvals.scoreConfig.detail.eyebrow')"
     data-test="score-config-detail"
@@ -93,7 +93,7 @@
                 <dd
                   class="text-compact text-text-body m-0 font-mono [font-variant-numeric:tabular-nums]"
                 >
-                  true / false
+                  {{ t("onlineEvals.scoreConfig.booleanValues") }}
                 </dd>
               </template>
             </dl>
@@ -146,7 +146,7 @@
               <dd
                 class="text-compact text-text-body m-0 font-mono [font-variant-numeric:tabular-nums]"
               >
-                v{{ row.version }}
+                {{ t("onlineEvals.versionPrefix") }}{{ row.version }}
               </dd>
               <dt v-if="createdAt" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.scoreConfig.detail.createdLabel") }}
@@ -182,7 +182,7 @@
               <div class="flex items-center gap-2">
                 <span
                   class="text-compact text-text-body font-mono font-bold [font-variant-numeric:tabular-nums]"
-                  >v{{ row.version }}</span
+                  >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span
                 >
                 <OTag type="activeVersionFlag" value="active" />
               </div>
@@ -224,7 +224,7 @@
                     >
                     <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
                     <span class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]"
-                      >v{{ scorer.version }}</span
+                      >{{ t("onlineEvals.versionPrefix") }}{{ scorer.version }}</span
                     >
                   </div>
                 </div>
@@ -244,7 +244,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -265,7 +265,7 @@ const emit = defineEmits<{
   (e: "view-scorer", row: Scorer): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Drawer open state — starts open (the parent mounts this only when a score
 // config row is selected). ODrawer's update:open(false) — via ×, Escape, or

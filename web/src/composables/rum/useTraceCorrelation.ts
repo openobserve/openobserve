@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed, Ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
@@ -42,10 +43,11 @@ export interface CorrelationTimeRange {
 
 export default function useTraceCorrelation(
   traceId: Ref<string>,
+  t: TranslateFn,
   timeRange?: Ref<CorrelationTimeRange | null>,
 ) {
   const store = useStore();
-  const { getStream } = useStreams();
+  const { getStream } = useStreams(t);
   const correlationData = ref<TraceCorrelationData | null>(null);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);

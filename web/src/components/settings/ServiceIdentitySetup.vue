@@ -51,7 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-compact min-w-0 flex-1 leading-tight">
                 <template v-if="serviceNameDetected">
                   {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
-                  <span class="text-primary font-bold">Service</span>
+                  <span class="text-primary font-bold">{{
+                    t("settings.correlation.service")
+                  }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
                   <span class="text-xs opacity-60"
                     >({{ detectedServiceFields.length + unseenServiceFields.length }})</span
@@ -174,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="editableServiceFields"
               @update:model-value="editableServiceFields = $event"
               :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
-              label=""
+              :label="raw('')"
             />
           </ODialog>
 
@@ -261,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ getGroupByValue(fieldId)?.display ?? fieldId }}</span>
                     <OTooltip
                       v-if="getFieldCardinalityTooltip(fieldId)"
-                      :content="getFieldCardinalityTooltip(fieldId) ?? ''"
+                      :content="raw(getFieldCardinalityTooltip(fieldId) ?? '')"
                       side="top"
                     />
                     <OButton
@@ -785,7 +787,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ insightData.title }}
                   <OTooltip
                     v-if="insightData.title.length > 25"
-                    :content="insightData.title"
+                    :content="raw(insightData.title)"
                     side="top"
                   />
                 </span>
@@ -977,8 +979,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }
         "
         size="md"
-        :title="primaryDim?.display"
-        :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
+        :title="raw(primaryDim?.display)"
+        :sub-title="raw(popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined)"
       >
         <OCardSection class="flex flex-col gap-4 border-t p-0">
           <!-- Header section with cardinality details -->
@@ -1147,7 +1149,7 @@ import { ref, computed, onMounted, watch, nextTick } from "vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
@@ -1181,7 +1183,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 interface DetectedEnvironment {
   environment_type: string;
-  description: string;
+  description: I18nText;
   evidence_groups: string[];
 }
 
@@ -1201,7 +1203,7 @@ const props = defineProps<{
 
 const store = useStore();
 const { isDark: isDarkTheme } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -1773,7 +1775,7 @@ const insightData = computed(() => {
 
     // Build dimension columns (no stream columns — chart handles that)
     const relatedDimensions: {
-      label: string;
+      label: I18nText;
       level: string;
       color: string;
       values: string[];
@@ -1781,7 +1783,7 @@ const insightData = computed(() => {
     }[] = [];
     if (card && secondaryDim.value) {
       relatedDimensions.push({
-        label: secondaryDim.value.display,
+        label: raw(secondaryDim.value.display),
         level: "secondary",
         color: "teal",
         values: card.childValues,
@@ -1794,7 +1796,7 @@ const insightData = computed(() => {
           for (const tv of tvs) allTertiary.add(tv);
         }
         relatedDimensions.push({
-          label: tertiaryDim.value.display,
+          label: raw(tertiaryDim.value.display),
           level: "tertiary",
           color: "purple",
           values: [...allTertiary].sort(),
@@ -1876,7 +1878,7 @@ const insightData = computed(() => {
 
     const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
     const relatedDimensions: {
-      label: string;
+      label: I18nText;
       level: string;
       color: string;
       values: string[];
@@ -1884,7 +1886,7 @@ const insightData = computed(() => {
     }[] = [];
     if (primaryDim.value && parents.length > 0) {
       relatedDimensions.push({
-        label: primaryDim.value.display,
+        label: raw(primaryDim.value.display),
         level: "primary",
         color: "blue",
         values: parents.sort(),
@@ -1893,7 +1895,7 @@ const insightData = computed(() => {
     }
     if (tertiaryDim.value && tertiaryVals.length > 0) {
       relatedDimensions.push({
-        label: tertiaryDim.value.display,
+        label: raw(tertiaryDim.value.display),
         level: "tertiary",
         color: "purple",
         values: tertiaryVals,
@@ -1955,7 +1957,7 @@ const insightData = computed(() => {
 
   const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
   const relatedDimensions: {
-    label: string;
+    label: I18nText;
     level: string;
     color: string;
     values: string[];
@@ -1964,7 +1966,7 @@ const insightData = computed(() => {
   if (primaryDim.value && locations.length > 0) {
     const uniquePrimaries = [...new Set(locations.map((l) => l.primary))].sort();
     relatedDimensions.push({
-      label: primaryDim.value.display,
+      label: raw(primaryDim.value.display),
       level: "primary",
       color: "blue",
       values: uniquePrimaries,
@@ -1974,7 +1976,7 @@ const insightData = computed(() => {
   if (secondaryDim.value && locations.length > 0) {
     const uniqueSecondaries = [...new Set(locations.map((l) => l.secondary))].sort();
     relatedDimensions.push({
-      label: secondaryDim.value.display,
+      label: raw(secondaryDim.value.display),
       level: "secondary",
       color: "teal",
       values: uniqueSecondaries,
@@ -2002,7 +2004,7 @@ const insightData = computed(() => {
 
 /** Related-dimension column shown in the insight dialog. */
 interface RelatedDimension {
-  label: string;
+  label: I18nText;
   level: string;
   color: string;
   values: string[];
@@ -2251,31 +2253,26 @@ const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
 
   const env = activeEnvironment.value;
   let envType = "General";
-  let description = "General fields detected in your telemetry data.";
   let evidenceGroups: string[] = [];
 
   if (env === "kubernetes" || env === "k8s") {
     envType = "Kubernetes";
-    description = "Kubernetes fields detected in your telemetry data.";
     evidenceGroups = activeEnvGroups.value
       .filter((g) => g.group_id.startsWith("k8s-"))
       .map((g) => g.group_id);
   } else if (env === "aws") {
     const isEcs = activeEnvGroups.value.some((g) => g.group_id.startsWith("aws-ecs-"));
     envType = isEcs ? "AWS ECS" : "AWS";
-    description = `${envType} fields detected in your telemetry data.`;
     evidenceGroups = activeEnvGroups.value
       .filter((g) => g.group_id.startsWith("aws-"))
       .map((g) => g.group_id);
   } else if (env === "gcp") {
     envType = "GCP";
-    description = "GCP fields detected in your telemetry data.";
     evidenceGroups = activeEnvGroups.value
       .filter((g) => g.group_id.startsWith("gcp-"))
       .map((g) => g.group_id);
   } else if (env === "azure") {
     envType = "Azure";
-    description = "Azure fields detected in your telemetry data.";
     evidenceGroups = activeEnvGroups.value
       .filter((g) => g.group_id.startsWith("azure-"))
       .map((g) => g.group_id);
@@ -2283,7 +2280,7 @@ const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
 
   return {
     environment_type: envType,
-    description: description,
+    description: t("settings.serviceIdentitySetup.envFieldsDetected", { env: envType }),
     evidence_groups: evidenceGroups.slice(0, 3),
   };
 });
@@ -2490,20 +2487,20 @@ const primaryDimCards = computed<
 
 /** Default tracked alias options shown when analytics data is not yet loaded */
 const DEFAULT_TRACKED_OPTIONS = [
-  { label: "K8s Cluster", value: "k8s-cluster" },
-  { label: "K8s Namespace", value: "k8s-namespace" },
-  { label: "K8s Deployment", value: "k8s-deployment" },
-  { label: "K8s StatefulSet", value: "k8s-statefulset" },
-  { label: "K8s DaemonSet", value: "k8s-daemonset" },
-  { label: "K8s Pod Name", value: "k8s-pod-name" },
-  { label: "AWS ECS Cluster", value: "aws-ecs-cluster" },
-  { label: "AWS ECS Task", value: "aws-ecs-task" },
-  { label: "Cloud Account", value: "cloud-account" },
-  { label: "Region", value: "region" },
-  { label: "Environment", value: "environment" },
-  { label: "Host", value: "host" },
-  { label: "Service Namespace", value: "service-namespace" },
-  { label: "Service Version", value: "service-version" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sCluster"), value: "k8s-cluster" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sNamespace"), value: "k8s-namespace" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sDeployment"), value: "k8s-deployment" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sStatefulSet"), value: "k8s-statefulset" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sDaemonSet"), value: "k8s-daemonset" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sPodName"), value: "k8s-pod-name" },
+  { label: t("settings.serviceIdentitySetup.trackedAwsEcsCluster"), value: "aws-ecs-cluster" },
+  { label: t("settings.serviceIdentitySetup.trackedAwsEcsTask"), value: "aws-ecs-task" },
+  { label: t("settings.serviceIdentitySetup.trackedCloudAccount"), value: "cloud-account" },
+  { label: t("search.region"), value: "region" },
+  { label: t("rum.environment"), value: "environment" },
+  { label: t("traces.dbSpanDetails.host"), value: "host" },
+  { label: t("settings.serviceIdentitySetup.trackedServiceNamespace"), value: "service-namespace" },
+  { label: t("settings.serviceIdentitySetup.trackedServiceVersion"), value: "service-version" },
 ];
 
 /**
@@ -2517,7 +2514,7 @@ const trackedAliasOptions = computed(() => {
     return groups
       .filter((g: FoundGroup) => g.group_id !== "service")
       .map((g: FoundGroup) => ({
-        label: g.display,
+        label: raw(g.display),
         value: g.group_id,
       }));
   }
@@ -2537,10 +2534,12 @@ const resolvedTrackedAliases = computed(() => {
       let label = labelMap.get(id);
       if (!label) {
         // Fallback: convert ID to readable label (e.g., "k8s-cluster" → "K8s Cluster")
-        label = id
-          .split("-")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-          .join(" ");
+        label = raw(
+          id
+            .split("-")
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join(" "),
+        );
         console.warn(
           `[ServiceIdentitySetup] No label found for tracked alias "${id}", using fallback: "${label}"`,
         );
@@ -2652,7 +2651,7 @@ function getDisambiguationOptions(rowIndex: number) {
   return availableGroups.value
     .filter((g) => !alreadyUsed.has(g.group_id))
     .map((g) => ({
-      label: g.display,
+      label: raw(g.display),
       value: g.group_id,
       streamTypes: g.stream_types,
       recommended: g.recommended,
@@ -2857,7 +2856,7 @@ function getAddFieldOptionsForEnv(envKey: string) {
       const dim = dimensionAnalytics.value[g.group_id];
       const cardClass = dim?.cardinality_class ?? g.cardinality_class ?? null;
       return {
-        label: g.display,
+        label: raw(g.display),
         value: g.group_id,
         streamTypes: g.stream_types,
         subLabel: g.stream_types?.join(", ") || undefined,
@@ -3099,17 +3098,14 @@ async function saveConfig() {
       .filter(([id, fields]) => id !== "all" && id !== "" && fields.filter(Boolean).length > 0)
       .map(([id, fields]) => ({
         id,
-        label: setLabels.value[id] ?? id,
+        label: raw(setLabels.value[id] ?? id),
         distinguish_by: fields.filter(Boolean),
       }));
 
     if (sets.length === 0) {
       toast({
         variant: "warning",
-        message: t(
-          "settings.correlation.identityConfigNoSets",
-          "Configure at least one identity set before saving.",
-        ),
+        message: t("settings.correlation.identityConfigNoSets"),
       });
       return;
     }

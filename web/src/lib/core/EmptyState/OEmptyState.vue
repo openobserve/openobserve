@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useSlots } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -173,12 +173,12 @@ const props = withDefaults(
     /** Icon for the compact `inline` size (when no illustration). */
     icon?: IconName;
     /** Copy — overrides preset i18n when provided. */
-    title?: string;
-    description?: string;
+    title?: I18nText;
+    description?: I18nText;
     /** Rich action cards; overrides the preset's actions when provided. */
     actions?: EmptyStateAction[];
     /** Simple primary button (used instead of cards); emits `action` on click. */
-    actionLabel?: string;
+    actionLabel?: I18nText;
     actionIcon?: IconName;
     /** Secondary action; emits `secondaryAction` on click. */
     secondaryActionLabel?: string;
@@ -208,7 +208,7 @@ const emit = defineEmits<{
 }>();
 
 const slots = useSlots();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Widen to the interface: the `satisfies` map keeps per-key literal types,
 // and unioning 25 literals breaks `?.actions` on entries without actions.
@@ -317,8 +317,8 @@ const SIZE_MAP: Record<
     copy: string;
     actions: string;
     extra: string;
-    title: string;
-    description: string;
+    title: I18nText;
+    description: I18nText;
     illustrationWidth: number;
     iconWrap: string;
   }
@@ -329,8 +329,8 @@ const SIZE_MAP: Record<
     copy: "gap-2.5",
     actions: "gap-3 pt-1",
     extra: "w-full flex flex-col items-center gap-3 pt-2",
-    title: "text-2xl!",
-    description: "text-base",
+    title: raw("text-2xl!"),
+    description: raw("text-base"),
     illustrationWidth: 300,
     iconWrap: "",
   },
@@ -340,8 +340,8 @@ const SIZE_MAP: Record<
     copy: "gap-2",
     actions: "gap-2.5 pt-0.5",
     extra: "w-full flex flex-col items-center gap-2 pt-1",
-    title: "text-lg!",
-    description: "text-sm",
+    title: raw("text-lg!"),
+    description: raw("text-sm"),
     illustrationWidth: 150,
     iconWrap: "",
   },
@@ -351,8 +351,8 @@ const SIZE_MAP: Record<
     copy: "gap-1",
     actions: "gap-2 pt-1",
     extra: "w-full flex flex-col items-center gap-1.5 pt-1",
-    title: "text-sm!",
-    description: "text-xs",
+    title: raw("text-sm!"),
+    description: raw("text-xs"),
     illustrationWidth: 0,
     iconWrap: "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
   },

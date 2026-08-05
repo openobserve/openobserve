@@ -23,8 +23,11 @@ description: >-
   never define one, never add a .body--dark block — migrate any --o2-* you touch to
   its --color-* equivalent); all of this is CI-enforced and fails the build,
   (6) no hardcoded user-facing text — every label, title, placeholder, and
-  message comes from i18n (useI18n t()) with keys added to
-  web/src/locales/languages/en-US.json. It also settles the recurring
+  message comes from i18n (useI18nTyped t(), never useI18n from vue-i18n, which
+  is banned) with keys added to web/src/locales/languages/en-US.json; text-carrying
+  props/fields are typed I18nText and i18n keys stored as data are typed I18nKey,
+  and the ONLY opt-out for a genuinely non-translatable string is raw() — never an
+  eslint-disable. It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
   view → service → Vuex/local-ref layering for fetching list data, choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
@@ -182,9 +185,150 @@ read it once, it is the backbone of everything below.
    > `cd web && node scripts/check-design-consistency.mjs --baseline` and commit
    > the tightened `scripts/design-debt-baseline.json` with your change.
 6. **No hardcoded user-facing text** — every label, title, placeholder, tooltip,
-   empty-state, toast, and validation message comes from `useI18n()`'s `t()`, with
-   keys added to `web/src/locales/languages/en-US.json` (other locales follow from
-   there — never hand-edit them).
+   empty-state, toast, and validation message comes from `useI18nTyped()`'s `t()`,
+   with keys added to `web/src/locales/languages/en-US.json` (other locales follow
+   from there — never hand-edit them).
+
+   > **Where each surface is enforced.** Lint sees only `<template>`; everything
+   > else is enforced by the TYPES at `npm run type-check:app`. Both gate CI.
+   >
+   > | Surface | Enforced by |
+   > |---|---|
+   > | Text node — `<div>Save</div>` | `vue/no-bare-strings-in-template` |
+   > | Mustache literal — `{{ 'Save' }}` | `local/no-bare-bound-text-props` |
+   > | `v-text` / `v-html` literal | `local/no-bare-bound-text-props` |
+   > | Component prop — `label="Save"` **or** `:label="'Save'"` | **`I18nText` type** |
+   > | Any string in `<script>` / `.ts` | **`I18nText` type** |
+   > | Native HTML/ARIA attr — `<input placeholder="Search">` | `vue/no-bare-strings-in-template` |
+   > | `t('x.y')` key exists | `@intlify/vue-i18n/no-missing-keys` |
+   > | A key stored as data (`titleKey`) | **`I18nKey` type** |
+   >
+   > Two consequences worth internalising:
+   > - **Lint does NOT check component props** — that is deliberate. A text-carrying
+   >   prop is caught by its `I18nText` declaration, which is strictly stronger (it
+   >   also rejects a plain `string` variable, which no lint rule could see). There
+   >   is no `TEXT_ATTRS` list any more; **declare the prop `I18nText` and you are
+   >   done.**
+   > - **Native HTML/ARIA text attributes ARE linted** — `title`, `alt`, `aria-label`
+   >   (+ `aria-placeholder` / `aria-roledescription` / `aria-valuetext`) on any
+   >   element, and `placeholder` on `<input>` / `<textarea>`. They get lint rather
+   >   than the type because a native element has no prop to annotate. Residual gap:
+   >   only the STATIC form is covered, so `:title="'Delete'"` still slips through —
+   >   don't reach for it to dodge the error.
+   >
+   > **Non-translatable text — the ladder.** Decide in this order:
+   >
+   > 1. **Does code branch on it?** (`"px" | "%"`, `"sm" | "md"`) → it is not text at
+   >    all. Use a **union type**. Never an i18n concern.
+   > 2. **Everywhere else → `raw("…")`** from `@/types/i18n`. This is the default and
+   >    covers script data, typed props, bound expressions **and** text nodes:
+   >    `<code>{{ raw("time_bucket") }}</code>`. It is type-checked, survives
+   >    refactors, and `grep -rn "raw(" src` enumerates every exemption in the app
+   >    (~1,185 of them).
+   > 3. **Only if the token is short, universal and RECURS across files** → add it to
+   >    the allowlist in `eslint.config.js`, which is split into three named groups so
+   >    reviewers can apply the right scrutiny:
+   >    `GLYPHS_AND_UNITS` (`px`, `ms`, `×`, `→`, `●`, `…`), `SPEC_IDENTIFIERS`
+   >    (`GET`, `UTC`, `SQL`, `OK`), `TEXT_NODE_LITERALS` (`1000`, `./.env`,
+   >    `trace.zip`). An entry here is **global, permanent and context-free** — it
+   >    silences that string in every file forever, so it must be genuinely universal.
+   >
+   > **Do NOT use `eslint-disable` for i18n.** There are **zero** of them left in
+   > `src/` and that is deliberate — `raw()` says the same thing at the call site, is
+   > type-checked, and shows up in one greppable inventory. (Disables for *other*
+   > rules — hyphenation, `x-invalid-end-tag` — are fine and still present.)
+   >
+   > **Moving a text node into `raw()` changes its parsing context from HTML to
+   > JavaScript.** Four things bite:
+   > - `\` becomes an escape prefix. `raw("\w+")` silently renders `w+`. Write
+   >   `raw("\\w+")` to render `\w+`.
+   > - HTML entities stop decoding. `&amp;` renders literally — use the real
+   >   character: `raw("a & b")`.
+   > - A literal `<` **breaks Prettier**, which parses `{{ raw("<Foo>") }}` as a tag
+   >   and hard-fails the file (`format:check` is a CI gate). Hoist it into
+   >   `<script setup>`: `const tag = raw("<Foo>")` and interpolate `{{ tag }}`.
+   > - Surrounding whitespace is dropped. `<div>\n  OO\n</div>` renders `" OO "` but
+   >   `<div>\n  {{ raw("OO") }}\n</div>` renders `"OO"` — invisible in normal flow,
+   >   but check it inside `<pre>` / `white-space: pre-line`.
+   >
+   > **Plurals use vue-i18n pipe syntax, never string concatenation.** Write the key
+   > as `"{count} occurrence | {count} occurrences"` and call
+   > `t("alerts.occurrence", { count: n }, n)`. Never
+   > `{{ n }} {{ t('x') }}{{ n > 1 ? 's' : '' }}` — no other language pluralises that
+   > way, and a translator reading en-US.json cannot see the appended `s`.
+
+   > **Text in `<script>` — use the TYPES, not a lint rule.** The three rules above
+   > only see `<template>`. A string in `<script>`/`.ts` — a table column `label`, a
+   > toast `message`, an i18n key stored as data — is invisible to them, because
+   > deciding "is this string user-facing?" from the string alone is guesswork. So
+   > that decision lives in the **type declaration**, where the author already knows
+   > the answer, and `npm run type-check:app` enforces it. Two types in
+   > **`web/src/types/i18n.ts`**:
+   >
+   > | Type | Use for | Effect |
+   > |---|---|---|
+   > | **`I18nKey`** | a field holding an i18n **key** (`titleKey`, `labelKey`) | only real en-US.json paths compile; a typo gets a "Did you mean…?" |
+   > | **`I18nText`** | a field holding **resolved user-facing text** (`label`, `message`, `title`) | a bare string literal is a compile error; only `t()` / `raw()` satisfy it |
+   >
+   > ```ts
+   > import type { I18nKey, I18nText } from "@/types/i18n";
+   >
+   > interface Column {
+   >   label: I18nText;    // user-facing  -> must be t() or raw()
+   >   field: string;      // data accessor -> ordinary string
+   > }
+   > interface Preset { titleKey: I18nKey }   // stores a key, not the text
+   > ```
+   >
+   > **When you declare a new interface, prop type, or `*.types.ts` that carries UI
+   > text or an i18n key, type that field as `I18nText` / `I18nKey` — never bare
+   > `string`.** This is the same pattern the library already uses for icons
+   > (`iconLeft?: IconName`): a constrained type derived from a source of truth.
+   > `I18nKey` is derived from en-US.json at compile time, so there is no list to
+   > maintain — add a key and it is instantly valid.
+   >
+   > Careful: a `*Key` field is **not** always an i18n key. `OSelect.labelKey` and
+   > `JourneySteps.actionKey` are *field accessors* ("which property of the row holds
+   > the label") and stay `string`. Read the doc comment before annotating.
+   >
+   > The opt-out is **`raw()`**, not an eslint-disable — it is type-checked, survives
+   > refactors, and `grep -rn "raw(" src` lists every exemption in the app:
+   > ```ts
+   > const columns = [
+   >   { label: t("logs.timestamp"), field: "ts" },
+   >   { label: raw("trace_id"),     field: "trace_id" },  // a field name, not prose
+   > ];
+   > ```
+   > **Getting a `t()` that returns `I18nText`** — the whole app already does this:
+   > - **In a component** → `const { t } = useI18nTyped()` (from `@/types/i18n`).
+   >   Never import `useI18n` from `vue-i18n` directly; `useI18nTyped()` hands back
+   >   the exact same composer, just typed, so everything else is unchanged.
+   > - **Outside a setup context** (a composable reached from a plain function, a
+   >   util, service-layer error handling) → `gt("some.key")` from the same module.
+   >   `useI18n()` may only be called during setup; `gt` reads the shared instance.
+   >
+   > **Non-translatable text uses `raw()`** — a server-provided error message, an
+   > identifier, a code token. It accepts nullish, so the usual fallback chain reads
+   > naturally and stays type-safe:
+   > ```ts
+   > toast({
+   >   variant: "error",
+   >   message: raw(err.response?.data?.message) || t("alerts.saveFailed"),
+   > });
+   > ```
+   > Never reach for `raw()` to silence the checker on real UI copy — that is exactly
+   > the bug the brand exists to catch. `grep -rn "raw(" src` is the review surface.
+   >
+   > **Composed text is a type error, by design.** `"Deleted " + n + " rows"`,
+   > `cond ? "Yes" : "No"` and `` `Saved ${name}` `` all widen to `string`, so they
+   > cannot satisfy `I18nText`. Use vue-i18n interpolation instead —
+   > `t("x.deletedRows", { count: n })` with `"Deleted {count} rows"` in en-US.json —
+   > and a plural message (`"one | many"` + `t(key, params, count)`) when singular and
+   > plural really differ. The same rule is enforced in `<template>` by
+   > `local/no-bare-bound-text-props`.
+   >
+   > Toast/notification copy added by this convention lives under `toastMessages.*`,
+   > grouped by module.
 
 ## Structural decisions
 
@@ -328,9 +472,26 @@ considering the UI done:
       `--color-*` equivalent.
 - [ ] Any new color/size needed was **registered as a `--color-*` token** (light
       `:root` + `@theme inline` + dark under `.dark`) before use.
-- [ ] No hardcoded user-facing text — every label, title, placeholder, message,
-      and validation string uses `t()` with keys added to
-      `web/src/locales/languages/en-US.json`.
+- [ ] No hardcoded user-facing text **and** no `t()` key missing from the locale
+      file — every label, title, placeholder, message, and validation string (whether
+      a text node, a static prop `label="…"`, a bound prop `:label="'…'"`, a
+      `{{ '…' }}` mustache, or `v-text`) uses
+      `t()` with the key added to `web/src/locales/languages/en-US.json` in the same
+      change. Text NODES, `{{ '…' }}` mustaches, `v-text`/`v-html`, and native
+      HTML/ARIA attributes (`title`, `alt`, `aria-label`, `placeholder`) are caught
+      by ESLint (`no-missing-keys`, `vue/no-bare-strings-in-template`,
+      `local/no-bare-bound-text-props` — all **error**); COMPONENT props (static or
+      bound) are caught by declaring them `I18nText`, not by any lint rule. New
+      text-carrying component prop → type it `I18nText`; there is no `TEXT_ATTRS`
+      list any more.
+      Non-translatable strings use `raw("…")` — **never** an `eslint-disable`.
+- [ ] Any **new type / interface / `*.types.ts`** field that carries UI text or an
+      i18n key is declared `I18nText` / `I18nKey` (from `@/types/i18n`), not bare
+      `string` — that is what guards `<script>`, which the ESLint rules cannot see.
+      Non-translatable values use `raw("…")`. Verified by `npm run type-check:app`.
+- [ ] Translation is obtained via **`useI18nTyped()`** (components) or **`gt()`**
+      (outside setup) — never `useI18n` imported straight from `vue-i18n`, which
+      returns unbranded `string` and silently defeats the check.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.
