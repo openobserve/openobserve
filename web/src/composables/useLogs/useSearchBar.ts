@@ -281,14 +281,23 @@ export const useSearchBar = () => {
 
   const onStreamChange = async (queryStr: string) => {
     try {
+      // Only flag the results grid as loading when a search will actually run;
+      // otherwise this call just refreshes the stream schema.
+      const willRunQuery =
+        !store.state.zoConfig.query_on_stream_selection ||
+        (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode);
+
       searchObj.loadingStream = true;
-      searchObj.loading = true;
+      searchObj.loading = willRunQuery;
       searchObj.loadingProgressPercentage = 0;
 
       await cancelQuery();
 
       // Reset query results
       searchObj.data.queryResults = { hits: [] };
+      // Cleared with the results, else the previous stream's "no events found"
+      // flashes before the new fields land.
+      searchObj.meta.searchApplied = false;
 
       // Build UNION query once
       const streams = searchObj.data.stream.selectedStream;
@@ -348,7 +357,6 @@ export const useSearchBar = () => {
       searchObj.data.editorValue = finalQuery;
       searchObj.data.query = finalQuery;
       searchObj.data.tempFunctionContent = "";
-      searchObj.meta.searchApplied = false;
 
       // Update histogram visibility
       if (streams.length > 1 && searchObj.meta.sqlMode == true) {
