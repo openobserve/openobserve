@@ -1,0 +1,20 @@
+ARG CROSS_BASE_IMAGE
+FROM $CROSS_BASE_IMAGE
+
+ARG CROSS_DEB_ARCH
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install -y --option=Dpkg::Options::=--force-confnew \
+    libssl-dev pkg-config musl-dev musl-tools libboost-all-dev cmake patch wget unzip
+
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip && \
+    unzip protoc-21.12-linux-x86_64.zip -d protoc && \
+    cp protoc/bin/protoc /usr/local/bin/ && \
+    cp -r protoc/include/google /usr/local/include/
+
+RUN case "$CROSS_DEB_ARCH" in \
+        amd64) target_prefix=x86_64-linux-musl ;; \
+        arm64) target_prefix=aarch64-linux-musl ;; \
+        *) echo "Unsupported target architecture: $CROSS_DEB_ARCH" >&2; exit 1 ;; \
+    esac && \
+    ln -s /usr/include/boost/ "/usr/local/${target_prefix}/include/"
