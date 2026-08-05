@@ -258,27 +258,17 @@ class WorkflowsPage {
    * In an open Destination node drawer, create a new remote destination inline and bind it to
    * the node.
    *
-   * The workflow destination node passes `forced-type="custom"` to the shared DestinationPicker,
-   * so CreateDestinationForm now opens directly on the Connection step (name/url) and hides the
-   * type-selection step (no `destination-type-card-*`, no `step1-continue-btn`). Older builds
-   * showed the Choose-Type step first. Handle both: race the type card against the name field and
-   * only walk the type step when the cards actually render.
+   * The workflow destination node passes `forced-type="custom"` (WorkflowDestination.vue) to the
+   * shared DestinationPicker, so CreateDestinationForm opens DIRECTLY on the Connection step
+   * (name/url) with `step === 2` and hides the type-selection step — there is no
+   * `destination-type-card-*` / `step1-continue-btn` in this flow. We assert that expected UX
+   * (name field present right after toggling create); we do NOT tolerate a type-selection step
+   * here — if it reappears, the forced-type contract has changed and this should fail loudly.
    */
-  async createDestinationInline({ name, url, type = 'custom' }) {
+  async createDestinationInline({ name, url }) {
     await this.page.locator(this.destPickerCreateToggle).click({ timeout: DRAWER_TIMEOUT_MS });
 
-    const typeCard = this.page.locator(this.destTypeCard(type));
     const nameField = this.page.locator(this.destNameField);
-    // Whichever step the form lands on, wait for it before deciding which path to take.
-    await Promise.race([
-      typeCard.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS }).catch(() => {}),
-      nameField.waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS }).catch(() => {}),
-    ]);
-    if (await typeCard.isVisible().catch(() => false)) {
-      await typeCard.click({ timeout: DRAWER_TIMEOUT_MS });
-      await this.page.locator(this.destStep1Continue).click({ timeout: DRAWER_TIMEOUT_MS });
-    }
-
     await nameField.waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS });
     await nameField.fill(name);
     await this.page.locator(this.destUrlField).fill(url);
