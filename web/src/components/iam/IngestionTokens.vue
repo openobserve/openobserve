@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
-                :placeholder="t('ingestion.searchToken', 'Search tokens')"
+                :placeholder="t('ingestion.searchToken')"
                 class="flex-1"
                 data-test="ingestion-tokens-search-input"
               />
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -251,7 +251,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 interface Token {
   name: string;
   token: string;
-  description: string;
+  description: I18nText;
   is_default: boolean;
   enabled: boolean;
   created_by: string;
@@ -277,7 +277,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Create-token dialog is an OForm — the schema (name required + max 256) and
     // its defaults factory MUST be returned from setup() (Options-API), else
@@ -442,7 +442,7 @@ export default defineComponent({
     const toBasicAuth = (name: string, token: string) => getBasicAuth(name, token);
 
     const copyToken = (token: string) => {
-      copyToClipboard(token);
+      copyToClipboard(token, t);
     };
 
     onBeforeMount(() => {

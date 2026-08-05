@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="250px">
               <template #content>
-                <b>Step - </b>
+                <b>{{ t("dashboard.stepPrefix") }}</b>
                 {{ t("dashboard.stepValueTooltip") }}
                 <br />
                 {{ t("dashboard.stepValueExample") }}
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-config-panel-time-picker"
                   class="w-fit max-w-full min-w-0 overflow-hidden"
                 />
-                <OTooltip :content="formattedPickerValue" max-width="320px" />
+                <OTooltip :content="raw(formattedPickerValue)" max-width="320px" />
               </div>
               <OIcon
                 class="mr-1 ml-2 flex-shrink-0 shrink-0 cursor-pointer"
@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="`${t('dashboard.queryLabel')} ${Number(index) + 1}`"
+              :label="raw(`${t('dashboard.queryLabel')} ${Number(index) + 1}`)"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>
@@ -603,12 +603,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <OInput
+            :placeholder="raw('{field_name}')"
             v-model="
               dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex]
                 .config.query_label
             "
             size="sm"
-            placeholder="{field_name}"
             class="w-full"
             :data-test="`dashboard-config-legend-${dashboardPanelData.layout.currentQueryIndex}`"
             @focus="
@@ -648,7 +648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.layout.currentQueryIndex
               ].config.limit = 0)
           "
-          placeholder="0"
+          :placeholder="t('dashboard.zeroPlaceholder')"
           :label="t('dashboard.queryLimit')"
           data-test="dashboard-config-limit"
         >
@@ -719,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
           v-model="dashboardPanelDataModel.data.config.no_value_replacement"
-          placeholder="-"
+          :placeholder="raw('-')"
           :label="t('dashboard.noValueReplacement')"
           data-test="dashboard-config-no-value-replacement"
         >
@@ -862,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model.number="dashboardPanelDataModel.data.config.label_option.rotate"
           :label="t('dashboard.labelRotate')"
           type="number"
-          placeholder="0"
+          :placeholder="t('dashboard.zeroPlaceholder')"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.config.label_option.rotate =
@@ -886,7 +886,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-w-0 flex-1"
             v-model.number="dashboardPanelDataModel.data.config.axis_label_rotate"
             type="number"
-            placeholder="0"
+            :placeholder="t('dashboard.zeroPlaceholder')"
             :label="t('dashboard.axisLabelRotate')"
             @update:model-value="
               (value: any) =>
@@ -917,7 +917,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-w-0 flex-1"
             v-model.number="dashboardPanelDataModel.data.config.axis_label_truncate_width"
             type="number"
-            placeholder="0"
+            :placeholder="t('dashboard.zeroPlaceholder')"
             :label="t('dashboard.axisLabelTruncate')"
             @update:model-value="
               (value: any) =>
@@ -1425,7 +1425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           type="number"
           :label="t('dashboard.gaugeMaxValue')"
-          placeholder="100"
+          :placeholder="t('dashboard.hundredPlaceholder')"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.queries[
@@ -1749,7 +1749,7 @@ import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { computed, defineComponent, inject, nextTick, onBeforeMount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -1834,8 +1834,11 @@ export default defineComponent({
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode, isPivotMode } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { t } = useI18nTyped();
+    const { dashboardPanelData, promqlMode, isPivotMode } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
 
     // Alias for template v-model mutation sites; same reference, no behavior change.
     const dashboardPanelDataModel = computed(() => dashboardPanelData);
@@ -1859,7 +1862,6 @@ export default defineComponent({
     const toggleItemValue = (value: unknown) =>
       value === null || value === undefined ? TOGGLE_AUTO : value;
 
-    const { t } = useI18n();
     const store = useStore();
 
     const basemapTypeOptions = [
@@ -2170,8 +2172,9 @@ export default defineComponent({
         value: "center",
       },
     ];
-    // Single source of truth — shared with the column-formatting dialog.
-    const unitOptions = getUnitOptions(t);
+    // Single source of truth — shared with the column-formatting dialog. Labels are
+    // already translated; raw() only re-brands the `string` the helper widens to.
+    const unitOptions = getUnitOptions(t).map((o) => ({ ...o, label: raw(o.label) }));
 
     const labelPositionOptions = [
       {
@@ -2326,7 +2329,7 @@ export default defineComponent({
 
       return streamFields.schema.map((it: any) => {
         return {
-          label: it.name,
+          label: raw(it.name),
           value: it.name,
         };
       });
@@ -2577,6 +2580,7 @@ export default defineComponent({
     const decimalsTouched = ref(false);
 
     return {
+      raw,
       legendsPositionModel,
       legendsTypeModel,
       chartAlignModel,

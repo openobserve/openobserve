@@ -67,7 +67,9 @@
           icon-left="refresh"
         >
           <OTooltip
-            :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'"
+            :content="
+              isVariablesChanged ? t('common.refresh') : t('dashboard.refreshToApplyVariables')
+            "
           />
         </OButton>
         <OButton
@@ -175,7 +177,7 @@ import {
   onBeforeMount,
 } from "vue";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -255,7 +257,7 @@ export default defineComponent({
     const chartData = ref();
     const showLegendsDialog = ref(false);
     const panelSchemaRendererRef: any = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const store = useStore();
 
@@ -271,8 +273,10 @@ export default defineComponent({
 
     let parser: any;
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, promqlMode, resetDashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
     // default selected date will be absolute time
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
@@ -732,7 +736,7 @@ export default defineComponent({
       return searchIds.flat() as string[];
     });
 
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelViewPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;

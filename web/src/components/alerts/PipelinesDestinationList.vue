@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showDestinationEditor"
       :title="t('pipeline_destinations.header')"
       icon="person-pin-circle"
-      :subtitle="'External targets for pipeline output'"
+      :subtitle="t('settings.pipelineDestinationsDesc')"
     >
       <template #actions>
         <OButton
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="selectedDestinations.length > 0" #bottom>
             <span class="text-text-secondary text-xs font-medium">
-              {{ selectedDestinations.length }} selected
+              {{ selectedDestinations.length }} {{ t("alert_destinations.selected") }}
             </span>
             <OButton
               data-test="pipeline-destination-list-delete-destinations-btn"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              Delete
+              {{ t("common.delete") }}
             </OButton>
           </template>
         </OTable>
@@ -154,16 +154,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Destination"
-      message="Are you sure you want to delete destination?"
+      :title="t('alert_destinations.deleteDestinationTitle')"
+      :message="t('alert_destinations.deleteDestinationMessage')"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Destinations"
-      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      :title="t('alert_destinations.deleteDestinationsTitle')"
+      :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
@@ -228,7 +228,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       {
@@ -244,7 +244,7 @@ export default defineComponent({
       },
       {
         id: "destination_type",
-        header: "Destination Type",
+        header: t("alert_destinations.destination_type"),
         accessorKey: "destination_type_name",
         sortable: true,
         resizable: true,
@@ -273,7 +273,7 @@ export default defineComponent({
       },
       {
         id: "output_format",
-        header: "Output Format",
+        header: t("alert_destinations.output_format"),
         accessorKey: "output_format",
         sortable: true,
         resizable: true,
@@ -337,7 +337,7 @@ export default defineComponent({
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading destinations...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
         timeout: 0,
       });
       loading.value = true;
@@ -359,7 +359,7 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               variant: "error",
-              message: "Error while pulling destinations.",
+              message: t("toastMessages.alerts.errorWhilePullingDestinations"),
             });
           }
           dismiss();
@@ -426,7 +426,9 @@ export default defineComponent({
           .then(() => {
             toast({
               variant: "success",
-              message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
+              message: t("toastMessages.alerts.destinationDeletedSuccessfully", {
+                name: confirmDelete.value.data.name,
+              }),
             });
             getDestinations();
           })
@@ -469,7 +471,9 @@ export default defineComponent({
 
       toast({
         variant: "success",
-        message: `Destination "${destinationName}" created successfully.`,
+        message: t("toastMessages.alerts.destinationCreatedSuccessfully", {
+          name: destinationName,
+        }),
       });
     };
 
@@ -479,7 +483,9 @@ export default defineComponent({
 
       toast({
         variant: "success",
-        message: `Destination "${destinationName}" updated successfully.`,
+        message: t("toastMessages.alerts.destinationUpdatedSuccessfully", {
+          name: destinationName,
+        }),
       });
     };
 
@@ -543,7 +549,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting destinations...",
+        message: t("toastMessages.alerts.deletingDestinations"),
         timeout: 0,
       });
 
@@ -551,7 +557,7 @@ export default defineComponent({
         if (selectedDestinations.value.length === 0) {
           toast({
             variant: "error",
-            message: "No destinations selected for deletion",
+            message: t("toastMessages.alerts.noDestinationsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -576,24 +582,31 @@ export default defineComponent({
           if (failCount > 0 && successCount > 0) {
             toast({
               variant: "warning",
-              message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.destinationsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} destination(s)`,
+              message: t("toastMessages.alerts.failedToDeleteDestinations", { count: failCount }),
             });
           } else {
             toast({
               variant: "success",
-              message: `${successCount} destination(s) deleted successfully`,
+              message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
           toast({
             variant: "success",
-            message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
+            message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+              count: selectedDestinations.value.length,
+            }),
           });
         }
 

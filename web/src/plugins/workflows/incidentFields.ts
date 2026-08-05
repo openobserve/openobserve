@@ -25,6 +25,8 @@
 // filtering on an event-specific field naturally only matches its own events
 // (e.g. `meta_new_severity` is set only on severity_upgrade/override).
 
+import { raw } from "@/types/i18n";
+
 import type { WorkflowFieldOption } from "./alertFields";
 
 // Timestamps arrive as i64 epochs (real numbers, unlike the alert meta block
@@ -33,31 +35,31 @@ import type { WorkflowFieldOption } from "./alertFields";
 // array is ill-defined — but remain typeable via allow-custom-columns.
 export const INCIDENT_PAYLOAD_FIELDS: WorkflowFieldOption[] = [
   // ── Common — present on every lifecycle event ──
-  { label: "meta_event_type", value: "meta_event_type", type: "Utf8" },
-  { label: "meta_incident_id", value: "meta_incident_id", type: "Utf8" },
-  { label: "meta_title", value: "meta_title", type: "Utf8" },
-  { label: "meta_status", value: "meta_status", type: "Utf8" },
-  { label: "meta_severity", value: "meta_severity", type: "Utf8" },
-  { label: "meta_org_id", value: "meta_org_id", type: "Utf8" },
-  { label: "meta_user_id", value: "meta_user_id", type: "Utf8" },
-  { label: "meta_created_at", value: "meta_created_at", type: "Int64" },
-  { label: "meta_updated_at", value: "meta_updated_at", type: "Int64" },
-  { label: "meta_first_alert_at", value: "meta_first_alert_at", type: "Int64" },
-  { label: "meta_last_alert_at", value: "meta_last_alert_at", type: "Int64" },
+  { label: raw("meta_event_type"), value: "meta_event_type", type: "Utf8" },
+  { label: raw("meta_incident_id"), value: "meta_incident_id", type: "Utf8" },
+  { label: raw("meta_title"), value: "meta_title", type: "Utf8" },
+  { label: raw("meta_status"), value: "meta_status", type: "Utf8" },
+  { label: raw("meta_severity"), value: "meta_severity", type: "Utf8" },
+  { label: raw("meta_org_id"), value: "meta_org_id", type: "Utf8" },
+  { label: raw("meta_user_id"), value: "meta_user_id", type: "Utf8" },
+  { label: raw("meta_created_at"), value: "meta_created_at", type: "Int64" },
+  { label: raw("meta_updated_at"), value: "meta_updated_at", type: "Int64" },
+  { label: raw("meta_first_alert_at"), value: "meta_first_alert_at", type: "Int64" },
+  { label: raw("meta_last_alert_at"), value: "meta_last_alert_at", type: "Int64" },
   // ── Event-specific — set only for certain event_types ──
-  { label: "meta_alert_name", value: "meta_alert_name", type: "Utf8" }, // alert
-  { label: "meta_alert_id", value: "meta_alert_id", type: "Utf8" }, // alert
-  { label: "meta_alert_count", value: "meta_alert_count", type: "Int64" }, // alert
-  { label: "meta_old_severity", value: "meta_old_severity", type: "Utf8" }, // severity_*
-  { label: "meta_new_severity", value: "meta_new_severity", type: "Utf8" }, // severity_*
-  { label: "meta_old_title", value: "meta_old_title", type: "Utf8" }, // title_changed
-  { label: "meta_new_title", value: "meta_new_title", type: "Utf8" }, // title_changed
-  { label: "meta_from_user", value: "meta_from_user", type: "Utf8" }, // assignment_changed
-  { label: "meta_to_user", value: "meta_to_user", type: "Utf8" }, // assignment_changed
-  { label: "meta_from_key", value: "meta_from_key", type: "Utf8" }, // dimension_upgraded
-  { label: "meta_to_key", value: "meta_to_key", type: "Utf8" }, // dimension_upgraded
-  { label: "meta_reason", value: "meta_reason", type: "Utf8" }, // severity_upgrade/reopened/ai_failed
-  { label: "meta_comment", value: "meta_comment", type: "Utf8" }, // comment
-  { label: "meta_analysis_trigger_type", value: "meta_analysis_trigger_type", type: "Utf8" }, // ai_analysis_failed
-  { label: "meta_error_details", value: "meta_error_details", type: "Utf8" }, // ai_analysis_failed
+  { label: raw("meta_alert_name"), value: "meta_alert_name", type: "Utf8" }, // alert
+  { label: raw("meta_alert_id"), value: "meta_alert_id", type: "Utf8" }, // alert
+  { label: raw("meta_alert_count"), value: "meta_alert_count", type: "Int64" }, // alert
+  { label: raw("meta_old_severity"), value: "meta_old_severity", type: "Utf8" }, // severity_*
+  { label: raw("meta_new_severity"), value: "meta_new_severity", type: "Utf8" }, // severity_*
+  { label: raw("meta_old_title"), value: "meta_old_title", type: "Utf8" }, // title_changed
+  { label: raw("meta_new_title"), value: "meta_new_title", type: "Utf8" }, // title_changed
+  { label: raw("meta_from_user"), value: "meta_from_user", type: "Utf8" }, // assignment_changed
+  { label: raw("meta_to_user"), value: "meta_to_user", type: "Utf8" }, // assignment_changed
+  { label: raw("meta_from_key"), value: "meta_from_key", type: "Utf8" }, // dimension_upgraded
+  { label: raw("meta_to_key"), value: "meta_to_key", type: "Utf8" }, // dimension_upgraded
+  { label: raw("meta_reason"), value: "meta_reason", type: "Utf8" }, // severity_upgrade/reopened/ai_failed
+  { label: raw("meta_comment"), value: "meta_comment", type: "Utf8" }, // comment
+  { label: raw("meta_analysis_trigger_type"), value: "meta_analysis_trigger_type", type: "Utf8" }, // ai_analysis_failed
+  { label: raw("meta_error_details"), value: "meta_error_details", type: "Utf8" }, // ai_analysis_failed
 ];

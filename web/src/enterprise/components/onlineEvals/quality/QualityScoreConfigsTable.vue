@@ -177,7 +177,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -198,7 +198,7 @@ const emit = defineEmits<{
   (e: "refresh"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const filter = ref("");

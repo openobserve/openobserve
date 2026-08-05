@@ -16,6 +16,8 @@
 // Oracle DB data-source setup card. Follows the OpenObserve doc:
 // https://openobserve.ai/docs/integration/database/oracle/ (oracledb receiver).
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
@@ -59,54 +61,72 @@ export default function oracleCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Oracle",
-      tagline:
-        "Collect Oracle DB metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.oracleTagline"),
       logo: getImageURL("images/ingestion/oracle.svg"),
       tone: "#F80000",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
         id: "prepare",
-        title: "Prepare Oracle",
-        description:
-          "Create the monitoring user — run it as a DBA in SQL*Plus or SQL Developer, **not** your shell.",
-        chip: { kind: "editor", label: "grant.sql" },
+        titleKey: "ingestion.setupCard.prepareOracleTitle",
+        descriptionKey: "ingestion.setupCard.prepareOracleDesc",
+        chip: { kind: "editor", label: raw("grant.sql") },
         completeOn: "copy",
         code: { lang: "sql", filename: "grant.sql", raw: GRANT_SQL },
       },
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         variantGroup: "os",
         variantToggle: false,
         inputs: [
-          { id: "host", label: "Oracle Host", default: "localhost", placeholder: "localhost" },
-          { id: "port", label: "Port", default: "1521", placeholder: "1521", width: "sm" },
+          {
+            id: "host",
+            labelKey: "ingestion.setupCard.oracleHostLabel",
+            default: "localhost",
+            placeholder: raw("localhost"),
+          },
+          {
+            id: "port",
+            labelKey: "ingestion.setupCard.portLabel",
+            default: "1521",
+            placeholder: raw("1521"),
+            width: "sm",
+          },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description: "Hit Test below, or check Streams for the `oracledb_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyOracledbMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "System Stats", "Tablespace Usage", "Data Files", "Resource Limits"],
+        // The Oracle data-dictionary views granted above (V$SESSION, V$SYSSTAT,
+        // DBA_TABLESPACE_USAGE_METRICS, DBA_DATA_FILES, V$RESOURCE_LIMIT) — the
+        // names the user sees in their own data, so they stay untranslated.
+        pills: [
+          raw("Sessions"),
+          raw("System Stats"),
+          raw("Tablespace Usage"),
+          raw("Data Files"),
+          raw("Resource Limits"),
+        ],
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "oracledb", filter: "" },

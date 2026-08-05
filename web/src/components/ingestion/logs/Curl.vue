@@ -16,11 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
   </IngestionContent>
 </template>
 
 <script lang="ts">
+import { raw } from "@/types/i18n";
 import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
@@ -55,6 +56,7 @@ export default defineComponent({
     const content = `curl -u [EMAIL]:[PASSCODE] -k ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json -d "[{\\"level\\":\\"info\\",\\"job\\":\\"test\\",\\"log\\":\\"test message for openobserve\\"}]"`;
 
     return {
+      raw,
       store,
       config,
       endpoint,

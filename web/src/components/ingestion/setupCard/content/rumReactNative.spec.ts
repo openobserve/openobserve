@@ -244,7 +244,7 @@ describe("rumReactNativeCard builder", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
 
-      expect(install.chip?.label).toBe("Install");
+      expect(install.chip?.labelKey).toBe("ingestion.setupCard.chipInstall");
     });
 
     it("verify step has chip with label 'RUM'", () => {

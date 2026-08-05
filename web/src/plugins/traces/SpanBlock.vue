@@ -79,7 +79,7 @@ import { defineComponent, computed, ref, onMounted, onBeforeUnmount, watch } fro
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 // TODO(design-tokens): fallback bar colour for a span the trace colour allocator
 // never assigned. No semantic token fits — it is a categorical "unassigned span"
@@ -138,7 +138,7 @@ export default defineComponent({
     });
 
     const durationStyle = ref({});
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const leftPosition = ref(0);
 

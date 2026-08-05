@@ -16,31 +16,33 @@
 import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast";
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
+import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 
-// ── Friendly name overrides ──────────────────────────────────────────────────
+// Friendly name overrides. Keys, not text — this map is module scope, so it is
+// translated at display time in extractResourceInfo().
 
-const FRIENDLY_NAMES: Record<string, string> = {
-  dashboards: "Dashboards",
-  alerts: "Alerts",
-  streams: "Streams",
-  functions: "Functions",
-  savedviews: "Saved Views",
-  users: "Users",
-  roles: "Roles",
-  organizations: "Organizations",
-  pipelines: "Pipelines",
-  destinations: "Destinations",
-  templates: "Templates",
-  reports: "Reports",
-  "llm/models": "LLM Model Pricing",
-  "llm/models/built-in": "LLM Model Pricing",
-  "llm/models/refresh-built-in": "LLM Model Pricing",
+const FRIENDLY_NAME_KEYS: Record<string, I18nKey> = {
+  dashboards: "toastMessages.composables.resources.dashboards",
+  alerts: "toastMessages.composables.resources.alerts",
+  streams: "toastMessages.composables.resources.streams",
+  functions: "toastMessages.composables.resources.functions",
+  savedviews: "toastMessages.composables.resources.savedviews",
+  users: "toastMessages.composables.resources.users",
+  roles: "toastMessages.composables.resources.roles",
+  organizations: "toastMessages.composables.resources.organizations",
+  pipelines: "toastMessages.composables.resources.pipelines",
+  destinations: "toastMessages.composables.resources.destinations",
+  templates: "toastMessages.composables.resources.templates",
+  reports: "toastMessages.composables.resources.reports",
+  "llm/models": "toastMessages.composables.resources.llmModelPricing",
+  "llm/models/built-in": "toastMessages.composables.resources.llmModelPricing",
+  "llm/models/refresh-built-in": "toastMessages.composables.resources.llmModelPricing",
 };
 
 // ── URL → {label, urlPath} extraction ───────────────────────────────────────
 
 function extractResourceInfo(rawUrl: string): ToastDetail {
-  let label = "Resource";
+  let label: I18nText = gt("toastMessages.composables.resourceFallback");
   let urlPath = rawUrl;
 
   try {
@@ -60,7 +62,7 @@ function extractResourceInfo(rawUrl: string): ToastDetail {
       // Special namespace (_meta, etc.) — no org segment
       const remaining = segments.slice(idx + 1);
       if (remaining.length > 0) {
-        label = capitalize(remaining[remaining.length - 1]);
+        label = raw(capitalize(remaining[remaining.length - 1]));
       }
     } else if (candidate) {
       // Skip org identifier
@@ -72,9 +74,13 @@ function extractResourceInfo(rawUrl: string): ToastDetail {
 
       if (resourceNames.length > 0) {
         const joined = resourceNames.join("/");
-        const friendly =
-          FRIENDLY_NAMES[joined] ?? FRIENDLY_NAMES[resourceNames[resourceNames.length - 1]];
-        label = friendly ?? capitalize(resourceNames[resourceNames.length - 1]);
+        const friendlyKey =
+          FRIENDLY_NAME_KEYS[joined] ?? FRIENDLY_NAME_KEYS[resourceNames[resourceNames.length - 1]];
+        // Unknown resources fall back to the capitalised URL segment — a path
+        // token, not prose, so it is deliberately left untranslated.
+        label = friendlyKey
+          ? gt(friendlyKey)
+          : raw(capitalize(resourceNames[resourceNames.length - 1]));
       }
     }
   } catch {
@@ -89,12 +95,13 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function buildTitle(): string {
-  return "Access Required";
+// Resolved per call, not at module scope, so a locale change is reflected.
+function buildTitle() {
+  return gt("toastMessages.composables.accessRequiredTitle");
 }
 
-function buildMessage(): string {
-  return "Some sections couldn't load because you don't have the required permissions. Contact your administrator if you believe you should have access.";
+function buildMessage() {
+  return gt("toastMessages.composables.accessRequiredMessage");
 }
 
 // ── Module-level singleton state ─────────────────────────────────────────────
@@ -112,7 +119,7 @@ function copyDetails(): void {
   const text = accumulatedErrors.map((e) => `${e.label}: ${e.url}`).join("\n");
   // silent: true — feedback is shown on the button itself via successLabel,
   // not as a separate toast notification.
-  copyToClipboard(text, { silent: true });
+  copyToClipboard(text, gt, { silent: true });
 }
 
 function flushGroupedToast(): void {
@@ -124,7 +131,12 @@ function flushGroupedToast(): void {
   if (activeToastId !== null) {
     const record = toastRecords.find((r) => r.id === activeToastId && r.open);
     if (record) {
-      updateToast(activeToastId, { title, message, details, titleCount: details.length });
+      updateToast(activeToastId, {
+        title,
+        message,
+        details,
+        titleCount: details.length,
+      });
       return;
     }
     // Toast was dismissed before the debounce fired
@@ -139,7 +151,11 @@ function flushGroupedToast(): void {
     message,
     titleCount: details.length,
     details,
-    action: { label: "Copy details", handler: copyDetails, successLabel: "Copied!" },
+    action: {
+      label: gt("toastMessages.composables.copyDetails"),
+      handler: copyDetails,
+      successLabel: gt("toastMessages.composables.copied"),
+    },
     onDismiss: onToastDismissed,
   });
 

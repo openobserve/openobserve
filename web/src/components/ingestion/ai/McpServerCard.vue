@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import CopyContent from "@/components/CopyContent.vue";
@@ -49,7 +49,7 @@ const props = defineProps<{
   docUrl?: string;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { generate, generating, error: genError, credential, canGenerate } = useMcpCredential();
@@ -318,7 +318,7 @@ const openDocs = () => {
     <!-- Endpoint -->
     <div class="flex flex-col gap-2">
       <div class="font-semibold">{{ t("ingestion.mcp.endpointLabel") }}</div>
-      <CopyContent :content="endpoint" />
+      <CopyContent :content="raw(endpoint)" />
     </div>
 
     <!-- Authentication method -->
@@ -385,7 +385,7 @@ const openDocs = () => {
         <p class="text-text-secondary">
           {{ t("ingestion.mcp.credential.shownOnce", { email: credential.email }) }}
         </p>
-        <CopyContent :content="credentialHeader" />
+        <CopyContent :content="raw(credentialHeader)" />
         <div class="flex gap-2">
           <OButton
             variant="outline"
@@ -451,7 +451,7 @@ const openDocs = () => {
           }}
         </OButton>
       </div>
-      <CopyContent :content="activeConfig" />
+      <CopyContent :content="raw(activeConfig)" />
     </div>
 
     <!-- Security note (token mode only) -->

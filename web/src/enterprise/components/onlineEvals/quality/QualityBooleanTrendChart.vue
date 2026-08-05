@@ -3,6 +3,7 @@
 </template>
 
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
@@ -36,7 +37,7 @@ const PALETTE = [
 function effectiveSeries(): BooleanTrendSeries[] {
   if (props.series && props.series.length > 0) return props.series;
   if (props.points && props.points.length > 0) {
-    return [{ id: "default", label: props.legendPassRate, points: props.points }];
+    return [{ id: "default", label: raw(props.legendPassRate), points: props.points }];
   }
   return [];
 }

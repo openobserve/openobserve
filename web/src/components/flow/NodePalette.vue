@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     testPrefix  — data-test prefix, so each editor keeps its existing selectors
 -->
 <script lang="ts">
+import type { I18nText } from "@/types/i18n";
 // Palette styling lives in its own token-driven stylesheet (see the note at the
 // top of node-palette.css for why it cannot be scoped). Imported here rather
 // than through an SFC style block, so this component carries none at all.
@@ -51,8 +52,8 @@ interface NodePaletteItem {
   subtype?: string;
   io_type?: string;
   isSectionHeader?: boolean;
-  label?: string;
-  tooltip?: string;
+  label?: I18nText;
+  tooltip?: I18nText;
   icon?: string;
   [key: string]: unknown;
 }

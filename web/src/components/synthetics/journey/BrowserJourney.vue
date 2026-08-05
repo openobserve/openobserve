@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
@@ -270,7 +270,7 @@ const multiSelectEnabled = computed(
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Chrome UI element names — must stay in English across all locales
 // because they reference the actual Chrome browser interface.
@@ -1161,7 +1161,9 @@ function openChromeExtensions() {
         <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-text-muted text-xs">{{ capturedSteps.length }} steps</span>
+        <span class="text-text-muted text-xs"
+          >{{ capturedSteps.length }} {{ t("synthetics.table.stepsSuffix") }}</span
+        >
       </div>
 
       <JourneySteps
@@ -1280,11 +1282,11 @@ function openChromeExtensions() {
           :action-error-message="
             (firstStepError && props.modelValue[0]?.id === row.id
               ? t('synthetics.validation.firstStepMustNavigate')
-              : '') || fieldError(row.id, 'action')
+              : raw('')) || fieldError(row.id, 'action')
           "
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
-            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : '') ||
+            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : raw('')) ||
             fieldError(row.id, 'selector')
           "
           :value-error-message="fieldError(row.id, 'value')"

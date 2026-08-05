@@ -10,13 +10,12 @@
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 class="text-text-heading text-2xl font-semibold">
-            Empty states — full set for review
+            {{ t("emptyState.demo.pageTitle") }}
           </h1>
           <p class="text-text-secondary mt-1 max-w-2xl text-sm">
-            Every preset below is a real
-            <code class="text-text-body">&lt;OEmptyState&gt;</code> with its production copy,
-            illustration, and action. Each detailed scene has its own character micro-animation and
-            pauses under OS "reduce motion". Nothing is wired into real pages yet.
+            {{ t("emptyState.demo.introText") }}
+            <code class="text-text-body">{{ emptyStateTag }}</code>
+            {{ t("emptyState.demo.introTextSuffix") }}
           </p>
         </div>
         <div class="flex items-center gap-2">
@@ -26,7 +25,11 @@
             icon-left="filter-list"
             @click="filteredPreview = !filteredPreview"
           >
-            {{ filteredPreview ? "First-run state" : "Filtered state" }}
+            {{
+              filteredPreview
+                ? t("emptyState.demo.firstRunState")
+                : t("emptyState.demo.filteredState")
+            }}
           </OButton>
           <OButton
             variant="outline"
@@ -34,7 +37,7 @@
             icon-left="dark-mode"
             @click="localDark = !localDark"
           >
-            {{ localDark ? "Light preview" : "Dark preview" }}
+            {{ localDark ? t("emptyState.demo.lightPreview") : t("emptyState.demo.darkPreview") }}
           </OButton>
         </div>
       </div>
@@ -45,7 +48,9 @@
             <span class="text-text-secondary text-xs font-semibold tracking-wider uppercase">
               {{ p.label }}
             </span>
-            <code class="text-2xs text-text-disabled">preset="{{ p.preset }}"</code>
+            <code class="text-2xs text-text-disabled"
+              >{{ raw('preset="') }}{{ p.preset }}{{ raw('"') }}</code
+            >
           </div>
           <div class="rounded-default border-border-default h-110 overflow-hidden border">
             <OEmptyState
@@ -61,21 +66,21 @@
 
       <div>
         <h2 class="text-text-heading mb-1 text-lg font-semibold">
-          Character — optional, only where it adds value
+          {{ t("emptyState.demo.characterSectionTitle") }}
         </h2>
         <p class="text-text-secondary mb-3 max-w-2xl text-sm">
-          The illustration is just a named choice, so a scene can opt into a character (e.g. a
-          prominent first-run hero) while everything else stays object-only. Same component,
-          <code class="text-text-body">illustration="explorer"</code>.
+          {{ t("emptyState.demo.characterSectionDesc") }}
+          <code class="text-text-body">{{ raw('illustration="explorer"') }}</code
+          >.
         </p>
         <div class="rounded-default border-border-default h-110 overflow-hidden border">
           <OEmptyState
             size="hero"
             variant="create"
             illustration="explorer"
-            title="We couldn't find any data"
-            description="Nothing matches yet — try a different stream, widen the time range, or create something new."
-            action-label="Clear filters"
+            :title="t('emptyState.demo.noDataTitle')"
+            :description="t('emptyState.demo.noDataDescription')"
+            :action-label="t('emptyState.demo.clearFiltersAction')"
             action-icon="filter-list"
             @action="onAction()"
           />
@@ -84,12 +89,12 @@
 
       <div>
         <h2 class="text-text-heading mb-3 text-lg font-semibold">
-          Sizes — the same system at block &amp; inline scale
+          {{ t("emptyState.demo.sizesSectionTitle") }}
         </h2>
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <section class="flex flex-col gap-2">
             <span class="text-text-secondary text-xs font-semibold tracking-wider uppercase">
-              size="block" (inside a card / dashboard panel)
+              {{ t("emptyState.demo.sizeBlockLabel") }}
             </span>
             <div class="rounded-default border-border-default overflow-hidden border">
               <OEmptyState preset="no-search-results" size="block" @action="onAction('block')" />
@@ -97,7 +102,7 @@
           </section>
           <section class="flex flex-col gap-2">
             <span class="text-text-secondary text-xs font-semibold tracking-wider uppercase">
-              size="inline" (table body / dropdown)
+              {{ t("emptyState.demo.sizeInlineLabel") }}
             </span>
             <div class="rounded-default border-border-default overflow-hidden border">
               <OEmptyState preset="no-search-results" size="inline" @action="onAction('inline')" />
@@ -114,6 +119,13 @@ import { ref } from "vue";
 
 import { OEmptyState, type EmptyStatePresetName } from "@/lib/core/EmptyState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { useI18nTyped, raw } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+
+// Hoisted, not inline as `{{ raw("<OEmptyState>") }}`: Prettier's HTML parser
+// reads the `<` inside an interpolation as a tag open and fails to parse.
+const emptyStateTag = raw("<OEmptyState>");
 
 // local dark-mode preview wrapper so reviewers can flip themes without changing
 // their global setting (mirrors the app's `.dark` class on a scoped root).

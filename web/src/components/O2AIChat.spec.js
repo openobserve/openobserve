@@ -317,7 +317,7 @@ describe("O2AIChat - clipboard", () => {
     const wrapper = await mountChat({ isOpen: true });
 
     // Act
-    const result = await wrapper.vm.copyToClipboard("abc");
+    const result = await wrapper.vm.copyToClipboard("abc", wrapper.vm.t);
 
     // Assert: the function succeeds (returns true) and clipboard was written
     expect(result).toBe(true);
@@ -331,7 +331,7 @@ describe("O2AIChat - clipboard", () => {
     const wrapper = await mountChat({ isOpen: true });
 
     // Act
-    const result = await wrapper.vm.copyToClipboard("abc");
+    const result = await wrapper.vm.copyToClipboard("abc", wrapper.vm.t);
 
     // Assert: the function reports failure (returns false)
     expect(result).toBe(false);

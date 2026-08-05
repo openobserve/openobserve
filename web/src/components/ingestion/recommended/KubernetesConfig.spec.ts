@@ -113,7 +113,7 @@ describe("kubernetesCard builder", () => {
 
   it("marks the quick install as the recommended path", async () => {
     const install = (await buildCard()).steps[0];
-    expect(install.title).toBe("Quick Install (Recommended)");
+    expect(install.titleKey).toBe("ingestion.setupCard.quickInstallTitle");
     expect(install.required).toBe(true);
   });
 
@@ -122,12 +122,11 @@ describe("kubernetesCard builder", () => {
     // who wants Helm has to scroll past two steps that don't apply to them.
     const card = await buildCard();
     const install = card.steps[0];
-    const label = card.extras!.advanced!.label;
     for (const v of install.variants!) {
       // A jump link, not prose — it opens the accordion and scrolls to it.
-      expect(v.note).toContain(`[${label}](#advanced)`);
+      expect(v.note).toContain("[Advanced Installation (Manual Steps)](#advanced)");
     }
-    expect(label).toBe("Advanced Installation (Manual Steps)");
+    expect(card.extras!.advanced!.labelKey).toBe("ingestion.setupCard.advancedInstallLabel");
   });
 
   it("keeps the quick install to the two endpoint choices", async () => {
@@ -163,7 +162,7 @@ describe("kubernetesCard builder", () => {
 
   it("keeps the manual helm sequence as one collapsed advanced block", async () => {
     const advanced = (await buildCard()).extras!.advanced!;
-    expect(advanced.label).toContain("Advanced Installation");
+    expect(advanced.labelKey).toBe("ingestion.setupCard.advancedInstallLabel");
     const code = advanced.code.raw;
     // Previously six separate copy boxes plus a "wait 2 minutes" instruction.
     expect(code).toContain("cert-manager.yaml");

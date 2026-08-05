@@ -23,6 +23,8 @@
 // first-agent default the selected agent's `source_stream` is non-empty, so the
 // fallback is never observably reached (covered by an equivalence test).
 
+import { raw } from "@/types/i18n";
+
 import { computed, ref, watch } from "vue";
 import type { ComputedRef, Ref } from "vue";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
@@ -182,7 +184,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
       if (seen.has(v)) continue;
       seen.add(v);
       out.push({
-        label: v === UNSET ? (unsetLabel ?? v) : v,
+        label: raw(v === UNSET ? (unsetLabel ?? v) : v),
         value: v,
       });
     }

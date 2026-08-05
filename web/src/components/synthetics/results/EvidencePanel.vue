@@ -29,7 +29,7 @@
  * error, not a cosmetic one.
  */
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import {
   evidenceOriginTs,
@@ -89,7 +89,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: "clear-step-filter"): void; (e: "retry"): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /**
  * Three views, not five kind chips.

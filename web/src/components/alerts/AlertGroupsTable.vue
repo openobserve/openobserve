@@ -156,7 +156,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -182,7 +182,7 @@ const emit = defineEmits<{
   "show-history": [group: AlertGroup];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const search = ref("");
 
@@ -270,7 +270,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     cell: " ",
     isAction: true,
     size: 70,

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
+import { raw } from "@/types/i18n";
 
 const DB_NAME = "o2ChatDB";
 const DB_VERSION = 2;
@@ -362,7 +363,7 @@ export function useChatHistory(getUserEmail: () => string, getOrgIdentifier: () 
             resolve(false);
             return;
           }
-          chat.title = newTitle;
+          chat.title = raw(newTitle);
           const putRequest = store.put(chat);
           putRequest.onsuccess = () => resolve(true);
           putRequest.onerror = () => {

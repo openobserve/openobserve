@@ -119,16 +119,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OSeparator class="mr-2 -ml-2" />
           <div class="px-1 py-3">
-            <div>org_name, stream_type, stream_name</div>
-            <div>alert_name, alert_type</div>
-            <div>alert_period, alert_operator, alert_threshold</div>
-            <div>alert_count, alert_agg_value</div>
-            <div>alert_start_time, alert_end_time, alert_url</div>
+            <div>{{ raw("org_name, stream_type, stream_name") }}</div>
+            <div>{{ raw("alert_name, alert_type") }}</div>
+            <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
+            <div>{{ raw("alert_count, alert_agg_value") }}</div>
+            <div>{{ raw("alert_start_time, alert_end_time, alert_url") }}</div>
             <div>
-              alert_trigger_time, alert_trigger_time_millis, alert_trigger_time_seconds,
-              alert_trigger_time_str
+              {{
+                raw(
+                  "alert_trigger_time, alert_trigger_time_millis, alert_trigger_time_seconds, alert_trigger_time_str",
+                )
+              }}
             </div>
-            <div><b>rows</b> {{ t("alert_templates.variableRowsDescription") }}</div>
+            <div>
+              <b>{{ raw("rows") }}</b> {{ t("alert_templates.variableRowsDescription") }}
+            </div>
             <div>
               <b>{{ t("alert_templates.variableStreamFields") }}</b>
             </div>
@@ -173,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onActivated, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
@@ -216,7 +221,7 @@ const props = withDefaults(
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const splitterModel: Ref<number> = ref(75);
 const store = useStore();
 const router = useRouter();
@@ -350,7 +355,7 @@ const isTemplateBodyValid = (bodyValue: string) => {
   if (!result.valid) {
     toast({
       variant: "error",
-      message: getTemplateValidationErrorMessage(),
+      message: raw(getTemplateValidationErrorMessage()),
       timeout: 1500,
     });
   }
@@ -432,7 +437,7 @@ async function saveTemplate(value: AddTemplateForm) {
 }
 
 const copyTemplateBody = (text: any) => {
-  copyToClipboard(JSON.parse(JSON.stringify(text)), {
+  copyToClipboard(JSON.parse(JSON.stringify(text)), t, {
     successMessage: t("alert_templates.contentCopied"),
     timeout: 1000,
   });

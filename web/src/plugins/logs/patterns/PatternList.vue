@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <EmptyStateActionCard
             icon="schedule"
             :label="t('logs.noEvents.jumpToData')"
-            :sublabel="jumpTargetSublabel"
+            :sublabel="raw(jumpTargetSublabel)"
             data-test="log-patterns-jump-to-data-card"
             @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
           />
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import PatternCard from "./PatternCard.vue";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
@@ -270,7 +270,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Severity chips scale the sample's share up to the window's real total, which
 // SearchResult owns — one count query feeds both that chip row and its

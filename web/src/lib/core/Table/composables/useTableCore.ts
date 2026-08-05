@@ -13,6 +13,7 @@ import {
   type Row,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
+import { raw } from "@/types/i18n";
 import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
 
 // Register the custom "avg" fn (provided via table options below) so
@@ -74,7 +75,7 @@ export function useTableCore<TData>(
       : 0;
     return {
       id: "#",
-      header: "#",
+      header: raw("#"),
       size: TABLE_INDEX_COL_SIZE,
       sortable: false,
       hideable: false,
@@ -124,7 +125,7 @@ export function useTableCore<TData>(
     if (!hasTrailingSpacer.value) return base;
     const spacer: OTableColumnDef<TData> = {
       id: "__spacer__",
-      header: "",
+      header: raw(""),
       sortable: false,
       hideable: false,
       resizable: false,

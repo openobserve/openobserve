@@ -64,7 +64,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OFormOptionGroup from "@/lib/forms/OptionGroup/OFormOptionGroup.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -94,7 +94,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{ change: [value: unknown] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const onLabelKey = computed(() =>
   props.unit === "series" ? "alerts.multiAlert.perSeries" : "alerts.multiAlert.perGroup",
