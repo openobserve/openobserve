@@ -141,7 +141,7 @@ const stageNode = (nodeType: string, opts: { isEdit?: boolean; id?: string; data
 
 describe("WorkflowNodeDrawer", () => {
   let wrapper: any = null;
-  const { resetWorkflowData } = useWorkflowCanvas();
+  const { resetWorkflowData } = useWorkflowCanvas(t);
 
   beforeEach(() => {
     vi.clearAllMocks();

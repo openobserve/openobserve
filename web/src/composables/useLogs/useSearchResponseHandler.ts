@@ -27,7 +27,7 @@ import {
 } from "@/ts/interfaces/query";
 import { logsErrorMessage } from "@/utils/common";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
@@ -42,14 +42,14 @@ export const useSearchResponseHandler = () => {
     showCancelSearchNotification,
   } = logsUtils();
 
-  const { getHistogramTitle, generateHistogramData } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts, generateHistogramData } = useHistogram();
 
   const { refreshPagination, sortResponse } = useSearchPagination();
 
   const { clearCache } = useLogsHighlighter();
 
   const store = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
 
   const {
     searchObj,
@@ -163,7 +163,7 @@ export const useSearchResponseHandler = () => {
       searchObj.loadingHistogramProgressPercentage = 0;
       searchObj.data.isOperationCancelled = false;
 
-      showCancelSearchNotification();
+      showCancelSearchNotification(t);
       setCancelSearchError();
     }
   };
@@ -215,6 +215,7 @@ export const useSearchResponseHandler = () => {
     updateGridColumns();
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const handleStreamingMetadata = (
@@ -403,6 +404,7 @@ export const useSearchResponseHandler = () => {
 
     if (!payload.meta?.isHistogramOnly)
       searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
 
     searchObjDebug["histogramProcessingEndTime"] = performance.now();
     searchObjDebug["histogramEndTime"] = performance.now();
@@ -456,6 +458,7 @@ export const useSearchResponseHandler = () => {
 
     refreshPagination(regeratePaginationFlag);
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const handlePageCountStreamingMetadata = (
@@ -533,7 +536,7 @@ export const useSearchResponseHandler = () => {
     const { message, trace_id, code, error_detail, error } = err.content;
 
     if (code === 20009) {
-      showCancelSearchNotification();
+      showCancelSearchNotification(t);
       setCancelSearchError();
     }
 
@@ -589,7 +592,7 @@ export const useSearchResponseHandler = () => {
     trace_id,
     defaultMessage,
   }: {
-    message?: string;
+    message?: I18nText;
     code?: number;
     trace_id?: string;
     defaultMessage: string;

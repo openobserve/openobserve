@@ -23,7 +23,7 @@ import {
   captureFromSearchHits,
   captureFromValuesApi,
   getFieldValuesForSuggestion,
-} from "./useFieldValueStore";
+} from "./fieldValueStore";
 
 const ctx = { org: "myorg", streamType: "logs", streamName: "http_logs" };
 

@@ -940,14 +940,12 @@ mod tests {
 
     #[test]
     fn test_postgres_scheduler_new() {
-        let s = PostgresScheduler::new();
-        drop(s);
+        let _scheduler = PostgresScheduler::new();
     }
 
     #[test]
     fn test_postgres_scheduler_default() {
-        let s = PostgresScheduler::default();
-        drop(s);
+        let _scheduler = PostgresScheduler::default();
     }
 
     #[test]

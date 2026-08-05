@@ -1,7 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export interface ComboboxOption {
-  label: string;
+  label: I18nText;
   value: string;
 }
 
@@ -9,9 +11,9 @@ export interface ComboboxProps {
   /** Bound value — the text displayed in the input */
   modelValue?: string;
   /** Placeholder text for the input */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Label shown above the input */
-  label?: string;
+  label?: I18nText;
   /** Options array: `{ label, value }` objects  */
   items?: ComboboxOption[];
   /**
@@ -36,9 +38,9 @@ export interface ComboboxProps {
   /** Whether the input is in an error state */
   error?: boolean;
   /** Error message shown below the input */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Help text shown below the input */
-  helpText?: string;
+  helpText?: I18nText;
   /**
    * Debounce delay (ms) before emitting `update:modelValue`.
    * Useful when the parent performs expensive operations on every change.

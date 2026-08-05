@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Resources rail -->
         <aside
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col overflow-y-auto border p-4"
-          aria-label="Resources"
+          :aria-label="t('common.resources')"
         >
           <!-- Resources — owned assets with live counts. Each row is gated to the
                same route the left nav uses, so it hides when access is missing. -->
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Alerts -->
         <section
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
-          aria-label="Alerts overview section"
+          :aria-label="t('home.alertsOverviewSection')"
         >
           <div class="flex items-center justify-between gap-2">
             <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Pipelines -->
         <section
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
-          aria-label="Pipelines overview section"
+          :aria-label="t('home.pipelinesOverviewSection')"
         >
           <div class="flex items-center justify-between gap-2">
             <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
@@ -576,7 +576,7 @@ import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -634,7 +634,7 @@ const getSummary = (org_id: any) => {
   isLoadingSummary.value = true;
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading summary...",
+    message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
     timeout: 0,
   });
   orgService
@@ -705,7 +705,7 @@ const getSummary = (org_id: any) => {
       dismiss();
       toast({
         variant: "error",
-        message: "Error while pulling summary.",
+        message: t("toastMessages.views.errorWhilePullingSummary"),
       });
     })
     .finally(() => {

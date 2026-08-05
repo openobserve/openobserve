@@ -2455,19 +2455,19 @@ mod tests {
 
     #[test]
     fn test_search_event_type_try_from() {
-        type SET = SearchEventType; // Saving line too long
-        assert_eq!(SET::try_from("ui").unwrap(), SET::UI);
-        assert_eq!(SET::try_from("dashboards").unwrap(), SET::Dashboards);
-        assert_eq!(SET::try_from("reports").unwrap(), SET::Reports);
-        assert_eq!(SET::try_from("alerts").unwrap(), SET::Alerts);
-        assert_eq!(SET::try_from("values").unwrap(), SET::Values);
-        assert_eq!(SET::try_from("_values").unwrap(), SET::Values);
-        assert_eq!(SET::try_from("other").unwrap(), SET::Other);
-        assert_eq!(SET::try_from("rum").unwrap(), SET::RUM);
-        assert_eq!(SET::try_from("derived_stream").unwrap(), SET::DerivedStream);
-        assert_eq!(SET::try_from("derivedstream").unwrap(), SET::DerivedStream);
-        assert_eq!(SET::try_from("search_job").unwrap(), SET::SearchJob);
-        assert_eq!(SET::try_from("searchjob").unwrap(), SET::SearchJob);
+        type Set = SearchEventType; // Saving line too long
+        assert_eq!(Set::try_from("ui").unwrap(), Set::UI);
+        assert_eq!(Set::try_from("dashboards").unwrap(), Set::Dashboards);
+        assert_eq!(Set::try_from("reports").unwrap(), Set::Reports);
+        assert_eq!(Set::try_from("alerts").unwrap(), Set::Alerts);
+        assert_eq!(Set::try_from("values").unwrap(), Set::Values);
+        assert_eq!(Set::try_from("_values").unwrap(), Set::Values);
+        assert_eq!(Set::try_from("other").unwrap(), Set::Other);
+        assert_eq!(Set::try_from("rum").unwrap(), Set::RUM);
+        assert_eq!(Set::try_from("derived_stream").unwrap(), Set::DerivedStream);
+        assert_eq!(Set::try_from("derivedstream").unwrap(), Set::DerivedStream);
+        assert_eq!(Set::try_from("search_job").unwrap(), Set::SearchJob);
+        assert_eq!(Set::try_from("searchjob").unwrap(), Set::SearchJob);
         assert!(SearchEventType::try_from("invalid").is_err());
     }
 
@@ -2749,29 +2749,27 @@ mod tests {
         // Find the chunk containing the oversized hit (id=11)
         let mut found_oversized_chunk = false;
         for chunk in &chunks[1..] {
-            if let ResponseChunk::Hits { hits } = chunk {
-                if hits.len() == 1 {
-                    if let Some(id) = hits[0].get("id").and_then(|v| v.as_u64()) {
-                        if id == 11 {
-                            // Verify this is indeed the oversized hit
-                            assert!(
-                                hits[0]
-                                    .get("oversized")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false),
-                                "Chunk with single hit should contain the oversized hit"
-                            );
-                            found_oversized_chunk = true;
+            if let ResponseChunk::Hits { hits } = chunk
+                && hits.len() == 1
+                && let Some(id) = hits[0].get("id").and_then(|v| v.as_u64())
+                && id == 11
+            {
+                // Verify this is indeed the oversized hit
+                assert!(
+                    hits[0]
+                        .get("oversized")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                    "Chunk with single hit should contain the oversized hit"
+                );
+                found_oversized_chunk = true;
 
-                            // Verify the oversized hit is sent alone (preserving order)
-                            assert_eq!(
-                                hits.len(),
-                                1,
-                                "Oversized hit should be sent alone in its own chunk"
-                            );
-                        }
-                    }
-                }
+                // Verify the oversized hit is sent alone (preserving order)
+                assert_eq!(
+                    hits.len(),
+                    1,
+                    "Oversized hit should be sent alone in its own chunk"
+                );
             }
         }
 
@@ -3631,21 +3629,23 @@ mod tests {
 
     #[test]
     fn test_response_skip_serializing_if_set_fields_present() {
-        let mut r = Response::default();
-        r.columns = vec!["col1".to_string()];
-        r.function_error = vec!["err".to_string()];
-        r.response_type = "json".to_string();
-        r.trace_id = "t1".to_string();
-        r.histogram_interval = Some(3600);
-        r.new_start_time = Some(1000);
-        r.new_end_time = Some(2000);
-        r.work_group = Some("wg".to_string());
-        r.order_by = Some(OrderBy::Desc);
-        r.converted_histogram_query = Some("SELECT ...".to_string());
-        r.histogram_breakdown_field = Some("level".to_string());
-        r.is_histogram_eligible = Some(true);
-        r.query_index = Some(3);
-        r.peak_memory_usage = Some(512.0);
+        let r = Response {
+            columns: vec!["col1".to_string()],
+            function_error: vec!["err".to_string()],
+            response_type: "json".to_string(),
+            trace_id: "t1".to_string(),
+            histogram_interval: Some(3600),
+            new_start_time: Some(1000),
+            new_end_time: Some(2000),
+            work_group: Some("wg".to_string()),
+            order_by: Some(OrderBy::Desc),
+            converted_histogram_query: Some("SELECT ...".to_string()),
+            histogram_breakdown_field: Some("level".to_string()),
+            is_histogram_eligible: Some(true),
+            query_index: Some(3),
+            peak_memory_usage: Some(512.0),
+            ..Default::default()
+        };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("columns"));

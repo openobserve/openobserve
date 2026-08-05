@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <section
     class="grid grid-cols-2 gap-2 p-2 lg:grid-cols-5"
     data-test="rum-sessions-metrics-strip"
-    aria-label="Session metrics summary"
+    :aria-label="t('rum.sessionMetricsAria')"
   >
     <button
       v-for="card in cards"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { durationFormatter } from "@/utils/zincutils";
 
 export type SessionsMetricCardKey = "sessions" | "errors" | "frustrated" | "duration" | "bounced";
@@ -78,7 +78,7 @@ const emit = defineEmits<{
   select: [card: SessionsMetricCardKey];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const rate = (count: number) =>
   props.total > 0 ? `${((count / props.total) * 100).toFixed(1)}%` : "";

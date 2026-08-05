@@ -13,12 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 // ── Replay state machine ──────────────────────────────────────────────────────
-export type ReplayPhase = "idle" | "running" | "passed" | "failed" | "stopped";
+// `stopping` is the interval between the user pressing Stop and the extension
+// confirming it: the run is no longer advancing but is not yet torn down, so the
+// UI must neither offer Re-run nor claim the journey has stopped.
+export type ReplayPhase = "idle" | "running" | "stopping" | "passed" | "failed" | "stopped";
 
 /** Machine-readable error from the extension's replay pipeline. */
 export interface StructuredError {
-  message: string;
+  message: I18nText;
   name?: string; // "TimeoutError" | "TargetClosedError" | "Error"
   stack?: string;
   actionName?: string;
@@ -242,7 +247,7 @@ export interface WireStep {
   endTime?: number;
   pageAlias?: string;
   framePath?: string[];
-  description?: string;
+  description?: I18nText;
 }
 
 /** Commands the web app sends to the extension via `chrome.runtime.sendMessage`. */
@@ -452,14 +457,14 @@ export interface BrowserCheckSchedule {
 export interface SyntheticsFolder {
   folderId: string;
   name: string;
-  description?: string;
+  description?: I18nText;
 }
 
 // Available probe location returned by GET /api/{org}/synthetics/locations
 export interface SyntheticsLocation {
   id: string;
   /** Display label — user/agent-chosen (private) or o2's friendly name (public). */
-  label: string;
+  label: I18nText;
   region: string;
   provider: string;
   /** "public" (o2-operated) | "private" (customer agent) — absent in old payloads. */
@@ -489,7 +494,7 @@ export interface AgentSetup {
 // Full location record for admin/settings panel (GET /api/{org}/synthetics/locations)
 export interface SyntheticsLocationRecord {
   id: string;
-  label: string;
+  label: I18nText;
   region: string;
   provider: string;
   enabled: boolean;
@@ -499,7 +504,7 @@ export interface SyntheticsLocationRecord {
 
 export interface SyntheticsDevice {
   id: string;
-  label: string;
+  label: I18nText;
   width: number;
   height: number;
 }
@@ -515,7 +520,7 @@ export interface BrowserCheck {
   id?: string;
   name: string;
   url: string;
-  description?: string;
+  description?: I18nText;
   enabled: boolean;
   folder?: string;
   tags: string[];
@@ -555,7 +560,7 @@ export interface BrowserCheck {
 export interface SyntheticLocation {
   id: string;
   /** Display label — user/agent-chosen (private) or o2's friendly name (public). */
-  label: string;
+  label: I18nText;
   region: string;
   provider: string;
   kind: "public" | "private";
@@ -571,7 +576,10 @@ export interface SyntheticLocation {
   /** Name of the most recently seen agent, live or stale. */
   last_agent_name?: string;
   last_seen_at?: number;
-  monitors_count: number;
+  /** Renamed from `monitors_count`; the optional alias keeps a UI bundle
+   *  working against a server on either side of that rename. */
+  checks_count: number;
+  monitors_count?: number;
   checks_per_min: number;
 }
 

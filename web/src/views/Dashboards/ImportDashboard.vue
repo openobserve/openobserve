@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormInput
                           data-test="dashboard-import-url-control"
                           name="url"
-                          label="URL"
+                          :label="t('common.url')"
                           :placeholder="t('dashboard.addURL')"
                         />
                       </div>
@@ -259,7 +259,7 @@ import {
   reactive,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList } from "../../utils/commons.js";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -289,7 +289,7 @@ export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();

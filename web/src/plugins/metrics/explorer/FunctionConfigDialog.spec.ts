@@ -168,7 +168,10 @@ describe("FunctionConfigDialog", () => {
 
       for (const variant of defaults.variants) {
         expect(tile(wrapper, variant.id).exists()).toBe(true);
-        expect(tile(wrapper, variant.id).text()).toContain(variant.label);
+        // Static names moved to an i18n `labelKey`; `label` remains only for dynamic
+        // names (topk's). Mirror the dialog's precedence.
+        const expected = variant.labelKey ? i18n.global.t(variant.labelKey) : variant.label;
+        expect(tile(wrapper, variant.id).text()).toContain(expected);
       }
     });
 

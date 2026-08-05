@@ -14,9 +14,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Composable that orchestrates field value capture from both data sources:
- *   1. Values API — field expansion in FieldList
- *   2. Search result hits — Run Query results
+ * Persisted field VALUES, for autocomplete. Not a composable — plain functions
+ * over IndexedDB, which is why it carries no `use` prefix and sits beside
+ * fieldValueDB.ts. (It was `useFieldValueStore`, one character from the real
+ * composable `useFieldValuesStream`, and the two were mistaken for each other.)
+ *
+ * THE ONLY TWO WRITERS, and neither is tied to a stream type:
+ *   1. captureFromValuesApi   — expanding a field in the sidebar. Reached from
+ *      logs, traces and pipeline, via useFieldValuesStream.
+ *   2. captureFromSearchHits  — Run Query results. Its one caller lives under
+ *      composables/useLogs/, which is the Logs PAGE, not the logs stream TYPE:
+ *      it captures under whichever type was searched, and that page's stream
+ *      selector covers metrics and traces too.
+ *
+ * So the rule is "values come from what has been SEARCHED or EXPANDED", never
+ * "values are logs-only". A stream nobody has looked at yet simply has none;
+ * that is a cold cache, not a missing capability.
  *
  * All IndexedDB writes are scheduled via requestIdleCallback so they have
  * zero impact on main-thread rendering. Reads use an in-memory cache
@@ -24,6 +37,7 @@
  */
 
 import * as fieldValueDB from "@/composables/fieldValueDB";
+import streamService from "@/services/stream";
 import { extractValuesFromHits } from "@/utils/fieldValueUtils";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
@@ -34,6 +48,24 @@ const MAX_VALUES_PER_FIELD = Number((import.meta as any).env?.VITE_MAX_FIELD_VAL
 // Total IDB record cap across all orgs/streams/fields combined. Prevents the
 // browser's IndexedDB storage from growing forever. Overridable via .env.
 const MAX_FIELDS_STORED = Number((import.meta as any).env?.VITE_MAX_FIELDS_STORED ?? 5000);
+
+// How far back to look when asking the server for values a cold cache has never
+// seen. Recent values are the useful ones for completion, and a narrow window
+// keeps the scan small.
+const VALUES_LOOKBACK_MS = 15 * 60 * 1000;
+
+// How many values one request asks for. A dropdown shows a handful; the
+// endpoint charges for the rest.
+const VALUES_REQUEST_SIZE = 10;
+
+// How long to wait for the endpoint before giving up. services/http.ts has its
+// axios timeout commented out, so nothing upstream ends a stalled request.
+const VALUES_REQUEST_TIMEOUT_MS = 10_000;
+
+// How long to wait before asking again about a field that answered with nothing
+// — or whose request failed. NOT permanent: a transient 500, or one quiet
+// fifteen-minute window, must not disable a field's values for the session.
+const VALUES_RETRY_COOLDOWN_MS = 60_000;
 
 // How long a field's values stay valid in IDB after the last write.
 // Sliding window — every new write resets the clock. Overridable via .env (unit: days).
@@ -52,7 +84,12 @@ const READ_CACHE_MAX_ENTRIES = 500;
 
 export interface StreamContext {
   org: string;
-  streamType: string; // 'logs' | 'metrics' | 'traces'
+  /**
+   * Whichever type the caller searched or expanded — all three are stored and
+   * read back the same way. Part of the key, never a filter on what may be
+   * captured.
+   */
+  streamType: "logs" | "metrics" | "traces" | (string & {});
   streamName: string;
 }
 
@@ -207,4 +244,103 @@ export const getFieldValuesForSuggestion = async (
   } catch {
     return [];
   }
+};
+
+// ─── On-demand fetch ─────────────────────────────────────────────────────────
+
+// Shared at module scope on purpose: every editor on the page asks the same
+// questions, and the point of both maps is that the second asker pays nothing.
+const inFlightRequests = new Map<string, Promise<string[]>>();
+const suppressedUntil = new Map<string, number>();
+
+/**
+ * Ask the server for a field's recent values, and leave them in the cache.
+ *
+ * Both capture paths are byproducts of something the user already did — a Run
+ * Query, or expanding a field in the sidebar — so a stream nobody has touched
+ * has no values at all and the editor quietly offers the field list instead.
+ * This is the path for that case.
+ *
+ * Writes through captureFromValuesApi rather than to IndexedDB directly,
+ * because that is what invalidates the read cache: the caller has just read
+ * this key and primed it with an EMPTY list, and without invalidation the next
+ * keystroke would still see nothing for a minute.
+ *
+ * Never throws, and never blocks anything that matters — see the callers, which
+ * do not await it.
+ */
+export const requestFieldValues = async (
+  ctx: StreamContext,
+  fieldName: string,
+): Promise<string[]> => {
+  if (!fieldName || !ctx.org || !ctx.streamType || !ctx.streamName) return [];
+
+  const key = makeKey(ctx, fieldName);
+
+  const until = suppressedUntil.get(key);
+  if (until !== undefined && Date.now() < until) return [];
+
+  const existing = inFlightRequests.get(key);
+  if (existing) return existing;
+
+  const endMicros = Date.now() * 1000;
+
+  // The timeout races the request, and the cleanup hangs off the RACE rather
+  // than off the request: a promise that never settles would never run its own
+  // finally, which is precisely the state being guarded against.
+  const request = (async (): Promise<string[]> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const response: any = await Promise.race([
+        streamService.fieldValues({
+          org_identifier: ctx.org,
+          stream_name: ctx.streamName,
+          fields: [fieldName],
+          size: VALUES_REQUEST_SIZE,
+          start_time: endMicros - VALUES_LOOKBACK_MS * 1000,
+          end_time: endMicros,
+          // Without this a metrics or traces stream is read as logs, and
+          // answers with nothing.
+          type: ctx.streamType,
+          no_count: true,
+        }),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("field values request timed out")),
+            VALUES_REQUEST_TIMEOUT_MS,
+          );
+        }),
+      ]);
+
+      const values: string[] = (response?.data?.hits?.[0]?.values ?? [])
+        .map((entry: any) => String(entry?.zo_sql_key ?? ""))
+        .filter((value: string) => value.length > 0);
+
+      if (values.length) {
+        // The read cache is filled HERE, synchronously, so the next keystroke
+        // is local. captureFromValuesApi persists to IndexedDB on
+        // requestIdleCallback — up to two seconds away, and observed in the app
+        // as a list still showing field names long after the values had
+        // arrived. Persistence can wait; the next lookup cannot.
+        setCacheEntry(key, values);
+        captureFromValuesApi(
+          ctx,
+          fieldName,
+          values.map((value) => ({ key: value })),
+        );
+      } else suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
+
+      return values;
+    } catch {
+      // Failed, or took too long to matter. Either way, wait before asking again.
+      suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
+      return [];
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+      inFlightRequests.delete(key);
+    }
+  })();
+
+  inFlightRequests.set(key, request);
+  return request;
 };

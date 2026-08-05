@@ -24,7 +24,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { ingestTestData, waitForStreamData } = require('../utils/data-ingestion.js');
 const MonacoEditorHelper = require('../utils/MonacoEditorHelper.js');
 
 // ============================================================================
@@ -130,18 +130,47 @@ async function waitForFieldInIndexedDB(page, org, streamType, streamName, fieldN
 }
 
 /**
- * Click a field expand button and wait for the values_stream response that
- * carries the values back to the page (which then schedules the IDB write).
- * Replaces the legacy `click → waitForTimeout(2000)` pattern with a deterministic
- * wait keyed on the actual /_values_stream response.
+ * Expand a field in the sidebar and deterministically capture its values.
+ *
+ * The sidebar expand fires a /_values_stream fetch; the page then schedules an
+ * IndexedDB write from that response. The legacy pattern here was
+ * `click → poll IndexedDB(10s)`, but the 10s window started at CLICK time and so
+ * raced a slow-runner fetch: under CI load /_values_stream could land AFTER the
+ * poll had already given up, leaving the record null even though the data
+ * existed (3848 rows are ingested at shard start). This anchors the IndexedDB
+ * wait AFTER the values response instead of racing it, which removes the flake.
+ *
+ * Matches any /_values_stream response (the click triggers exactly one, for this
+ * field) rather than the exact `fields=` encoding, so it is robust to how the
+ * field name is serialised. The OSS test env serves values over HTTP/SSE, so the
+ * response reliably surfaces to waitForResponse; the wait is still best-effort
+ * (`.catch`) so any non-HTTP transport falls straight through to the IDB poll.
+ *
+ * @returns the IndexedDB record ({ values, ... }) or null if none was captured.
  */
-async function clickFieldExpandAndWaitValues(page, button, fieldName) {
-    const valuesPromise = page.waitForResponse(
-        (r) => r.url().includes('_values_stream') && r.url().includes(`fields=${fieldName}`),
-        { timeout: 15000 }
+async function expandFieldAndCaptureValues(page, button, orgName, streamName, fieldName) {
+    const waitValues = () => page.waitForResponse(
+        (r) => r.url().includes('_values_stream'),
+        { timeout: 20000 }
     ).catch(() => null);
+
+    let valuesResponse = waitValues();
     await button.click();
-    await valuesPromise;
+    let responded = await valuesResponse;
+
+    // If the click collapsed an already-expanded panel (no values fetch fired —
+    // e.g. a prior retry round left this field open), re-click to expand and
+    // re-arm the wait. Guarded on `responded` so a field that DID fetch is never
+    // toggled back shut.
+    if (!responded) {
+        valuesResponse = waitValues();
+        await button.click().catch(() => {});
+        responded = await valuesResponse;
+    }
+
+    // The IDB write happens within a beat of the response landing, so an 8s
+    // window post-response is ample (vs. the old 10s racing from click time).
+    return await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 8000);
 }
 
 /**
@@ -339,55 +368,75 @@ async function runQueryAndWaitForResults(page, pm) {
 }
 
 /**
- * Find a field that has string values (not purely numeric or boolean)
- * Iterates through available fields until finding one with string values
- * Returns { fieldName, stringValue, record } or null if none found
+ * Pick the first genuine string value (not numeric / boolean) from a captured
+ * IndexedDB record. Returns { fieldName, stringValue, record } or null.
  */
-async function findFieldWithStringValues(page, pm, orgName, streamName, maxAttempts = 5) {
-    const fieldButtons = pm.logsPage.getAllFieldExpandButtons();
-    const buttonCount = await fieldButtons.count();
+function pickStringValue(fieldName, record) {
+    if (record && record.values && record.values.length > 0) {
+        const stringValue = record.values.find(v =>
+            isNaN(Number(v)) && v !== 'true' && v !== 'false'
+        );
+        if (stringValue) {
+            testLogger.info(`Found string field: ${fieldName} with value: ${stringValue}`);
+            return { fieldName, stringValue, record };
+        }
+    }
+    return null;
+}
 
+/**
+ * Find a field that has string values (not purely numeric or boolean).
+ * Iterates through available fields until finding one with string values,
+ * capturing each via expandFieldAndCaptureValues (response-anchored, no
+ * click-time race). If a full pass captures nothing, re-runs the query to
+ * refresh the field-values context and re-scans — bounded by `maxRounds` so a
+ * genuinely value-less stream still fails in a reasonable time rather than
+ * hanging. Returns { fieldName, stringValue, record } or null if none found.
+ */
+async function findFieldWithStringValues(page, pm, orgName, streamName, maxAttempts = 6, maxRounds = 2) {
     // Try known string fields first - these are more likely to have string values
     const preferredStringFields = ['kubernetes_container_name', 'level', 'log', 'kubernetes_pod_name', 'kubernetes_namespace_name'];
 
-    for (const preferredField of preferredStringFields) {
-        const preferredButton = pm.logsPage.getFieldExpandButton(preferredField);
-        if (await preferredButton.count() > 0) {
-            await preferredButton.click();
+    const scanOnce = async () => {
+        const fieldButtons = pm.logsPage.getAllFieldExpandButtons();
+        const buttonCount = await fieldButtons.count();
 
-            const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, preferredField, 10000);
-            if (record && record.values && record.values.length > 0) {
-                const stringValue = record.values.find(v =>
-                    isNaN(Number(v)) && v !== 'true' && v !== 'false'
-                );
-                if (stringValue) {
-                    testLogger.info(`Found string field: ${preferredField} with value: ${stringValue}`);
-                    return { fieldName: preferredField, stringValue, record };
-                }
+        for (const preferredField of preferredStringFields) {
+            const preferredButton = pm.logsPage.getFieldExpandButton(preferredField);
+            if (await preferredButton.count() > 0) {
+                const record = await expandFieldAndCaptureValues(page, preferredButton, orgName, streamName, preferredField);
+                const hit = pickStringValue(preferredField, record);
+                if (hit) return hit;
             }
         }
-    }
 
-    // Fallback: iterate through all fields
-    for (let i = 0; i < Math.min(buttonCount, maxAttempts); i++) {
-        const button = fieldButtons.nth(i);
-        const dataTest = await button.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
+        // Fallback: iterate through all fields
+        for (let i = 0; i < Math.min(buttonCount, maxAttempts); i++) {
+            const button = fieldButtons.nth(i);
+            const dataTest = await button.getAttribute('data-test');
+            const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
 
-        // Skip if already expanded (part of preferred fields)
-        if (preferredStringFields.includes(fieldName)) continue;
+            // Skip if already expanded (part of preferred fields)
+            if (preferredStringFields.includes(fieldName)) continue;
 
-        await button.click();
+            const record = await expandFieldAndCaptureValues(page, button, orgName, streamName, fieldName);
+            const hit = pickStringValue(fieldName, record);
+            if (hit) return hit;
+        }
 
-        const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, fieldName, 10000);
-        if (record && record.values && record.values.length > 0) {
-            const stringValue = record.values.find(v =>
-                isNaN(Number(v)) && v !== 'true' && v !== 'false'
-            );
-            if (stringValue) {
-                testLogger.info(`Found string field: ${fieldName} with value: ${stringValue}`);
-                return { fieldName, stringValue, record };
-            }
+        return null;
+    };
+
+    for (let round = 0; round < maxRounds; round++) {
+        const result = await scanOnce();
+        if (result) return result;
+
+        // No field yielded values this pass — the /_values backend may have
+        // transiently returned empty (index still catching up under load).
+        // Re-run the query to refresh the field-values context, then re-scan.
+        if (round < maxRounds - 1) {
+            testLogger.warn(`findFieldWithStringValues: no values captured on round ${round + 1}/${maxRounds}, refreshing and retrying`);
+            await runQueryAndWaitForResults(page, pm).catch(() => {});
         }
     }
 
@@ -417,6 +466,14 @@ test.describe("Autocomplete Value Suggestions", () => {
 
         // Ingest test data
         await ingestTestData(page);
+
+        // Readiness gate: freshly-ingested data is not queryable immediately
+        // (WAL -> index lag). The value-capture flow reads the same index that
+        // /_search does, so gate on the stream being searchable before driving
+        // the UI — otherwise field expansion can fetch an empty value set and the
+        // IndexedDB capture never populates. Best-effort so an already-warm
+        // shared stream doesn't block on a slow poll.
+        await waitForStreamData(page, streamName, 1).catch(() => {});
 
         // Navigate to logs page
         await page.goto(
@@ -780,6 +837,9 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         pm = new PageManager(page);
         await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
+        // Gate on the stream being searchable before driving the UI so field
+        // expansion never fetches an empty value set (WAL -> index lag).
+        await waitForStreamData(page, streamName, 1).catch(() => {});
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await page.waitForLoadState('domcontentloaded');
     });
@@ -1012,6 +1072,9 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         pm = new PageManager(page);
         await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
+        // Gate on the stream being searchable before driving the UI so field
+        // expansion never fetches an empty value set (WAL -> index lag).
+        await waitForStreamData(page, streamName, 1).catch(() => {});
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await page.waitForLoadState('domcontentloaded');
     });
@@ -1031,10 +1094,11 @@ test.describe("Autocomplete Value Suggestions - Quoting Behavior", () => {
         // Find the field expand button for 'code'
         const codeFieldBtn = pm.logsPage.getFieldExpandButton('code');
         await codeFieldBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await codeFieldBtn.click();
 
-        // Wait for values in IndexedDB - assert values were captured
-        const record = await waitForFieldInIndexedDB(page, orgName, 'logs', streamName, 'code', 15000);
+        // Response-anchored capture (not a click-time IDB race): waits for the
+        // /_values_stream fetch before confirming the IndexedDB write, so a slow
+        // runner can't make this null even though the data exists.
+        const record = await expandFieldAndCaptureValues(page, codeFieldBtn, orgName, streamName, 'code');
         expect(record, 'Expected IndexedDB record for code field').not.toBeNull();
         expect(record.values.length, 'Expected captured values for code field').toBeGreaterThan(0);
 
@@ -1135,6 +1199,9 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         pm = new PageManager(page);
         await page.waitForLoadState('domcontentloaded');
         await ingestTestData(page);
+        // Gate on the stream being searchable before driving the UI so field
+        // expansion never fetches an empty value set (WAL -> index lag).
+        await waitForStreamData(page, streamName, 1).catch(() => {});
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await page.waitForLoadState('domcontentloaded');
     });

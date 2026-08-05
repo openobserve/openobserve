@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   icon-left="account-tree"
-                  :title="'Associated Pipelines'"
+                  :title="t('function.associatedPipelines')"
                   data-row-action="view"
                   @click="getAssociatedPipelines({ row })"
                 />
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="openBulkDeleteDialog"
                   icon-left="delete"
                 >
-                  Delete
+                  {{ t("common.delete") }}
                 </OButton>
               </div>
             </template>
@@ -179,16 +179,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <ConfirmDialog
-      title="Delete Transform"
-      message="Are you sure you want to delete transform?"
+      :title="t('function.deleteTransformDialogTitle')"
+      :message="t('function.deleteTransformConfirmMessage')"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Functions"
-      :message="`Are you sure you want to delete ${selectedFunctions.length} function(s)?`"
+      :title="t('function.deleteFunctionsDialogTitle')"
+      :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmForceDelete"
       persistent
       size="md"
-      :title="`Pipelines Associated with ${selectedDelete?.name}`"
+      :title="t('common.pipelinesAssociatedWith', { name: selectedDelete?.name })"
     >
       <div v-if="transformedPipelineList.length > 0" class="max-h-50 overflow-y-auto">
         <ul class="scrollable-list m-0 flex list-none flex-col p-0">
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="text-center text-xl font-semibold">
-          No pipelines associated with this function
+          {{ t("function.noPipelinesAssociated") }}
         </div>
       </div>
     </ODialog>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -273,7 +273,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -333,7 +333,7 @@ export default defineComponent({
       // return ;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading functions...",
+        message: t("toastMessages.functions.pleaseWaitWhileLoadingFunctions"),
         timeout: 0,
       });
 
@@ -375,7 +375,7 @@ export default defineComponent({
           if (err?.response?.status && err?.response?.status != 403) {
             toast({
               variant: "error",
-              message: "Error while pulling function.",
+              message: t("toastMessages.functions.errorWhilePullingFunction"),
             });
           }
         })
@@ -499,11 +499,10 @@ export default defineComponent({
           if (err.response.data.code == 409) {
             toast({
               variant: "error",
-              message:
-                "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+              message: t("toastMessages.functions.functionDeletionAssociatedPipelines"),
               timeout: 10000,
               action: {
-                label: "View",
+                label: t("toastMessages.functions.view"),
                 handler: () => {
                   forceRemoveFunction(err.response.data["message"]);
                 },
@@ -514,7 +513,9 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               variant: "error",
-              message: JSON.stringify(err.response.data["message"]) || "Function deletion failed.",
+              message: raw(
+                JSON.stringify(err.response.data["message"]) || "Function deletion failed.",
+              ),
             });
           }
         });
@@ -601,7 +602,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting functions...",
+        message: t("toastMessages.functions.deletingFunctions"),
         timeout: 0,
       });
 
@@ -609,7 +610,7 @@ export default defineComponent({
         if (selectedFunctions.value.length === 0) {
           toast({
             variant: "error",
-            message: "No functions selected for deletion",
+            message: t("toastMessages.functions.noFunctionsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -638,27 +639,34 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.functions.functionsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} function(s)`,
+              message: t("toastMessages.functions.failedToDeleteFunctions", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} function(s) deleted successfully`,
+              message: t("toastMessages.functions.functionsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedFunctions.value.length} function(s) deleted successfully`,
+            message: t("toastMessages.functions.functionsDeletedSuccessfully", {
+              count: selectedFunctions.value.length,
+            }),
           });
         }
 

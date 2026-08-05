@@ -65,10 +65,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
+          :default-columns="false"
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-synthetics-tokens"
           filter-mode="client"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          sorting="client"
+          show-index
+          :footer-title="t('synthetics.tokens.title')"
         >
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
@@ -86,10 +93,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               icon-left="refresh"
               :loading="loading"
-              :title="t('common.refresh')"
               data-test="synthetics-tokens-refresh-btn"
               @click="fetchTokens"
-            />
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="syntheticsTokensRefresh"
+              />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -126,9 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-status="{ row }">
-            <OBadge :variant="row.enabled ? 'success' : 'default'" :dot="true" size="sm">
-              {{ row.enabled ? t("common.enable") : t("common.disable") }}
-            </OBadge>
+            <OTag type="featureStatus" :value="row.enabled ? 'enabled' : 'disabled'" />
           </template>
 
           <template #cell-created_by="{ row }">
@@ -262,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -272,7 +282,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -284,6 +293,8 @@ import {
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import syntheticsService from "@/services/synthetics";
 import type { AgentSetup } from "@/types/synthetics";
 
@@ -310,13 +321,12 @@ export default defineComponent({
     OForm,
     OFormInput,
     OTable,
-    OBadge,
     OTag,
     OUserCell,
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const createTokenSchema = makeCreateTokenSchema(t);
 
@@ -505,11 +515,11 @@ export default defineComponent({
       if (!token) return;
       // Single toast: let the clipboard util own the notification with the
       // token-specific message, instead of firing a second generic one.
-      copyToClipboard(token, { successMessage: t("synthetics.tokens.copiedToast") });
+      copyToClipboard(token, t, { successMessage: t("synthetics.tokens.copiedToast") });
     };
 
     const copyCommand = () => {
-      if (installCommand.value) copyToClipboard(installCommand.value);
+      if (installCommand.value) copyToClipboard(installCommand.value, t);
     };
 
     const fetchAgentSetup = async () => {
@@ -528,6 +538,28 @@ export default defineComponent({
       fetchTokens();
       fetchAgentSetup();
     });
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "syntheticsTokensAdd",
+        handler: () => {
+          if (!isInputFocused()) showCreateForm.value = true;
+        },
+      },
+      {
+        id: "syntheticsTokensRefresh",
+        handler: () => {
+          if (!isInputFocused()) fetchTokens();
+        },
+      },
+      {
+        id: "syntheticsTokensFocusSearch",
+        handler: () => {
+          focusSearchInput("synthetics-tokens-search-input");
+        },
+      },
+    ]);
 
     return {
       t,

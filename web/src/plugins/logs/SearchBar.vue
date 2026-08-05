@@ -1318,6 +1318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :query="searchObj.data.query"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
+                :field-value-resolver="resolveFieldValues"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -1379,7 +1380,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :hide-nl-toggle="false"
                       :has-expand-button="true"
                       :disable-ai="isVrlEditorDisabled"
-                      :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
+                      :disable-ai-reason="
+                        isVrlEditorDisabled ? t('search.vrlOnlyForTableWarning') : ''
+                      "
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"
@@ -1886,7 +1889,7 @@ import {
   defineAsyncComponent,
   onBeforeUnmount,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -2193,7 +2196,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
@@ -2201,14 +2204,14 @@ export default defineComponent({
     const savedViewColumns = [
       {
         id: "view_name",
-        header: "",
+        header: raw(""),
         accessorKey: "view_name",
         sortable: false,
         meta: { align: "left" },
       },
       {
         id: "actions",
-        header: "",
+        header: raw(""),
         isAction: true,
         sortable: false,
         size: 30,
@@ -2218,7 +2221,7 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
-    const { buildSearch } = useSearchStream();
+    const { buildSearch } = useSearchStream(t);
 
     const {
       fnParsedSQL,
@@ -2230,14 +2233,20 @@ export default defineComponent({
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
-      useSearchBar();
+      useSearchBar(t);
     const { loadStreamLists, extractFields } = useStreamFields();
     const { cancelPatterns } = usePatterns();
 
-    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule, getHistogramTitle } =
-      useLogs();
+    const {
+      refreshData,
+      handleRunQuery,
+      getJobData,
+      routeToSearchSchedule,
+      getHistogramTitle,
+      getHistogramTitleParts,
+    } = useLogs(t);
 
-    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
+    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams(t);
     const queryEditorRef = ref(null);
     const syntaxGuideRef = ref(null);
 
@@ -2391,6 +2400,7 @@ export default defineComponent({
       updateFieldKeywords,
       updateFunctionKeywords,
       updateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     const refreshTimeChange = (item) => {
@@ -4618,7 +4628,8 @@ export default defineComponent({
           searchObj.data?.queryResults?.hits && searchObj.data.queryResults.hits.length > 0;
 
         if (hasLogs) {
-          searchObj.data.histogram.chartParams.title = getHistogramTitle(false);
+          searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
         }
       }
 
@@ -4627,7 +4638,7 @@ export default defineComponent({
     };
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // [START] cancel running queries
 
@@ -4661,7 +4672,7 @@ export default defineComponent({
         };
       }
     });
-    const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery(t);
 
     const cancelVisualizeQueries = () => {
       // Filter out the dummy id before sending to backend cancel API
@@ -4943,6 +4954,7 @@ export default defineComponent({
       autoCompleteKeywords,
       autoCompleteSuggestions,
       effectiveKeywords,
+      resolveFieldValues,
       effectiveSuggestions,
       onRefreshIntervalUpdate,
       updateTimezone,

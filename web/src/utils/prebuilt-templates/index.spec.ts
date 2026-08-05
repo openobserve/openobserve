@@ -51,12 +51,12 @@ describe("Prebuilt Templates Index", () => {
       PREBUILT_DESTINATION_TYPES.forEach((type) => {
         expect(type).toHaveProperty("id");
         expect(type).toHaveProperty("name");
-        expect(type).toHaveProperty("description");
+        expect(type).toHaveProperty("descriptionKey");
         expect(type).toHaveProperty("icon");
         expect(type).toHaveProperty("category");
         expect(typeof type.popular).toBe("boolean");
         expect(typeof type.name).toBe("string");
-        expect(typeof type.description).toBe("string");
+        expect(typeof type.descriptionKey).toBe("string");
         expect(["messaging", "incident", "email", "custom"]).toContain(type.category);
       });
     });

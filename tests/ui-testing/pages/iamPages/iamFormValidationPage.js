@@ -36,8 +36,7 @@ export class IamFormValidationPage {
         this.groupCancelBtn        = '[data-test="add-group-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // ── Role form ─────────────────────────────────────────────────────────
-        // Add role button in AppRoles.vue currently uses this data-test value
-        this.addRoleButton         = '[data-test="alert-list-add-alert-btn"]';
+        this.addRoleButton         = '[data-test="iam-roles-add-role-btn"]';
         this.roleDialog            = '[data-test="add-role-dialog"]';
         // OInput data-test="add-role-rolename-input-btn" → -field / -error
         this.roleNameInput         = '[data-test="add-role-rolename-input-btn-field"]';

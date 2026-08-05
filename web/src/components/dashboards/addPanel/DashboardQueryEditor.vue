@@ -62,9 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
                 class="cursor-pointer text-xs whitespace-nowrap select-none"
-                :title="'Double-click to rename'"
+                :title="t('dashboard.doubleClickToRename')"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
-                >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
+                >{{ tab.tabName || t("common.queryNumber", { index: Number(index) + 1 }) }}</span
               >
               <!-- Eye icon + its tooltip wrapped in a span so the tooltip's
                    trigger is scoped to JUST the icon, not the entire OTab. -->
@@ -184,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :keywords="currentEditorKeywords"
                 :suggestions="currentEditorSuggestions"
+                :field-value-resolver="resolveFieldValues"
                 @update:query="handleQueryUpdate"
                 @focus="_sqlOnFocus"
                 @blur="_sqlOnBlur"
@@ -211,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :hide-nl-toggle="false"
                     :disable-ai="false"
-                    :disable-ai-reason="''"
+                    :disable-ai-reason="raw('')"
                     :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                     :ai-tooltip="t('function.enterFunctionPrompt')"
                     editor-height="100%"
@@ -276,7 +277,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
 import { defineComponent, ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
@@ -342,7 +343,7 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification, showPositiveNotification } = useNotifications();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
@@ -364,11 +365,6 @@ export default defineComponent({
         }
 
         store.state.organizationData.functions.map((data: any) => {
-          const args: any = [];
-          for (let i = 0; i < parseInt(data.num_args); i++) {
-            args.push("'${1:value}'");
-          }
-
           functionList.value.push({
             name: data.name,
             function: data.function,
@@ -418,7 +414,7 @@ export default defineComponent({
       addQuery,
       removeQuery,
       selectedStreamFieldsBasedOnUserDefinedSchema,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const splitterModel = ref(
       promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70,
@@ -448,6 +444,7 @@ export default defineComponent({
       getSuggestions: sqlGetSuggestions,
       updateAllKeywords: sqlUpdateAllKeywords,
       updateStreamKeywords: sqlUpdateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     const queryEditorRef = ref<QueryEditorInstance | null>(null);
@@ -647,6 +644,27 @@ export default defineComponent({
         sqlUpdateStreamKeywords((newResults ?? []).map((stream: any) => ({ name: stream.name })));
       },
       { immediate: true },
+    );
+
+    // Field VALUES are looked up under "org|streamType|streamName|field", so the
+    // resolver returns nothing at all until this is set. Tracked per QUERY, not
+    // per panel: each tab has its own stream, and switching tabs must not leave
+    // the previous tab's values on offer. A multi-stream query is keyed on its
+    // primary stream — the same one the Fields panel is built from.
+    watch(
+      [
+        () => dashboardPanelData.layout.currentQueryIndex,
+        () =>
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields,
+      ],
+      () => {
+        const fields =
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
+        sqlAutoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+        sqlAutoCompleteData.value.streamType = String(fields?.stream_type ?? "");
+        sqlAutoCompleteData.value.streamName = String(fields?.stream ?? "");
+      },
+      { immediate: true, deep: true },
     );
 
     const removeTab = async (rawIndex: string | number) => {
@@ -892,6 +910,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       router,
       onDropDownClick,
@@ -937,6 +956,7 @@ export default defineComponent({
       saveQueryName,
       cancelQueryNameEdit,
       currentEditorKeywords,
+      resolveFieldValues,
       currentEditorSuggestions,
       _sqlOnFocus,
       _sqlOnBlur,

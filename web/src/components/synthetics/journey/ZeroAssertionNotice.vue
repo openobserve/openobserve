@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * Dismissible on purpose: an author who has decided is not told twice.
  */
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { BrowserStep } from "@/types/synthetics";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -39,7 +39,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps<{ steps: BrowserStep[] }>();
 const emit = defineEmits<{ "add-assertion": [value: BrowserStep] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const dismissed = ref(false);
 
@@ -67,12 +67,12 @@ function addAssertion() {
 <template>
   <div
     v-if="show"
-    class="rounded-surface bg-warning-50 mb-3 flex flex-col gap-2 border border-[var(--color-warning-300)] px-3 py-3"
+    class="rounded-surface bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mb-3 flex flex-col gap-2 border px-3 py-3"
     role="status"
     data-test="synthetics-journey-zero-assertion-notice"
   >
     <div class="flex items-center gap-2">
-      <OIcon name="fact-check" size="sm" class="text-warning-600" aria-hidden="true" />
+      <OIcon name="fact-check" size="sm" class="text-badge-warning-ol-text" aria-hidden="true" />
       <span class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.journey.zeroAssertionTitle") }}
       </span>

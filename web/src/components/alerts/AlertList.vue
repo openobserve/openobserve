@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="xs"
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
-                            title="Search only this folder"
+                            :title="t('alerts.searchThisFolderTooltip')"
                             >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
                           >
                           <OToggleGroupItem
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="xs"
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
-                            title="Search across all folders"
+                            :title="t('alerts.searchAllFoldersTooltip')"
                             >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
                           >
                         </OToggleGroup>
@@ -207,7 +207,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
                 >
-                  <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
+                  <OTooltip
+                    side="bottom"
+                    :content="t('alerts.reloadAlertsTooltip')"
+                    shortcut-id="alertsRefresh"
+                  />
                 </OButton>
               </template>
 
@@ -248,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     unit="us"
                     mode="relative"
                     :timezone="store.state.timezone"
-                    empty-label="Never"
+                    :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </span>
               </template>
@@ -259,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unit="iso"
                   mode="absolute"
                   :timezone="store.state.timezone"
-                  empty-label="Never"
+                  :empty-label="t('alerts.anomaly.retrainNever')"
                 />
               </template>
 
@@ -382,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 33.14px; height: auto"
                     class="ml-1 flex items-center justify-center"
-                    :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+                    :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -466,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon name="drive-file-move" size="sm" />
                       </template>
-                      Move
+                      {{ t("common.move") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <ODropdownItem
@@ -489,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon size="sm" name="download" />
                       </template>
-                      Export
+                      {{ t("common.export") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <!-- Anomaly Detection: Trigger Detection + Re-train -->
@@ -501,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon size="sm" name="sound-sampler" />
                         </template>
-                        Trigger Detection
+                        {{ t("alerts.triggerDetection") }}
                       </ODropdownItem>
                       <ODropdownItem
                         :data-test="`alert-list-${row.name}-retrain-anomaly`"
@@ -510,7 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon size="sm" name="replay" />
                         </template>
-                        Re-train
+                        {{ t("alerts.retrain") }}
                       </ODropdownItem>
                     </template>
                     <!-- Regular alerts: Trigger Alert item -->
@@ -563,7 +567,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex h-12 w-full items-center justify-between gap-1">
                   <div class="flex min-w-25 items-center text-xs font-normal">
                     <template v-if="selectedAlerts.length > 0"
-                      >{{ selectedAlerts.length }} of {{ resultTotal }} selected</template
+                      >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
+                      {{ t("alerts.selectedLabel") }}</template
                     >
                     <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
                   </div>
@@ -575,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="drive-file-move"
                     @click="moveMultipleAlerts"
-                    >Move</OButton
+                    >{{ t("common.move") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -584,7 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="download"
                     @click="multipleExportAlert"
-                    >Export</OButton
+                    >{{ t("common.export") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -593,7 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="pause"
                     @click="bulkToggleAlerts('pause')"
-                    >Pause</OButton
+                    >{{ t("alerts.pause") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -602,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="play-arrow"
                     @click="bulkToggleAlerts('resume')"
-                    >Resume</OButton
+                    >{{ t("alerts.resume") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -612,7 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="delete"
                     :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
-                    >Delete</OButton
+                    >{{ t("common.delete") }}</OButton
                   >
                 </div>
               </template>
@@ -646,16 +651,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <ConfirmDialog
-      title="Delete Alert"
-      message="Are you sure you want to delete this alert?"
+      :title="t('alerts.deleteAlertTitle')"
+      :message="t('alerts.deleteAlertMessage')"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Alerts"
-      :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
+      :title="t('alerts.deleteAlertsTitle')"
+      :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -678,12 +683,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
-            label="Alert Name"
+            :label="t('alerts.alertName')"
           />
           <OSelect
             data-test="to-be-clone-stream-type"
             v-model="toBeClonestreamType"
-            label="Stream Type"
+            :label="t('alerts.streamType')"
             :options="streamTypes"
             @update:model-value="updateStreams()"
             class="mt-1"
@@ -692,7 +697,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="to-be-clone-stream-name"
             v-model="toBeClonestreamName"
             :disabled="!toBeClonestreamType"
-            label="Stream Name"
+            :label="t('alerts.stream_name')"
             :options="indexOptions"
             searchable
             @update:model-value="updateStreamName"
@@ -740,8 +745,8 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
-import { useI18n } from "vue-i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import templateService from "@/services/alert_templates";
@@ -819,7 +824,7 @@ export default defineComponent({
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -873,7 +878,7 @@ export default defineComponent({
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");
@@ -975,10 +980,18 @@ export default defineComponent({
 
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
-    const runOutcomeTooltip = (row: any): string => {
+    const runOutcomeTooltip = (row: any) => {
       const at = row?.last_outcome_at ? convertUnixToDateFormat(row.last_outcome_at) : null;
-      const label = outcomeLabel(row?.last_outcome);
-      return at ? `${label} ${t("alerts.asOf")} ${at}` : label;
+      // Pass every label: outcomeLabel's own defaults are English.
+      const label = outcomeLabel(
+        row?.last_outcome,
+        t("alerts.historyTimeline.firing"),
+        t("alerts.historyTimeline.ok"),
+        t("alerts.historyTimeline.error"),
+        t("alerts.historyTimeline.skipped"),
+        t("alerts.historyTimeline.unknown"),
+      );
+      return raw(at ? `${label} ${t("alerts.asOf")} ${at}` : label);
     };
 
     // Full-row highlight — only the EXCEPTIONS get a wash, so attention goes to
@@ -1022,6 +1035,9 @@ export default defineComponent({
       let failed = 0;
       let recent = 0;
       for (const r of rows) {
+        // active = unpaused (enabled); paused = disabled. These two partition the
+        // rows. `failed` is an orthogonal health overlay (a failed anomaly is still
+        // active), so it is counted separately and may overlap with active/paused.
         if (r.enabled) active += 1;
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
@@ -1106,7 +1122,13 @@ export default defineComponent({
       if (!f) return rows;
       if (f === "recent")
         return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
-      return rows.filter((r: any) => alertState(r) === f);
+      if (f === "failed")
+        return rows.filter(
+          (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
+        );
+      // active = unpaused (enabled); paused = disabled — matching the summary
+      // counts. A failed anomaly is still active here (failed is an overlay).
+      return rows.filter((r: any) => (f === "active" ? r.enabled : !r.enabled));
     });
     const onStatSelect = (key: string) => {
       if (key === "total") {
@@ -1176,6 +1198,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: COL.status,
+          minSize: 130,
           meta: { align: "left" },
         },
         // "priority" — how much humans care (Feature 2, PT-3). A different
@@ -1284,7 +1307,7 @@ export default defineComponent({
         baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
-          header: "Folder",
+          header: t("alerts.folder"),
           cell: " ",
           sortable: true,
           resizable: true,
@@ -1413,7 +1436,7 @@ export default defineComponent({
       }
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alerts...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
         timeout: 0,
       });
       if (query) {
@@ -1567,7 +1590,7 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "error",
-          message: "Error while pulling alerts.",
+          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
         });
       } finally {
         loading.value = false;
@@ -1576,7 +1599,7 @@ export default defineComponent({
     const getAlertById = async (id: string) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alert...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlert"),
         timeout: 0,
       });
       try {
@@ -1784,7 +1807,7 @@ export default defineComponent({
             console.error("AlertList: Failed to load alert", error);
             toast({
               variant: "error",
-              message: "Failed to load alert for editing",
+              message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
             });
           }
         }
@@ -1809,7 +1832,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching destinations.",
+            message: t("toastMessages.alerts.errorWhileFetchingDestinations"),
           }),
         );
     };
@@ -1825,7 +1848,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching templates.",
+            message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
           }),
         );
     };
@@ -1861,21 +1884,21 @@ export default defineComponent({
         if (!toBeClonestreamType.value) {
           toast({
             variant: "error",
-            message: "Please select stream type ",
+            message: t("toastMessages.alerts.pleaseSelectStreamType"),
           });
           return;
         }
         if (!toBeClonestreamName.value) {
           toast({
             variant: "error",
-            message: "Please select stream name",
+            message: t("toastMessages.alerts.pleaseSelectStreamName"),
           });
           return;
         }
         isSubmitting.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait...",
+          message: t("toastMessages.alerts.pleaseWait"),
           timeout: 0,
         });
         try {
@@ -1893,7 +1916,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: "Anomaly detection cloned successfully",
+            message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
           await getAlertsFn(store, folderIdToBeCloned.value, "", true, true);
@@ -1913,28 +1936,28 @@ export default defineComponent({
       if (!toBeClonedAlert.value) {
         toast({
           variant: "error",
-          message: "Alert not found",
+          message: t("toastMessages.alerts.alertNotFound"),
         });
         return;
       }
       if (!toBeClonestreamType.value) {
         toast({
           variant: "error",
-          message: "Please select stream type ",
+          message: t("toastMessages.alerts.pleaseSelectStreamType"),
         });
         return;
       }
       if (!toBeClonestreamName.value) {
         toast({
           variant: "error",
-          message: "Please select stream name",
+          message: t("toastMessages.alerts.pleaseSelectStreamName"),
         });
         return;
       }
       isSubmitting.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("toastMessages.alerts.pleaseWait"),
         timeout: 0,
       });
 
@@ -1963,7 +1986,7 @@ export default defineComponent({
             if (res.data.code == 200) {
               toast({
                 variant: "success",
-                message: "Alert Cloned Successfully",
+                message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
               await getAlertsFn(store, folderIdToBeCloned.value, "", true, true);
@@ -2142,7 +2165,9 @@ export default defineComponent({
           });
           toast({
             variant: "success",
-            message: isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully",
+            message: isEnabled
+              ? t("toastMessages.alerts.alertResumedSuccessfully")
+              : t("toastMessages.alerts.alertPausedSuccessfully"),
           });
         })
         .finally(() => {
@@ -2267,7 +2292,7 @@ export default defineComponent({
         row.status = "training";
         toast({
           variant: "success",
-          message: "Retraining triggered",
+          message: t("toastMessages.alerts.retrainingTriggered"),
         });
       } catch (error: any) {
         toast({
@@ -2415,7 +2440,7 @@ export default defineComponent({
       if (!query) return;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while searching for dashboards...",
+        message: t("toastMessages.alerts.pleaseWaitWhileSearchingForDashboards"),
         timeout: 0,
       });
       dismiss();
@@ -2486,7 +2511,7 @@ export default defineComponent({
       try {
         const dismiss = toast({
           variant: "loading",
-          message: "Exporting alerts...",
+          message: t("toastMessages.alerts.exportingAlerts"),
           timeout: 0, // Set timeout to 0 to keep it showing until dismissed
         });
 
@@ -2520,7 +2545,9 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "success",
-          message: `Successfully exported ${selectedAlertsToExport.length} alert${selectedAlertsToExport.length > 1 ? "s" : ""}`,
+          message: t("toastMessages.alerts.successfullyExportedAlert", {
+            count: selectedAlertsToExport.length,
+          }),
         });
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
@@ -2528,7 +2555,7 @@ export default defineComponent({
         console.error("Error exporting alerts:", error);
         toast({
           variant: "error",
-          message: "Error exporting alerts. Please try again.",
+          message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
         });
       }
     };
@@ -2599,7 +2626,10 @@ export default defineComponent({
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
       const dismiss = toast({
         variant: "loading",
-        message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
+        message:
+          action === "resume"
+            ? t("toastMessages.alerts.resumingAlerts")
+            : t("toastMessages.alerts.pausingAlerts"),
         timeout: 0,
       });
       try {
@@ -2613,7 +2643,10 @@ export default defineComponent({
         if (alertsToToggle.length === 0) {
           toast({
             variant: "error",
-            message: `No alerts to ${action}`,
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.noAlertsToResume")
+                : t("toastMessages.alerts.noAlertsToPause"),
           });
           dismiss();
           return;
@@ -2636,7 +2669,10 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: `Alerts ${action}d successfully`,
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.alertsResumedSuccessfully")
+                : t("toastMessages.alerts.alertsPausedSuccessfully"),
           });
         }
         // Refresh alerts
@@ -2650,7 +2686,10 @@ export default defineComponent({
         console.error(`Error ${action}ing alerts:`, error);
         toast({
           variant: "error",
-          message: `Error ${action}ing alerts. Please try again.`,
+          message:
+            action === "resume"
+              ? t("toastMessages.alerts.errorResumingAlerts")
+              : t("toastMessages.alerts.errorPausingAlerts"),
         });
       }
     };
@@ -2666,7 +2705,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting alerts...",
+        message: t("toastMessages.alerts.deletingAlerts"),
         timeout: 0,
       });
 
@@ -2674,7 +2713,7 @@ export default defineComponent({
         if (selectedAlerts.value.length === 0) {
           toast({
             variant: "error",
-            message: "No alerts selected for deletion",
+            message: t("toastMessages.alerts.noAlertsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -2703,27 +2742,32 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.alertsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} alert(s)`,
+              message: t("toastMessages.alerts.failedToDeleteAlerts", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} alert(s) deleted successfully`,
+              message: t("toastMessages.alerts.alertsDeletedSuccessfully", { count: successCount }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
+            message: t("toastMessages.alerts.alertsDeletedSuccessfully", {
+              count: selectedAlerts.value.length,
+            }),
           });
         }
 
@@ -2801,6 +2845,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       store,
       router,

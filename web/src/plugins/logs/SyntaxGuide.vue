@@ -223,8 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, type PropType } from "vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -242,8 +242,8 @@ export default defineComponent({
       default: false,
     },
     label: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     menuItem: {
       type: Boolean,
@@ -256,9 +256,10 @@ export default defineComponent({
   },
   components: { OButton, OTooltip, OIcon, ODropdown },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     return {
+      raw,
       t,
       store,
     };

@@ -176,8 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <ConfirmDialog
-      title="Reset RUM Token"
-      message="Are you sure you want to update rum token for this organization?"
+      :title="t('ingestion.resetRUMTokenLabel')"
+      :message="t('ingestion.updateRUMTokenMessage')"
       @update:ok="updateRUMToken"
       @update:cancel="confirmRUMUpdate = false"
       v-model="confirmRUMUpdate"
@@ -213,7 +213,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onMounted, onUpdated, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -233,7 +233,7 @@ export default defineComponent({
   name: "PageIngestion",
   components: { OPageLayout, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput, OSelect },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const route = useRoute();
@@ -373,7 +373,7 @@ export default defineComponent({
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
-              message: "Passcode not found.",
+              message: t("toastMessages.views.passcodeNotFound"),
               timeout: 5000,
             });
           } else {
@@ -400,13 +400,13 @@ export default defineComponent({
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
-              message: "Passcode not found.",
+              message: t("toastMessages.views.passcodeNotFound"),
               timeout: 5000,
             });
           } else {
             toast({
               variant: "success",
-              message: "Token reset successfully.",
+              message: t("toastMessages.views.tokenResetSuccessfully"),
               timeout: 5000,
             });
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
@@ -418,7 +418,7 @@ export default defineComponent({
           if (e.response.status != 403) {
             toast({
               variant: "error",
-              message: "Error while updating Token." + e.error,
+              message: t("toastMessages.views.errorWhileUpdatingToken", { error: e.error }),
               timeout: 5000,
             });
           }
@@ -461,9 +461,9 @@ export default defineComponent({
     };
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
@@ -488,7 +488,7 @@ export default defineComponent({
           getRUMToken();
           toast({
             variant: "success",
-            message: "RUM Token generated successfully.",
+            message: t("toastMessages.views.rumTokenGeneratedSuccessfully"),
             timeout: 5000,
           });
         })
@@ -520,7 +520,7 @@ export default defineComponent({
           getRUMToken();
           toast({
             variant: "success",
-            message: "RUM Token updated successfully.",
+            message: t("toastMessages.views.rumTokenUpdatedSuccessfully"),
             timeout: 5000,
           });
         })

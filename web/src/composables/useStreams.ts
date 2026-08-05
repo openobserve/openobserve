@@ -22,8 +22,9 @@ import {
   fetchStreamNameList,
   invalidateStreams,
 } from "@/composables/query/queries/streams";
+import type { TranslateFn, I18nText } from "@/types/i18n";
 
-const useStreams = () => {
+const useStreams = (t: TranslateFn) => {
   const store = useStore();
 
   const updateStreamsInStore = (streamType: string, streams: any) => {
@@ -77,7 +78,7 @@ const useStreams = () => {
             const dismiss = notify
               ? toast({
                   variant: "loading",
-                  message: "Please wait while loading streams...",
+                  message: t("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
                   timeout: 0,
                 })
               : () => {};
@@ -175,7 +176,7 @@ const useStreams = () => {
           const dismiss = notify
             ? toast({
                 variant: "loading",
-                message: "Please wait while loading streams...",
+                message: t("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
                 timeout: 5000,
               })
             : () => {};
@@ -663,7 +664,7 @@ const useStreams = () => {
     policy: string;
     apply_at?: string | null; // Optional or nullable
     pattern: string;
-    description?: string;
+    description?: I18nText;
   };
 
   //this function is used to compare the pattern associations

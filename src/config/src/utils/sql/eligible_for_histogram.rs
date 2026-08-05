@@ -58,8 +58,8 @@ mod tests {
         ];
         for query in queries.iter() {
             let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
-            assert_eq!(is_eligible, true);
-            assert_eq!(is_sub_query, false);
+            assert!(is_eligible);
+            assert!(!is_sub_query);
         }
     }
 
@@ -72,11 +72,11 @@ mod tests {
         ];
         for query in queries.iter() {
             let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
-            assert_eq!(is_eligible, false);
+            assert!(!is_eligible);
             if query.contains("SELECT * FROM (SELECT") {
-                assert_eq!(is_sub_query, true);
+                assert!(is_sub_query);
             } else {
-                assert_eq!(is_sub_query, false);
+                assert!(!is_sub_query);
             }
         }
     }

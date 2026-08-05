@@ -14,6 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+import { raw, type I18nKey, I18nText } from "@/types/i18n";
+
 // Fields available to a workflow Condition. A workflow has no upstream stream
 // node (unlike a pipeline), so conditions branch on the fired-alert payload.
 // The backend flattens the `{ meta: {...} }` envelope, so the alert fields are
@@ -24,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // column).
 
 export interface WorkflowFieldOption {
-  label: string;
+  label: I18nText;
   value: string;
   type: string;
 }
@@ -41,17 +43,17 @@ export interface TriggerOutputVar {
   ref: string;
   type: string;
   /** i18n key for the field's description. */
-  descKey: string;
+  descKey: I18nKey;
   /** For enum fields — the literal values, rendered like `"a" | "b"`. */
   enumValues?: string[];
 }
 
-// Every value in the emitted `meta` block is a STRING — the backend serialises
-// the whole block as a string:string map, so numeric-looking fields (count,
-// threshold, period) and the microsecond-epoch timestamps arrive quoted (e.g.
-// `"alert_count": "8"`, `"alert_start_time": "1784027820000000"`). Types below
-// say `string` to match that real payload, so a Condition author isn't misled
-// into a numeric comparison. Confirmed against a live alert firing.
+// The emitted `meta` block is a MIXED-type map: text fields are strings, but the
+// numeric alert fields (period, threshold, count) and the microsecond-epoch
+// timestamps (start/end time) are real numbers — the backend now types them
+// (e.g. `"alert_count": 3`, `"alert_start_time": 1785493175167770`). Types below
+// match that payload so a Condition author reads the right type. Confirmed
+// against a live alert firing.
 export const TRIGGER_META_VARS: TriggerOutputVar[] = [
   { ref: "meta.org_id", type: "string", descKey: "workflow.triggerMeta.orgId" },
   { ref: "meta.stream_type", type: "string", descKey: "workflow.triggerMeta.streamType" },
@@ -63,29 +65,29 @@ export const TRIGGER_META_VARS: TriggerOutputVar[] = [
     descKey: "workflow.triggerMeta.alertType",
     enumValues: ["realtime", "scheduled"],
   },
-  { ref: "meta.alert_period", type: "string", descKey: "workflow.triggerMeta.alertPeriod" },
+  { ref: "meta.alert_period", type: "int", descKey: "workflow.triggerMeta.alertPeriod" },
   { ref: "meta.alert_operator", type: "string", descKey: "workflow.triggerMeta.alertOperator" },
-  { ref: "meta.alert_threshold", type: "string", descKey: "workflow.triggerMeta.alertThreshold" },
-  { ref: "meta.alert_count", type: "string", descKey: "workflow.triggerMeta.alertCount" },
-  { ref: "meta.alert_start_time", type: "string", descKey: "workflow.triggerMeta.alertStartTime" },
-  { ref: "meta.alert_end_time", type: "string", descKey: "workflow.triggerMeta.alertEndTime" },
+  { ref: "meta.alert_threshold", type: "int", descKey: "workflow.triggerMeta.alertThreshold" },
+  { ref: "meta.alert_count", type: "int", descKey: "workflow.triggerMeta.alertCount" },
+  { ref: "meta.alert_start_time", type: "int", descKey: "workflow.triggerMeta.alertStartTime" },
+  { ref: "meta.alert_end_time", type: "int", descKey: "workflow.triggerMeta.alertEndTime" },
 ];
 
 // All fields are `Utf8` for now — the flattened `meta` block is a string:string
 // map at this stage, so even numeric-looking fields (threshold/count/period,
 // timestamps) are exposed as strings. Revisit once the backend types the columns.
 export const ALERT_PAYLOAD_FIELDS: WorkflowFieldOption[] = [
-  { label: "meta_alert_name", value: "meta_alert_name", type: "Utf8" },
-  { label: "meta_alert_type", value: "meta_alert_type", type: "Utf8" },
-  { label: "meta_alert_operator", value: "meta_alert_operator", type: "Utf8" },
-  { label: "meta_alert_threshold", value: "meta_alert_threshold", type: "Utf8" },
-  { label: "meta_alert_count", value: "meta_alert_count", type: "Utf8" },
-  { label: "meta_alert_period", value: "meta_alert_period", type: "Utf8" },
-  { label: "meta_stream_name", value: "meta_stream_name", type: "Utf8" },
-  { label: "meta_stream_type", value: "meta_stream_type", type: "Utf8" },
-  { label: "meta_org_id", value: "meta_org_id", type: "Utf8" },
-  { label: "meta_alert_start_time", value: "meta_alert_start_time", type: "Utf8" },
-  { label: "meta_alert_end_time", value: "meta_alert_end_time", type: "Utf8" },
-  { label: "meta_alert_trigger_time", value: "meta_alert_trigger_time", type: "Utf8" },
-  { label: "meta_alert_url", value: "meta_alert_url", type: "Utf8" },
+  { label: raw("meta_alert_name"), value: "meta_alert_name", type: "Utf8" },
+  { label: raw("meta_alert_type"), value: "meta_alert_type", type: "Utf8" },
+  { label: raw("meta_alert_operator"), value: "meta_alert_operator", type: "Utf8" },
+  { label: raw("meta_alert_threshold"), value: "meta_alert_threshold", type: "Utf8" },
+  { label: raw("meta_alert_count"), value: "meta_alert_count", type: "Utf8" },
+  { label: raw("meta_alert_period"), value: "meta_alert_period", type: "Utf8" },
+  { label: raw("meta_stream_name"), value: "meta_stream_name", type: "Utf8" },
+  { label: raw("meta_stream_type"), value: "meta_stream_type", type: "Utf8" },
+  { label: raw("meta_org_id"), value: "meta_org_id", type: "Utf8" },
+  { label: raw("meta_alert_start_time"), value: "meta_alert_start_time", type: "Utf8" },
+  { label: raw("meta_alert_end_time"), value: "meta_alert_end_time", type: "Utf8" },
+  { label: raw("meta_alert_trigger_time"), value: "meta_alert_trigger_time", type: "Utf8" },
+  { label: raw("meta_alert_url"), value: "meta_alert_url", type: "Utf8" },
 ];

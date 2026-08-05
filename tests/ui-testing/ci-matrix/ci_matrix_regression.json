@@ -1,0 +1,100 @@
+[
+  {
+    "testfolder": "Logs-Regression",
+    "actual_folder": "RegressionSet/Logs",
+    "browser": "chrome",
+    "run_files": [
+      "logs-regression.spec.js",
+      "logs-bugs.spec.js",
+      "logs-9754.spec.js",
+      "logs-9044-7354.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Alerts-Regression",
+    "actual_folder": "RegressionSet/Alerts",
+    "browser": "chrome",
+    "run_files": [
+      "alerts-regression.spec.js",
+      "alerts-stream-switching.spec.js",
+      "alerts-bugs.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Dashboard-Regression",
+    "actual_folder": "RegressionSet/Dashboards",
+    "browser": "chrome",
+    "run_files": [
+      "dashboard-regression.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Streams-Regression",
+    "actual_folder": "RegressionSet/Streams",
+    "browser": "chrome",
+    "run_files": [
+      "streams-regression.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Pipelines-Regression",
+    "actual_folder": "RegressionSet/Pipelines",
+    "browser": "chrome",
+    "run_files": [
+      "enrichment-regression.spec.js",
+      "pipeline-regression.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Traces-Regression",
+    "actual_folder": "RegressionSet/Traces",
+    "browser": "chrome",
+    "run_files": [
+      "traces-regression.spec.js",
+      "traces-bugs.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Metrics-Regression",
+    "actual_folder": "RegressionSet/Metrics",
+    "browser": "chrome",
+    "run_files": [
+      "metrics-regression.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "GeneralTests-Regression",
+    "actual_folder": "RegressionSet/General",
+    "browser": "chrome",
+    "run_files": [
+      "ui-regression.spec.js",
+      "landing-regression.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "DataSources-Regression",
+    "actual_folder": "RegressionSet/DataSources",
+    "browser": "chrome",
+    "run_files": [
+      "datasources-regression.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Reports-Regression",
+    "actual_folder": "RegressionSet/Reports",
+    "browser": "chrome",
+    "run_files": [
+      "reports-regression-bugs.spec.js"
+    ],
+    "disabled": []
+  }
+]

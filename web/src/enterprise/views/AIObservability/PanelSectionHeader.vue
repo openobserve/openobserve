@@ -12,14 +12,15 @@
 // `#actions` slot for a trailing control.
 -->
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 const props = defineProps<{
-  title: string;
+  title: I18nText;
   /** Optional one-line explanation under the title. */
-  hint?: string;
+  hint?: I18nText;
   /** Optional leading glyph — use the SAME one as the section's summary tile. */
   icon?: IconName;
   /** Icon colour — match the summary tile's tone so the two read as one thing. */

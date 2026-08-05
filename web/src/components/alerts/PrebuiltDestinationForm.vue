@@ -234,7 +234,7 @@ limitations under the License.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -263,7 +263,7 @@ defineProps({
 
 defineEmits(["preview", "test"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // PagerDuty severity options — computed so the labels re-resolve on locale change.
 const severityOptions = computed(() => [

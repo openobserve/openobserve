@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserStep, SettleResponse, StepAssertion, StepLocator } from "@/types/synthetics";
 import {
   DEFAULT_SETTLE_BUDGET_MS,
@@ -24,8 +24,8 @@ import {
   MAX_STEP_TIMEOUT_MS,
   MIN_SETTLE_BUDGET_MS,
   VALUE_ACTIONS,
-  VALUE_LABELS,
-  VALUE_TOOLTIP_MAP,
+  VALUE_LABEL_KEYS,
+  VALUE_TOOLTIP_KEYS,
   actionOptions,
 } from "@/constants/synthetics";
 import { applyValueToWire, defaultTimeoutFor } from "@/utils/synthetics/mapRecordedStep";
@@ -72,7 +72,7 @@ const emit = defineEmits<{
   "selector-edited": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /**
  * Apply an edit and keep the recorded wire step in sync.
@@ -126,11 +126,19 @@ const showTarget = computed(() => stepNeedsTarget(props.step));
  */
 const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { candidates: [] });
 
+// Built inside a computed so the option wording follows the active locale
+// rather than freezing at whatever was loaded when the module first evaluated.
+const actionSelectOptions = computed(() => actionOptions(t));
+
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
-const valueLabel = computed(
-  () => VALUE_LABELS[props.step.action] || t("synthetics.journey.valueFallback"),
-);
-const valueTooltip = computed(() => VALUE_TOOLTIP_MAP[props.step.action]);
+const valueLabel = computed(() => {
+  const key = VALUE_LABEL_KEYS[props.step.action];
+  return key ? t(key) : t("synthetics.journey.valueFallback");
+});
+const valueTooltip = computed(() => {
+  const key = VALUE_TOOLTIP_KEYS[props.step.action];
+  return key ? t(key) : undefined;
+});
 
 /**
  * Did changing the action just discard a recorded wire step? (SE-11 / D9)
@@ -191,6 +199,11 @@ const timeoutBelowDefault = computed(() => {
 
 function updateLocator(locator: StepLocator) {
   update({ locator });
+  // The host clears its "this step names no element" error on this event. Without
+  // it the message outlives the author fixing the very thing it complains about —
+  // and since the error also force-expands the step, a stale one keeps re-opening
+  // a row that is already correct.
+  emit("selector-edited");
 }
 
 function updateAssertion(assertion: StepAssertion) {
@@ -360,10 +373,10 @@ const hasAdvancedChanges = computed(
         <OSelect
           v-model="actionComputed"
           :label="t('synthetics.journey.actionLabel')"
-          :options="actionOptions"
+          :options="actionSelectOptions"
           class="basis-1/3"
           :error="!!actionErrorMessage"
-          :error-message="actionErrorMessage ?? ''"
+          :error-message="raw(actionErrorMessage ?? '')"
           data-test="synthetics-journey-step-action-select"
         />
         <OInput
@@ -372,7 +385,7 @@ const hasAdvancedChanges = computed(
           :placeholder="t('synthetics.journey.stepNamePurposePlaceholder')"
           :required="true"
           :error="!!nameErrorMessage"
-          :error-message="nameErrorMessage ?? ''"
+          :error-message="raw(nameErrorMessage ?? '')"
           class="basis-2/3"
           data-test="synthetics-journey-step-name-input"
         />
@@ -395,7 +408,7 @@ const hasAdvancedChanges = computed(
         :placeholder="valueLabel"
         class="w-full"
         :error="!!valueErrorMessage"
-        :error-message="valueErrorMessage ?? ''"
+        :error-message="raw(valueErrorMessage ?? '')"
         data-test="synthetics-journey-step-value-input"
       >
         <template v-if="valueTooltip" #tooltip>
@@ -414,10 +427,17 @@ const hasAdvancedChanges = computed(
 
     <!-- Target — the locator bundle is the only way a step names its element.
            `stepNeedsTarget` is the same rule the save-time validator uses, so the
-           block appears exactly when a target is required. -->
+           block appears exactly when a target is required.
+
+           `selectorErrorMessage` was passed by the host and bound by nothing from
+           D7 onward: the v1 Selector field it used to render on was deleted, and
+           the error lost its render site rather than moving to the block that
+           replaced it. So the save named a step, expanded it, and then showed the
+           author no reason on any field inside it. -->
     <BrowserJourneyLocator
       v-if="showTarget"
       :locator="effectiveLocator"
+      :error-message="selectorErrorMessage"
       class="mt-2 w-full max-w-200"
       @update:locator="updateLocator"
     />
@@ -480,7 +500,7 @@ const hasAdvancedChanges = computed(
             <OInput
               v-model="timeoutComputed"
               :label="t('synthetics.journey.timeoutLabel')"
-              :placeholder="String(timeoutDefault)"
+              :placeholder="raw(String(timeoutDefault))"
               :helpText="timeoutHelp"
               type="number"
               class="w-75!"
@@ -569,7 +589,7 @@ const hasAdvancedChanges = computed(
               <OInput
                 v-model="settleBudgetComputed"
                 :label="t('synthetics.journey.settleBudgetLabel')"
-                :placeholder="String(DEFAULT_SETTLE_BUDGET_MS)"
+                :placeholder="raw(String(DEFAULT_SETTLE_BUDGET_MS))"
                 :helpText="settleBudgetHelp"
                 type="number"
                 class="w-75!"

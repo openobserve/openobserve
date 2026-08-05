@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import type { BrowserCheck } from "@/types/synthetics";
@@ -36,7 +36,7 @@ const emit = defineEmits<{
   "refresh:destinations": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -130,7 +130,7 @@ const silenceMinutes = computed({
           v-model="failureThreshold"
           type="number"
           class="w-25!"
-          placeholder="1"
+          :placeholder="raw('1')"
           data-test="synthetics-check-alerts-threshold-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{

@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import AppHeader from "../components/Header.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import {
   useLocalCurrentUser,
   useLocalOrganization,
@@ -311,12 +311,12 @@ export default defineComponent({
     const store: any = useStore();
     const { isDark } = useTheme();
     const router: any = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
-    const { getStreams, resetStreams } = useStreams();
+    const { getStreams, resetStreams } = useStreams(t);
     const { closeSocket } = useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
     const { prefetchRoute } = useRoutePrefetch();
@@ -392,7 +392,19 @@ export default defineComponent({
     // `=== true`, not truthy: /config is fetched without await, so the flag is
     // briefly undefined and the entry must stay hidden rather than flash in
     // and then navigate to a page the API answers with 501.
-    const isSloEnabled = computed(() => store.state.zoConfig?.slo_enabled === true);
+    // TEMPORARY, for the release: SLOs are hidden from the nav whatever
+    // `slo_enabled` says. To restore, set this to false (or delete it and the
+    // `!SLO_HIDDEN_FOR_RELEASE &&` below). Nothing else is touched — the flag,
+    // the routes, the pages and the Reliability group's `sloList` child are all
+    // still there, so the entry returns exactly as it was, and /slos remains
+    // reachable by typing the URL.
+    //
+    // Typed as boolean rather than left to literal inference so the `&&` below
+    // is not a constant expression.
+    const SLO_HIDDEN_FOR_RELEASE: boolean = true;
+    const isSloEnabled = computed(
+      () => !SLO_HIDDEN_FOR_RELEASE && store.state.zoConfig?.slo_enabled === true,
+    );
 
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
@@ -875,8 +887,7 @@ export default defineComponent({
           }
           toast({
             variant: "warning",
-            message:
-              "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
+            message: t("toastMessages.layouts.ingestionNotStarted"),
             timeout: 5000,
           });
           router.push({ name: "ingestion" });

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="qp-2"
-    :title="sessionDetails.id || t('rum.sessionReplay')"
+    :title="sessionDetails.id ? raw(sessionDetails.id) : t('rum.sessionReplay')"
     :back="{
       label: t('rum.sessionReplay'),
       onClick: () => router.back(),
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="person" size="sm" />
-          {{ sessionDetails.user_email || "Unknown User" }}
+          {{ sessionDetails.user_email || t("common.unknownUser") }}
         </div>
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="location-on" size="sm" />
@@ -50,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="frustrationCount > 0"
           class="flex items-center truncate text-xs"
-          :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
+          :title="
+            t('rum.frustrationSignalsDetected', { count: frustrationCount }, frustrationCount)
+          "
           data-test="session-viewer-frustration-summary"
         >
           <OIcon
@@ -62,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="text-severity-warning-color font-semibold"
             data-test="frustration-summary-text"
-            >{{ frustrationCount }} Frustration{{ frustrationCount > 1 ? "s" : "" }}</span
+            >{{ t("rum.frustration", { count: frustrationCount }, frustrationCount) }}</span
           >
         </div>
       </div>
@@ -129,7 +131,7 @@ import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
@@ -160,7 +162,7 @@ const sessionId = ref("1");
 const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
@@ -283,7 +285,7 @@ const getSessionDetails = () => {
     browser: sessionState.data.selectedSession?.browser,
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
-    user_email: sessionState.data.selectedSession?.user_email || "Unknown User",
+    user_email: sessionState.data.selectedSession?.user_email || t("common.unknownUser"),
     city: sessionState.data.selectedSession?.city || "Unknown",
     country: sessionState.data.selectedSession?.country || "Unknown",
     id: sessionState.data.selectedSession?.session_id,
@@ -363,7 +365,7 @@ const getSessionSegments = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_sessionreplay" where session_id='${sessionId.value}' order by start asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -418,7 +420,7 @@ const getSessionEvents = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and (type='error' or type='action' or type='view') order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -473,7 +475,7 @@ const getSessionErrorLogs = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_rumlog" where session_id='${sessionId.value}' and status='error' order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);

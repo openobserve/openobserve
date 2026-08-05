@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import dashboardService from "../../services/dashboards";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
@@ -87,7 +87,7 @@ export default defineComponent({
     const addDashboardForm: any = ref(null);
     const disableColor: any = ref("");
     const isValidIdentifier: any = ref(true);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const addDashboardSchema = makeAddDashboardSchema(t);
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 

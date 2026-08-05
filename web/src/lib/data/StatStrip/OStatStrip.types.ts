@@ -4,6 +4,8 @@
 // top of list / table / dashboard screens. `tone` is the ONE knob that drives a
 // stat's colour, so the same semantic state reads the same colour everywhere.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 /** Semantic colour of a stat. Maps to one icon-chip + value colour pair.
@@ -26,7 +28,7 @@ export type StatTone =
 export interface StatTrend {
   direction: "up" | "down" | "flat";
   /** Already-formatted delta text, e.g. "12%" or "+4". */
-  label: string;
+  label: I18nText;
   /** Colour of the trend text. Defaults to neutral. */
   tone?: StatTone;
 }
@@ -35,7 +37,7 @@ export interface StatItem {
   /** Stable key for the v-for. */
   key: string;
   /** Uppercase caption under the value (already localised by the caller). */
-  label: string;
+  label: I18nText;
   /** The number / text shown large. */
   value: string | number;
   /** Optional leading glyph, shown in a tone-coloured chip. */

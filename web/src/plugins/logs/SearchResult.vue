@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
               >
               <OTag type="logsResultChip" value="info" data-test="logs-result-pattern-time-chip"
-                >{{ patternChips.time }} ms</OTag
+                >{{ patternChips.time }} {{ t("logs.searchResult.msUnit") }}</OTag
               >
             </template>
             <span v-else class="min-w-0 truncate">{{ patternSummaryText }}</span>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-warning shrink-0 cursor-pointer"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
-            <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
+            <OTooltip :content="raw(searchObj.data.histogram.errorMsg)" side="top" align="center" />
           </div>
         </div>
 
@@ -811,7 +811,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
@@ -1127,7 +1127,7 @@ export default defineComponent({
   setup(props, { emit }) {
     // Accessing nested JavaScript objects and arrays by string path
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const searchListContainer = ref<HTMLElement | null>(null);
@@ -1171,25 +1171,23 @@ export default defineComponent({
       });
     });
 
-    // Parses the histogram title string into structured chip data for logs mode.
-    // Format: "Showing X to Y out of Z events in T ms. (Scan Size: S MB)"
+    // Builds the logs-mode chips from the histogram's structured values. Read
+    // `titleParts`, never the rendered title — parsing that back apart only worked
+    // while it was hardcoded English and breaks in every other locale.
     const recordsChips = computed(() => {
-      const title = noOfRecordsTitle.value;
-      if (!title) return null;
+      const parts = searchObj.data.histogram.chartParams.titleParts;
+      if (!parts) return null;
 
-      const eventsInIdx = title.indexOf(" events in ");
-      if (eventsInIdx === -1) return null;
-
-      const records = title.substring("Showing ".length, eventsInIdx + " events".length);
-      const afterEvents = title.substring(eventsInIdx + " events in ".length);
-
-      const msIdx = afterEvents.indexOf(" ms.");
-      const time = msIdx !== -1 ? afterEvents.substring(0, msIdx) + " ms" : afterEvents;
-
-      const parenMatch = afterEvents.match(/\((.+?)\)/);
-      const scan = parenMatch ? parenMatch[1] : null;
-
-      return { records, time, scan };
+      return {
+        records: t("search.recordsChip", {
+          start: parts.start,
+          end: parts.end,
+          total: parts.total,
+        }),
+        time: t("search.tookChip", { took: parts.took }),
+        // Label is already translated, the size is data — joined so the pair reads like the title.
+        scan: parts.scanLabel != null ? raw(`${parts.scanLabel}: ${parts.scanSize}`) : null,
+      };
     });
 
     // Derives structured chip data for patterns mode from raw stats.
@@ -1218,13 +1216,13 @@ export default defineComponent({
     const disableMoreErrorDetails = ref(false);
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
-    const { refreshPagination } = useSearchStream();
+    const { refreshPagination } = useSearchStream(t);
     const { refreshPartitionPagination, refreshJobPagination } = usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
     const { reorderSelectedFields, getFilterExpressionByFieldType, resolveDefaultColumns } =
-      useLogs();
+      useLogs(t);
 
     const { searchObj } = searchState();
 
@@ -1322,7 +1320,7 @@ export default defineComponent({
     const correlationDashboardProps = ref<any>(null);
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
-    const detailTableInitialTab = ref<string>("json");
+    const detailTableInitialTab = ref<string>("table");
     const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
@@ -1337,7 +1335,7 @@ export default defineComponent({
     const patternsColumns = [
       {
         accessorKey: "pattern_id",
-        header: "#",
+        header: raw("#"),
         id: "index",
         size: 60,
         cell: (info: any) => info.row.index + 1,
@@ -1348,7 +1346,7 @@ export default defineComponent({
       },
       {
         accessorKey: "template",
-        header: "Pattern Template",
+        header: t("search.patternTemplate"),
         id: "template",
         cell: (info: any) => info.getValue(),
         size: 500,
@@ -1359,7 +1357,7 @@ export default defineComponent({
       },
       {
         accessorKey: "frequency",
-        header: "Count",
+        header: t("search.patternCount"),
         id: "frequency",
         size: 100,
         cell: (info: any) => `${info.getValue()} (${info.row.original.percentage.toFixed(1)}%)`,
@@ -1370,7 +1368,7 @@ export default defineComponent({
       },
       {
         accessorKey: "examples",
-        header: "Example Log",
+        header: t("search.patternExampleLog"),
         id: "example",
         size: 400,
         cell: (info: any) => {
@@ -1622,7 +1620,7 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
-      detailTableInitialTab.value = "json"; // Reset to default tab
+      detailTableInitialTab.value = "table"; // Reset to default tab (#13368: Table is the default log-detail view)
 
       // Prepare correlation context (but don't open panel automatically)
       const logData = searchObj.data.queryResults?.hits?.[index];
@@ -1877,7 +1875,7 @@ export default defineComponent({
 
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
       const copyData = copyAsJson ? JSON.stringify(log) : log;
-      copyToClipboard(copyData, {
+      copyToClipboard(copyData, t, {
         successMessage: t("logs.searchResult.contentCopied"),
         timeout: 1000,
       });
@@ -2298,6 +2296,7 @@ export default defineComponent({
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
+      raw,
       isDark,
       t,
       store,

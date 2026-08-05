@@ -83,7 +83,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
+        run: cargo --config net.git-fetch-with-cli=true clippy --workspace --all-targets -- -D warnings
 
   backend_unit_tests_postgres:
     needs: [check_changes]

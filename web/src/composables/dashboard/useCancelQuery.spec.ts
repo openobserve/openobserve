@@ -1,4 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 import useCancelQuery from "./useCancelQuery";
 import queryService from "../../services/search";
 
@@ -49,7 +52,7 @@ describe("useCancelQuery", () => {
   });
 
   it("should create useCancelQuery composable with correct properties", () => {
-    const composable = useCancelQuery();
+    const composable = useCancelQuery(t);
 
     expect(composable).toBeDefined();
     expect(composable.traceIdRef).toBeDefined();
@@ -62,7 +65,7 @@ describe("useCancelQuery", () => {
 
   describe("searchRequestTraceIds", () => {
     it("should set trace IDs when data is an array", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       const traceIds = ["trace1", "trace2", "trace3"];
 
       composable.searchRequestTraceIds(traceIds);
@@ -71,7 +74,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should convert single value to array", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       const singleTraceId = "single-trace";
 
       composable.searchRequestTraceIds(singleTraceId);
@@ -80,7 +83,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should handle null value", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       composable.searchRequestTraceIds(null);
 
@@ -88,7 +91,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should handle undefined value", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       composable.searchRequestTraceIds(undefined);
 
@@ -96,7 +99,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should handle number values", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       composable.searchRequestTraceIds(123);
 
@@ -104,7 +107,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should handle object values", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       const objectValue = { id: "test", name: "trace" };
 
       composable.searchRequestTraceIds(objectValue);
@@ -113,7 +116,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should handle empty array", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       composable.searchRequestTraceIds([]);
 
@@ -121,7 +124,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should overwrite previous trace IDs", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       composable.searchRequestTraceIds(["trace1", "trace2"]);
       expect(composable.traceIdRef.value).toEqual(["trace1", "trace2"]);
@@ -136,7 +139,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: true }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1"]);
 
       composable.cancelQuery();
@@ -145,7 +148,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should return early when no trace IDs are set", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       composable.cancelQuery();
 
@@ -154,7 +157,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should return early when trace IDs array is empty", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds([]);
 
       composable.cancelQuery();
@@ -164,7 +167,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should return early when traceIdRef.value is not an array", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       // Manually set to non-array value
       composable.traceIdRef.value = "not-an-array";
 
@@ -178,7 +181,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: true }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1", "trace2"]);
 
       composable.cancelQuery();
@@ -193,7 +196,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: true }, { is_success: false }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1", "trace2"]);
 
       composable.cancelQuery();
@@ -211,7 +214,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: false }, { is_success: false }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1", "trace2"]);
 
       composable.cancelQuery();
@@ -226,7 +229,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: false }, { is_success: true }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1", "trace2"]);
 
       composable.cancelQuery();
@@ -250,7 +253,7 @@ describe("useCancelQuery", () => {
       };
       mockQueryService.delete_running_queries.mockRejectedValue(mockError);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1"]);
 
       composable.cancelQuery();
@@ -272,7 +275,7 @@ describe("useCancelQuery", () => {
       };
       mockQueryService.delete_running_queries.mockRejectedValue(mockError);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1"]);
 
       composable.cancelQuery();
@@ -290,7 +293,7 @@ describe("useCancelQuery", () => {
       const mockError = new Error("Network error");
       mockQueryService.delete_running_queries.mockRejectedValue(mockError);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1"]);
 
       composable.cancelQuery();
@@ -308,7 +311,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: true }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1", "trace2", "trace3"]);
 
       composable.cancelQuery();
@@ -324,7 +327,7 @@ describe("useCancelQuery", () => {
       const mockError = new Error("Network error");
       mockQueryService.delete_running_queries.mockRejectedValue(mockError);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1", "trace2"]);
 
       composable.cancelQuery();
@@ -340,7 +343,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: true }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1", "trace2", "trace3"]);
 
       // Start the cancel operation
@@ -360,7 +363,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: true }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       composable.searchRequestTraceIds(["trace1", "trace2"]);
       composable.cancelQuery();
@@ -383,7 +386,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1"]);
 
       composable.cancelQuery();
@@ -399,7 +402,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ status: "completed" }, { status: "failed" }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1", "trace2"]);
 
       composable.cancelQuery();
@@ -420,7 +423,7 @@ describe("useCancelQuery", () => {
       // Change the organization identifier
       mockStore.state.selectedOrganization.identifier = "different-org";
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1"]);
 
       composable.cancelQuery();
@@ -437,7 +440,7 @@ describe("useCancelQuery", () => {
       const mockResponse = { data: [{ is_success: true }] };
       mockQueryService.delete_running_queries.mockResolvedValue(mockResponse);
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       // Set trace IDs and cancel multiple times rapidly
       composable.searchRequestTraceIds(["trace1"]);
@@ -466,7 +469,7 @@ describe("useCancelQuery", () => {
         "trace@with@symbols",
       ];
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(complexTraceIds);
 
       composable.cancelQuery();
@@ -484,7 +487,7 @@ describe("useCancelQuery", () => {
       const originalState = mockStore.state;
       mockStore.state = { selectedOrganization: undefined };
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1"]);
 
       // This should throw an error since the code doesn't handle undefined gracefully
@@ -501,7 +504,7 @@ describe("useCancelQuery", () => {
       const originalOrg = mockStore.state.selectedOrganization;
       mockStore.state.selectedOrganization = undefined;
 
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
       composable.searchRequestTraceIds(["trace1"]);
 
       // This should throw an error since the code doesn't handle undefined gracefully
@@ -516,7 +519,7 @@ describe("useCancelQuery", () => {
 
   describe("reactive behavior", () => {
     it("should maintain reactivity of traceIdRef", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       // Initial value
       expect(composable.traceIdRef.value).toEqual([]);
@@ -531,7 +534,7 @@ describe("useCancelQuery", () => {
     });
 
     it("should allow direct manipulation of traceIdRef", () => {
-      const composable = useCancelQuery();
+      const composable = useCancelQuery(t);
 
       // Direct manipulation should work
       composable.traceIdRef.value = ["direct-trace"];

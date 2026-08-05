@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="showPreview"
       size="md"
-      :title="previewedPattern?.name"
+      :title="raw(previewedPattern?.name)"
       data-test="pattern-preview-dialog"
       :secondary-button-label="t('regex_patterns.close')"
       :primary-button-label="t('regex_patterns.import_this_pattern')"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
   fetchBuiltInRegexPatterns,
@@ -248,7 +248,7 @@ interface PatternExample {
 interface BuiltInPattern {
   name: string;
   pattern: string;
-  description: string;
+  description: I18nText;
   tags: string[];
   rarity: number;
   url: string | null;
@@ -272,7 +272,7 @@ export default defineComponent({
   },
   emits: ["import-patterns"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const patterns = ref<BuiltInPattern[]>([]);
@@ -293,7 +293,7 @@ export default defineComponent({
     });
 
     const tagOptions = computed(() =>
-      availableTags.value.map((tag) => ({ label: tag, value: tag })),
+      availableTags.value.map((tag) => ({ label: raw(tag), value: tag })),
     );
 
     const filteredPatterns = computed(() => {
@@ -351,7 +351,7 @@ export default defineComponent({
       } catch (e: any) {
         error.value = e.response?.data?.message || e.message || t("regex_patterns.failed_to_load");
         toast({
-          message: error.value,
+          message: raw(error.value),
           variant: "error",
         });
       } finally {
@@ -407,6 +407,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       patterns,
       loading,

@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type RangeSize = "sm" | "md" | "lg";
 
 export interface RangeValue {
@@ -17,15 +19,15 @@ export interface RangeProps {
   /** Step increment */
   step?: number;
   /** Label rendered above the track */
-  label?: string;
+  label?: I18nText;
   /** Show numeric range next to the label */
   showValue?: boolean;
   /** Format function for individual displayed values */
   formatValue?: (_value: number) => string;
   /** Helper text below the track */
-  helpText?: string;
+  helpText?: I18nText;
   /** Error message — when provided the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field as being in error state without a message */
   error?: boolean;
   /** Prevents interaction */

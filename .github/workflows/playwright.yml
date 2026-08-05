@@ -176,10 +176,36 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Build the shard matrix from tests/ui-testing/ci-matrix/ci_matrix.json (single source of truth,
+  # shared with ENT via build-ci-matrix.js). Runs under the same gate as build_binary so
+  # ui_integration_tests always has a matrix whenever it is allowed to run.
+  generate_matrix:
+    timeout-minutes: 5
+    name: generate_matrix
+    needs: [check_changes]
+    if: >-
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
+      (github.event_name != 'pull_request' &&
+       needs.check_changes.outputs.has_changes == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: gen
+        run: |
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json)
+          if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
+
   ui_integration_tests:
     timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary]
+    needs: [build_binary, generate_matrix]
     if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
     runs-on:
       labels: eks-openobserve-standard-8
@@ -191,328 +217,10 @@ jobs:
     #   options: --user root
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - testfolder: "GeneralTests"
-            browser: "chrome"
-            run_files:
-              [
-                "sanity.spec.js",
-                "changeOrg.spec.js",
-                "enrichment.spec.js",
-                "schema.spec.js",
-                "schemaload.spec.js",
-                "serviceAccount.spec.js",
-                "usersOrg.spec.js",
-                "org.spec.js",
-                "theme-management.spec.js",
-                "ingestion-config.spec.js",
-                "ingestionTokens.spec.js",
-                "landingPage.spec.js",
-                "languageTranslation.spec.js",
-                "model-pricing.spec.js",
-                "edition-features.spec.js",
-                "logsqueries.sql-comments.spec.js",
-                "iam-form-validation.spec.js",
-                "regex-patterns-form-validation.spec.js",
-                "cipher-keys-form-validation.spec.js",
-                "settings-form-validation.spec.js",
-                "ai-toolsets-form-validation.spec.js",
-                "shared-components-form-validation.spec.js",
-                "onboarding-form-validation.spec.js",
-                "rum-form-validation.spec.js",
-                "login-form-validation.spec.js",
-              ]
-          - testfolder: "Logs-Builder-Basic"
-            browser: "chrome"
-            run_files:
-              [
-                "logsQueryBuilder-chart.spec.js",
-                "logsQueryBuilder-filters-basic.spec.js",
-                "pagination.spec.js",
-                "unflattened.spec.js",
-              ]
-          - testfolder: "Logs-Builder-Advanced"
-            browser: "chrome"
-            run_files:
-              [
-                "logsQueryBuilder-editor.spec.js",
-                "logsQueryBuilder-filters-advanced.spec.js",
-                "logsquickmode.spec.js",
-                "logshistogram.spec.js",
-                "logsQuickPick.spec.js",
-              ]
-          - testfolder: "Logs-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "logspage.spec.js",
-                "logstable.spec.js",
-                "logsqueries.spec.js",
-                "join.spec.js",
-                "shareLink.spec.js",
-                "logsAnalyzeDimensions.spec.js",
-                "monaco-query-prefill.spec.js",
-                "logsqueries.matchall.spec.js",
-                "ftsDefaultColumn.spec.js",
-                "logsVisualizePersistence.spec.js",
-              ]
-          - testfolder: "Logs-Features"
-            browser: "chrome"
-            run_files: [
-                "logs-autocomplete-suggestions.spec.js",
-                # "searchJobInspector.spec.js",  # TODO: update these tests for new correlation feature
-                "logs-sql-autocomplete.spec.js",
-                "logsqueries.cte.spec.js",
-                "logsDownloads.spec.js",
-                "secondsPrecisionAdded.spec.js",
-                "searchpartition.spec.js",
-                "indexquery.spec.js",
-                "region.spec.js",
-              ]
-          - testfolder: "Alerts"
-            browser: "chrome"
-            run_files: [
-                # "alerts-e2e-flow.spec.js",
-                "alerts-ui-operations.spec.js",
-                "alerts-import.spec.js",
-                # "alerts-advanced.spec.js",
-                # "alerts-scheduled-features.spec.js",
-                "alerts-metrics-notification.spec.js",
-                "alerts-destinations-prebuilt.spec.js",
-                "alerts-vrl-encoding.spec.js",
-                "alerts-history.spec.js",
-                "alerts-template-prebuilt-guard.spec.js",
-                "alerts-form-validation.spec.js",
-                "anomaly-detection-form-validation.spec.js",
-                # Alerts 4.0 (multi-alerts) e2e — PR #13547
-                "alerts-priority-tags.spec.js",
-                "alerts-multialert-api.spec.js",
-                "alerts-multialert-ui.spec.js",
-                "alerts-multialert-regression.spec.js",
-                "alerts-multialert-firing.spec.js",
-                "alerts-multialert-transitions.spec.js",
-              ]
-          - testfolder: "Dashboards-Core"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard.spec.js",
-                "dashboard2.spec.js",
-                "dashboardtype.spec.js",
-                "dashboard-folder.spec.js",
-                "dashboard-import.spec.js",
-                "maxquery.spec.js",
-                "dashboard-chartJson.spec.js",
-                "dashboard-promql-suggestions.spec.js",
-                "dashboard-sql-autocomplete.spec.js",
-                "dashboard-share-link.spec.js",
-                "crossLinking.spec.js",
-                "dashboard-multi-sql.spec.js",
-                "crossLinkMultiStream.spec.js",
-                "dashboards-form-validation.spec.js",
-              ]         
-          - testfolder: "Dashboards-Isolated"
-            browser: "chrome"
-            run_files: ["dashboard-favorites.spec.js"]
-          - testfolder: "Dashboards-Settings"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-filter.spec.js",
-                "dashboard-general-setting.spec.js",
-                "dashboard-tabs-setting.spec.js",
-                "dashboard-transpose.spec.js",
-                "dashboard-join.spec.js",
-                "dashboard-nested-functions.spec.js",
-                "dashboard-legends-copy.spec.js",
-                "dashboard-raw-query.spec.js",
-              ]
-          # Dashboard panel tests are grouped by the feature they exercise so
-          # each shard stays well under the ephemeral-runner endurance window.
-          # A single combined 16-spec shard ran ~40 min on CI and got reclaimed
-          # mid-run ("runner lost communication"). Add new specs to the shard of
-          # the feature they cover; the Tables shard also owns the pagination and
-          # pivot-table specs (previously their own single-spec shards).
-          - testfolder: "Dashboards-Charts"
-            browser: "chrome"
-            run_files:
-              [
-                "custom-charts.spec.js",
-                "dashboard-geoMap.spec.js",
-                "dashboard-maps.spec.js",
-                "dashboard-multi-y-axis.spec.js",
-                "dashboard-html-chart.spec.js",
-                "dashboard-sankey.spec.js",
-                "dashboard-pie-donut.spec.js",
-                "dashboard-metric-camelcase.spec.js",
-                "dashboard-create-alert.spec.js",
-              ]
-          - testfolder: "Dashboards-Visualize"
-            browser: "chrome"
-            run_files:
-              [
-                "visualize.spec.js",
-                "visualize-vrl.spec.js",
-              ]
-          - testfolder: "Dashboards-Tables"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-table-chart.spec.js",
-                "dashboard-table-copy-cell.spec.js",
-                "dashboard-table-csv-download.spec.js",
-                "dashboard-table-column-formatting.spec.js",
-                "dashboard-table-column-filtering.spec.js",
-                "dashboard-table-pagination.spec.js",
-                "dashboard-pivot-table.spec.js",
-              ]
-          - testfolder: "Dashboards-Streaming"
-            browser: "chrome"
-            run_files: ["dashboard-streaming.spec.js"]
-          - testfolder: "Pipelines"
-            browser: "chrome"
-            run_files: [
-                "pipeline-conditions.spec.js",
-                "pipeline-conditions-validation.spec.js",
-                "pipelines.spec.js",
-                "pipeline-dynamic.spec.js",
-                "pipeline-core.spec.js",
-                "pipeline-traces.spec.js",
-                "pipeline-metrics.spec.js",
-                "pipeline-backfill.spec.js",
-                "pipeline-history.spec.js",
-                "scheduled-pipeline-query-builder.spec.js",
-                # "remotepipeline.spec.js"
-                "pipelines-form-validation.spec.js",
-              ]
-          - testfolder: "Functions"
-            browser: "chrome"
-            run_files:
-              [
-                "js-transform-type.spec.js",
-                "row-expansion.spec.js",
-                "enrichment-table-url.spec.js",
-                "functions-form-validation.spec.js",
-                "action-scripts-form-validation.spec.js",
-              ]
-          - testfolder: "Reports"
-            browser: "chrome"
-            run_files:
-              [
-                "reportsScheduleNow.spec.js",
-                "reportsScheduleLater.spec.js",
-                "reportFolders.spec.js",
-                "reports-bulk-operations.spec.js",
-                "reports-form-validation.spec.js",
-                "reportCsvMediaType.spec.js",
-              ]
-          - testfolder: "Streams"
-            browser: "chrome"
-            run_files:
-              [
-                "multiselect-stream.spec.js",
-                "streamname.spec.js",
-                "streaming.spec.js",
-                "stream-settings.spec.js",
-                "streams-form-validation.spec.js",
-              ]
-          - testfolder: "Traces"
-            browser: "chrome"
-            run_files:
-              [
-                "service-catalog.spec.js",
-                "tracesSearch.spec.js",
-                "traceQueryEditor.spec.js",
-                "traceErrorFilter.spec.js",
-                "traceDetails.spec.js",
-                "traceAdvancedFiltering.spec.js",
-                "tracesAnalyzeDimensions.spec.js",
-                "traces-autocomplete-suggestions.spec.js",
-              ]
-          # The RUM ingest/token/sourcemaps routes are part of the standard
-          # (OSS) router (src/api/http/src/handler/http/router/mod.rs), so these specs run
-          # against the OSS binary built by this workflow. Ingestion-auth
-          # negative cases live in the API suite (tests/api-testing/tests/rum).
-          - testfolder: "RUM"
-            browser: "chrome"
-            run_files:
-              [
-                "rum-cdn-dataflow.spec.js",
-                "rum-npm-dataflow.spec.js",
-                "rum-page-dataflow.spec.js",
-                "rum-onboarding-snippets.spec.js",
-                "sourcemap-ui.spec.js",
-                "sourcemap-upload-pretty.spec.js",
-              ]
-          # rum-token.spec.js RESETS the org RUM token; running it beside the
-          # dataflow specs (workers run files in parallel) would 401 their
-          # in-flight SDK beacons. Own shard = own isolated instance.
-          - testfolder: "RUM-Token"
-            browser: "chrome"
-            run_files: ["rum-token.spec.js"]
-          - testfolder: "Metrics"
-            browser: "chrome"
-            run_files:
-              [
-                "metrics.spec.js",
-                "metrics-queries.spec.js",
-                "metrics-aggregations.spec.js",
-                "metrics-advanced.spec.js",
-                "metrics-config-tabs.spec.js",
-                "metrics-visualizations.spec.js",
-                "metrics-config.spec.js",
-                "metrics-promql-query-persistence.spec.js",
-                "metrics-table-column-order.spec.js",
-                "metrics-promql-builder.spec.js",
-                "promqlAutocomplete.spec.js",
-                "metrics-share-deep-link.spec.js",
-              ]
-          - testfolder: "Dashboards-Variables"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-variables-setting.spec.js",
-                "dashboard-variables-global.spec.js",
-                "dashboard-variables-tab-level.spec.js",
-                "dashboard-variables-panel-level.spec.js",
-                "dashboard-variables-dependency.spec.js",
-                "dashboard-variables-refresh.spec.js",
-                "dashboard-variables-url-sync.spec.js",
-                "dashboard-variables-creation-scopes.spec.js",
-                "dashboard-variables-default-values-chain.spec.js",
-                "dashboard-variables-custom-parents.spec.js",
-                "dashboard-variables-stream-field.spec.js",
-                "dashboard-mustache-variables.spec.js",
-              ]
-          - testfolder: "Dashboards-Panel-Level-DateTime-Config"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-panel-time-config-behavior.spec.js",
-                "dashboard-panel-time-url-priority.spec.js",
-                "dashboard-panel-time-advanced-edge-cases.spec.js",
-                "dashboard-panel-time-apply-behavior.spec.js",
-                "dashboard-panel-time-variables-behavior.spec.js",
-              ]
-          - testfolder: "Dashboard-Config-Settings"
-            browser: "chrome"
-            run_files:
-              [
-                "dashboard-series-color-multiwindow.spec.js",
-                "dashboard-config-advanced.spec.js",
-                "dashboard-config-axis.spec.js",
-                "dashboard-config-gauge-maps.spec.js",
-                "dashboard-config-general.spec.js",
-                "dashboard-config-legends.spec.js",
-                "dashboard-config-line-style.spec.js",
-                "dashboard-config-panel-time.spec.js",
-                "dashboard-config-table.spec.js",
-                "dashboard-config-trellis.spec.js",
-                "dashboard-config-drilldown.spec.js",
-                "dashboard-config-promql.spec.js",
-                "dashboard-config-markline.spec.js",
-              ]
+      # Matrix is generated from tests/ui-testing/ci-matrix/ci_matrix.json by the
+      # generate_matrix job (the single source of truth shared with ENT). To add
+      # or move a spec, edit that JSON file — do NOT hand-edit a matrix here.
+      matrix: ${{ fromJSON(needs.generate_matrix.outputs.matrix) }}
     steps:
       - name: Kill background apt processes
         run: |
@@ -539,6 +247,12 @@ jobs:
           path: /tmp/dist
 
       - name: Start OpenObserve
+        # Per-shard override of the workflow-level default. ZO_QUICK_MODE_ENABLED is
+        # read once at server start and is global to the process, so a shard is the
+        # smallest unit that can change it. Set via "quick_mode_enabled" in
+        # tests/ui-testing/ci-matrix/ci_matrix.json; shards that omit it get "false".
+        env:
+          ZO_QUICK_MODE_ENABLED: ${{ matrix.quick_mode_enabled || 'false' }}
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
@@ -629,22 +343,9 @@ jobs:
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
 
           if [ -n "$FILE_LIST" ]; then
-            # Map logical folder names to actual directories
-            case "${{ matrix.testfolder }}" in
-              "Logs-Builder-Basic"|"Logs-Builder-Advanced"|"Logs-Core"|"Logs-Features")
-                ACTUAL_FOLDER="Logs"
-                ;;
-              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Visualize"|"Dashboards-Tables"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings"|"Dashboards-Isolated")
-                ACTUAL_FOLDER="Dashboards"
-                ;;
-              "RUM-Token")
-                ACTUAL_FOLDER="RUM"
-                ;;
-              *)
-                ACTUAL_FOLDER="${{ matrix.testfolder }}"
-                ;;
-            esac
-
+            # actual_folder (the real directory under playwright-tests/) comes straight
+            # from the matrix now — the logical->directory mapping lives in ci-matrix/ci_matrix.json.
+            ACTUAL_FOLDER="${{ matrix.actual_folder }}"
             echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
 
             # Build file paths

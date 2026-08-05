@@ -19,6 +19,12 @@
 //! (`/synthetics/jobs/resolve`, `/ack`, `/lease`). Separate from
 //! `org_ingestion_tokens` (`o2oi_`) which is write-only ingest.
 
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
+use config::RwHashMap;
 use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait, sea_query::Expr,
 };
@@ -33,6 +39,51 @@ use crate::{
 };
 
 pub const SYNTHETICS_PROBE_TOKEN_PREFIX: &str = "o2syn_";
+
+/// Token → lookup result, with the time it was loaded.
+///
+/// `find_global` runs in the auth middleware on **every** probe request
+/// (`api/common/src/auth/validator.rs`), so it fired once per lease, resolve and
+/// ack — the single highest-frequency query in the feature, always for the same
+/// handful of token strings.
+///
+/// `None` is cached as well as `Some`: an unknown or disabled token must not be
+/// able to force a DB round trip per request, which is what makes an uncached
+/// validator a cheap way to generate load from outside.
+///
+/// **The TTL is a security parameter, not a performance one.** It bounds how
+/// long a disabled token keeps working. 10 s is short enough that revocation is
+/// effectively immediate for an operator and long enough to remove ~99 % of the
+/// queries. Writes in this module invalidate eagerly, so the TTL only covers a
+/// disable performed on a *different* node.
+static TOKEN_CACHE: LazyLock<RwHashMap<String, (Option<SyntheticsProbeTokenRecord>, Instant)>> =
+    LazyLock::new(Default::default);
+
+/// Org → its default enabled token, same TTL rules as [`TOKEN_CACHE`].
+static DEFAULT_TOKEN_CACHE: LazyLock<
+    RwHashMap<String, (Option<SyntheticsProbeTokenRecord>, Instant)>,
+> = LazyLock::new(Default::default);
+
+const TOKEN_CACHE_TTL: Duration = Duration::from_secs(10);
+
+/// Clears both token caches. Called by every write path here so a disable,
+/// rotate or default-change takes effect on this node immediately.
+pub fn invalidate_cache() {
+    TOKEN_CACHE.clear();
+    DEFAULT_TOKEN_CACHE.clear();
+}
+
+/// Invalidates locally **and** tells every other node.
+///
+/// This is the revocation path: `set_enabled(false)` reaches other nodes as a
+/// coordinator event rather than waiting out their TTL, which is what makes a
+/// disable effectively fleet-wide-immediate.
+async fn invalidate_and_publish(org_id: &str) {
+    invalidate_cache();
+    if let Err(e) = crate::coordinator::synthetics::emit_tokens_changed(org_id).await {
+        log::error!("[synthetics] emit probe token cache event failed for {org_id}: {e}");
+    }
+}
 
 /// Name of the token every org starts with (backfilled / created at org
 /// creation). Named tokens minted later carry their own operator-chosen name.
@@ -93,7 +144,16 @@ pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Erro
     };
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match Entity::insert(model).exec(client).await {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+            // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+            // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+            // returns, so emitting while holding it deadlocks the process — and the
+            // mutex is then held forever, hanging every later synthetics query.
+            drop(_lock);
+            // A new token can become the org default, so both caches are stale.
+            invalidate_and_publish(&record.org_id).await;
+            Ok(())
+        }
         Err(e) => match e.sql_err() {
             Some(SqlErr::UniqueConstraintViolation(_)) => {
                 Err(Error::DbError(DbError::SeaORMError(format!(
@@ -112,14 +172,23 @@ pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Erro
 /// path (the tenant boundary). Matches ANY enabled token, so old + new tokens
 /// coexist during a rotation overlap window.
 pub async fn find_global(token: &str) -> Result<Option<SyntheticsProbeTokenRecord>, errors::Error> {
+    if let Some(entry) = TOKEN_CACHE.get(token)
+        && entry.1.elapsed() < TOKEN_CACHE_TTL
+    {
+        return Ok(entry.0.clone());
+    }
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .filter(Column::Token.eq(token))
         .filter(Column::Enabled.eq(true))
         .one(client)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(record.map(SyntheticsProbeTokenRecord::from))
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .map(SyntheticsProbeTokenRecord::from);
+
+    TOKEN_CACHE.insert(token.to_string(), (record.clone(), Instant::now()));
+    Ok(record)
 }
 
 /// Find the org's default enabled probe token — the one handed out by
@@ -127,6 +196,12 @@ pub async fn find_global(token: &str) -> Result<Option<SyntheticsProbeTokenRecor
 pub async fn find_default(
     org_id: &str,
 ) -> Result<Option<SyntheticsProbeTokenRecord>, errors::Error> {
+    if let Some(entry) = DEFAULT_TOKEN_CACHE.get(org_id)
+        && entry.1.elapsed() < TOKEN_CACHE_TTL
+    {
+        return Ok(entry.0.clone());
+    }
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -134,8 +209,11 @@ pub async fn find_default(
         .filter(Column::Enabled.eq(true))
         .one(client)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(record.map(SyntheticsProbeTokenRecord::from))
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .map(SyntheticsProbeTokenRecord::from);
+
+    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), (record.clone(), Instant::now()));
+    Ok(record)
 }
 
 /// List all probe tokens for an org (enabled + disabled), newest-default first.
@@ -172,8 +250,12 @@ pub async fn get_by_name(
 }
 
 /// Enable or disable a token by `(org_id, name)`. Disabling is how a token is
-/// revoked — because there is no validator cache for probe tokens, it takes
-/// effect on the next request (no invalidation step needed).
+/// revoked.
+///
+/// Revocation is immediate **on this node** — the caches are cleared below. On
+/// other nodes it takes effect within `TOKEN_CACHE_TTL` (10 s), because there is
+/// no coordinator channel for synthetics yet. If instant fleet-wide revocation
+/// is ever required, that channel is the thing to build; do not remove the cache.
 pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
@@ -186,6 +268,12 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
+    invalidate_and_publish(org_id).await;
     Ok(())
 }
 
@@ -219,6 +307,12 @@ pub async fn set_default(org_id: &str, name: &str) -> Result<(), errors::Error> 
     txn.commit()
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
+    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
+    // returns, so emitting while holding it deadlocks the process — and the
+    // mutex is then held forever, hanging every later synthetics query.
+    drop(_lock);
+    invalidate_and_publish(org_id).await;
     Ok(())
 }
 

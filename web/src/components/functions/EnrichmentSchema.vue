@@ -70,7 +70,7 @@
             data-test="enrichment-schema-total-fields"
             class="rounded-default bg-theme-accent text-text-inverse flex h-7.5 w-28.75 items-center justify-center text-sm"
           >
-            All Fields ({{ schemaData.schema.length }})
+            {{ t("logStream.allFieldsCount", { count: schemaData.schema.length }) }}
           </div>
           <OSearchInput
             data-test="schema-field-search-input"
@@ -104,7 +104,7 @@
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -146,9 +146,9 @@ export default defineComponent({
   },
   emits: ["update:open"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
     const columns = [
       {
         id: "name",

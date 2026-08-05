@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-secondary text-xs whitespace-nowrap tabular-nums"
                     :title="t('iam.orgCleanupTasksDialog.attempts', { n: child.attempts })"
                   >
-                    {{ child.attempts }}×
+                    {{ child.attempts }}{{ t("iam.orgCleanupTasksDialog.attemptsMultiplier") }}
                   </span>
                   <OBadge :variant="badgeVariant(child.status)" size="sm" class="whitespace-nowrap">
                     {{ child.status }}
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-secondary text-xs whitespace-nowrap tabular-nums"
                 :title="t('iam.orgCleanupTasksDialog.attempts', { n: row.task.attempts })"
               >
-                {{ row.task.attempts }}×
+                {{ row.task.attempts }}{{ t("iam.orgCleanupTasksDialog.attemptsMultiplier") }}
               </span>
 
               <!-- Status badge -->
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -277,7 +277,7 @@ export default defineComponent({
   },
   emits: ["update:open"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const tasks = ref<CleanupTask[]>([]);
 
     const sortedTasks = computed(() =>

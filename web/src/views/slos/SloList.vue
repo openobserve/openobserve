@@ -155,7 +155,7 @@
             variant="purple-soft"
             icon="layers"
             size="xs"
-            :label="String(row.group_by?.length ?? 0)"
+            :label="raw(String(row.group_by?.length ?? 0))"
           />
           <OTag
             v-if="!row.enabled"
@@ -223,7 +223,7 @@
             :key="tag"
             variant="default-soft"
             size="xs"
-            :label="tag"
+            :label="raw(tag)"
           />
           <span v-if="(row.tags || []).length > 2" class="text-text-secondary">…</span>
         </div>
@@ -337,7 +337,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -378,7 +378,7 @@ import {
   type SloHealth,
 } from "@/composables/useSloFormat";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();

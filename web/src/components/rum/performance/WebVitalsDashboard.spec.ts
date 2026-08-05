@@ -1,7 +1,6 @@
 import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { nextTick } from "vue";
-import { createI18n } from "vue-i18n";
 import WebVitalsDashboard from "./WebVitalsDashboard.vue";
 
 // ---------------------------------------------------------------------------
@@ -57,19 +56,6 @@ const mockStore = {
 vi.mock("vuex", () => ({ useStore: () => mockStore }));
 
 // ---------------------------------------------------------------------------
-// i18n
-// ---------------------------------------------------------------------------
-
-const i18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {
-      rum: { learnWebVitalsLabel: "Learn about Web Vitals", clickHereLabel: "Click here" },
-    },
-  },
-});
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -86,7 +72,6 @@ function createWrapper(props: Record<string, any> = {}) {
   return mount(WebVitalsDashboard, {
     props: { ...defaultProps, ...props },
     global: {
-      plugins: [i18n],
       stubs: {
         RenderDashboardCharts: {
           name: "RenderDashboardCharts",
@@ -486,7 +471,7 @@ describe("WebVitalsDashboard", () => {
       wrapper = createWrapper();
 
       // Assert
-      expect(wrapper.text()).toContain("Learn about Web Vitals");
+      expect(wrapper.text()).toContain("Learn more about Web Vitals");
     });
 
     it("renders the clickHereLabel text from i18n", () => {

@@ -58,38 +58,6 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-// Mock vue-i18n
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: (key: string) => {
-      const translations: Record<string, string> = {
-        "dashboard.colorPalette": "Color palette",
-        "dashboard.colorSeriesBy": "Color series by:",
-        "dashboard.colorBySeries": "<b>By Series</b>",
-        "dashboard.colorDefaultPaletteBySeries": "Default Palette (By Series)",
-        "dashboard.colorDefaultPaletteBySeriesSubLabel":
-          "Series with the same name will use the same color",
-        "dashboard.colorPaletteClassic": "Palette-Classic",
-        "dashboard.colorPaletteClassicSubLabel":
-          "A random color will be used for each series, regardless of its name",
-        "dashboard.colorSingleColor": "Single Color",
-        "dashboard.colorSingleColorSubLabel": "Set a specific color to all series",
-        "dashboard.colorShadesOfSpecificColor": "Shades Of Specific Color",
-        "dashboard.colorShadesOfSpecificColorSubLabel": "Different shades of specific color",
-        "dashboard.colorByValue": "<b>By Value</b>",
-        "dashboard.colorGreenYellowRed": "Green-Yellow-Red (By Value)",
-        "dashboard.colorRedYellowGreen": "Red-Yellow-Green (By Value)",
-        "dashboard.colorTemperature": "Temperature (By Value)",
-        "dashboard.colorPositive": "Positive (By Value)",
-        "dashboard.colorNegative": "Negative (By Value)",
-        "dashboard.colorLightToDarkBlue": "Light To Dark Blue (By Value)",
-        "dashboard.colorPaletteClassicBySeries": "Palette-Classic (By Series)",
-      };
-      return translations[key] || key;
-    },
-  }),
-}));
-
 describe("ColorPaletteDropDown", () => {
   let wrapper: VueWrapper;
 
@@ -226,11 +194,11 @@ describe("ColorPaletteDropDown", () => {
       expect(colorOptions.length).toBeGreaterThan(10);
 
       // Should have group headers
-      const bySeriesGroup = colorOptions.find((opt) => opt.label === "<b>By Series</b>");
+      const bySeriesGroup = colorOptions.find((opt) => opt.label === "By Series");
       expect(bySeriesGroup).toBeDefined();
       expect(bySeriesGroup.header).toBe(true);
 
-      const byValueGroup = colorOptions.find((opt) => opt.label === "<b>By Value</b>");
+      const byValueGroup = colorOptions.find((opt) => opt.label === "By Value");
       expect(byValueGroup).toBeDefined();
       expect(byValueGroup.header).toBe(true);
     });
@@ -501,7 +469,7 @@ describe("ColorPaletteDropDown", () => {
       const groupOption = colorOptions.find((opt) => opt.header);
 
       expect(groupOption).toBeDefined();
-      expect(groupOption.label).toContain("<b>");
+      expect(groupOption.label).toBe("By Series");
     });
 
     it("should handle options with colorPalette arrays", () => {

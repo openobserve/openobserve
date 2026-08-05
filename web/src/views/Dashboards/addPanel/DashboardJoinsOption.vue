@@ -95,7 +95,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { watchDebounced } from "@vueuse/core";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import AddJoinPopUp from "./AddJoinPopUp.vue";
@@ -176,9 +176,8 @@ export default defineComponent({
   setup() {
     const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
-
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     /**
      * Determines if joins section should be displayed

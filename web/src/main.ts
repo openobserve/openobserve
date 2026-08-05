@@ -35,6 +35,7 @@ import { queryClient } from "./composables/query/queryClient";
 import { fetchConfig } from "./composables/query/queries/config";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
+import { raw } from "@/types/i18n";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -209,10 +210,10 @@ function showNewVersionNotification() {
   staleNotificationShown = true;
   toast({
     variant: "error",
-    message: i18n.global.t("common.chunkLoadErrorMsg"),
+    message: raw(i18n.global.t("common.chunkLoadErrorMsg")),
     timeout: 0, // Don't auto-dismiss
     action: {
-      label: i18n.global.t("common.refresh"),
+      label: raw(i18n.global.t("common.refresh")),
       handler: () => {
         window.location.reload();
       },

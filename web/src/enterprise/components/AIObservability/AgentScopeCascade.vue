@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
@@ -120,7 +120,7 @@ const emit = defineEmits<{
   (e: "update:selectedVersion", value: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const onEnvChange = (value: unknown) => {
   emit("update:selectedEnv", value as string);

@@ -1,3 +1,5 @@
+import type { I18nText } from "@/types/i18n";
+
 import type { Ref } from "vue";
 
 export interface Shortcut {
@@ -14,7 +16,7 @@ export interface Shortcut {
   /** Override combo on macOS (falls back to `key`). */
   keyForMac?: string;
   handler: () => void;
-  description?: string;
+  description?: I18nText;
   scope?: string;
   whenFocused?: Ref<HTMLElement | null> | HTMLElement | null;
   /** When true the shortcut fires but is omitted from the cheatsheet list */

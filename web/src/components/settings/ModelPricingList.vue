@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="getSource(row) === 'built_in'"
                 class="mr-1 inline-flex shrink-0 cursor-default"
               >
-                <img :src="ooLogo" class="h-4 w-4" alt="OpenObserve" />
+                <img :src="ooLogo" class="h-4 w-4" :alt="t('modelPricing.openObserveLogoAlt')" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
               </span>
               <span
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="getSource(pricingDialogRow) === 'built_in'"
           class="inline-flex shrink-0 cursor-default"
         >
-          <img :src="ooLogo" class="h-4.5 w-4.5" alt="OpenObserve" />
+          <img :src="ooLogo" class="h-4.5 w-4.5" :alt="t('modelPricing.openObserveLogoAlt')" />
           <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
         </span>
         <span
@@ -472,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount, onActivated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -499,7 +499,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { modelPricingQuery } from "@/composables/query/queries/settingsLists";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
 const router = useRouter();
@@ -744,7 +744,7 @@ function notifyError(prefix: string, e: any) {
   const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
   toast({
     variant: "error",
-    message: `${prefix}: ${msg}`,
+    message: t("toastMessages.settings.message", { prefix: prefix, message: msg }),
     timeout: 5000,
   });
 }

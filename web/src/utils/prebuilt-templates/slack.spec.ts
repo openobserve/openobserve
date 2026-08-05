@@ -116,8 +116,8 @@ describe("slack template", () => {
     });
 
     it("has description", () => {
-      expect(slackDestinationType.description).toBeTruthy();
-      expect(typeof slackDestinationType.description).toBe("string");
+      expect(slackDestinationType.descriptionKey).toBeTruthy();
+      expect(typeof slackDestinationType.descriptionKey).toBe("string");
     });
 
     it("has icon", () => {

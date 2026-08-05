@@ -26,8 +26,13 @@ import { qk } from "../queryKeys";
 
 export const syntheticsMonitorsQuery = createOrgListQuery<any, [folderId?: string]>({
   key: (org, folderId) => qk.synthetics.monitors(org, folderId),
-  fetch: async (org, folderId) =>
-    (await syntheticsService.listByFolderId(org, folderId)).data?.monitors ?? [],
+  // The API field was renamed `monitors` -> `checks`. Both are read so a
+  // bundle and a server on opposite sides of that rename still render.
+  fetch: async (org, folderId) => {
+    const data = (await syntheticsService.listByFolderId(org, folderId))
+      .data as any;
+    return data?.checks ?? data?.monitors ?? [];
+  },
   tier: "ENTITY_LIST",
   root: (org) => qk.synthetics.root(org),
 });

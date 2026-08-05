@@ -794,17 +794,17 @@ mod tests {
         fs::write(config_path, test_config).unwrap();
 
         // Temporarily replace the main config path
-        if let Ok(config_str) = fs::read_to_string(config_path) {
-            if let Ok(config) = serde_json::from_str::<PrebuiltDestinationsConfig>(&config_str) {
-                let destinations: Vec<Destination> = config
-                    .destinations
-                    .into_iter()
-                    .filter_map(|dest| convert_to_destination(dest).ok())
-                    .collect();
+        if let Ok(config_str) = fs::read_to_string(config_path)
+            && let Ok(config) = serde_json::from_str::<PrebuiltDestinationsConfig>(&config_str)
+        {
+            let destinations: Vec<Destination> = config
+                .destinations
+                .into_iter()
+                .filter_map(|dest| convert_to_destination(dest).ok())
+                .collect();
 
-                assert_eq!(destinations.len(), 1);
-                assert_eq!(destinations[0].name, "Test Destination");
-            }
+            assert_eq!(destinations.len(), 1);
+            assert_eq!(destinations[0].name, "Test Destination");
         }
 
         // Clean up

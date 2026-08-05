@@ -4,7 +4,14 @@ const fs = require('fs');
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
 
-// Auth storage paths
+// Auth storage paths. Filenames stay canonical (user.json / cloud-config.json)
+// because ~20 spec files and shared utils (cloud-auth.js, enhanced-baseFixtures.js)
+// read these exact paths. Multi-user splitting (ALPHA1_USER_INDEX, 1|2|3) is
+// achieved at the CI layer instead: each shard runs on its own runner and
+// downloads only ITS user's artifact into this dir, so the canonical file always
+// holds the right user's session. USER_INDEX here only selects which Dex user to
+// log in as (email resolution below).
+const USER_INDEX = (process.env.ALPHA1_USER_INDEX || '1').trim();
 const AUTH_DIR = path.join(__dirname, 'auth');
 const AUTH_FILE = path.join(AUTH_DIR, 'user.json');
 const CLOUD_CONFIG_FILE = path.join(AUTH_DIR, 'cloud-config.json');
@@ -28,11 +35,17 @@ async function globalSetup() {
   if (!baseUrl) {
     throw new Error('ZO_BASE_URL must be set');
   }
-  const userEmail = (process.env.ALPHA1_USER_EMAIL || '').trim();
+  // Resolve this shard's Dex user by index: ALPHA1_USER_EMAIL_<N> when provided,
+  // else fall back to the base ALPHA1_USER_EMAIL. This keeps the workflow safe to
+  // roll out incrementally — if _2/_3 aren't set yet, every shard just uses user 1.
+  // Password is shared across all users (single ALPHA1_USER_PASSWORD secret).
+  const userEmail = (process.env[`ALPHA1_USER_EMAIL_${USER_INDEX}`]
+    || process.env.ALPHA1_USER_EMAIL || '').trim();
   const userPassword = (process.env.ALPHA1_USER_PASSWORD || '').trim();
   if (!userEmail || !userPassword) {
     throw new Error('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set');
   }
+  testLogger.info(`[alpha1] Using Dex user index ${USER_INDEX} (${userEmail})`);
 
   // Check if shared auth state exists (downloaded from cleanup job artifact)
   // If valid, skip the entire Dex login flow — just verify and ingest
@@ -704,3 +717,8 @@ async function performGlobalIngestionWithFetch() {
 }
 
 module.exports = globalSetup;
+// Named helpers reused by mid-run re-authentication (reauth-alpha1.js). Attaching
+// them as properties keeps the default export the globalSetup function Playwright calls.
+module.exports.performDexLogin = performDexLogin;
+module.exports.switchOrgViaDropdown = switchOrgViaDropdown;
+module.exports.fetchCloudConfig = fetchCloudConfig;

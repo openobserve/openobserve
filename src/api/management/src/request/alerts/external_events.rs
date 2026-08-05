@@ -127,14 +127,7 @@ async fn handle_events(
         )); // 400; sources should configure max_alerts/grouping
     }
 
-    let base_destinations: Vec<String> = integration.config["destinations"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
+    let base_destinations: Vec<String> = integration.destinations.clone();
 
     let (mut accepted, mut rejected, mut saw_resolved) = (0u32, 0u32, false);
     let mut errors: Vec<serde_json::Value> = Vec::new();

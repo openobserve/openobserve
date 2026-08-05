@@ -314,7 +314,7 @@ import {
   computed,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
@@ -382,7 +382,7 @@ export default defineComponent({
     OTooltip,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -789,7 +789,7 @@ export default defineComponent({
       arePanelsLoading.value = !allPanelsLoaded;
     };
 
-    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery();
+    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery(t);
 
     // [END] cancel running queries
 
@@ -1531,6 +1531,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.viewDashboard.panelDeletionFailed"),
+            t,
           );
         } else {
           showErrorNotification(
@@ -1565,6 +1566,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.viewDashboard.panelMoveFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelMoveFailed"), {
@@ -1619,8 +1621,11 @@ export default defineComponent({
       scheduledReports.value = [];
       isLoadingReports.value = true;
 
+      // folder_id is intentionally omitted here: it filters by the REPORT's own
+      // folder, not the dashboard's folder, so passing the dashboard folder id
+      // would incorrectly exclude reports saved to a different report folder.
       reports
-        .list(store.state.selectedOrganization.identifier, folderId.value, dashboardId.value)
+        .list(store.state.selectedOrganization.identifier, "", dashboardId.value)
         .then((response) => {
           scheduledReports.value = response.data;
         })

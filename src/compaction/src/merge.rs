@@ -620,7 +620,32 @@ pub async fn merge_by_stream(
         orphan_blooms.extend(task.await??);
     }
 
-    let _ = (is_incremental, orphan_blooms);
+    // Build bloom filters for the current hour. Failures are non-fatal: files
+    // left at bloom_ver = 0 fall back to the regular Tantivy search path.
+    let build_start = std::time::Instant::now();
+    match crate::bloom::compact::build_for_stream(
+        org_id,
+        stream_type,
+        stream_name,
+        &date_start,
+        is_incremental,
+        orphan_blooms,
+    )
+    .await
+    {
+        Ok(false) => {}
+        Ok(true) => {
+            let build_time = build_start.elapsed().as_millis();
+            log::info!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
+            );
+        }
+        Err(e) => {
+            log::warn!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
+            );
+        }
+    }
 
     // update job status
     if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {

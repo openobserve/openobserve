@@ -399,7 +399,7 @@ import regexPatternsService from "@/services/regex_pattern";
 import { convertUnixToDateFormat, getImageURL } from "@/utils/zincutils";
 import { debounce } from "lodash-es";
 import { useToast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -450,7 +450,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const filterPattern = ref("");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const allPatterns = ref([]);
     const selectedPatterns = ref<any[]>([]);
     const listLoading = ref(false);
@@ -520,7 +520,7 @@ export default defineComponent({
         const e = error as { response?: { data?: { message?: string } } };
         toast({
           variant: "error",
-          message: e.response?.data?.message || t("regex_patterns.failed_to_test_string"),
+          message: raw(e.response?.data?.message || t("regex_patterns.failed_to_test_string")),
         });
       } finally {
         testLoading.value = false;
@@ -658,7 +658,9 @@ export default defineComponent({
         toast({
           variant: "error",
           message:
-            e?.response?.data?.message || e?.data?.message || "Error fetching regex patterns",
+            raw(e?.response?.data?.message) ||
+            raw(e?.data?.message) ||
+            t("toastMessages.logstream.errorFetchingRegexPatterns"),
         });
       } finally {
         listLoading.value = false;
