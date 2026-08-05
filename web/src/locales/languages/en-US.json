@@ -11421,7 +11421,8 @@
         "toggleVisibilityAria": "Toggle column visibility",
         "resetToDefault": "Reset to default",
         "resetColumnWidths": "Reset column widths"
-      }
+      },
+      "removeColumnAria": "Remove column"
     },
     "predefinedThemes": {
       "title": "Theme",

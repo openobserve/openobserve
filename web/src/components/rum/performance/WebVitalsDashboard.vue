@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info" size="sm" class="mr-1" />
         {{ t("rum.learnWebVitalsLabel") }}
         <a
-          title="https://web.dev/articles/vitals"
+          :title="raw('https://web.dev/articles/vitals')"
           href="https://web.dev/articles/vitals"
           class="text-badge-indigo-soft-text ml-1"
           target="_blank"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, ref, watch, onActivated, nextTick, onMounted, type Ref } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import {
@@ -212,6 +212,7 @@ export default defineComponent({
     return {
       currentDashboardData,
       goBackToDashboardList,
+      raw,
       addPanelData,
       t,
       getDashboard,

@@ -205,7 +205,9 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
         const text = bareText(node.value && node.value.expression);
         if (text == null) return;
         if (dir === "bind") {
-          return; // guarded by the I18nText type instead — see src/types/i18n.ts
+          // Component props → guarded by I18nText. Native `:title` / `:alt` are the
+          // residual gap: the built-in rule covers only their static form.
+          return;
         } else if (dir === "text" || dir === "html") {
           context.report({
             node,
@@ -297,16 +299,30 @@ export default [
       // the user. Dynamic keys are skipped by the rule; specs are exempted below.
       "@intlify/vue-i18n/no-missing-keys": "error",
       //
-      // Text nodes only. `attributes: {}` is deliberate: props are guarded by the
-      // `I18nText` type (src/types/i18n.ts), which also rejects a plain string
-      // variable — something no lint rule can see. A text node has no prop to
-      // annotate, so this rule still runs for those.
+      // Text nodes, plus the native HTML/ARIA attributes below. Component props are
+      // absent on purpose — `I18nText` (src/types/i18n.ts) guards those, and rejects
+      // even `:label="someStringVariable"`, which no lint rule can see. These
+      // attributes have no prop to annotate, so lint is the only gate they get.
+      //
+      // Not the old `TEXT_ATTRS` list returning: that tracked OUR components and went
+      // stale silently. This tracks the web platform, which does not change.
       // (@intlify's own `no-raw-text` is not used — it counts punctuation and code
       // tokens, so it stays in the hundreds even fully migrated.)
       "vue/no-bare-strings-in-template": [
         "error",
         {
-          attributes: {},
+          attributes: {
+            "/.+/": [
+              "title",
+              "alt",
+              "aria-label",
+              "aria-placeholder",
+              "aria-roledescription",
+              "aria-valuetext",
+            ],
+            input: ["placeholder"],
+            textarea: ["placeholder"],
+          },
           allowlist: [...BARE_STRING_DEFAULT_ALLOWLIST, ...NON_TRANSLATABLE],
         },
       ],
