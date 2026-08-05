@@ -106,11 +106,10 @@ const OIconStub = {
 };
 
 // Shallow stub — renders a plain <button> so native DOM events (click, etc.)
-// bubble normally. The parent template's @click handler is registered as a
-// native event listener and fires when the button is clicked.
+// bubble normally. `click` must NOT be a declared emit: declaring it strips the
+// parent's onClick from $attrs, so v-bind="$attrs" would never attach it.
 const OButtonStub = {
   props: ["variant", "size", "icon", "iconLeft", "loading"],
-  emits: ["click"],
   inheritAttrs: false,
   template:
     '<button v-bind="$attrs" :data-variant="variant" :data-icon="icon" :data-icon-left="iconLeft"><slot /></button>',
@@ -305,7 +304,7 @@ describe("CheckLocations", () => {
       ).toBe(true);
     });
 
-    it("should emit setup-agent from the CTA when no locations exist at all", async () => {
+    it("should emit new-location from the CTA when no locations exist at all", async () => {
       wrapper = mountCheckLocations({
         locations: [] as SyntheticsLocation[],
         allowPrivate: true,
@@ -315,7 +314,7 @@ describe("CheckLocations", () => {
         .find('[data-test="synthetics-check-locations-private-empty-cta"]')
         .trigger("click");
 
-      expect(wrapper.emitted("setup-agent")).toBeTruthy();
+      expect(wrapper.emitted("new-location")).toBeTruthy();
     });
   });
 
@@ -436,11 +435,13 @@ describe("CheckLocations", () => {
     });
 
     it("should emit new-location when new location button is clicked", async () => {
-      // Verify the button renders with correct variant and text
       const btn = wrapper.find('[data-test="synthetics-check-locations-new-location-btn"]');
       expect(btn.exists()).toBe(true);
       expect(btn.attributes("data-variant")).toBe("primary");
       expect(btn.text()).toContain("synthetics.locations.newLocation");
+
+      await btn.trigger("click");
+      expect(wrapper.emitted("new-location")).toBeTruthy();
     });
 
     it("should render per-row action button with correct variant per status", () => {

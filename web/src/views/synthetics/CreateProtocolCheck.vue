@@ -43,7 +43,6 @@ import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
@@ -430,7 +429,8 @@ async function saveCheck() {
         </OButton>
       </div>
 
-      <!-- Private agent setup drawer. -->
+      <!-- Private agent setup drawer; locations reload on close so a freshly
+           registered location becomes selectable without leaving the form. -->
       <AgentSetupDrawer
         v-model:open="showAgentSetup"
         :token="agentSetup?.token"
@@ -445,6 +445,7 @@ async function saveCheck() {
             if (!open) {
               agentSetupLocationId = null;
               agentSetupLocationName = null;
+              fetchLocations();
             }
           }
         "
