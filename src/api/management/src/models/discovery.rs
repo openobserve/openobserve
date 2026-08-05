@@ -15,7 +15,8 @@
 
 use config::meta::self_reporting::llm_scores::LlmScoreTargetScope;
 use openobserve_core::llm_evaluations::discovery::{
-    DiscoveryItem, DiscoveryPage, DiscoveryQueueStatusFilter, ListDiscoveryItems,
+    DiscoveryItem, DiscoveryPage, DiscoveryQueueStatusFilter, DiscoveryScopeTotals,
+    ListDiscoveryItems,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -73,9 +74,16 @@ pub struct DiscoveryItemResponseBody {
     /// two or more unhealthy dimensions.
     pub quality: String,
     pub issue_count: usize,
-    /// One representative row from the target trace stream, fetched only after
-    /// Discovery filtering and pagination.
-    pub trace_details: Option<serde_json::Value>,
+    /// Scope-specific display fields hydrated from the target trace stream.
+    pub context: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveryScopeTotalsResponseBody {
+    pub span: usize,
+    pub trace: usize,
+    pub session: usize,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -83,8 +91,10 @@ pub struct DiscoveryItemResponseBody {
 pub struct ListDiscoveryItemsResponseBody {
     pub list: Vec<DiscoveryItemResponseBody>,
     pub total: usize,
+    pub scope_totals: DiscoveryScopeTotalsResponseBody,
     pub from: usize,
     pub size: usize,
+    pub has_more: bool,
 }
 
 impl From<DiscoveryItem> for DiscoveryItemResponseBody {
@@ -98,7 +108,17 @@ impl From<DiscoveryItem> for DiscoveryItemResponseBody {
             source_stream: value.source_stream,
             quality: value.quality.as_str().to_string(),
             issue_count: value.issue_count,
-            trace_details: value.trace_details,
+            context: value.context,
+        }
+    }
+}
+
+impl From<DiscoveryScopeTotals> for DiscoveryScopeTotalsResponseBody {
+    fn from(value: DiscoveryScopeTotals) -> Self {
+        Self {
+            span: value.span,
+            trace: value.trace,
+            session: value.session,
         }
     }
 }
@@ -112,14 +132,18 @@ impl From<DiscoveryPage> for ListDiscoveryItemsResponseBody {
                 .map(DiscoveryItemResponseBody::from)
                 .collect(),
             total: value.total,
+            scope_totals: value.scope_totals.into(),
             from: value.from,
             size: value.size,
+            has_more: value.has_more,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use openobserve_core::llm_evaluations::discovery::{DiscoveryQuality, DiscoveryScopeTotals};
+
     use super::*;
 
     #[test]
@@ -154,5 +178,47 @@ mod tests {
         });
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn response_serializes_context_and_all_scope_totals() {
+        let response = ListDiscoveryItemsResponseBody::from(DiscoveryPage {
+            items: vec![DiscoveryItem {
+                scope: LlmScoreTargetScope::Trace,
+                target_id: "trace-1".to_string(),
+                trace_id: Some("trace-1".to_string()),
+                session_id: None,
+                ref_timestamp: 123,
+                source_stream: Some("traces".to_string()),
+                quality: DiscoveryQuality::Issue,
+                issue_count: 1,
+                context: Some(serde_json::json!({
+                    "input": "question",
+                    "serviceName": "api",
+                    "operationName": "chat",
+                    "spanKind": "INTERNAL",
+                })),
+            }],
+            total: 42,
+            scope_totals: DiscoveryScopeTotals {
+                span: 216,
+                trace: 42,
+                session: 11,
+            },
+            from: 0,
+            size: 20,
+            has_more: true,
+        });
+        let value = serde_json::to_value(response).unwrap();
+
+        assert_eq!(value["scopeTotals"]["span"], 216);
+        assert_eq!(value["scopeTotals"]["trace"], 42);
+        assert_eq!(value["scopeTotals"]["session"], 11);
+        assert_eq!(value["list"][0]["context"]["input"], "question");
+        assert!(value["list"][0].get("traceDetails").is_none());
+        assert!(value["list"][0]["context"].get("output").is_none());
+        assert_eq!(value["from"], 0);
+        assert_eq!(value["size"], 20);
+        assert_eq!(value["hasMore"], true);
     }
 }

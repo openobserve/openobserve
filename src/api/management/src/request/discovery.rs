@@ -37,9 +37,7 @@ fn discovery_error_response(error: DiscoveryError) -> Response {
             log::error!("[Discovery] queue database error: {error}");
             MetaHttpResponse::internal_error("Internal server error")
         }
-        error @ (DiscoveryError::Search(_)
-        | DiscoveryError::MalformedSearchResponse(_)
-        | DiscoveryError::MissingSessionIdentity(_)) => {
+        error @ (DiscoveryError::Search(_) | DiscoveryError::MalformedSearchResponse(_)) => {
             log::error!("[Discovery] {error}");
             MetaHttpResponse::internal_error("Discovery query failed")
         }
@@ -54,7 +52,7 @@ fn discovery_error_response(error: DiscoveryError) -> Response {
     tag = "Discovery",
     operation_id = "ListDiscoveryItems",
     summary = "List unhealthy scored LLM targets",
-    description = "Resolves the latest score evaluation and score dimension, applies the current active Score Config thresholds, derives issue or multiple quality, applies the queue-membership filter before pagination, and then hydrates one representative trace row for every returned target.",
+    description = "Resolves the latest score evaluation and score dimension, applies the current active Score Config thresholds, derives issue or multiple quality, applies the queue-membership filter, returns exact totals for every native scope, pages the requested scope, and hydrates scope-specific context for that page.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
