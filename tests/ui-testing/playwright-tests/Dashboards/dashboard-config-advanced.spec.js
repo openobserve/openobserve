@@ -420,7 +420,34 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     // Add a row, then delete the last one via the relocated per-row delete button
     await pm.dashboardPanelConfigs.addValueMappingRow(popup);
-    await expect(rows).toHaveCount(beforeAdd + 1);
+    try {
+      await expect(rows).toHaveCount(beforeAdd + 1, { timeout: 5000 });
+    } catch (e) {
+      // Observed count doubling (2→4) in CI, unexplained by source reading —
+      // ODialog's neutral button is bound once and OSelect's two `-trigger`
+      // bindings are properly v-if/v-else mutually exclusive (both checked in
+      // source), so the duplication mechanism is still unknown. Dump the
+      // matched elements' actual identity so the failure is self-diagnosing:
+      // is the popup itself duplicated, or are there genuinely duplicate row
+      // containers, or is one data-test value landing on 2 real elements?
+      const diag = await page.evaluate(() => {
+        const popups = [...document.querySelectorAll('[data-test="dashboard-value-mapping-popup"]')];
+        return {
+          popupCount: popups.length,
+          rowsPerPopup: popups.map((p) =>
+            [...p.querySelectorAll('[data-test^="dashboard-addpanel-config-value-mapping-type-select-"]')].map(
+              (el) => ({
+                dataTest: el.getAttribute("data-test"),
+                tag: el.tagName,
+                outerHTMLSnippet: el.outerHTML.slice(0, 150),
+              }),
+            ),
+          ),
+        };
+      });
+      testLogger.error("Value mapping row-count mismatch — DOM diagnostic", diag);
+      throw e;
+    }
     const beforeDelete = await rows.count();
     await pm.dashboardPanelConfigs.deleteValueMappingRow(popup, beforeDelete - 1);
     await expect(rows).toHaveCount(beforeDelete - 1);
