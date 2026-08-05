@@ -588,7 +588,7 @@ export const BADGE_GROUPS = {
   featureStatus: {
     mode: "plain",
     shape: "pill",
-    size: "md",
+    size: "sm",
     values: {
       enabled: { variant: "success" },
       disabled: { variant: "error" },

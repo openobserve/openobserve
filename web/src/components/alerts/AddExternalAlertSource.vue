@@ -20,66 +20,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="onDrawerOpenChange"
     :title="isEditMode ? t('alert_sources.editTitle') : t('alert_sources.addTitle')"
     size="lg"
+    :form-id="created ? undefined : FORM_ID"
     :primary-button-label="created ? t('alert_sources.done') : t('alert_sources.save')"
     :secondary-button-label="created ? undefined : t('alert_sources.cancel')"
-    :primary-button-disabled="!created && !form.name.trim()"
-    :primary-button-loading="saving"
     data-test="add-alert-source-drawer"
     @click:primary="onPrimaryClick"
     @click:secondary="cancel"
   >
     <div class="flex flex-col gap-4">
-      <OInput
-        v-model="form.name"
-        :disabled="created"
-        :label="t('alert_sources.name')"
-        :help-text="t('alert_sources.nameHint')"
-        data-test="add-alert-source-name-input"
-      />
-      <div class="flex flex-col gap-1">
-        <p class="text-text-secondary text-xs">{{ t("alert_sources.incidentDestination") }}</p>
-        <div class="flex items-center">
-          <OSelect
-            v-model="form.destinations"
-            multiple
-            searchable
-            :disabled="created"
-            class="max-w-[18.75rem] min-w-[11.25rem]"
-            :options="destinationOptions"
-            :placeholder="t('alert_sources.incidentDestinationPlaceholder')"
-            data-test="add-alert-source-destinations-select"
-          >
-            <template #empty>{{ t("alerts.alertSettings.noDestinationsAvailable") }}</template>
-          </OSelect>
-          <OButton
-            variant="ghost"
-            size="icon-circle-sm"
-            class="ml-1"
-            :disabled="created"
-            :title="t('alerts.alertSettings.refreshDestinations')"
-            data-test="add-alert-source-refresh-destinations-btn"
-            @click="fetchDestinationOptions"
-          >
-            <OIcon name="refresh" size="sm" />
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm"
-            class="ml-2"
-            :disabled="created"
-            data-test="add-alert-source-create-destination-btn"
-            @click="routeToCreateDestination"
-          >
-            {{ t("alerts.alertSettings.addNewDestination") }}
-          </OButton>
+      <!-- `formKey` remounts OForm on open so defaults re-read the edit target. -->
+      <OForm
+        :id="FORM_ID"
+        :key="formKey"
+        :schema="schema"
+        :default-values="defaultValues"
+        class="flex flex-col gap-5"
+        @submit="onSubmit"
+      >
+        <OFormInput
+          name="name"
+          :disabled="created"
+          :label="t('alert_sources.name')"
+          :help-text="t('alert_sources.nameHint')"
+          required
+          data-test="add-alert-source-name-input"
+        />
+        <div class="flex flex-col gap-1">
+          <div class="flex items-end gap-2">
+            <!-- OSelect fills its container, so the width lives on the wrapper. -->
+            <div class="w-72">
+              <OFormSelect
+                name="destinations"
+                multiple
+                searchable
+                :disabled="created"
+                :label="t('alert_sources.incidentDestination')"
+                :options="destinationOptions"
+                :placeholder="t('alert_sources.incidentDestinationPlaceholder')"
+                data-test="add-alert-source-destinations-select"
+              >
+                <template #empty>{{ t("alerts.alertSettings.noDestinationsAvailable") }}</template>
+              </OFormSelect>
+            </div>
+            <OButton
+              variant="ghost"
+              size="icon-circle-sm"
+              :disabled="created"
+              :title="t('alerts.alertSettings.refreshDestinations')"
+              data-test="add-alert-source-refresh-destinations-btn"
+              @click="fetchDestinationOptions"
+            >
+              <OIcon name="refresh" size="sm" />
+            </OButton>
+            <OButton
+              variant="outline"
+              size="sm"
+              :disabled="created"
+              data-test="add-alert-source-create-destination-btn"
+              @click="routeToCreateDestination"
+            >
+              {{ t("alerts.alertSettings.addNewDestination") }}
+            </OButton>
+          </div>
+          <p class="text-text-secondary text-xs">
+            {{ t("alert_sources.incidentDestinationHint") }}
+          </p>
         </div>
-        <p class="text-text-secondary text-xs">{{ t("alert_sources.incidentDestinationHint") }}</p>
-      </div>
+      </OForm>
 
-      <!-- All 3 setup steps render together from the start (matches the
-           ingestion setup cards' OStepper `expanded` checklist pattern) —
-           steps 2/3 just show a "save first" placeholder until the source
-           exists, instead of being hidden entirely. -->
+      <!-- All 3 steps show from the start; 2 and 3 hold a "save first"
+           placeholder until the source exists. -->
       <OStepper v-if="!isEditMode" :model-value="activeStep" expanded orientation="vertical">
         <OStep :name="1" :title="t('alert_sources.setupStep1Title')" :done="created">
           <p class="text-text-secondary text-sm">{{ t("alert_sources.setupStep1Body") }}</p>
@@ -139,8 +149,9 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -151,27 +162,41 @@ import alertSources from "@/services/alert_sources";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
+import {
+  makeAlertSourceSchema,
+  alertSourceDefaults,
+  type AlertSourceForm,
+} from "./AddExternalAlertSource.schema";
 import type { AlertSourceIntegration } from "@/ts/interfaces/alertSources";
 
-// Polls the senders endpoint until the first event arrives, so the admin sees
-// wiring confirmed live instead of having to manually refresh the source
-// list — closes the "no feedback loop" gap flagged in the design review.
+// Polls senders until the first event arrives, so wiring is confirmed live.
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 120000;
 
+// Links ODrawer's Save button to the nested OForm (submit + spinner).
+const FORM_ID = "add-alert-source-form";
+
 export default defineComponent({
   name: "AddExternalAlertSource",
-  components: { ODrawer, OInput, OSelect, OButton, OIcon, OTag, OStepper, OStep, CopyContent },
+  components: {
+    ODrawer,
+    OForm,
+    OFormInput,
+    OFormSelect,
+    OButton,
+    OIcon,
+    OTag,
+    OStepper,
+    OStep,
+    CopyContent,
+  },
   props: {
     open: {
       type: Boolean,
       default: false,
     },
-    // When set, the drawer opens pre-filled with this integration's current
-    // name/destinations and Save patches them in place instead of creating a
-    // new source — one row-level "Edit" action covering all editable fields,
-    // matching the list ⇄ editor convention used by Destinations/Templates
-    // rather than separate per-field popovers.
+    // When set, the drawer pre-fills from this integration and Save patches
+    // it in place instead of creating a new source.
     editingIntegration: {
       type: Object as () => AlertSourceIntegration | undefined,
       default: undefined,
@@ -182,19 +207,20 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
-    return { store, t, router, raw };
+    const schema = makeAlertSourceSchema(t);
+    return { store, t, router, schema, FORM_ID };
   },
   data() {
     return {
-      form: { name: "", destinations: [] as string[] },
       destinationOptions: [] as Array<{ label: I18nText; value: string }>,
+      defaultValues: alertSourceDefaults(),
+      formKey: 0,
       created: false,
       createdIntegration: undefined as AlertSourceIntegration | undefined,
       waitingForEvent: true,
       detectedFormat: "",
       pollTimer: undefined as ReturnType<typeof setInterval> | undefined,
       pollDeadline: 0,
-      saving: false,
     };
   },
   computed: {
@@ -204,14 +230,13 @@ export default defineComponent({
     isEditMode(): boolean {
       return !!this.editingIntegration;
     },
-    // Drives OStepper's required modelValue: highlights step 1 until the
-    // source is created, step 2 while waiting for the first event, step 3
-    // once connected. Steps are still shown together (expanded mode) — this
-    // only controls which one reads as "active".
+    // OStepper's modelValue — which step reads as active (all stay visible).
     activeStep(): number {
       if (!this.created) return 1;
       return this.waitingForEvent ? 2 : 3;
     },
+    // A URL and a bearer token the user copies verbatim — machine vocabulary,
+    // identical in every locale.
     createdUrlSnippet(): I18nText {
       if (!this.createdIntegration) return raw("");
       const ingestionURL = getIngestionURL();
@@ -231,13 +256,8 @@ export default defineComponent({
       const ingestionURL = getIngestionURL();
       const base = getEndPoint(ingestionURL).url;
       const url = `${base}/api/v2/${this.orgIdentifier}/incidents/events`;
-      // No leading "# curl" comment line here — unlike createdUrlSnippet,
-      // this whole block is meant to be pasted straight into a shell and
-      // run as-is, so it must contain nothing but valid shell syntax.
-      // Body is the minimal payload the generic-format detector accepts
-      // (status: firing/resolved + a labels object) — see
-      // core/src/alerts/external_alerts/detect.rs — an empty `{}` body
-      // fails with "unrecognized payload format".
+      // Pasted straight into a shell, so: no comment lines. The body is the
+      // minimal payload detect.rs accepts — an empty `{}` is rejected.
       return raw(
         [
           `curl -X POST '${url}' \\`,
@@ -248,11 +268,8 @@ export default defineComponent({
       );
     },
     connectedLabel(): I18nText {
-      // Built from a plain (non-interpolated) t() call + string concatenation
-      // rather than t(key, { format }) — vue-i18n's named-interpolation path
-      // throws on a missing/renamed key instead of warning-and-falling-back
-      // the way a plain t() call does, which previously could take down this
-      // whole branch's render.
+      // Plain t() + concatenation: named interpolation THROWS on a missing
+      // key, which would take down this whole branch's render.
       return raw(`${this.t("alert_sources.connectedPrefix")} ${this.detectedFormat}`);
     },
   },
@@ -271,12 +288,8 @@ export default defineComponent({
   },
   methods: {
     resetForm() {
-      this.form = this.editingIntegration
-        ? {
-            name: this.editingIntegration.name,
-            destinations: [...this.editingIntegration.destinations],
-          }
-        : { name: "", destinations: [] };
+      this.defaultValues = alertSourceDefaults(this.editingIntegration);
+      this.formKey += 1;
       this.created = false;
       this.createdIntegration = undefined;
       this.waitingForEvent = true;
@@ -296,10 +309,8 @@ export default defineComponent({
         toast({ variant: "error", message: this.t("alert_sources.destinationsLoadError") });
       }
     },
-    // Matches AlertSettings.vue's routeToCreateDestination — destinations are
-    // a full resource (webhook/email/etc config), so creation always happens
-    // on the real Destinations page, not inline. Opens in a new tab; the
-    // admin returns and clicks refresh to pick up the new destination.
+    // Destinations are a full resource, so they're created on their own page
+    // (new tab) — matches AlertSettings.vue.
     routeToCreateDestination() {
       const url = this.router.resolve({
         name: "alertDestinations",
@@ -310,22 +321,22 @@ export default defineComponent({
       }).href;
       window.open(url, "_blank");
     },
+    // ODrawer only emits click:primary without a form-id — i.e. the "Done"
+    // button. Save/Update go through the form's own submit.
     onPrimaryClick() {
-      if (this.created) {
-        this.onDrawerOpenChange(false);
-      } else if (this.isEditMode) {
-        this.submitEdit();
-      } else {
-        this.submit();
-      }
+      if (this.created) this.onDrawerOpenChange(false);
     },
-    async submit() {
-      if (!this.form.name.trim()) return;
+    onSubmit(values: AlertSourceForm) {
+      return this.isEditMode ? this.submitEdit(values) : this.submit(values);
+    },
+    async submit(values: AlertSourceForm) {
+      const name = values.name.trim();
+      if (!name) return;
       try {
         const res = await alertSources.create(this.orgIdentifier, {
-          name: this.form.name,
+          name,
           source_type: "auto",
-          destinations: this.form.destinations,
+          destinations: values.destinations,
         });
         this.createdIntegration = res.data;
         this.created = true;
@@ -336,19 +347,18 @@ export default defineComponent({
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }
     },
-    async submitEdit() {
-      if (!this.editingIntegration || !this.form.name.trim()) return;
-      this.saving = true;
+    async submitEdit(values: AlertSourceForm) {
+      const name = values.name.trim();
+      if (!this.editingIntegration || !name) return;
       try {
-        const name = this.form.name.trim();
         const nameChanged = name !== this.editingIntegration.name;
         const destinationsChanged =
-          JSON.stringify([...this.form.destinations].sort()) !==
+          JSON.stringify([...values.destinations].sort()) !==
           JSON.stringify([...this.editingIntegration.destinations].sort());
         if (nameChanged || destinationsChanged) {
           await alertSources.update(this.orgIdentifier, this.editingIntegration.id, {
             ...(nameChanged ? { name } : {}),
-            ...(destinationsChanged ? { destinations: this.form.destinations } : {}),
+            ...(destinationsChanged ? { destinations: values.destinations } : {}),
           });
         }
         toast({ variant: "success", message: this.t("alert_sources.updatedSuccess") });
@@ -356,8 +366,6 @@ export default defineComponent({
         this.onDrawerOpenChange(false);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
-      } finally {
-        this.saving = false;
       }
     },
     startPolling() {
@@ -388,8 +396,7 @@ export default defineComponent({
           this.stopPolling();
         }
       } catch (e) {
-        // Transient poll failures don't need a toast — the pill just stays
-        // "waiting" and the next tick tries again.
+        // Transient failures just leave the pill "waiting" for the next tick.
       }
     },
     onDrawerOpenChange(value: boolean) {

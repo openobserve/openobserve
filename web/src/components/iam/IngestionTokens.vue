@@ -64,6 +64,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persist-columns="true"
           table-id="iam-ingestion-tokens"
           filter-mode="client"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          sorting="client"
+          show-index
+          :footer-title="t('iam.ingestionTokens')"
         >
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
@@ -111,6 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                base64 step is needed. -->
           <template #cell-token="{ row }">
             <OCodeCell :value="toBasicAuth(row.name, row.token)" />
+          </template>
+
+          <template #cell-status="{ row }">
+            <OTag type="featureStatus" :value="row.enabled ? 'enabled' : 'disabled'" />
           </template>
 
           <template #cell-created_by="{ row }">
@@ -221,6 +231,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import {
@@ -260,6 +271,7 @@ export default defineComponent({
     OForm,
     OFormInput,
     OTable,
+    OTag,
     OCodeCell,
     OUserCell,
   },
@@ -306,6 +318,15 @@ export default defineComponent({
         hideable: true,
         // Wide enough for the truncated credential + gap + copy btn.
         size: 340,
+        meta: { align: "left" },
+      },
+      {
+        id: "status",
+        header: t("ingestion.tokenStatus"),
+        accessorKey: "enabled",
+        sortable: true,
+        hideable: true,
+        size: 120,
         meta: { align: "left" },
       },
       {
