@@ -1,11 +1,30 @@
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import ErrorsDashboard from "./ErrorsDashboard.vue";
 
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
+
+// Shared reactive `_rumdata` schema state, mirroring the module-level singleton the real
+// usePerformance() exposes. `mock` prefix so the vi.mock factories may reference it.
+const mockPerformanceState = reactive({
+  data: {
+    datetime: { startTime: 0, endTime: 0, relativeTimePeriod: "15m", valueType: "relative" },
+    streams: {} as Record<string, any>,
+  },
+});
+
+const mockGetStream = vi.fn();
+
+vi.mock("@/composables/rum/usePerformance", () => ({
+  default: () => ({ performanceState: mockPerformanceState }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: mockGetStream }),
+}));
 
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: {
@@ -19,8 +38,23 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   },
 }));
 
+// At least one panel is required: the capability filter treats a zero-panel dashboard as
+// "everything dropped", which flips the component into its empty state. This panel's SQL
+// references a gated crash column so it survives a crash-capable schema and is dropped by
+// a stream that has never recorded one.
 vi.mock("@/utils/rum/errors.json", () => ({
-  default: { title: "RUM Errors Dashboard", panels: [], variables: { list: [] } },
+  default: {
+    title: "RUM Errors Dashboard",
+    panels: [
+      {
+        id: "crash-panel",
+        title: "Crashes",
+        layout: { x: 0, y: 0, w: 12, h: 4, i: 1 },
+        queries: [{ query: 'SELECT count(*) FROM "_rumdata" WHERE error_is_crash = true' }],
+      },
+    ],
+    variables: { list: [] },
+  },
 }));
 
 vi.mock("@/services/search", () => ({
@@ -73,9 +107,44 @@ function createWrapper(props: Record<string, any> = {}) {
           },
         },
         OSpinner: { template: '<div data-test="spinner" />' },
+        OEmptyState: {
+          name: "OEmptyState",
+          template: '<div><slot name="title" /><slot name="description" /></div>',
+        },
       },
     },
   });
+}
+
+// Columns the mocked errors dashboard gates on.
+const ERROR_FIELDS = ["error_is_crash", "error_category"];
+
+function buildSchemaMap(fieldNames: string[]): Record<string, any> {
+  const schemaMap: Record<string, any> = {};
+  fieldNames.forEach((name) => {
+    schemaMap[name] = { name };
+  });
+  return schemaMap;
+}
+
+const errorSchemaMap = buildSchemaMap(ERROR_FIELDS);
+
+// Seeds the shared performanceState so ensureRumSchema() short-circuits without calling
+// getStream — the dashboard branch then renders after a single flush.
+function seedRumSchema(schemaMap: Record<string, any> | null) {
+  if (schemaMap === null) {
+    delete mockPerformanceState.data.streams["_rumdata"];
+    return;
+  }
+  mockPerformanceState.data.streams["_rumdata"] = { schema: schemaMap, name: "_rumdata" };
+}
+
+/** Mounts with a resolved, crash-capable schema so the dashboard branch is rendered. */
+async function createResolvedWrapper(props: Record<string, any> = {}) {
+  seedRumSchema(errorSchemaMap);
+  const mounted = createWrapper(props);
+  await flushPromises();
+  return mounted;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +153,13 @@ function createWrapper(props: Record<string, any> = {}) {
 
 describe("ErrorsDashboard", () => {
   let wrapper: ReturnType<typeof createWrapper>;
+
+  beforeEach(() => {
+    // Every test starts with no known `_rumdata` schema; tests opt into one as needed.
+    seedRumSchema(null);
+    mockGetStream.mockReset();
+    mockGetStream.mockResolvedValue({ schema: [] });
+  });
 
   afterEach(() => {
     wrapper?.unmount();
@@ -123,13 +199,12 @@ describe("ErrorsDashboard", () => {
       expect(wrapper.vm.isLoading).toEqual([]);
     });
 
-    it("initializes currentDashboardData with a data property", () => {
+    it("exposes the capability-filtered dashboard as dashboardData", () => {
       // Arrange + Act
       wrapper = createWrapper();
 
       // Assert
-      expect(wrapper.vm.currentDashboardData).toBeTruthy();
-      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
+      expect(wrapper.vm.dashboardData).toMatchObject({ title: "RUM Errors Dashboard" });
     });
 
     it("initializes variablesData ref", () => {
@@ -150,8 +225,10 @@ describe("ErrorsDashboard", () => {
   });
 
   describe("template rendering", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+    beforeEach(async () => {
+      // A known crash-capable schema resolves the gate without calling getStream, so the
+      // dashboard branch (not the spinner or the empty state) renders.
+      wrapper = await createResolvedWrapper();
     });
 
     it("renders the performance-error-dashboard container", () => {
@@ -194,12 +271,12 @@ describe("ErrorsDashboard", () => {
       expect(charts.props("currentTimeObj")).toEqual(defaultProps.dateTime);
     });
 
-    it("passes currentDashboardData.data as dashboardData to RenderDashboardCharts", () => {
+    it("passes the capability-filtered dashboardData to RenderDashboardCharts", () => {
       // Act
       const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
 
       // Assert
-      expect(charts.props("dashboardData")).toBe(wrapper.vm.currentDashboardData.data);
+      expect(charts.props("dashboardData")).toEqual(wrapper.vm.dashboardData);
     });
 
     it("renders loading spinner when isLoading has items", async () => {
@@ -221,31 +298,51 @@ describe("ErrorsDashboard", () => {
     });
   });
 
-  describe("dashboard loading", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("exposes loadDashboard as a function", () => {
-      // Assert
-      expect(typeof wrapper.vm.loadDashboard).toBe("function");
-    });
-
-    it("populates currentDashboardData.data after loadDashboard is called", async () => {
+  describe("schema gating", () => {
+    it("resolves the schema gate after mount so the dashboard renders", async () => {
       // Act
-      await wrapper.vm.loadDashboard();
+      wrapper = await createResolvedWrapper();
 
       // Assert
-      expect(wrapper.vm.currentDashboardData.data).toBeTruthy();
+      expect(wrapper.vm.schemaResolved).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
     });
 
-    it("calls convertDashboardSchemaVersion during loadDashboard", async () => {
+    it("renders the empty state when the resolved schema lacks the gated error columns", async () => {
+      // Arrange — a stream that has never recorded a crash.
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "view_name" }, { name: "session_id" }],
+      });
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="errors-dashboard-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
+    });
+
+    it("renders the full dashboard when getStream rejects and the schema stays inconclusive", async () => {
+      // Arrange
+      mockGetStream.mockRejectedValueOnce(new Error("network error"));
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert — a transient error must never degrade a working dashboard.
+      expect(wrapper.find('[data-test="errors-dashboard-empty"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+    });
+
+    it("migrates the dashboard schema while setting up", async () => {
       // Arrange
       const convertModule = await import("../../../utils/dashboard/convertDashboardSchemaVersion");
       const mockConvert = vi.mocked(convertModule.convertDashboardSchemaVersion);
 
       // Act
-      await wrapper.vm.loadDashboard();
+      wrapper = await createResolvedWrapper();
 
       // Assert
       expect(mockConvert).toHaveBeenCalled();
