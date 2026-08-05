@@ -146,6 +146,26 @@ or duplicate styles for dark mode around an O2 component. If something looks
 wrong in dark mode, the fix is a token value in `dark.css`, not a per-component
 conditional.
 
+### Comments stay short
+
+**One or two lines.** A comment carries the *why* behind a non-obvious choice —
+not a re-telling of the code, and not the history of the PR that added it.
+
+```vue
+<!-- good -->
+<!-- OSelect fills its container, so the width lives on the wrapper. -->
+
+<!-- bad — a paragraph, half of it review archaeology -->
+<!-- Bounded elastic column: absorbs leftover width but stays inside the
+     horizontal-scroll container instead of stretching to fit its longest
+     value. Matches the recipe used by Nodes.vue, PipelinesList.vue, etc.
+     (tag 02 review finding) -->
+```
+
+Drop ticket ids, "review finding", "as discussed", "previously we…", and any
+line that just narrates the next statement. Same rule in `.spec.ts` files: one
+line on why a setup is unusual, not a paragraph defending it.
+
 ### No component fits? Build a reusable one — don't assemble raw classes
 
 When you need a UI element and **no existing component matches it**, the answer

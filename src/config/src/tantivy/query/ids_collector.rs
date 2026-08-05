@@ -94,7 +94,7 @@ mod tests {
 
         for i in 0..doc_count {
             let mut doc = TantivyDocument::default();
-            doc.add_text(body, &format!("document number {i}"));
+            doc.add_text(body, format!("document number {i}"));
             writer.add_document(doc).unwrap();
         }
         writer.commit().unwrap();

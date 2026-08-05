@@ -51,6 +51,11 @@ pub struct IncidentIntegrationRecord {
     pub token: String,
     pub enabled: bool,
     pub config: serde_json::Value,
+    /// Notification destinations used when this source's alerts create or
+    /// join an incident. `None`/empty means "use the org default" — see
+    /// `collect_incident_destinations` in `src/core/src/alerts/incidents.rs`,
+    /// which has no fallback beyond what's passed in as `base_destinations`.
+    pub destinations: Vec<String>,
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
@@ -58,6 +63,25 @@ pub struct IncidentIntegrationRecord {
 
 impl From<Model> for IncidentIntegrationRecord {
     fn from(m: Model) -> Self {
+        let config: serde_json::Value =
+            serde_json::from_str(&m.config).unwrap_or_else(|_| serde_json::json!({}));
+        // Rows created before the typed `destinations` column existed have
+        // their destinations inside `config["destinations"]` — fall back to
+        // that so pre-existing integrations don't silently lose their
+        // notification targets on first read after the migration.
+        let destinations = m
+            .destinations
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+            .filter(|d: &Vec<String>| !d.is_empty())
+            .or_else(|| {
+                config["destinations"].as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+            })
+            .unwrap_or_default();
         Self {
             id: m.id,
             org_id: m.org_id,
@@ -65,7 +89,8 @@ impl From<Model> for IncidentIntegrationRecord {
             source_type: m.source_type,
             token: m.token,
             enabled: m.enabled,
-            config: serde_json::from_str(&m.config).unwrap_or_else(|_| serde_json::json!({})),
+            config,
+            destinations,
             created_by: m.created_by,
             created_at: m.created_at,
             updated_at: m.updated_at,
@@ -121,6 +146,11 @@ pub async fn add(record: &IncidentIntegrationRecord) -> Result<(), errors::Error
         token: Set(record.token.clone()),
         enabled: Set(record.enabled),
         config: Set(record.config.to_string()),
+        destinations: Set(if record.destinations.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&record.destinations).ok()
+        }),
         created_by: Set(record.created_by.clone()),
         created_at: Set(now),
         updated_at: Set(now),
@@ -194,6 +224,7 @@ pub async fn ensure_default_for_org(
         token: generate_token(),
         enabled: true,
         config: serde_json::json!({}),
+        destinations: Vec::new(),
         created_by: created_by.to_owned(),
         created_at: now,
         updated_at: now,
@@ -228,6 +259,44 @@ pub async fn set_enabled(org_id: &str, id: &str, enabled: bool) -> Result<(), er
         .col_expr(Column::Enabled, Expr::value(enabled))
         .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
+/// Update an integration's name and/or incident-notification destinations
+/// in a single write. `None` leaves that field untouched; `destinations:
+/// Some(&[])` clears destinations back to "use the org default". `name` is
+/// just a label — it doesn't affect routing/matching, so it's safe to
+/// change at any time, including for the org's "default" source.
+pub async fn update(
+    org_id: &str,
+    id: &str,
+    name: Option<&str>,
+    destinations: Option<&[String]>,
+) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let now = chrono::Utc::now().timestamp_micros();
+    let mut q = Entity::update_many().col_expr(Column::UpdatedAt, Expr::value(now));
+    if let Some(name) = name {
+        q = q.col_expr(Column::Name, Expr::value(name));
+    }
+    if let Some(destinations) = destinations {
+        let encoded = if destinations.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(destinations).map_err(|e| {
+                Error::DbError(DbError::SeaORMError(format!(
+                    "failed to encode destinations: {e}"
+                )))
+            })?)
+        };
+        q = q.col_expr(Column::Destinations, Expr::value(encoded));
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    q.filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(client)
         .await
@@ -441,6 +510,7 @@ mod tests {
             token: "o2iat_x".into(),
             enabled: true,
             config: r#"{"destinations":["slack"]}"#.into(),
+            destinations: None,
             created_by: "a@b.c".into(),
             created_at: 1,
             updated_at: 1,
@@ -459,11 +529,91 @@ mod tests {
             token: "o2iat_x".into(),
             enabled: true,
             config: "not-json".into(),
+            destinations: None,
             created_by: "a@b.c".into(),
             created_at: 1,
             updated_at: 1,
         };
         let r = IncidentIntegrationRecord::from(m);
         assert!(r.config.is_object() && r.config.as_object().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_record_from_model_parses_destinations_column() {
+        let m = super::super::entity::incident_integrations::Model {
+            id: "i1".into(),
+            org_id: "o1".into(),
+            name: "grafana-prod".into(),
+            source_type: "grafana".into(),
+            token: "o2iat_x".into(),
+            enabled: true,
+            config: "{}".into(),
+            destinations: Some(r#"["sre-pages","email-oncall"]"#.into()),
+            created_by: "a@b.c".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        let r = IncidentIntegrationRecord::from(m);
+        assert_eq!(r.destinations, vec!["sre-pages", "email-oncall"]);
+    }
+
+    #[test]
+    fn test_record_from_model_missing_destinations_is_empty() {
+        let m = super::super::entity::incident_integrations::Model {
+            id: "i1".into(),
+            org_id: "o1".into(),
+            name: "default".into(),
+            source_type: "auto".into(),
+            token: "o2iat_x".into(),
+            enabled: true,
+            config: "{}".into(),
+            destinations: None,
+            created_by: "a@b.c".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        let r = IncidentIntegrationRecord::from(m);
+        assert!(r.destinations.is_empty());
+    }
+
+    #[test]
+    fn test_record_from_model_falls_back_to_config_destinations_when_column_absent() {
+        // Rows written before the typed `destinations` column existed (main's
+        // shipped contract) have destinations inside `config["destinations"]`
+        // and a NULL `destinations` column — must not read back as empty.
+        let m = super::super::entity::incident_integrations::Model {
+            id: "i1".into(),
+            org_id: "o1".into(),
+            name: "grafana-prod".into(),
+            source_type: "grafana".into(),
+            token: "o2iat_x".into(),
+            enabled: true,
+            config: r#"{"destinations":["sre-pages"]}"#.into(),
+            destinations: None,
+            created_by: "a@b.c".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        let r = IncidentIntegrationRecord::from(m);
+        assert_eq!(r.destinations, vec!["sre-pages"]);
+    }
+
+    #[test]
+    fn test_record_from_model_prefers_typed_column_over_config() {
+        let m = super::super::entity::incident_integrations::Model {
+            id: "i1".into(),
+            org_id: "o1".into(),
+            name: "grafana-prod".into(),
+            source_type: "grafana".into(),
+            token: "o2iat_x".into(),
+            enabled: true,
+            config: r#"{"destinations":["stale-config-value"]}"#.into(),
+            destinations: Some(r#"["sre-pages"]"#.into()),
+            created_by: "a@b.c".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        let r = IncidentIntegrationRecord::from(m);
+        assert_eq!(r.destinations, vec!["sre-pages"]);
     }
 }

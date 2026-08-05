@@ -170,8 +170,9 @@
               editor-id="slo-scope-editor"
               :label="t('slos.field.scope')"
               :hint="t('slos.field.scopeHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               data-test="slos-addslo-scope"
             />
@@ -180,8 +181,9 @@
               editor-id="slo-good-expr-editor"
               :label="t('slos.field.goodWhen')"
               :hint="t('slos.field.goodWhenHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               required
               class="mt-3"
               data-test="slos-addslo-good-expr"
@@ -219,8 +221,9 @@
               editor-id="slo-aggregate-editor"
               :label="t('slos.field.aggregate')"
               :hint="t('slos.field.aggregateHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               required
               data-test="slos-addslo-aggregate"
@@ -241,8 +244,9 @@
               v-model="form.config.scope"
               editor-id="slo-timeslice-scope-editor"
               :label="t('slos.field.scope')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               data-test="slos-addslo-timeslice-scope"
             />
@@ -557,9 +561,22 @@ const streamFieldNames = computed(() => streamFields.value.map((f) => f.value));
 // builds the field list (dropping the timestamp column) and merges it with
 // the SQL keyword and function sets. Nothing about autocomplete is
 // reimplemented here.
-const { autoCompleteKeywords, autoCompleteSuggestions, updateFieldKeywords } = useSqlSuggestions();
+const {
+  autoCompleteData,
+  effectiveKeywords,
+  effectiveSuggestions,
+  updateFieldKeywords,
+  resolveFieldValues,
+} = useSqlSuggestions();
 
 async function loadStreamFields(streamName: string) {
+  // Field VALUES are looked up under "org|streamType|streamName|field", so the
+  // resolver returns nothing at all until this is set. Cleared alongside the
+  // field list so a de-selected stream cannot keep offering its old values.
+  autoCompleteData.value.org = org.value ?? "";
+  autoCompleteData.value.streamType = String(form.config.stream_type ?? "");
+  autoCompleteData.value.streamName = streamName;
+
   if (!streamName || !form.config.stream_type) {
     streamFields.value = [];
     updateFieldKeywords([]);

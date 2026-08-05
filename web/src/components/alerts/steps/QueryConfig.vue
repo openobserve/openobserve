@@ -1052,8 +1052,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
-                        :keywords="autoCompleteKeywords"
-                        :suggestions="autoCompleteSuggestions"
+                        :keywords="effectiveKeywords"
+                        :suggestions="effectiveSuggestions"
+                        :field-value-resolver="resolveFieldValues"
                         @focus="onQueryEditorFocus"
                         @blur="onBlurInlineSqlEditor"
                         @update:query="handleInlineQueryUpdate"
@@ -1619,6 +1620,7 @@ import {
   isAboveMinRefreshInterval,
   describeCron,
   getImageURL,
+  resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
@@ -1886,8 +1888,13 @@ export default defineComponent({
       autoCompleteData,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      // Context-aware views — see QueryEditorDialog for why the raw lists are
+      // not what the editor should receive.
+      effectiveKeywords,
+      effectiveSuggestions,
       getSuggestions,
       updateFieldKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     // Rebuild field keywords whenever columns prop changes
@@ -2553,13 +2560,16 @@ export default defineComponent({
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
     const initTimezones = () => {
       try {
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
         // @ts-ignore
-        if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
-          // @ts-ignore
-          filteredTimezones.value = Intl.supportedValuesOf("timeZone");
-        } else {
-          filteredTimezones.value = [cronTimezone.value || "UTC"];
-        }
+        const zones: string[] =
+          typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
+            ? // @ts-ignore
+              Intl.supportedValuesOf("timeZone")
+            : [cronTimezone.value || "UTC"];
+        // Convenience shortcuts first (matching the reports picker), then every
+        // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
+        filteredTimezones.value = [`Browser Time (${browserTz})`, "UTC", ...zones];
       } catch {
         filteredTimezones.value = ["UTC"];
       }
@@ -2667,7 +2677,10 @@ export default defineComponent({
 
     const onCronTimezoneChange = (value: any) => {
       isUserTriggerChange.value = true;
-      cronTimezone.value = value;
+      // "Browser Time (<zone>)" is a display-only shortcut; persist the resolved
+      // IANA zone so trigger_condition.timezone stays a value the backend can
+      // parse (storing the raw label produces a NaN tz_offset).
+      cronTimezone.value = resolveBrowserTimezone(value);
       validateCron();
       emitTriggerUpdate();
     };
@@ -3568,6 +3581,9 @@ export default defineComponent({
       inlineQueryEditorRef,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      effectiveKeywords,
+      resolveFieldValues,
+      effectiveSuggestions,
       handleInlineQueryUpdate,
       inlineEditorPlaceholder,
       promqlSamples,

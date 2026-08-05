@@ -447,7 +447,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 20 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(20); // 6 base + llmProviders + genAiAgentMapping + alertSources + 11 enterprise
+      expect(routes[0].children).toHaveLength(20); // 7 base (incl. alert_sources redirect) + llmProviders + genAiAgentMapping + 11 enterprise
     });
   });
 
@@ -510,7 +510,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 10 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(10); // 6 base + llmProviders + genAiAgentMapping + alertSources + 1 cloud
+      expect(routes[0].children).toHaveLength(10); // 7 base (incl. alert_sources redirect) + llmProviders + genAiAgentMapping + 1 cloud
     });
   });
 
@@ -527,7 +527,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 21 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 6 base + llmProviders + genAiAgentMapping + alertSources + 11 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(21); // 7 base (incl. alert_sources redirect) + llmProviders + genAiAgentMapping + 11 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -627,63 +627,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(6); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only
+      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should return the same structure on multiple calls", () => {

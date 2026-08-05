@@ -77,6 +77,14 @@ const useManagementRoutes = () => {
           path: "templates",
           redirect: (to: any) => ({ name: "alertTemplates", query: to.query }),
         },
+        // Alert Sources moved to /alert-sources (Reliability), same reasoning
+        // as alert_destinations/templates above. Redirect kept for bookmarks;
+        // the enterprise/cloud gate now lives on the target route itself
+        // (router.ts), not on whether this redirect entry exists.
+        {
+          path: "alert_sources",
+          redirect: (to: any) => ({ name: "alertSources", query: to.query }),
+        },
       ],
     },
   ];
@@ -108,17 +116,10 @@ const useManagementRoutes = () => {
         routeGuard(to, from, next);
       },
     });
-    routes[0].children.push({
-      path: "alert_sources",
-      name: "alertSources",
-      component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
-      meta: {
-        title: "Alert Sources",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
+    // Alert Sources moved to a flat top-level route (router.ts, name
+    // "alertSources") — no longer pushed here. It used to be conditional on
+    // this same enterprise/cloud check; that gating now lives on the target
+    // route's own beforeEnter instead.
   }
   if (config.isEnterprise == "true") {
     routes[0].children.push(

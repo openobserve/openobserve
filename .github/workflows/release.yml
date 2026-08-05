@@ -12,17 +12,17 @@ jobs:
       matrix:
         include:
           - arch: x86_64-unknown-linux-gnu
-            os: ubicloud-standard-8
+            os: ubicloud-standard-16
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-gnu
-            os: ubicloud-standard-8
+            os: ubicloud-standard-16
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-simd
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-musl
-            os: ubicloud-standard-8
+            os: ubicloud-standard-16
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-musl
             file_ext: .tar.gz

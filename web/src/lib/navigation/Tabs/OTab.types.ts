@@ -12,6 +12,12 @@ export interface OTabProps {
   icon?: string;
   /** Prevents interaction with this tab */
   disable?: boolean;
+  /**
+   * Opt this single tab out of drag-to-reorder even while OTabs is reorderable
+   * (e.g. its label is being renamed inline). The grip stays visible but the tab
+   * is no longer draggable and shows a text cursor instead of grab.
+   */
+  disableDrag?: boolean;
   /** Tooltip shown on hover — especially useful when disable is true to explain why */
   tooltip?: string;
 }
