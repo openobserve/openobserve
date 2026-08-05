@@ -113,12 +113,12 @@ vi.mock("@/utils/synthetics/mapRecordedStep", () => ({
 vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
   const { z } = require("zod");
   return {
-    makeBrowserCheckGateSchema: (t: any) =>
+    makeBrowserCheckGateSchema: (_t: any) =>
       z.object({
         url: z.string().min(1, "URL is required"),
         name: z.string().optional(),
       }),
-    makeBrowserCheckSaveSchema: (t: any) =>
+    makeBrowserCheckSaveSchema: (_t: any) =>
       z
         .object({
           name: z.string().min(1, "Name is required"),
@@ -324,6 +324,22 @@ describe("CreateBrowserTest", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("locations fetch failure", () => {
+    it("should stay silent when the endpoint 403s (community build)", async () => {
+      mockServiceGetLocations.mockRejectedValue({ response: { status: 403 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("should toast on a real fetch failure", async () => {
+      mockServiceGetLocations.mockRejectedValue({ response: { status: 500 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
   });
 
   describe("initial render", () => {
