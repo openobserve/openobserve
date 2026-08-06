@@ -60,6 +60,8 @@ export class TracesPage {
     this.traceDetailsLogStreamsSelect = '[data-test="trace-details-log-streams-select"]';
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
+    this.traceDetailsSearchResults = '[data-test="trace-details-search-results"]';
+    this.toastSuccess = '[data-test-variant="success"] [data-test="o-toast-message"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
     this.traceDetailsSidebarHeader = '[data-test="trace-details-sidebar-header"]';
     this.traceDetailsSidebarHeaderToolbar = '[data-test="trace-details-sidebar-header-toolbar"]';
@@ -1335,6 +1337,53 @@ export class TracesPage {
    */
   async isShareLinkButtonVisible() {
     return await this.page.locator(this.traceDetailsShareLinkButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if trace details search results indicator is visible.
+   * The indicator shows current match / total matches (e.g. "1 / 5").
+   * @returns {Promise<boolean>}
+   */
+  async isTraceDetailsSearchResultsVisible() {
+    return await this.page.locator(this.traceDetailsSearchResults).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if trace-details search results indicator shows non-zero matches.
+   * Reads the text from trace-details-search-results and parses the "X / Y"
+   * format to verify Y > 0.
+   * @returns {Promise<boolean>} true when search results show matches
+   */
+  async hasTraceDetailsSearchMatches() {
+    const el = this.page.locator(this.traceDetailsSearchResults);
+    if (!(await el.isVisible({ timeout: 3000 }).catch(() => false))) return false;
+    const text = (await el.textContent({ timeout: 3000 }).catch(() => '')) || '';
+    // Text format: "N / M" — the total (M) should be > 0
+    const parts = text.split('/');
+    if (parts.length < 2) return false;
+    const total = parseInt(parts[1].trim(), 10);
+    return !isNaN(total) && total > 0;
+  }
+
+  /**
+   * Check if "Trace ID copied" success toast is visible.
+   * The copyTraceId action triggers a toast with
+   * data-test-variant="success" containing text "Trace ID copied".
+   * @returns {Promise<boolean>}
+   */
+  async isCopyTraceIdSuccessVisible() {
+    return await this.page.locator(this.toastSuccess).filter({ hasText: /Trace ID/i }).first().isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if "Link Copied" success toast is visible.
+   * The shareTraceLink action triggers a ShareButton that shortens the URL
+   * and copies it, showing a toast with
+   * data-test-variant="success" containing text "Link Copied".
+   * @returns {Promise<boolean>}
+   */
+  async isShareLinkSuccessVisible() {
+    return await this.page.locator(this.toastSuccess).filter({ hasText: /Link Copied/i }).first().isVisible({ timeout: 8000 }).catch(() => false);
   }
 
   /**

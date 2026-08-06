@@ -99,6 +99,9 @@ test.describe("Trace Details testcases", () => {
 
     await openTraceDetailsIfAvailable(page, pm, 'panel features test');
 
+    // Unconditional: trace details must be open — runs regardless of feature availability below
+    expect(await pm.tracesPage.isAnyTraceDetailVisible() || await pm.tracesPage.isTraceDetailsTreeVisible()).toBeTruthy();
+
     // === Test 1: Toggle timeline view in trace details (Original test #1) ===
     await test.step('Toggle timeline view in trace details', async () => {
       testLogger.info('Testing timeline toggle in trace details');
@@ -112,8 +115,8 @@ test.describe("Trace Details testcases", () => {
         // Check if timeline is visible
         const timelineVisible = await pm.tracesPage.isTimelineChartVisible();
         testLogger.info(`Timeline toggled: ${timelineVisible ? 'visible' : 'hidden'}`);
-        // Verify toggle functionality worked
-        expect(timelineButtonVisible).toBeTruthy();
+        // Verify toggle made the timeline chart visible
+        expect(timelineVisible).toBeTruthy();
       } else {
         testLogger.info('Timeline toggle not available');
         // Verify we at least opened trace details
@@ -131,9 +134,10 @@ test.describe("Trace Details testcases", () => {
       if (copyButtonVisible) {
         await pm.tracesPage.copyTraceId();
 
-        // Check for success notification or clipboard content
-        testLogger.info('Trace ID copy functionality tested');
-        expect(copyButtonVisible).toBeTruthy();
+        // Check for success notification confirming the trace ID was copied
+        const copySuccessVisible = await pm.tracesPage.isCopyTraceIdSuccessVisible();
+        testLogger.info(`Trace ID copy success toast: ${copySuccessVisible}`);
+        expect(copySuccessVisible).toBeTruthy();
       } else {
         testLogger.info('Copy button not available');
         // Verify we at least opened trace details
@@ -149,6 +153,9 @@ test.describe("Trace Details testcases", () => {
     testLogger.info('Testing view related logs');
 
     await openTraceDetailsIfAvailable(page, pm, 'logs test');
+
+    // Unconditional: trace details must be open — runs regardless of feature availability below
+    expect(await pm.tracesPage.isAnyTraceDetailVisible() || await pm.tracesPage.isTraceDetailsTreeVisible()).toBeTruthy();
 
     // Check if log streams selector is visible (indicates non-enterprise mode)
     const logStreamsSelectVisible = await pm.tracesPage.isLogStreamsSelectVisible();
@@ -218,15 +225,19 @@ test.describe("Trace Details testcases", () => {
 
     await openTraceDetailsIfAvailable(page, pm, 'search test');
 
+    // Unconditional: trace details must be open — runs regardless of feature availability below
+    expect(await pm.tracesPage.isAnyTraceDetailVisible() || await pm.tracesPage.isTraceDetailsTreeVisible()).toBeTruthy();
+
     // Try search within trace
     const searchInputVisible = await pm.tracesPage.isTraceDetailsSearchInputVisible();
     if (searchInputVisible) {
       await pm.tracesPage.searchWithinTrace('error');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(1500);
 
-      // Check if search highlighted or filtered spans
-      testLogger.info('Search within trace tested');
-      expect(searchInputVisible).toBeTruthy();
+      // Check if search highlighted or filtered spans — results indicator should show matches
+      const hasSearchMatches = await pm.tracesPage.hasTraceDetailsSearchMatches();
+      testLogger.info(`Search within trace returned matches: ${hasSearchMatches}`);
+      expect(hasSearchMatches).toBeTruthy();
     } else {
       testLogger.info('Search input not available');
       // Verify we at least opened trace details
@@ -242,15 +253,19 @@ test.describe("Trace Details testcases", () => {
 
     await openTraceDetailsIfAvailable(page, pm, 'share test');
 
+    // Unconditional: trace details must be open — runs regardless of feature availability below
+    expect(await pm.tracesPage.isAnyTraceDetailVisible() || await pm.tracesPage.isTraceDetailsTreeVisible()).toBeTruthy();
+
     // Share trace link
     const shareButtonVisible = await pm.tracesPage.isShareLinkButtonVisible();
     if (shareButtonVisible) {
       await pm.tracesPage.shareTraceLink();
-      await page.waitForTimeout(1000);
 
-      // Check for share notification
-      testLogger.info('Share trace link tested');
-      expect(shareButtonVisible).toBeTruthy();
+      // The share button shortens the URL and copies it — wait for the success toast
+      await page.waitForTimeout(2000);
+      const shareSuccessVisible = await pm.tracesPage.isShareLinkSuccessVisible();
+      testLogger.info(`Share link success toast: ${shareSuccessVisible}`);
+      expect(shareSuccessVisible).toBeTruthy();
     } else {
       testLogger.info('Share button not available');
       // Verify we at least opened trace details
@@ -352,12 +367,12 @@ test.describe("Trace Details testcases", () => {
     testLogger.info('Successfully navigated to /logs from span sidebar');
   });
 
-  test("P1: Sidebar View Logs Button Disabled Without Stream Selection", {
+  test("P1: Sidebar View Logs Button Enabled After Auto-Selection", {
     tag: ['@trace-correlated-logs', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Testing sidebar View Logs button disabled state without stream selection');
+    testLogger.info('Testing sidebar View Logs button state after auto-selection of log streams');
 
-    await openTraceDetailsIfAvailable(page, pm, 'sidebar button disabled test');
+    await openTraceDetailsIfAvailable(page, pm, 'sidebar button auto-selection test');
 
     // Ensure the waterfall tab is active
     await pm.tracesPage.openTraceDetailsTab('waterfall');
@@ -393,18 +408,20 @@ test.describe("Trace Details testcases", () => {
     const buttonVisible = await pm.tracesPage.isSidebarViewLogsButtonVisible();
     expect(buttonVisible).toBeTruthy();
 
-    // Verify the sidebar View Logs button is DISABLED (no log streams selected)
+    // Verify the sidebar View Logs button is ENABLED.
+    // The product auto-selects the first available log stream when there is
+    // exactly 1 log stream (loadLogStreams in TraceDetails.vue:1841-1843).
+    // With e2e_automate as the sole log stream, auto-selection kicks in and
+    // the button should be enabled immediately.
     const buttonEnabled = await pm.tracesPage.isSidebarViewLogsButtonEnabled();
-    testLogger.info(`Sidebar View Logs button enabled (should be false): ${buttonEnabled}`);
-    // Assert the button is disabled — beforeEach only selects a trace stream,
-    // not a log stream, so the log stream selector starts empty.
-    expect(buttonEnabled).toBeFalsy();
-    testLogger.info('Sidebar View Logs button correctly disabled without stream selection');
+    testLogger.info(`Sidebar View Logs button enabled (expected true due to auto-selection): ${buttonEnabled}`);
+    expect(buttonEnabled).toBeTruthy();
+    testLogger.info('Sidebar View Logs button correctly enabled after auto-selection');
 
     // Close the sidebar
     await pm.tracesPage.closeSidebar();
 
-    // Select a log stream from the header dropdown
+    // Select a log stream from the header dropdown (if visible)
     const logStreamsSelectVisible = await pm.tracesPage.isLogStreamsSelectVisible();
     if (logStreamsSelectVisible) {
       const selectionSuccess = await pm.tracesPage.selectFirstLogStreamInTraceDetails();
@@ -417,9 +434,7 @@ test.describe("Trace Details testcases", () => {
         return;
       }
     } else {
-      testLogger.warn('Log stream selector not visible — cannot verify enabled state change');
-      // Fallback: assert sidebar was opened at least
-      expect(sidebarVisible).toBeTruthy();
+      testLogger.info('Log stream selector not visible — auto-selection already handled; test complete');
       return;
     }
 
@@ -440,7 +455,7 @@ test.describe("Trace Details testcases", () => {
     }
     expect(sidebarVisibleAgain).toBeTruthy();
 
-    // Verify the sidebar View Logs button is now ENABLED
+    // Verify the sidebar View Logs button is still ENABLED after selection
     const buttonEnabledAfterSelection = await pm.tracesPage.isSidebarViewLogsButtonEnabled();
     expect(buttonEnabledAfterSelection).toBeTruthy();
     testLogger.info('Sidebar View Logs button is enabled after stream selection');
