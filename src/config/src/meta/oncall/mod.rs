@@ -25,14 +25,18 @@
 //! `config::utils::time::now_micros`.
 
 pub mod level;
+pub mod policy;
 pub mod response;
 pub mod rotation;
 pub mod subject;
 
 pub use level::{EscalationLevel, LevelError};
+pub use policy::{
+    Channel, EscalationPolicy, LadderAction, LadderStep, PolicyError, PriorityRung, plan,
+};
 pub use response::{Response, ResponseError, ResponseEvent, ResponseEventKind, ResponseState};
 pub use rotation::{
-    MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK, OnCallSlot, Rotation, RotationError,
-    resolve_level, resolve_on_call,
+    MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OnCallSlot, Rotation,
+    RotationError, resolve_level, resolve_on_call,
 };
 pub use subject::{SubjectError, SubjectRef, SubjectType};

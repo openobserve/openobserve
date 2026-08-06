@@ -31,7 +31,8 @@ use super::level::EscalationLevel;
 
 /// Microseconds in one hour — shift lengths are stored in micros to match the
 /// scheduler's unit (`config::utils::time::now_micros`).
-pub const MICROS_PER_HOUR: i64 = 3_600_000_000;
+pub const MICROS_PER_MINUTE: i64 = 60_000_000;
+pub const MICROS_PER_HOUR: i64 = 60 * MICROS_PER_MINUTE;
 pub const MICROS_PER_DAY: i64 = 24 * MICROS_PER_HOUR;
 pub const MICROS_PER_WEEK: i64 = 7 * MICROS_PER_DAY;
 
