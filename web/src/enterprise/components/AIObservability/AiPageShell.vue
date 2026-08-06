@@ -43,6 +43,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :scroll="false"
   >
     <template #actions>
+      <span
+        v-if="lastRunAt"
+        class="mr-1 inline-flex items-center gap-1.5"
+        :title="lastRefreshedTitle"
+        :data-test="`${dataTest}-last-refreshed`"
+      >
+        <span
+          :class="[
+            'size-2 shrink-0 rounded-full transition-colors duration-700',
+            lastRefreshedDotClass,
+          ]"
+        />
+        <span class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none">
+          {{ relativeTime }}
+        </span>
+      </span>
+
       <!-- Compare mode (version-compare) makes windows per-version, so the
            page-level picker is disabled and explains why via a tooltip. Wrapping
            in OTooltip even when enabled is harmless — `disabled` on OTooltip
@@ -67,19 +84,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @on:date-change="$emit('date-change', $event)"
         />
       </OTooltip>
-      <!-- Last-refresh + refresh control, consistent across every AI page
-           header. -->
-      <div
-        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+      <!-- Labeled primary Refresh button, matching the Metrics explorer toolbar.
+           Disabled + spinning while a query is in flight (cancel isn't
+           supported). -->
+      <OButton
+        variant="primary"
+        size="sm-toolbar"
+        icon-left="refresh"
+        :disabled="isLoading"
+        :loading="isLoading"
+        :data-test="`${dataTest}-refresh-btn`"
+        @click="$emit('refresh')"
       >
-        <ORefreshButton
-          :last-run-at="lastRunAt"
-          :loading="isLoading"
-          :disabled="isLoading"
-          :data-test="`${dataTest}-refresh-btn`"
-          @click="$emit('refresh')"
-        />
-      </div>
+        {{ t("common.refresh") }}
+      </OButton>
     </template>
 
     <template v-if="$slots.subnav" #subnav><slot name="subnav" /></template>
@@ -88,16 +106,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
-import { ref } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-defineProps<{
+const { t } = useI18nTyped();
+
+const props = defineProps<{
   /** Page prefix — the header derives `${dataTest}-page`,
       `${dataTest}-date-time`, `${dataTest}-refresh-btn` from it, reproducing
       each page's existing data-test values unchanged. */
@@ -127,6 +147,51 @@ defineEmits<{
   (e: "date-change", payload: unknown): void;
   (e: "refresh"): void;
 }>();
+
+// "Last refreshed N ago" label shown left of the date picker. Same formatting
+// and staleness thresholds as ORefreshButton (green <30s / amber <5m / red),
+// re-derived here because the labeled primary Refresh button carries no
+// timestamp of its own. Ticks every 10s so it stays current between refreshes.
+const now = ref(Date.now());
+let tickId: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+  tickId = setInterval(() => (now.value = Date.now()), 10_000);
+});
+onBeforeUnmount(() => {
+  if (tickId) clearInterval(tickId);
+});
+watch(
+  () => props.lastRunAt,
+  () => (now.value = Date.now()),
+);
+
+const staleSeconds = computed(() =>
+  props.lastRunAt ? Math.floor((now.value - props.lastRunAt) / 1000) : Infinity,
+);
+const relativeTime = computed<I18nText>(() => {
+  const sec = staleSeconds.value;
+  if (sec === Infinity) return raw("");
+  if (sec < 5) return t("refreshButton.justNow");
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
+  const min = Math.floor(sec / 60);
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
+  return t("refreshButton.hoursAgo", { h: Math.floor(min / 60) });
+});
+const lastRefreshedDotClass = computed(() => {
+  if (props.isLoading) return "bg-refresh-dot-idle";
+  const s = staleSeconds.value;
+  if (s === Infinity) return "bg-refresh-dot-idle";
+  if (s < 30) return "bg-refresh-dot-fresh";
+  if (s < 300) return "bg-refresh-dot-stale";
+  return "bg-refresh-dot-critical";
+});
+const lastRefreshedTitle = computed<I18nText>(() =>
+  props.lastRunAt
+    ? t("refreshButton.lastRefreshed", {
+        time: new Date(props.lastRunAt).toLocaleTimeString(),
+      })
+    : t("refreshButton.notYetRefreshed"),
+);
 
 // Exposed for parity with the per-page usage, which held a `dateTimeRef` to
 // the picker. Pages that need the imperative handle can access it via a
