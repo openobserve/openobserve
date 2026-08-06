@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -35,6 +35,13 @@ const emit = defineEmits<{
   "update:open": [value: boolean];
   /** The extension is connected and the author chose to proceed with `action`. */
   continue: [];
+  /**
+   * The incognito attestation was just given. Toggling "Allow in Incognito"
+   * reloads the extension and orphans this tab's bridge, so the owner of the
+   * connection state must invalidate it and re-probe — the connect task stays
+   * open until a fresh probe passes.
+   */
+  verify: [];
 }>();
 
 const { t } = useI18nTyped();
@@ -47,6 +54,16 @@ const installAck = ref(false);
 const incognitoDone = ref(false);
 
 const installDone = computed(() => Boolean(props.connected) || installAck.value);
+
+// Giving the incognito ack invalidates the connection upstream (the toggle
+// reloads the extension). The install fact is not in doubt — latch it before
+// `connected` drops so task 1 does not regress while task 3 re-verifies.
+watch(incognitoDone, (val, old) => {
+  if (val && !old) {
+    if (props.connected) installAck.value = true;
+    emit("verify");
+  }
+});
 const allDone = computed(() => Boolean(props.connected) && incognitoDone.value);
 const doneCount = computed(
   () =>
@@ -77,6 +94,16 @@ function onContinue() {
   emit("continue");
   emit("update:open", false);
 }
+
+/**
+ * A preflight failure proved "Allow in Incognito" is actually off — clear the
+ * author's attestation so the checklist re-asks instead of showing all done.
+ */
+function revokeIncognitoAck() {
+  incognitoDone.value = false;
+}
+
+defineExpose({ revokeIncognitoAck });
 </script>
 
 <template>

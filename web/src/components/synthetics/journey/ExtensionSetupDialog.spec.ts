@@ -205,6 +205,65 @@ describe("ExtensionSetupDialog", () => {
     });
   });
 
+  // Toggling "Allow in Incognito" reloads the extension and orphans the tab's
+  // bridge — a pre-toggle connection is stale. Giving the ack must hand the
+  // invalidation upstream (verify) while latching the install fact, which is
+  // not in doubt, so task 1 does not regress when `connected` drops.
+  describe("incognito ack — connection re-verify", () => {
+    it("should emit verify when the incognito attestation is given", async () => {
+      wrapper = mountDialog({ connected: true });
+
+      await setIncognito(wrapper, true);
+
+      expect(wrapper.emitted("verify")).toHaveLength(1);
+    });
+
+    it("should latch the install ack on the incognito ack while connected", async () => {
+      wrapper = mountDialog({ connected: true });
+      expect(wrapper.findComponent(ChecklistStub).props("installAck")).toBe(false);
+
+      await setIncognito(wrapper, true);
+
+      expect(wrapper.findComponent(ChecklistStub).props("installAck")).toBe(true);
+    });
+
+    it("should still emit verify without latching when not connected", async () => {
+      wrapper = mountDialog({ connected: false });
+
+      await setIncognito(wrapper, true);
+
+      expect(wrapper.emitted("verify")).toHaveLength(1);
+      // No connection means no proven install — nothing to latch.
+      expect(wrapper.findComponent(ChecklistStub).props("installAck")).toBe(false);
+    });
+
+    it("should not emit verify when the ack is revoked or repeated", async () => {
+      wrapper = mountDialog({ connected: true });
+      await setIncognito(wrapper, true);
+
+      await setIncognito(wrapper, false);
+      await setIncognito(wrapper, true);
+
+      // Only the two false→true transitions verify — the revoke does not.
+      expect(wrapper.emitted("verify")).toHaveLength(2);
+    });
+  });
+
+  // A preflight failure proves "Allow in Incognito" is actually off — the
+  // exposed revoke clears the attestation so the checklist re-asks instead of
+  // showing all done.
+  it("should re-ask for the incognito attestation when revokeIncognitoAck is called", async () => {
+    wrapper = mountDialog({ connected: true });
+    await setIncognito(wrapper, true);
+    expect(ctaDisabled(wrapper)).toBe(false);
+
+    (wrapper.vm as unknown as { revokeIncognitoAck: () => void }).revokeIncognitoAck();
+    await wrapper.vm.$nextTick();
+
+    expect(ctaDisabled(wrapper)).toBe(true);
+    expect(wrapper.text()).toContain("synthetics.createBrowserTest.setupHintIncognito");
+  });
+
   // The acks live in component-lifetime refs — session-only on purpose, but a
   // dismissed dialog must not ask the author to attest twice.
   it("should keep both attestations across a close and re-open", async () => {

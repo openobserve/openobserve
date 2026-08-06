@@ -64,16 +64,21 @@ function mountChecklist(props: Record<string, unknown> = {}) {
 describe("ExtensionSetupChecklist", () => {
   let wrapper: VueWrapper;
   let openSpy: ReturnType<typeof vi.spyOn>;
-  let reloadMock: ReturnType<typeof vi.fn>;
+  let replaceMock: ReturnType<typeof vi.fn>;
   const originalLocation = window.location;
 
   beforeEach(() => {
     openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
-    // jsdom's location.reload throws "Not implemented"; replaced wholesale, as
-    // in http.spec.ts, because the property itself is read-only.
-    reloadMock = vi.fn();
+    // jsdom's navigation methods throw "Not implemented"; replaced wholesale,
+    // as in http.spec.ts, because the property itself is read-only. href is
+    // spelled out — location's accessors don't survive the object spread.
+    replaceMock = vi.fn();
     Object.defineProperty(window, "location", {
-      value: { ...originalLocation, reload: reloadMock },
+      value: {
+        ...originalLocation,
+        href: "http://localhost:3000/synthetics/browser/new?url=https%3A%2F%2Fexample.com&name=My+Check&setup=1",
+        replace: replaceMock,
+      },
       writable: true,
       configurable: true,
     });
@@ -227,12 +232,16 @@ describe("ExtensionSetupChecklist", () => {
       expect(wrapper.find('[data-test="synthetics-setup-refresh-btn"]').exists()).toBe(true);
     });
 
-    it("should reload the page from the refresh button", async () => {
+    it("should reload without the setup flag, keeping the other query params", async () => {
       wrapper = mountChecklist({ installAck: true, incognitoDone: true });
 
       await wrapper.find('[data-test="synthetics-setup-refresh-btn"]').trigger("click");
 
-      expect(reloadMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      const target = new URL(replaceMock.mock.calls[0][0] as string);
+      expect(target.searchParams.get("setup")).toBeNull();
+      expect(target.searchParams.get("url")).toBe("https://example.com");
+      expect(target.searchParams.get("name")).toBe("My Check");
     });
 
     it("should stay locked while the incognito ack is pending", () => {

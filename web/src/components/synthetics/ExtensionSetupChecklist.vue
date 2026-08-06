@@ -21,7 +21,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import { CHROME_UI_LABELS, CHROME_WEB_STORE_URL } from "@/constants/synthetics";
+import { CHROME_UI_LABELS, CHROME_WEB_STORE_URL, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 
 const props = defineProps<{
   /** Extension detected and connectable (the parent's live probe state). */
@@ -53,7 +53,12 @@ function openWebStore() {
 }
 
 function refreshPage() {
-  window.location.reload();
+  // Reload without the setup-phase flag: the wizard restores url/name from the
+  // query and lands on the gate — with the recorder connected after the reload,
+  // Record goes straight to recording instead of re-entering this checklist.
+  const url = new URL(window.location.href);
+  url.searchParams.delete(SETUP_QUERY_PARAM);
+  window.location.replace(url.toString());
 }
 </script>
 
@@ -111,6 +116,7 @@ function refreshPage() {
             :model-value="installAck"
             size="sm"
             data-test="synthetics-setup-install-ack"
+            class="mt-1"
             @update:model-value="installAck = $event === true"
           />
           <span class="flex min-w-0 flex-col">
@@ -169,10 +175,10 @@ function refreshPage() {
           {{ t("synthetics.createBrowserTest.setupIncognitoDescription") }}
         </p>
         <div class="bg-surface-subtle rounded-default mb-3 p-3">
-          <p class="text-text-muted text-2xs m-0 mb-2 font-semibold tracking-wide uppercase">
+          <p class="text-text-secondary m-0 mb-2 text-sm font-semibold tracking-wide capitalize">
             {{ t("synthetics.createBrowserTest.setupIncognitoCalloutTitle") }}
           </p>
-          <ol class="text-text-secondary m-0 flex list-decimal flex-col gap-1 pl-4 text-xs">
+          <ol class="text-text-secondary m-0 flex list-decimal flex-col gap-1 pl-4 text-sm">
             <i18n-t
               keypath="synthetics.createBrowserTest.setupIncognitoCalloutStep1"
               tag="li"
@@ -210,6 +216,7 @@ function refreshPage() {
             :model-value="incognitoDone"
             size="sm"
             data-test="synthetics-setup-incognito-ack"
+            class="mt-1"
             @update:model-value="incognitoDone = $event === true"
           />
           <span class="flex min-w-0 flex-col">
@@ -256,20 +263,11 @@ function refreshPage() {
           {{ t("synthetics.createBrowserTest.setupConnectDescription") }}
         </p>
         <div class="mb-3 flex flex-wrap items-center gap-2">
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="refresh"
-            data-test="synthetics-setup-refresh-btn"
-            @click="refreshPage"
-          >
-            {{ t("synthetics.createBrowserTest.setupConnectRefreshCta") }}
-          </OButton>
           <i18n-t
             keypath="synthetics.createBrowserTest.setupConnectAlt"
             tag="span"
             scope="global"
-            class="text-text-secondary text-xs"
+            class="text-text-secondary text-sm"
           >
             <template #name>
               <strong>{{ CHROME_UI_LABELS.recorderName }}</strong>
@@ -279,6 +277,15 @@ function refreshPage() {
             </template>
             <template #menu>{{ CHROME_UI_LABELS.extensionsMenu }}</template>
           </i18n-t>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="refresh"
+            data-test="synthetics-setup-refresh-btn"
+            @click="refreshPage"
+          >
+            {{ t("synthetics.createBrowserTest.setupConnectRefreshCta") }}
+          </OButton>
         </div>
         <p class="text-text-secondary m-0 flex items-center gap-2 text-xs">
           <OIcon
