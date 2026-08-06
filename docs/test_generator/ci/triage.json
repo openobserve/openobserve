@@ -1,0 +1,29 @@
+{
+  "feature_slug": "synthetics-extension-setup",
+  "feature_title": "Synthetics Extension Setup Dialog",
+  "area": "Synthetics",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "extensionSetup.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Synthetics/extensionSetup.spec.js",
+  "playwright_group": "Synthetics",
+  "source_files": [
+    "web/src/components/synthetics/ExtensionSetupChecklist.vue",
+    "web/src/components/synthetics/journey/ExtensionSetupDialog.vue",
+    "web/src/components/synthetics/journey/BrowserJourney.vue",
+    "web/src/views/synthetics/CreateBrowserTest.vue",
+    "web/src/constants/synthetics.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "11 of 12 changed files live in OSS paths (web/src/** and src/api/**). One file — o2_enterprise/src/enterprise/common/config.rs — lives in the enterprise repo and adds the recorder_extension_url config key consumed by the OSS frontend via /config. The feature spans both editions (OSS UI + enterprise config), so edition is 'both'.",
+    "skip": "Not skipping. No explicit opt-out label or skip comment is present. The diff adds two new Vue components (ExtensionSetupChecklist, ExtensionSetupDialog), modifies the BrowserJourney Record/Replay gating to open a modal, and replaces inline setup steps in CreateBrowserTest with the new checklist — all user-facing UI flows that warrant E2E coverage.",
+    "e2e": "E2E is warranted. The change introduces a structured, multi-step extension setup flow: an install button linking to the Chrome Web Store, an incognito toggle, a live connection-status indicator, and a dialog that gates Record/Replay on both extension readiness and incognito confirmation. Without E2E coverage, regressions in the dialog gating logic or checklist wiring would be invisible.",
+    "area": "Synthetics — all UI changes live under web/src/components/synthetics/ and web/src/views/synthetics/. No existing Playwright test folder or CI matrix shard exists for Synthetics; this is a new area.",
+    "group": "Synthetics — this is a new group. No Synthetics shard exists in ci_matrix.ent.json, ci_matrix_env.json, or any other matrix file. The Engineer must add a new 'Synthetics' shard to the appropriate matrix manifest (ci_matrix.ent.json for enterprise-only, or ci_matrix.json in OSS for shared).",
+    "existing_tests": "No Playwright E2E specs in the diff. The three .spec.ts files changed (ExtensionSetupChecklist.spec.ts, BrowserJourney.spec.ts, ExtensionSetupDialog.spec.ts) are all Vitest unit tests under web/src/components/synthetics/ — they exercise component logic in isolation, not end-to-end browser flows. No files under tests/ui-testing/playwright-tests/ were changed."
+  }
+}

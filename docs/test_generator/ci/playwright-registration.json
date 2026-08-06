@@ -1,0 +1,6 @@
+{
+  "group": "Synthetics",
+  "spec_filename": "extensionSetup.spec.js",
+  "create_group": true,
+  "browser": "chrome"
+}

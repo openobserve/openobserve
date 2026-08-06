@@ -1,0 +1,12 @@
+src/api/management/src/request/status/mod.rs
+web/src/components/synthetics/ExtensionSetupChecklist.spec.ts
+web/src/components/synthetics/ExtensionSetupChecklist.vue
+web/src/components/synthetics/journey/BrowserJourney.spec.ts
+web/src/components/synthetics/journey/BrowserJourney.vue
+web/src/components/synthetics/journey/ExtensionSetupDialog.spec.ts
+web/src/components/synthetics/journey/ExtensionSetupDialog.vue
+web/src/constants/synthetics.ts
+web/src/lib/core/Icon/OIcon.icons.ts
+web/src/locales/languages/en-US.json
+web/src/views/synthetics/CreateBrowserTest.vue
+o2_enterprise/src/enterprise/common/config.rs

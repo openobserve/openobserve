@@ -1,0 +1,7 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Synthetics/extensionSetup.spec.js",
+  "existing_tests_considered": [],
+  "needs_registration": true,
+  "rationale": "No Synthetics tests or page objects exist in the codebase. This is a brand-new feature area — the first Synthetics E2E spec. The spec must be registered in tests/ui-testing/ci-matrix/ci_matrix.json as a new shard entry (testfolder: 'Synthetics', actual_folder: 'Synthetics') and a new Synthetics page object (`syntheticsPage.js`) must be created in tests/ui-testing/pages/."
+}

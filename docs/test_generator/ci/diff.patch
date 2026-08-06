@@ -1,0 +1,1063 @@
+===== COMPLETE LIST OF CHANGED FILES (12 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/api/management/src/request/status/mod.rs
+web/src/components/synthetics/ExtensionSetupChecklist.spec.ts
+web/src/components/synthetics/ExtensionSetupChecklist.vue
+web/src/components/synthetics/journey/BrowserJourney.spec.ts
+web/src/components/synthetics/journey/BrowserJourney.vue
+web/src/components/synthetics/journey/ExtensionSetupDialog.spec.ts
+web/src/components/synthetics/journey/ExtensionSetupDialog.vue
+web/src/constants/synthetics.ts
+web/src/lib/core/Icon/OIcon.icons.ts
+web/src/locales/languages/en-US.json
+web/src/views/synthetics/CreateBrowserTest.vue
+o2_enterprise/src/enterprise/common/config.rs
+===== END CHANGED FILES =====
+
+diff --git a/src/api/management/src/request/status/mod.rs b/src/api/management/src/request/status/mod.rs
+index b4e18dccad4..e5c6793f10a 100644
+--- a/src/api/management/src/request/status/mod.rs
++++ b/src/api/management/src/request/status/mod.rs
+@@ -206,6 +206,10 @@ struct ConfigResponse<'a> {
+     online_evals_enabled: bool,
+     anomaly_detection_enabled: bool,
+     synthetics_enabled: bool,
++    /// Chrome Web Store URL of the OpenObserve Recorder extension
++    /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
++    /// links its install button here.
++    synthetics_recorder_extension_url: String,
+     /// SLO measurement (`ZO_SLO_ENABLED`). Not enterprise-gated — the SLO APIs
+     /// answer 501 while it is off, so the UI uses this to hide the menu entry
+     /// rather than offer a page that cannot work.
+@@ -370,6 +374,8 @@ pub async fn zo_config() -> impl IntoResponse {
+     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
+     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
+     let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
++    let synthetics_recorder_extension_url =
++        enterprise_value!("", &o2cfg.synthetics.recorder_extension_url);
+ 
+     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
+     let build_type = "cloud";
+@@ -483,6 +489,7 @@ pub async fn zo_config() -> impl IntoResponse {
+         online_evals_enabled,
+         anomaly_detection_enabled,
+         synthetics_enabled,
++        synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
+         slo_enabled: cfg.slo.enabled,
+         enable_cross_linking: cfg.common.enable_cross_linking,
+         show_fts_field_values: cfg.common.show_fts_field_values,
+diff --git a/web/src/components/synthetics/ExtensionSetupChecklist.spec.ts b/web/src/components/synthetics/ExtensionSetupChecklist.spec.ts
+new file mode 100644
+index 00000000000..90ff5d300a6
+--- /dev/null
++++ b/web/src/components/synthetics/ExtensionSetupChecklist.spec.ts
+@@ -0,0 +1,124 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { mount, VueWrapper } from "@vue/test-utils";
++
++vi.mock("vue-i18n", () => ({
++  useI18n: () => ({ t: (key: string) => key }),
++}));
++
++import { CHROME_WEB_STORE_URL } from "@/constants/synthetics";
++import store from "@/test/unit/helpers/store";
++import ExtensionSetupChecklist from "./ExtensionSetupChecklist.vue";
++
++// Stubs emit native-component click so parent @click handlers fire.
++const OButtonStub = {
++  template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
++};
++// Surfaces the bound model as a checkbox so the v-model round-trip is testable.
++const OSwitchStub = {
++  props: ["modelValue", "label"],
++  emits: ["update:modelValue"],
++  template:
++    '<input type="checkbox" v-bind="$attrs" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
++};
++
++const STUBS = {
++  OButton: OButtonStub,
++  OSwitch: OSwitchStub,
++};
++
++function mountChecklist(props: Record<string, unknown> = {}) {
++  return mount(ExtensionSetupChecklist, {
++    props,
++    global: { plugins: [store], stubs: STUBS },
++  }) as VueWrapper;
++}
++
++describe("ExtensionSetupChecklist", () => {
++  let wrapper: VueWrapper;
++  let openSpy: ReturnType<typeof vi.spyOn>;
++
++  beforeEach(() => {
++    openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
++  });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.restoreAllMocks();
++  });
++
++  it("should open the Chrome Web Store in a new tab from the install button", async () => {
++    wrapper = mountChecklist();
++
++    await wrapper.find('[data-test="synthetics-setup-install-btn"]').trigger("click");
++
++    expect(openSpy).toHaveBeenCalledWith(CHROME_WEB_STORE_URL, "_blank", "noopener");
++  });
++
++  it("should prefer the /config extension URL over the built-in fallback", async () => {
++    const configUrl = "https://chromewebstore.google.com/detail/custom-build";
++    store.state.zoConfig.synthetics_recorder_extension_url = configUrl;
++    wrapper = mountChecklist();
++
++    await wrapper.find('[data-test="synthetics-setup-install-btn"]').trigger("click");
++
++    expect(openSpy).toHaveBeenCalledWith(configUrl, "_blank", "noopener");
++    delete store.state.zoConfig.synthetics_recorder_extension_url;
++  });
++
++  it("should emit update:incognitoDone when the incognito switch is toggled on", async () => {
++    wrapper = mountChecklist();
++
++    await wrapper.find('[data-test="synthetics-setup-incognito-switch"]').setValue(true);
++
++    expect(wrapper.emitted("update:incognitoDone")).toEqual([[true]]);
++  });
++
++  it("should emit update:incognitoDone false when the switch is toggled back off", async () => {
++    wrapper = mountChecklist({ incognitoDone: true });
++
++    await wrapper.find('[data-test="synthetics-setup-incognito-switch"]').setValue(false);
++
++    expect(wrapper.emitted("update:incognitoDone")).toEqual([[false]]);
++  });
++
++  it("should reflect the incognitoDone model on the switch", () => {
++    wrapper = mountChecklist({ incognitoDone: true });
++
++    const el = wrapper.find('[data-test="synthetics-setup-incognito-switch"]')
++      .element as HTMLInputElement;
++    expect(el.checked).toBe(true);
++  });
++
++  it("should show the connected line when the extension is connected", () => {
++    wrapper = mountChecklist({ connected: true });
++
++    expect(wrapper.text()).toContain("synthetics.createBrowserTest.setupConnected");
++  });
++
++  it("should not show the connected line when the extension is not connected", () => {
++    wrapper = mountChecklist({ connected: false });
++
++    expect(wrapper.text()).not.toContain("synthetics.createBrowserTest.setupConnected");
++  });
++
++  it("should not show the connected line when connected is omitted", () => {
++    wrapper = mountChecklist();
++
++    expect(wrapper.text()).not.toContain("synthetics.createBrowserTest.setupConnected");
++  });
++});
+diff --git a/web/src/components/synthetics/ExtensionSetupChecklist.vue b/web/src/components/synthetics/ExtensionSetupChecklist.vue
+new file mode 100644
+index 00000000000..9669a3a73b2
+--- /dev/null
++++ b/web/src/components/synthetics/ExtensionSetupChecklist.vue
+@@ -0,0 +1,175 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<script setup lang="ts">
++import { useStore } from "vuex";
++import { useI18nTyped } from "@/types/i18n";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
++import { CHROME_WEB_STORE_URL } from "@/constants/synthetics";
++
++defineProps<{
++  /** Extension detected and connectable (the parent's live probe state). */
++  connected?: boolean;
++}>();
++
++/** Whether the author confirmed the incognito toggle — the one step we cannot probe. */
++const incognitoDone = defineModel<boolean>("incognitoDone", { default: false });
++
++const { t } = useI18nTyped();
++const store = useStore();
++
++// Chrome UI element names — must stay in English across all locales
++// because they reference the actual Chrome browser interface.
++const CHROME_UI_LABELS = {
++  allowIncognito: "Allow in Incognito",
++  extensionsMenu: "Extensions",
++  manageExtension: "Manage extension",
++  recorderName: "OpenObserve Recorder",
++} as const;
++
++function openWebStore() {
++  const url = store.state.zoConfig?.synthetics_recorder_extension_url || CHROME_WEB_STORE_URL;
++  window.open(url, "_blank", "noopener");
++}
++</script>
++
++<template>
++  <div class="rounded-default border-border-default divide-border-default divide-y border">
++    <!-- Step 1: Install the OpenObserve Recorder -->
++    <div class="flex items-start gap-4 p-4">
++      <span
++        class="bg-accent text-text-inverse flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
++        >{{ "1" }}</span
++      >
++      <div class="flex min-w-0 flex-1 items-start justify-between gap-4">
++        <div class="flex flex-col items-start">
++          <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
++            {{ t("synthetics.createBrowserTest.setupStep1Title") }}
++          </h4>
++          <p class="text-text-secondary m-0 text-xs">
++            {{ t("synthetics.createBrowserTest.setupStep1Description") }}
++          </p>
++        </div>
++        <OButton
++          variant="outline"
++          size="sm"
++          class="shrink-0"
++          icon-left="open-in-new"
++          data-test="synthetics-setup-install-btn"
++          @click="openWebStore"
++        >
++          {{ t("synthetics.createBrowserTest.setupInstallCta") }}
++        </OButton>
++      </div>
++    </div>
++
++    <!-- Step 2: Enable incognito mode -->
++    <div class="flex items-start gap-4 p-4">
++      <span
++        class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
++        :class="
++          incognitoDone
++            ? 'text-text-inverse bg-status-success-text!'
++            : 'bg-accent text-text-inverse'
++        "
++        >{{ "2" }}</span
++      >
++      <div class="flex min-w-0 flex-1 justify-between">
++        <div class="flex flex-col items-start">
++          <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
++            {{ t("synthetics.createBrowserTest.setupStep3Title") }}
++          </h4>
++          <p class="text-text-secondary m-0 mb-1 text-xs">
++            {{
++              t("synthetics.createBrowserTest.setupStep3Description", {
++                setting: CHROME_UI_LABELS.allowIncognito,
++              })
++            }}
++          </p>
++          <ul class="text-text-secondary m-0 flex list-disc flex-col gap-1 pl-4 text-xs">
++            <i18n-t keypath="synthetics.createBrowserTest.setupStep3Point1" tag="li" scope="global">
++              <template #icon>
++                <OIcon name="extension" size="sm" aria-hidden="true" />
++              </template>
++              <template #menu>{{ CHROME_UI_LABELS.extensionsMenu }}</template>
++              <template #more>
++                <OIcon name="more-vert" size="sm" aria-hidden="true" />
++              </template>
++              <template #name>{{ CHROME_UI_LABELS.recorderName }}</template>
++              <template #manage>{{ CHROME_UI_LABELS.manageExtension }}</template>
++            </i18n-t>
++            <li>
++              {{
++                t("synthetics.createBrowserTest.setupStep3Point2", {
++                  setting: CHROME_UI_LABELS.allowIncognito,
++                })
++              }}
++            </li>
++          </ul>
++        </div>
++        <OSwitch
++          v-model="incognitoDone"
++          :label="t('synthetics.createBrowserTest.setupIncognitoDone')"
++          data-test="synthetics-setup-incognito-switch"
++        />
++      </div>
++    </div>
++
++    <!-- Step 3: Click the extension icon to activate -->
++    <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !incognitoDone }">
++      <span
++        class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
++        :class="
++          connected
++            ? 'text-text-inverse bg-status-success-text!'
++            : incognitoDone
++              ? 'bg-accent text-text-inverse'
++              : 'bg-surface-subtle text-text-muted'
++        "
++        >{{ "3" }}</span
++      >
++      <div class="min-w-0 flex-1">
++        <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
++          {{ t("synthetics.createBrowserTest.setupStep2Title") }}
++        </h4>
++        <ul class="text-text-secondary m-0 flex list-disc flex-col gap-1 pl-4 text-xs">
++          <!-- i18n-t so the puzzle-piece icon renders inside the sentence while the
++               copy stays one translatable key with correct word order. -->
++          <i18n-t keypath="synthetics.createBrowserTest.setupStep2Point1" tag="li" scope="global">
++            <template #icon>
++              <OIcon name="extension" size="sm" aria-hidden="true" />
++            </template>
++            <template #menu>{{ CHROME_UI_LABELS.extensionsMenu }}</template>
++            <template #name>{{ CHROME_UI_LABELS.recorderName }}</template>
++          </i18n-t>
++          <li>{{ t("synthetics.createBrowserTest.setupStep2Point2") }}</li>
++          <li>
++            {{
++              t("synthetics.createBrowserTest.setupStep2Point3", {
++                connected: t("synthetics.createBrowserTest.setupConnected"),
++              })
++            }}
++          </li>
++        </ul>
++        <p v-if="connected" class="text-status-success-text! mt-2 text-xs font-medium">
++          {{ t("synthetics.createBrowserTest.setupConnected") }}
++        </p>
++      </div>
++    </div>
++  </div>
++</template>
+diff --git a/web/src/components/synthetics/journey/BrowserJourney.spec.ts b/web/src/components/synthetics/journey/BrowserJourney.spec.ts
+index 6102cd4a7f8..6f981ca7b8a 100644
+--- a/web/src/components/synthetics/journey/BrowserJourney.spec.ts
++++ b/web/src/components/synthetics/journey/BrowserJourney.spec.ts
+@@ -92,6 +92,14 @@ const ConfirmDialogStub = {
+   template: '<div class="confirm-dialog-stub" />',
+ };
+ 
++// Surfaces open/action in the DOM so the record/replay gating can be asserted
++// without pulling in the real ODialog.
++const ExtensionSetupDialogStub = {
++  props: ["open", "connected", "action"],
++  emits: ["update:open", "continue"],
++  template: '<div v-if="open" class="extension-setup-dialog-stub" :data-action="action" />',
++};
++
+ const STUBS = {
+   OButton: OButtonStub,
+   OIcon: OIconStub,
+@@ -102,6 +110,7 @@ const STUBS = {
+   OTooltip: OTooltipStub,
+   JourneySteps: JourneyStepsStub,
+   ConfirmDialog: ConfirmDialogStub,
++  ExtensionSetupDialog: ExtensionSetupDialogStub,
+ };
+ 
+ // ── Bridge transport helpers ──────────────────────────────────────────────
+@@ -169,15 +178,45 @@ describe("BrowserJourney recording", () => {
+     vi.useRealTimers();
+   });
+ 
+-  it("should emit need-extension-setup when recording without a ready extension", async () => {
++  it("should open the extension setup dialog when recording without a ready extension", async () => {
+     wrapper = mountJourney({ extensionReady: false });
+ 
+     await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+ 
+-    expect(wrapper.emitted("need-extension-setup")).toBeTruthy();
++    const dialog = wrapper.find(".extension-setup-dialog-stub");
++    expect(dialog.exists()).toBe(true);
++    expect(dialog.attributes("data-action")).toBe("record");
+     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+   });
+ 
++  it("should open the extension setup dialog instead of replaying without a ready extension", async () => {
++    wrapper = mountJourney({
++      extensionReady: false,
++      replayPhase: "idle",
++      modelValue: [{ id: "s1", action: "navigate", name: "Open app", value: "https://app.test" }],
++    });
++
++    await wrapper.find('[data-test="synthetics-journey-replay-btn"]').trigger("click");
++
++    const dialog = wrapper.find(".extension-setup-dialog-stub");
++    expect(dialog.exists()).toBe(true);
++    expect(dialog.attributes("data-action")).toBe("replay");
++    expect(wrapper.emitted("replay")).toBeFalsy();
++  });
++
++  it("should emit replay from the setup dialog's continue", async () => {
++    wrapper = mountJourney({
++      extensionReady: false,
++      replayPhase: "idle",
++      modelValue: [{ id: "s1", action: "navigate", name: "Open app", value: "https://app.test" }],
++    });
++    await wrapper.find('[data-test="synthetics-journey-replay-btn"]').trigger("click");
++
++    await wrapper.findComponent(ExtensionSetupDialogStub).vm.$emit("continue");
++
++    expect(wrapper.emitted("replay")).toBeTruthy();
++  });
++
+   it("should start recording and render streamed live steps", async () => {
+     wrapper = mountJourney({ extensionReady: true, startUrl: "https://app.test/login" });
+ 
+diff --git a/web/src/components/synthetics/journey/BrowserJourney.vue b/web/src/components/synthetics/journey/BrowserJourney.vue
+index 466a565e780..a533f9c904f 100644
+--- a/web/src/components/synthetics/journey/BrowserJourney.vue
++++ b/web/src/components/synthetics/journey/BrowserJourney.vue
+@@ -34,6 +34,7 @@ import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
+ import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
+ import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+ import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
++import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
+ import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
+ 
+ const props = defineProps<{
+@@ -45,7 +46,7 @@ const props = defineProps<{
+    * Absent falls back to DEFAULT_TEST_ID_ATTR — see useSyntheticsRecorder.
+    */
+   testIdAttr?: string;
+-  extensionReady?: boolean; // when false, Record button triggers need-extension-setup
++  extensionReady?: boolean; // when false, Record/Replay open the extension setup dialog
+   autoRecord?: boolean; // if true, start recording immediately on mount
+   /** Owned by the parent (CreateBrowserTest). */
+   replayPhase?: ReplayPhase;
+@@ -74,7 +75,6 @@ const props = defineProps<{
+ 
+ const emit = defineEmits<{
+   "update:modelValue": [value: BrowserStep[]];
+-  "need-extension-setup": [];
+   "clear-results": [];
+   replay: [];
+   /**
+@@ -477,14 +477,36 @@ function cancelRecording() {
+   recorder.cancelRecording();
+ }
+ 
++// ── Extension setup dialog ─────────────────────────────────────────────────
++// Record and Replay both run inside the extension, so either one clicked
++// without it installed opens the setup dialog instead of failing silently
++// (an ungated replay would sit in `running` until the bridge watchdog fired).
++const extensionSetup = ref<{ open: boolean; action: "record" | "replay" }>({
++  open: false,
++  action: "record",
++});
++
+ function onRecordButtonClick() {
+   if (props.extensionReady) {
+     startRecording();
+   } else {
+-    emit("need-extension-setup");
++    extensionSetup.value = { open: true, action: "record" };
+   }
+ }
+ 
++function onReplayButtonClick() {
++  if (props.extensionReady) {
++    emit("replay");
++  } else {
++    extensionSetup.value = { open: true, action: "replay" };
++  }
++}
++
++function onExtensionSetupContinue() {
++  if (extensionSetup.value.action === "record") startRecording();
++  else emit("replay");
++}
++
+ /** Sync stop — called by parent's route guard before navigating away.
+  *  Commits captured recording steps so they aren't lost. Returns true if
+  *  anything was stopped. */
+@@ -785,7 +807,7 @@ function openChromeExtensions() {
+             size="sm"
+             :disabled="readonly || modelValue.length === 0"
+             data-test="synthetics-journey-replay-btn"
+-            @click="emit('replay')"
++            @click="onReplayButtonClick"
+             icon-left="replay"
+           >
+             {{ t("synthetics.journey.replay") }}
+@@ -818,7 +840,7 @@ function openChromeExtensions() {
+             variant="outline"
+             size="sm"
+             data-test="synthetics-journey-replay-btn"
+-            @click="emit('replay')"
++            @click="onReplayButtonClick"
+             icon-left="replay"
+           >
+             {{ t("synthetics.journey.replay") }}
+@@ -1314,6 +1336,15 @@ function openChromeExtensions() {
+       @update:ok="confirmDelete"
+       @update:cancel="cancelDelete"
+     />
++
++    <!-- Extension install/setup dialog — opened by Record/Replay when the
++         extension is not detected; `connected` flips live via the parent's probe. -->
++    <ExtensionSetupDialog
++      v-model:open="extensionSetup.open"
++      :connected="extensionReady"
++      :action="extensionSetup.action"
++      @continue="onExtensionSetupContinue"
++    />
+   </div>
+ </template>
+ 
+diff --git a/web/src/components/synthetics/journey/ExtensionSetupDialog.spec.ts b/web/src/components/synthetics/journey/ExtensionSetupDialog.spec.ts
+new file mode 100644
+index 00000000000..fd9c2671c97
+--- /dev/null
++++ b/web/src/components/synthetics/journey/ExtensionSetupDialog.spec.ts
+@@ -0,0 +1,172 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { mount, VueWrapper } from "@vue/test-utils";
++
++vi.mock("vue-i18n", () => ({
++  useI18n: () => ({ t: (key: string) => key }),
++}));
++
++import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
++
++// ODialog teleports its content to document.body, which would put every
++// assertion below outside the wrapper's tree. Stubbed to render inline and
++// surface the primary button contract (label, disabled) in the DOM.
++const ODialogStub = {
++  name: "ODialog",
++  props: [
++    "open",
++    "title",
++    "size",
++    "primaryButtonLabel",
++    "primaryButtonDisabled",
++    "secondaryButtonLabel",
++  ],
++  emits: ["update:open", "click:primary", "click:secondary"],
++  template: `
++    <div v-if="open" class="dialog-stub" :data-primary-label="primaryButtonLabel">
++      <slot />
++      <button data-test="stub-primary" :disabled="primaryButtonDisabled" @click="$emit('click:primary')" />
++      <button data-test="stub-secondary" @click="$emit('click:secondary')" />
++    </div>`,
++};
++
++// Surfaces the connected pass-through and lets tests flip the incognito model
++// through the checklist's own event contract.
++const ChecklistStub = {
++  name: "ExtensionSetupChecklist",
++  props: ["connected", "incognitoDone"],
++  emits: ["update:incognitoDone"],
++  template: '<div class="checklist-stub" :data-connected="String(connected)" />',
++};
++
++const STUBS = {
++  ODialog: ODialogStub,
++  ExtensionSetupChecklist: ChecklistStub,
++};
++
++function mountDialog(props: Record<string, unknown> = {}) {
++  return mount(ExtensionSetupDialog, {
++    props: { open: true, action: "record", ...props },
++    global: { stubs: STUBS },
++  }) as VueWrapper;
++}
++
++async function confirmIncognito(wrapper: VueWrapper) {
++  await wrapper.findComponent(ChecklistStub).vm.$emit("update:incognitoDone", true);
++}
++
++function primaryDisabled(wrapper: VueWrapper): boolean {
++  return wrapper.find('[data-test="stub-primary"]').attributes("disabled") !== undefined;
++}
++
++describe("ExtensionSetupDialog", () => {
++  let wrapper: VueWrapper;
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.restoreAllMocks();
++  });
++
++  it("should label the primary button Record for the record action", () => {
++    wrapper = mountDialog({ action: "record" });
++
++    expect(wrapper.find(".dialog-stub").attributes("data-primary-label")).toBe(
++      "synthetics.journey.record",
++    );
++  });
++
++  it("should label the primary button Replay for the replay action", () => {
++    wrapper = mountDialog({ action: "replay" });
++
++    expect(wrapper.find(".dialog-stub").attributes("data-primary-label")).toBe(
++      "synthetics.journey.replay",
++    );
++  });
++
++  it("should disable the primary button when neither step is done", () => {
++    wrapper = mountDialog({ connected: false });
++
++    expect(primaryDisabled(wrapper)).toBe(true);
++  });
++
++  it("should keep the primary button disabled when connected but incognito is unconfirmed", () => {
++    wrapper = mountDialog({ connected: true });
++
++    expect(primaryDisabled(wrapper)).toBe(true);
++  });
++
++  it("should keep the primary button disabled when incognito is confirmed but not connected", async () => {
++    wrapper = mountDialog({ connected: false });
++
++    await confirmIncognito(wrapper);
++
++    expect(primaryDisabled(wrapper)).toBe(true);
++  });
++
++  it("should enable the primary button once connected and incognito is confirmed", async () => {
++    wrapper = mountDialog({ connected: true });
++
++    await confirmIncognito(wrapper);
++
++    expect(primaryDisabled(wrapper)).toBe(false);
++  });
++
++  it("should emit continue and close on primary click", async () => {
++    wrapper = mountDialog({ connected: true });
++    await confirmIncognito(wrapper);
++
++    await wrapper.find('[data-test="stub-primary"]').trigger("click");
++
++    expect(wrapper.emitted("continue")).toHaveLength(1);
++    expect(wrapper.emitted("update:open")).toEqual([[false]]);
++  });
++
++  it("should close without continuing on secondary click", async () => {
++    wrapper = mountDialog({ connected: true });
++
++    await wrapper.find('[data-test="stub-secondary"]').trigger("click");
++
++    expect(wrapper.emitted("update:open")).toEqual([[false]]);
++    expect(wrapper.emitted("continue")).toBeFalsy();
++  });
++
++  it("should forward the dialog's own update:open", async () => {
++    wrapper = mountDialog();
++
++    await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
++
++    expect(wrapper.emitted("update:open")).toEqual([[false]]);
++  });
++
++  it("should pass the connected state through to the checklist", () => {
++    wrapper = mountDialog({ connected: true });
++
++    expect(wrapper.find(".checklist-stub").attributes("data-connected")).toBe("true");
++  });
++
++  // The incognito confirmation is the one step that cannot be probed, so a
++  // dismissed dialog must not ask the author to confirm it twice.
++  it("should keep the incognito confirmation across a close and re-open", async () => {
++    wrapper = mountDialog({ connected: true });
++    await confirmIncognito(wrapper);
++
++    await wrapper.setProps({ open: false });
++    await wrapper.setProps({ open: true });
++
++    expect(primaryDisabled(wrapper)).toBe(false);
++  });
++});
+diff --git a/web/src/components/synthetics/journey/ExtensionSetupDialog.vue b/web/src/components/synthetics/journey/ExtensionSetupDialog.vue
+new file mode 100644
+index 00000000000..75744e5ebc4
+--- /dev/null
++++ b/web/src/components/synthetics/journey/ExtensionSetupDialog.vue
+@@ -0,0 +1,71 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<script setup lang="ts">
++import { computed, ref } from "vue";
++import { useI18nTyped } from "@/types/i18n";
++import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
++import ExtensionSetupChecklist from "@/components/synthetics/ExtensionSetupChecklist.vue";
++
++const props = defineProps<{
++  open: boolean;
++  /** Extension detected and connectable — flips live when the toolbar icon is clicked. */
++  connected?: boolean;
++  /** Which action resumes on the primary button — drives its label. */
++  action: "record" | "replay";
++}>();
++
++const emit = defineEmits<{
++  "update:open": [value: boolean];
++  /** The extension is connected and the author chose to proceed with `action`. */
++  continue: [];
++}>();
++
++const { t } = useI18nTyped();
++
++// Persists across opens on purpose: the incognito toggle survives a dismissed
++// dialog, so re-opening does not ask the author to confirm the same step twice.
++const incognitoDone = ref(false);
++
++const primaryLabel = computed(() =>
++  props.action === "record" ? t("synthetics.journey.record") : t("synthetics.journey.replay"),
++);
++
++function onContinue() {
++  emit("continue");
++  emit("update:open", false);
++}
++</script>
++
++<template>
++  <ODialog
++    :open="open"
++    size="md"
++    :title="t('synthetics.createBrowserTest.setupRecorder')"
++    :primary-button-label="primaryLabel"
++    :primary-button-disabled="!connected || !incognitoDone"
++    :secondary-button-label="t('common.cancel')"
++    data-test="synthetics-journey-extension-setup-dialog"
++    @update:open="emit('update:open', $event)"
++    @click:primary="onContinue"
++    @click:secondary="emit('update:open', false)"
++  >
++    <p class="text-text-secondary m-0 mb-4 text-sm">
++      {{ t("synthetics.journey.extensionDialogDescription") }}
++    </p>
++    <ExtensionSetupChecklist v-model:incognito-done="incognitoDone" :connected="connected" />
++  </ODialog>
++</template>
+diff --git a/web/src/constants/synthetics.ts b/web/src/constants/synthetics.ts
+index 76a78a11815..94a20628a3c 100644
+--- a/web/src/constants/synthetics.ts
++++ b/web/src/constants/synthetics.ts
+@@ -247,6 +247,16 @@ export const VALUE_TOOLTIP_KEYS: Record<string, I18nKey> = {
+   assert: "synthetics.journey.valueTooltips.assert",
+ };
+ 
++// ── Recorder extension ───────────────────────────────────────────────────────
++
++/**
++ * Chrome Web Store listing for the OpenObserve Recorder extension — fallback
++ * when the backend /config field `synthetics_recorder_extension_url`
++ * (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) is absent or empty.
++ */
++export const CHROME_WEB_STORE_URL =
++  "https://chromewebstore.google.com/detail/afhgiecgbpohkbobialnajlphbpcgomo";
++
+ // ── Recorder locator configuration ───────────────────────────────────────────
+ 
+ /**
+diff --git a/web/src/lib/core/Icon/OIcon.icons.ts b/web/src/lib/core/Icon/OIcon.icons.ts
+index d427c326d9a..c6be3792975 100644
+--- a/web/src/lib/core/Icon/OIcon.icons.ts
++++ b/web/src/lib/core/Icon/OIcon.icons.ts
+@@ -56,6 +56,7 @@ import Error from "~icons/material-symbols/error-outline";
+ import ErrorOutline from "~icons/material-symbols/error-outline";
+ import Event from "~icons/material-symbols/event-outline";
+ import ExpandMore from "~icons/material-symbols/expand-more";
++import Extension from "~icons/material-symbols/extension-outline";
+ import UploadFile from "~icons/material-symbols/upload-file-outline";
+ import FormatListBulleted from "~icons/material-symbols/format-list-bulleted";
+ import FormatBold from "~icons/material-symbols/format-bold";
+@@ -394,6 +395,7 @@ export const iconRegistry = {
+   "error-outline": ErrorOutline,
+   event: Event,
+   "expand-more": ExpandMore,
++  extension: Extension,
+   "upload-file": UploadFile,
+   "format-list-bulleted": FormatListBulleted,
+   "format-bold": FormatBold,
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 84494f7334e..fbc94850b25 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -10459,6 +10459,7 @@
+       "setupOpenRecord": "Open & Record",
+       "setupRecorder": "Set up the recorder",
+       "setupSkip": "Skip -- I'll build the steps manually",
++      "setupInstallCta": "Install from Chrome Web Store",
+       "setupStep1Description": "A lightweight Chrome extension that captures your actions.",
+       "setupStep1Title": "Install the OpenObserve Recorder",
+       "startingUrl": "Starting URL",
+@@ -10466,10 +10467,14 @@
+       "stepJourney": "Journey",
+       "untitledCheck": "Untitled check",
+       "variablesHint": "Supports {variables} like {baseUrl}.",
+-      "setupStep2Title": "Click the OpenObserve Recorder icon in your toolbar",
+-      "setupStep2Description": "Chrome can't automatically connect to pages that were open before you installed the extension. Clicking the extension icon injects the recorder into this tab — a one-time step.",
++      "setupStep2Title": "Connect the recorder to this tab",
++      "setupStep2Point1": "Click on the {icon} {menu} menu in Chrome's toolbar (top right) and select {name}.",
++      "setupStep2Point2": "Or simply refresh this page.",
++      "setupStep2Point3": "The status below flips to {connected} automatically.",
+       "setupStep3Title": "Enable incognito mode",
+-      "setupStep3IncognitoHint": "Open chrome://extensions, click {details}, then enable {setting}.",
++      "setupStep3Description": "Journeys record and replay in an Incognito window, so Chrome needs {setting} enabled for the recorder.",
++      "setupStep3Point1": "Click on the {icon} {menu} menu in Chrome's toolbar, then click {more} next to {name} and select {manage}.",
++      "setupStep3Point2": "Toggle {setting} on — the recorder can't interact with pages opened without it.",
+       "setupConnected": "Connected ✓"
+     },
+     "dialog": {
+@@ -10670,6 +10675,7 @@
+       "reRun": "Re-run",
+       "reRunToHere": "Re-run steps 1–{step}",
+       "fidelityLabel": "The preview could not reproduce",
++      "extensionDialogDescription": "Recording and replaying journeys uses the OpenObserve Recorder Chrome extension. Complete the steps below to continue.",
+       "record": "Record",
+       "recordJourney": "Record journey",
+       "recording": "Recording",
+diff --git a/web/src/views/synthetics/CreateBrowserTest.vue b/web/src/views/synthetics/CreateBrowserTest.vue
+index 4c2f4a6023e..2476a30f611 100644
+--- a/web/src/views/synthetics/CreateBrowserTest.vue
++++ b/web/src/views/synthetics/CreateBrowserTest.vue
+@@ -50,7 +50,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OInput from "@/lib/forms/Input/OInput.vue";
+-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
++import ExtensionSetupChecklist from "@/components/synthetics/ExtensionSetupChecklist.vue";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+ import OStep from "@/lib/navigation/Stepper/OStep.vue";
+@@ -75,13 +75,6 @@ const variablesHintParams = computed(() => ({
+   baseUrl: "{{baseUrl}}",
+ }));
+ 
+-// Chrome UI element names — must stay in English across all locales
+-// because they reference the actual Chrome browser interface.
+-const CHROME_UI_LABELS = {
+-  details: "Details",
+-  allowIncognito: "Allow in Incognito",
+-} as const;
+-
+ // Three top-level phases:
+ //   gate            → URL + name inputs
+ //   extension-setup → install extension checklist (only when extension not yet installed)
+@@ -451,12 +444,6 @@ function onExtensionSetupSkip() {
+   phase.value = "editor";
+ }
+ 
+-// Called when BrowserJourney's Record button is clicked while in editor
+-// and extension isn't ready yet
+-function onNeedExtensionSetup() {
+-  phase.value = "extension-setup";
+-}
+-
+ const isSaving = ref(false);
+ const apiPayload = computed(() => buildCreateBrowserTestPayload(check.value));
+ 
+@@ -810,7 +797,7 @@ function onClearResults() {
+         <div class="mb-6 flex justify-center">
+           <EmptyBrowserCheck :width="140" />
+         </div>
+-        <p class="mb-8 pb-4">
++        <p class="mb-4 pb-4">
+           {{ t("synthetics.createBrowserTest.gateDescription") }}
+         </p>
+ 
+@@ -838,7 +825,7 @@ function onClearResults() {
+           }}</small>
+         </div>
+ 
+-        <div class="mb-8">
++        <div class="mb-4">
+           <label for="synthetics-check-name" class="mb-1 block">{{
+             t("synthetics.checkDetails.name")
+           }}</label>
+@@ -855,6 +842,7 @@ function onClearResults() {
+           <OButton
+             variant="primary"
+             :disabled="!isGateUrlValid"
++            :loading="checkingExtension"
+             data-test="synthetics-create-record-btn"
+             @click="onRecordClick"
+           >
+@@ -897,88 +885,15 @@ function onClearResults() {
+           </div>
+         </div>
+ 
+-        <p class="mb-8 pb-4 text-left">
++        <p class="mb-2 pb-4 text-left">
+           {{ t("synthetics.createBrowserTest.setupDescription", { url: check.url }) }}
+         </p>
+ 
+-        <div
+-          class="rounded-default border-border-default divide-border-default mb-6 divide-y border"
+-        >
+-          <!-- Step 1: Install the OpenObserve Recorder -->
+-          <div class="flex items-start gap-4 p-4">
+-            <span
+-              class="bg-accent text-text-inverse flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+-              >{{ "1" }}</span
+-            >
+-            <div class="min-w-0 flex-1">
+-              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
+-                {{ t("synthetics.createBrowserTest.setupStep1Title") }}
+-              </h4>
+-              <p class="text-text-secondary m-0 text-xs">
+-                {{ t("synthetics.createBrowserTest.setupStep1Description") }}
+-              </p>
+-            </div>
+-          </div>
+-
+-          <!-- Step 2: Enable incognito mode -->
+-          <div class="flex items-start gap-4 p-4">
+-            <span
+-              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+-              :class="
+-                incognitoAllowed
+-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
+-                  : 'bg-accent text-text-inverse'
+-              "
+-              >{{ "2" }}</span
+-            >
+-            <div class="flex min-w-0 flex-1 justify-between">
+-              <div class="flex flex-col items-start">
+-                <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
+-                  {{ t("synthetics.createBrowserTest.setupStep3Title") }}
+-                </h4>
+-                <p class="text-text-secondary m-0 mb-3 text-xs">
+-                  {{
+-                    t("synthetics.createBrowserTest.setupStep3IncognitoHint", {
+-                      details: CHROME_UI_LABELS.details,
+-                      setting: CHROME_UI_LABELS.allowIncognito,
+-                    })
+-                  }}
+-                </p>
+-              </div>
+-              <OSwitch
+-                v-model="incognitoAllowed"
+-                :label="t('synthetics.createBrowserTest.setupIncognitoDone')"
+-                data-test="synthetics-setup-incognito-switch"
+-              />
+-            </div>
+-          </div>
+-
+-          <!-- Step 3: Click the extension icon to activate -->
+-          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !incognitoAllowed }">
+-            <span
+-              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+-              :class="
+-                extensionReady
+-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
+-                  : incognitoAllowed
+-                    ? 'bg-accent text-text-inverse'
+-                    : 'bg-surface-subtle text-text-muted'
+-              "
+-              >{{ "3" }}</span
+-            >
+-            <div class="min-w-0 flex-1">
+-              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
+-                {{ t("synthetics.createBrowserTest.setupStep2Title") }}
+-              </h4>
+-              <p class="text-text-secondary m-0 text-xs">
+-                {{ t("synthetics.createBrowserTest.setupStep2Description") }}
+-              </p>
+-              <p v-if="extensionReady" class="text-status-success-text! mt-2 text-xs font-medium">
+-                {{ t("synthetics.createBrowserTest.setupConnected") }}
+-              </p>
+-            </div>
+-          </div>
+-        </div>
++        <ExtensionSetupChecklist
++          v-model:incognito-done="incognitoAllowed"
++          :connected="extensionReady"
++          class="mb-6"
++        />
+ 
+         <OButton
+           variant="primary"
+@@ -1043,7 +958,6 @@ function onClearResults() {
+               :blocked-detail="blockedDetail"
+               :field-issues="journeyFieldIssues"
+               class="h-full!"
+-              @need-extension-setup="onNeedExtensionSetup"
+               @replay="onReplay"
+               @replay-up-to="onReplayUpTo"
+               @stop-replay="onStopReplay"
+
+
+===== LINKED / SISTER PR: openobserve/o2-enterprise #2363 (combined for full feature context) =====
+
+diff --git a/o2_enterprise/src/enterprise/common/config.rs b/o2_enterprise/src/enterprise/common/config.rs
+index d69d3c31a..ebe7237e4 100644
+--- a/o2_enterprise/src/enterprise/common/config.rs
++++ b/o2_enterprise/src/enterprise/common/config.rs
+@@ -1219,6 +1219,15 @@ pub struct SyntheticsConfig {
+         default = "https://raw.githubusercontent.com/openobserve/o2-datasource/main/synthetics/install.sh"
+     )]
+     pub install_script_url: String,
++    /// Chrome Web Store listing for the OpenObserve Recorder extension, shown
++    /// in the browser-test setup UI (via /config
++    /// synthetics_recorder_extension_url). Override for a privately hosted or
++    /// re-published build of the extension.
++    #[env_config(
++        name = "O2_SYNTHETICS_RECORDER_EXTENSION_URL",
++        default = "https://chromewebstore.google.com/detail/afhgiecgbpohkbobialnajlphbpcgomo"
++    )]
++    pub recorder_extension_url: String,
+     /// Seconds since the last lease/heartbeat before an agent counts as stale.
+     /// All agents of a private location stale ⇒ location shows Offline and the
+     /// staleness watcher raises a "location down" notification.
