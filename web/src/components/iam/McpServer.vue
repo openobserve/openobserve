@@ -30,6 +30,7 @@ import useIngestion from "@/composables/useIngestion";
 import organizationsService from "@/services/organizations";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import type { CardSubstitutions } from "@/components/ingestion/ai/content/renderMarkdown";
+import { fetchOrgPasscode } from "@/composables/query/queries/tokens";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -52,12 +53,11 @@ onMounted(() => {
   // snippet, copied in full). IAM can be opened without visiting Ingestion
   // first, so fetch it if the store doesn't already have it.
   if (!store.state.organizationData?.organizationPasscode) {
-    organizationsService
-      .get_organization_passcode(store.state.selectedOrganization.identifier)
+    fetchOrgPasscode(store.state.selectedOrganization.identifier)
       .then((res: any) => {
-        if (res.data?.data?.passcode) {
-          store.dispatch("setOrganizationPasscode", res.data.data.passcode);
-          store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
+        if (res.data?.passcode) {
+          store.dispatch("setOrganizationPasscode", res.data.passcode);
+          store.dispatch("setOrganizationPasscodeUser", res.data.user);
         }
       })
       .catch(() => {

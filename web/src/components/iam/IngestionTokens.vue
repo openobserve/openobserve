@@ -247,6 +247,7 @@ import organizationsService from "@/services/organizations";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { fetchIngestionTokens, invalidateIngestionTokens } from "@/composables/query/queries/tokens";
 
 interface Token {
   name: string;
@@ -353,10 +354,8 @@ export default defineComponent({
     const fetchTokens = async () => {
       loading.value = true;
       try {
-        const res = await organizationsService.list_org_ingestion_tokens(
-          store.state.selectedOrganization.identifier,
-        );
-        tokens.value = res.data.data;
+        const res = await fetchIngestionTokens(store.state.selectedOrganization.identifier);
+        tokens.value = res.data;
       } catch (e: any) {
         toast({
           variant: "error",
@@ -388,6 +387,7 @@ export default defineComponent({
         };
         showCreateForm.value = false;
         showRevealedDialog.value = true;
+        invalidateIngestionTokens(store.state.selectedOrganization.identifier);
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -414,6 +414,7 @@ export default defineComponent({
           name,
           enabled,
         );
+        invalidateIngestionTokens(store.state.selectedOrganization.identifier);
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -460,7 +461,10 @@ export default defineComponent({
       {
         id: "ingestionTokensRefresh",
         handler: () => {
-          if (!isInputFocused()) fetchTokens();
+          if (!isInputFocused()) {
+            invalidateIngestionTokens(store.state.selectedOrganization.identifier);
+            fetchTokens();
+          }
         },
       },
       {
