@@ -1,2 +1,0 @@
-web/src/components/alerts/AddTemplate.spec.ts
-web/src/components/alerts/AddTemplate.vue

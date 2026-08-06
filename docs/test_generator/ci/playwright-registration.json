@@ -1,6 +1,0 @@
-{
-  "group": "Alerts",
-  "spec_filename": "alertTemplateRoundtrip.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
