@@ -60,13 +60,6 @@ RTL languages (Arabic, Persian) are deliberately excluded until the web app has
 ### Setup
 
 ```bash
-# From the web directory
-npm run translate:setup
-```
-
-Or manually:
-
-```bash
 cd scripts/translations
 pip3 install -r requirements.txt
 ```
@@ -86,10 +79,6 @@ export TRANSLATION_CONCURRENCY=4               # batches in flight per locale (1
 
 Translate all languages:
 ```bash
-# From the web directory
-npm run translate
-
-# Or directly
 cd scripts/translations
 python3 main.py
 ```
@@ -257,7 +246,7 @@ DEEPSEEK_API_KEY is not set — cannot reach the translation service.
 ```
 ModuleNotFoundError: No module named 'openai'
 ```
-**Solution**: Run `npm run translate:setup` or `pip3 install -r requirements.txt`
+**Solution**: Run `pip3 install -r requirements.txt` from `scripts/translations`
 
 ### Translation Quality Issues
 - Machine translations are not perfect
