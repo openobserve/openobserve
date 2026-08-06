@@ -14,11 +14,19 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, http::StatusCode, response::Response};
+use config::meta::destinations::TemplateKind;
 use db::user::is_root_user;
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
-use openobserve_core::{alerts::templates, auth::UserEmail, http::template_error_response};
+use openobserve_core::{
+    alerts::{
+        notifications::preview::{PreviewError, PreviewRequest, preview},
+        templates,
+    },
+    auth::UserEmail,
+    http::template_error_response,
+};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -59,8 +67,26 @@ pub async fn save_template(
     Headers(user_email): Headers<UserEmail>,
     Json(tmpl): Json<Template>,
 ) -> Response {
+    let requested_kind = match tmpl.kind.as_deref() {
+        None => None,
+        Some("custom") => Some(TemplateKind::Custom),
+        Some("content") => Some(TemplateKind::Content),
+        Some(other) => {
+            return template_error_response(db::alerts::templates::TemplateError::InvalidKind(
+                other.to_string(),
+            ));
+        }
+    };
     let tmpl = tmpl.into(&org_id);
-    match templates::save("", tmpl, true, is_root_user(&user_email.user_id)).await {
+    match templates::save(
+        "",
+        tmpl,
+        requested_kind,
+        true,
+        is_root_user(&user_email.user_id),
+    )
+    .await
+    {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Template saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
@@ -104,8 +130,26 @@ pub async fn update_template(
     Headers(user_email): Headers<UserEmail>,
     Json(tmpl): Json<Template>,
 ) -> Response {
+    let requested_kind = match tmpl.kind.as_deref() {
+        None => None,
+        Some("custom") => Some(TemplateKind::Custom),
+        Some("content") => Some(TemplateKind::Content),
+        Some(other) => {
+            return template_error_response(db::alerts::templates::TemplateError::InvalidKind(
+                other.to_string(),
+            ));
+        }
+    };
     let tmpl = tmpl.into(&org_id);
-    match templates::save(&name, tmpl, false, is_root_user(&user_email.user_id)).await {
+    match templates::save(
+        &name,
+        tmpl,
+        requested_kind,
+        false,
+        is_root_user(&user_email.user_id),
+    )
+    .await
+    {
         Ok(_) => MetaHttpResponse::ok("Template updated"),
         Err(e) => template_error_response(e),
     }
@@ -383,6 +427,73 @@ pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
     MetaHttpResponse::json(templates)
 }
 
+/// PreviewTemplate
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/templates/preview",
+    context_path = "/api",
+    tag = "Templates",
+    operation_id = "PreviewTemplate",
+    summary = "Preview an alert template",
+    description = "Renders a draft content-template definition for a chosen channel against a deterministic synthetic \
+                   sample, returning both the real wire payload the send path would produce and a normalized preview \
+                   model for card rendering. Uses the exact same resolve/render code path as sending a live \
+                   notification, so the preview is guaranteed to match production output for the same input.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = inline(PreviewRequest), description = "Preview request", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn preview_template(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<PreviewRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = &user_email.user_id;
+        if !is_root_user(user_id)
+            && !check_permissions(
+                "templates",
+                &org_id,
+                user_id,
+                "template",
+                "GET",
+                None,
+                false,
+                false,
+                false,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = &org_id;
+
+    match preview(&req) {
+        Ok(resp) => MetaHttpResponse::json(resp),
+        Err(e @ PreviewError::UnknownChannel(_)) | Err(e @ PreviewError::UnknownSeverity(_)) => {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
+        // Unreachable today (the webhook fallback is total), but a render
+        // failure is a server-side fault, not a malformed request.
+        Err(e @ PreviewError::RenderFailed(_)) => MetaHttpResponse::internal_error(e.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
@@ -470,6 +581,22 @@ mod tests {
     fn test_reserved_name_is_bad_request() {
         assert_eq!(
             status(TemplateError::ReservedName("prebuilt_slack".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_kind_is_bad_request() {
+        assert_eq!(
+            status(TemplateError::InvalidKind("bogus".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_content_spec_is_bad_request() {
+        assert_eq!(
+            status(TemplateError::InvalidContentSpec("bad json".to_string())),
             StatusCode::BAD_REQUEST
         );
     }

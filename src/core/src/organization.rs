@@ -676,6 +676,20 @@ pub async fn create_org(
                     );
                 }
             }
+            // Best-effort — the compiled-in fallback (design §4.4) covers the
+            // race if this fails or the backfill hasn't run yet; never block
+            // org creation on it.
+            if let Err(e) = crate::alerts::notifications::org_default::set_org_default_template(
+                &org.identifier,
+                crate::alerts::notifications::default_template::DEFAULT_CONTENT_TEMPLATE_NAME,
+            )
+            .await
+            {
+                log::warn!(
+                    "Failed to set default_alert_template for org '{}': {e}",
+                    org.identifier
+                );
+            }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
