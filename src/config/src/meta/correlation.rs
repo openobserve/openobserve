@@ -149,8 +149,9 @@ const MAX_TRACKED_ALIASES: usize = 30;
 ///
 /// The `id` is the semantic category slug (e.g. "k8s", "aws", "gcp", "azure").
 /// At processing time the system tries ALL configured sets against each record and
-/// picks the one whose `distinguish_by` fields yield the most non-empty values
-/// (best-coverage wins; ties broken by first-in-list).
+/// ranks them by coverage of the record's non-empty dimensions: a fully-covered set
+/// wins first, then the highest covered ratio, then the highest raw count; ties are
+/// broken by declaration order (first-in-list). See `resolve_best_set_by_coverage`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema, PartialEq)]
 pub struct IdentitySet {
     /// Semantic category slug: "k8s", "aws", "gcp", "azure", or a custom slug.
@@ -205,8 +206,10 @@ impl IdentitySet {
 /// Contains 1–5 identity sets. Service name is always derived from the "service"
 /// semantic group — hardcoded, not configurable.
 ///
-/// At processing time each record is matched against ALL sets; the set whose
-/// `distinguish_by` fields yield the most non-empty values wins (best coverage).
+/// At processing time each record is matched against ALL sets and ranked by
+/// coverage of the record's non-empty dimensions: full coverage > highest ratio >
+/// highest count, ties broken by declaration order. The same ranking is used on the
+/// correlation read path so ingest files records under the set reads will select.
 /// If no set has any coverage the record is skipped.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct ServiceIdentityConfig {
@@ -280,30 +283,71 @@ impl ServiceIdentityConfig {
 
     /// Pick the best-matching identity set for `dims` using best-coverage resolution.
     ///
-    /// For each set, counts how many `distinguish_by` fields have non-empty values
-    /// in `dims`. Returns the set with the highest count. Ties are broken by
-    /// first-in-list wins. Returns `None` if no set has any coverage (all counts == 0).
+    /// Only non-empty values in `dims` count as available. Ranking is delegated to
+    /// [`resolve_best_set_by_coverage`] — full coverage > highest ratio > highest
+    /// count, ties broken by declaration order. Returns `None` if no set has any
+    /// coverage.
     pub fn resolve_best_set<'a>(
         &'a self,
         dims: &std::collections::HashMap<String, String>,
     ) -> Option<&'a IdentitySet> {
-        let mut best: Option<(&IdentitySet, usize)> = None;
-        for set in &self.sets {
-            let count = set
-                .distinguish_by
-                .iter()
-                .filter(|k| dims.get(k.as_str()).map(|v| !v.is_empty()).unwrap_or(false))
-                .count();
-            if count > 0 {
-                match best {
-                    None => best = Some((set, count)),
-                    Some((_, best_count)) if count > best_count => best = Some((set, count)),
-                    _ => {}
-                }
-            }
-        }
-        best.map(|(set, _)| set)
+        let available: std::collections::HashSet<&str> = dims
+            .iter()
+            .filter(|(_, v)| !v.is_empty())
+            .map(|(k, _)| k.as_str())
+            .collect();
+        resolve_best_set_by_coverage(&self.sets, &available).map(|(set, _)| set)
     }
+}
+
+/// Coverage of one identity set against a request's available dimension keys.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SetCoverage {
+    pub is_full: bool,
+    pub ratio: f64,
+    pub count: usize,
+}
+
+impl SetCoverage {
+    fn rank(&self) -> (bool, f64, usize) {
+        (self.is_full, self.ratio, self.count)
+    }
+}
+
+/// Shared ingest/read ranking: full coverage > highest ratio > highest count;
+/// ties broken by declaration order (strict `>` keeps the earlier set).
+/// Raw-count ranking is WRONG here — a 3/5 partial beating a 2/2 full set files
+/// records under a set the read side will never select (cross-workload pollution).
+pub fn resolve_best_set_by_coverage<'a>(
+    sets: &'a [IdentitySet],
+    available: &std::collections::HashSet<&str>,
+) -> Option<(&'a IdentitySet, SetCoverage)> {
+    let mut best: Option<(&IdentitySet, SetCoverage)> = None;
+    for set in sets {
+        if set.distinguish_by.is_empty() {
+            continue;
+        }
+        let total = set.distinguish_by.len();
+        let count = set
+            .distinguish_by
+            .iter()
+            .filter(|f| available.contains(f.as_str()))
+            .count();
+        if count == 0 {
+            continue;
+        }
+        let cov = SetCoverage {
+            is_full: count == total,
+            ratio: count as f64 / total as f64,
+            count,
+        };
+        match &best {
+            None => best = Some((set, cov)),
+            Some((_, b)) if cov.rank() > b.rank() => best = Some((set, cov)),
+            _ => {}
+        }
+    }
+    best
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -497,9 +541,14 @@ mod tests {
         dims.insert("k8s-namespace".to_string(), "app".to_string());
         dims.insert("aws-region".to_string(), "us-east-1".to_string());
 
-        // k8s has 2 matches, aws has 1 — k8s wins
+        // F8: k8s is 2/3 (partial), aws is 1/1 (full) — full coverage wins over raw
+        // count, matching the correlation read path's ranking.
         let best = cfg.resolve_best_set(&dims).unwrap();
-        assert_eq!(best.id, "k8s");
+        assert_eq!(best.id, "aws");
+
+        // Without the aws dimension, k8s is the only set with any coverage.
+        dims.remove("aws-region");
+        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "k8s");
     }
 
     #[test]
@@ -571,6 +620,64 @@ mod tests {
 
         let best = cfg.resolve_best_set(&k8s_dims).unwrap();
         assert_eq!(best.id, "k8s");
+    }
+
+    #[test]
+    fn test_resolve_best_set_prefers_full_coverage_over_raw_count() {
+        // F8: a fully-covered 2-field set must beat a 3/5 partial set at ingest,
+        // matching the read-side ranking (is_full, ratio, count).
+        let cfg = ServiceIdentityConfig {
+            sets: vec![
+                make_set("big", "Big", &["a", "b", "c", "d", "e"]),
+                make_set("small", "Small", &["x", "y"]),
+            ],
+            tracked_alias_ids: vec!["a".into()],
+            service_optional: false,
+        };
+        let dims: std::collections::HashMap<String, String> = [
+            ("a", "1"),
+            ("b", "1"),
+            ("c", "1"), // big: 3/5 partial
+            ("x", "1"),
+            ("y", "1"), // small: 2/2 full
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "small");
+    }
+
+    #[test]
+    fn test_resolve_best_set_ties_broken_by_declaration_order() {
+        let cfg = ServiceIdentityConfig {
+            sets: vec![
+                make_set("first", "F", &["a"]),
+                make_set("second", "S", &["b"]),
+            ],
+            tracked_alias_ids: vec!["a".into()],
+            service_optional: false,
+        };
+        let dims: std::collections::HashMap<String, String> = [("a", "1"), ("b", "1")]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "first");
+    }
+
+    #[test]
+    fn test_resolve_best_set_by_coverage_reports_coverage() {
+        let sets = vec![
+            make_set("k8s", "Kubernetes", &["k8s-cluster", "k8s-namespace"]),
+            make_set("aws", "AWS", &["aws-region"]),
+        ];
+        let available: std::collections::HashSet<&str> =
+            ["k8s-cluster", "aws-region"].into_iter().collect();
+        let (set, cov) = resolve_best_set_by_coverage(&sets, &available).unwrap();
+        // aws is fully covered (1/1); k8s is only 1/2 → aws wins on is_full
+        assert_eq!(set.id, "aws");
+        assert!(cov.is_full);
+        assert_eq!(cov.count, 1);
+        assert_eq!(cov.ratio, 1.0);
     }
 
     // ========== IncidentGroupingConfig::validate() Tests ==========
