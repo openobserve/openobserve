@@ -1,0 +1,15 @@
+{
+  "feature_slug": "perf-dashboard-api-tab-black-space-relative-time",
+  "feature_title": "Performance Dashboard - API Tab - Black Space on Month Change Under Relative Time",
+  "area": "General",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "performance-dashboard-api-tab.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RegressionSet/General/performance-dashboard-api-tab.spec.js",
+  "playwright_group": "GeneralTests-Regression",
+  "source_files": [],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

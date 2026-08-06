@@ -1,0 +1,8 @@
+[
+  { "title": "TC01: API tab renders dashboard panels after schema resolution", "action": "new", "verifies": "the API dashboard container, empty-state absence, and grid-stack panels are visible after schema resolution" },
+  { "title": "TC02: Panels render content after relative time range change (no stuck black space)", "action": "new", "verifies": "URL reflects the new time range and panels re-render with visible child content after a relative time change" },
+  { "title": "TC03: Tab switch roundtrip (API → Overview → API) preserves rendered content", "action": "new", "verifies": "switching to Overview tab and back to API tab preserves dashboard panels and content" },
+  { "title": "TC04: isLoading is never populated — content wrapper never receives invisible class — not wired: ApiDashboard.vue:131", "action": "new", "verifies": "the unwired isLoading ref keeps the content wrapper always visible" },
+  { "title": "TC05: isLoading is never populated — loading overlay never shown — not wired: ApiDashboard.vue:68-76", "action": "new", "verifies": "the unwired isLoading ref means the loading overlay is never shown" },
+  { "title": "TC06: Manual refresh button on API tab preserves panel visibility", "action": "new", "verifies": "clicking the manual refresh button on the API tab preserves panel visibility" }
+]

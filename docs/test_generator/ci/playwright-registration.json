@@ -1,0 +1,8 @@
+{
+  "group": "GeneralTests-Regression",
+  "spec_filename": "performance-dashboard-api-tab.spec.js",
+  "actual_folder": "RegressionSet/General",
+  "create_group": true,
+  "browser": "chrome",
+  "source": "ci_matrix.json"
+}

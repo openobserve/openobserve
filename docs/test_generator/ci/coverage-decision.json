@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/RegressionSet/General/performance-dashboard-api-tab.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/RUM/rum-page-dataflow.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_target": "ci_matrix_regression.json → GeneralTests-Regression → run_files",
+  "rationale": "No existing spec covers the Performance Dashboard API tab. The closest candidate is rum-page-dataflow.spec.js, which only tests the Overview tab's summary loading resolution (pm.rumPerformancePage.gotoPerformance / clickRefresh / expectSummaryLoadingResolved). The API tab (ApiDashboard.vue) has its own component tree, selectors, data-fetching paths, and the 'black space on time-range change' behaviour that are entirely unexercised. A new spec in RegressionSet/General is warranted for this regressions/bug-fix feature."
+}

@@ -1,0 +1,23 @@
+{
+  "feature_slug": "perf-dashboard-api-tab-black-space-relative-time",
+  "feature_title": "Performance Dashboard - API Tab - Black Space on Month Change Under Relative Time",
+  "area": "RUM",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "performance-dashboard-api-tab.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RUM/performance-dashboard-api-tab.spec.js",
+  "playwright_group": "RUM",
+  "source_files": [],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "ISSUE-MODE: edition always set to 'oss' per spec. No PR diff to classify; the batch caller filters by the OSS repo's Needs-Automation label. No file paths were checked because there is no code diff in issue-mode.",
+    "skip": "Not skipped — ISSUE-MODE regression runs always warrant E2E tests (needs_e2e is forced to true). The bug (black space on Performance Dashboard API tab) involves user-facing UI that is testable via Playwright: navigate the dashboard, simulate month changes under relative time, and verify no blank/black areas appear. No skip markers or labels are present in the trigger comment.",
+    "e2e": "E2E is warranted — the bug is a UI rendering defect (black space appears) when changing months under relative time on the Performance Dashboard API tab. A Playwright test can navigate to the RUM Performance Dashboard, select the API tab, change the relative time to span multiple months, and assert that the content area renders correctly without unexpected visual gaps.",
+    "area": "RUM (Real User Monitoring) — the issue body explicitly identifies 'real user monitoring' as the source functionality. The Performance Dashboard and its API tab belong to the RUM product area. The RUM testfolder exists in the Playwright CI matrix with sibling specs like sourcemap-ui.spec.js.",
+    "group": "RUM — the closest matching testfolder in .github/workflows/playwright.yml. The RUM group covers Real User Monitoring features and is the natural home for a Performance Dashboard regression test. If the spec needs to land in the regression suite instead, it should join a new 'RUM-Regression' folder mapped to RegressionSet/RUM.",
+    "existing_tests": "No E2E specs in the diff — ISSUE-MODE has no code diff to inspect. A changed Vitest/unit or Rust test is irrelevant to E2E coverage and would not be cited here even if present."
+  }
+}

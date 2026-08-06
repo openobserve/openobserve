@@ -1,0 +1,8 @@
+{
+  "verdict": "PASS",
+  "critical_count": 0,
+  "warning_count": 3,
+  "auto_fixed": 0,
+  "feature_slug": "perf-dashboard-api-tab-black-space-relative-time",
+  "audit_report": "docs/test_generator/audit-reports/perf-dashboard-api-tab-black-space-relative-time-audit.md"
+}

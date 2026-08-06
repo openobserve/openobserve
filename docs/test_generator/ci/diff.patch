@@ -1,0 +1,8 @@
+=== E2E-COUNCIL: ISSUE-MODE (no PR diff — regression coverage for a closed bug) ===
+Issue: #1760
+Title: Performance Dashboard - API tab - Black space appears on changing months under relative time
+Area labels: <none>
+
+The bug report body has been written to feature_hint.txt. Use it as the full
+feature description. No code change / no PR exists — you're generating a
+regression test that PROTECTS the fixed behavior going forward.
