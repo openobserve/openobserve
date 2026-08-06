@@ -143,6 +143,8 @@ export default createStore({
       filterQuery: "",
       searchAcrossFolders: false,
     },
+    // SIEM solution mode — switches nav and entry point between Observability and Security
+    solutionMode: (localStorage.getItem("solutionMode") || "observability") as "observability" | "security",
   },
   mutations: {
     login(state, payload) {
@@ -253,6 +255,10 @@ export default createStore({
     },
     setPrintMode(state, payload) {
       state.printMode = payload;
+    },
+    setSolutionMode(state, payload: "observability" | "security") {
+      state.solutionMode = payload;
+      localStorage.setItem("solutionMode", payload);
     },
     setTimezone(state, payload) {
       state.timezone = payload;

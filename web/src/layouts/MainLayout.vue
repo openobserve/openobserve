@@ -499,6 +499,46 @@ export default defineComponent({
         store.state.zoConfig.version != ""
       ),
     );
+    // ── SIEM nav links (shown when solutionMode === "security") ─────────────
+    // All icon names MUST exist in the OIcon registry (OIcon.icons.ts).
+    const securityNavLinks: NavItem[] = [
+      { title: "Overview",    icon: "bar-chart",           link: "/security/overview",    name: "securityOverview" },
+      { title: "Events",      icon: "manage-search",       link: "/security/events",      name: "securityEvents" },
+      { title: "Detections",  icon: "shield-alert-outline",link: "/security/detections",  name: "securityDetections" },
+      { title: "Alerts",      icon: "notifications-active",link: "/security/alerts",      name: "securityAlerts" },
+      { title: "Cases",       icon: "folder-open",         link: "/security/cases",       name: "securityCases" },
+      { title: "Entities",    icon: "person-pin-circle",   link: "/security/entities",    name: "securityEntities" },
+      { title: "Threat Intel",icon: "brain-circuit",       link: "/security/intel",       name: "securityIntel" },
+      { title: "UEBA",        icon: "group-work",          link: "/security/ueba",        name: "securityUEBA" },
+      { title: "MITRE ATT&CK",icon: "compare-arrows",     link: "/security/mitre",       name: "securityMitre" },
+      { title: "Compliance",  icon: "verified-user",       link: "/security/compliance",  name: "securityCompliance" },
+      { title: "Content",     icon: "menu-book",           link: "/security/content",     name: "securityContent" },
+    ];
+
+    // Snapshot of observability links — restored when switching back from security mode
+    let _obsLinksSnapshot: NavItem[] = [];
+
+    watch(
+      () => store.state.solutionMode,
+      (mode: string) => {
+        if (mode === "security") {
+          // Save observability links before swapping (skip if already in security mode)
+          if (linksList.value !== securityNavLinks) {
+            _obsLinksSnapshot = [...linksList.value];
+          }
+          linksList.value = securityNavLinks;
+        } else {
+          // Restore observability nav; if no snapshot (cold load as observability), leave as-is
+          if (_obsLinksSnapshot.length > 0) {
+            linksList.value = _obsLinksSnapshot;
+            _obsLinksSnapshot = [];
+          }
+          // If snapshot is empty, filterMenus() will re-init the observability nav normally
+        }
+      },
+      { immediate: true },
+    );
+
     const navLinks = computed(() => (menuReady.value ? linksList.value : []));
 
     const langList = [
@@ -605,7 +645,7 @@ export default defineComponent({
       ) {
         getConfig();
       } else {
-        if (config.isCloud == "false") {
+        if (config.isCloud == "false" && store.state.solutionMode !== "security") {
           linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           filterMenus();
         }
@@ -660,7 +700,9 @@ export default defineComponent({
     };
 
     // Keep the menu in sync if /config resolves after mount.
-    watch(isSloEnabled, () => updateSloMenu(), { immediate: false });
+    // Skip when in security mode — the security nav is a fixed set and must not
+    // be mutated by observability feature flags.
+    watch(isSloEnabled, () => { if (store.state.solutionMode !== "security") updateSloMenu(); }, { immediate: false });
 
     const updateActionsMenu = () => {
       if (isActionsEnabled.value) {
@@ -736,7 +778,7 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(isOnlineEvalsEnabled, () => { if (store.state.solutionMode !== "security") updateAIObservabilityMenu(); }, { immediate: false });
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");
@@ -765,11 +807,12 @@ export default defineComponent({
     };
 
     // Keep the menu in sync if /config resolves after mount.
-    watch(isSyntheticsEnabled, () => updateSyntheticMenu(), {
-      immediate: false,
-    });
+    watch(isSyntheticsEnabled, () => { if (store.state.solutionMode !== "security") updateSyntheticMenu(); }, { immediate: false });
 
     const filterMenus = () => {
+      // Security mode owns a fixed nav set — observability feature-flag items
+      // (AI, Synthetics, SLOs, Actions, Workflows) must not be spliced into it.
+      if (store.state.solutionMode === "security") return;
       updateIncidentsMenu();
       // After Incidents, so the flat order reads Alerts → SLOs → Incidents.
       updateSloMenu();
@@ -793,16 +836,21 @@ export default defineComponent({
     };
 
     // additional links based on environment and conditions
+    // Guard: security mode owns a fixed nav — do not splice observability items into it.
     if (config.isCloud == "true") {
-      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+      if (store.state.solutionMode !== "security") {
+        linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+      }
       filterMenus();
     } else {
-      linksList.value.splice(7, 0, {
-        title: t("menu.report"),
-        icon: "description",
-        link: "/reports",
-        name: "reports",
-      });
+      if (store.state.solutionMode !== "security") {
+        linksList.value.splice(7, 0, {
+          title: t("menu.report"),
+          icon: "description",
+          link: "/reports",
+          name: "reports",
+        });
+      }
       filterMenus();
     }
 
@@ -1175,7 +1223,7 @@ export default defineComponent({
       await configService
         .get_config()
         .then(async (res: any) => {
-          if (config.isCloud == "false") {
+          if (config.isCloud == "false" && store.state.solutionMode !== "security") {
             linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           }
 

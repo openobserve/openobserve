@@ -816,6 +816,100 @@ const useRoutes = () => {
     },
     ...useIngestionRoutes(),
     ...useEnterpriseRoutes(),
+
+    // ── SIEM Security routes ─────────────────────────────────────────────────
+    // Redirect bare /security → /security/overview so MenuLink.isActive
+    // (prefix-match) doesn't activate Overview on every security sub-page.
+    {
+      path: "security",
+      redirect: "security/overview",
+    },
+    {
+      path: "security/overview",
+      name: "securityOverview",
+      component: () => import("@/views/Security/SecurityOverview.vue"),
+      meta: { title: "Security Overview" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/events",
+      name: "securityEvents",
+      component: () => import("@/views/Security/SecurityEvents.vue"),
+      meta: { title: "Security Events" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/detections",
+      name: "securityDetections",
+      component: () => import("@/views/Security/SecurityDetections.vue"),
+      meta: { title: "Security Detections" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/alerts",
+      name: "securityAlerts",
+      component: () => import("@/views/Security/SecurityAlerts.vue"),
+      meta: { title: "Security Alerts" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/cases",
+      name: "securityCases",
+      component: () => import("@/views/Security/SecurityCases.vue"),
+      meta: { title: "Security Cases" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/entities",
+      name: "securityEntities",
+      component: () => import("@/views/Security/SecurityEntities.vue"),
+      meta: { title: "Security Entities" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/intel",
+      name: "securityIntel",
+      component: () => import("@/views/Security/SecurityIntel.vue"),
+      meta: { title: "Threat Intel" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/ueba",
+      name: "securityUEBA",
+      component: () => import("@/views/Security/SecurityUEBA.vue"),
+      meta: { title: "UEBA" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/mitre",
+      name: "securityMitre",
+      component: () => import("@/views/Security/SecurityMitre.vue"),
+      meta: { title: "MITRE ATT&CK" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/compliance",
+      name: "securityCompliance",
+      component: () => import("@/views/Security/SecurityCompliance.vue"),
+      meta: { title: "Compliance" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/sources",
+      name: "securitySources",
+      component: () => import("@/views/Security/SecuritySources.vue"),
+      meta: { title: "Data Sources" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    {
+      path: "security/content",
+      name: "securityContent",
+      component: () => import("@/views/Security/SecurityContent.vue"),
+      meta: { title: "Content" },
+      beforeEnter(to: any, from: any, next: any) { routeGuard(to, from, next); },
+    },
+    // ── end SIEM routes ──────────────────────────────────────────────────────
+
     {
       path: "/:catchAll(.*)*",
       component: Error404,

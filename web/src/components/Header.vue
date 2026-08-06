@@ -129,6 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
+    <!-- SOLUTION SWITCHER: Observability ↔ Security toggle -->
+    <div class="ml-3 flex shrink-0 items-center">
+      <SolutionSwitcher />
+    </div>
+
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
     <div class="min-w-0 flex-1" />
 
@@ -437,6 +442,7 @@ import { useTheme } from "@/composables/useTheme";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
+import SolutionSwitcher from "./SolutionSwitcher.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -454,6 +460,7 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
+    SolutionSwitcher,
     OButton,
     OIcon,
     OTooltip,

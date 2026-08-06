@@ -1,0 +1,117 @@
+// Shared SIEM styles — imported by Security view components
+
+// ── Layout ──────────────────────────────────────────────────────────────────
+.sec-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sec-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border-default, rgba(0,0,0,0.08));
+  flex-shrink: 0;
+}
+
+.sec-body {
+  flex: 1;
+  overflow: auto;
+}
+
+// ── Severity badges ──────────────────────────────────────────────────────────
+.sev-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.sev-critical { background: rgba(220,38,38,0.12); color: #dc2626; }
+.sev-high     { background: rgba(234,88,12,0.12); color: #ea580c; }
+.sev-medium   { background: rgba(202,138,4,0.12); color: #ca8a04; }
+.sev-low      { background: rgba(22,163,74,0.10); color: #16a34a; }
+.sev-info     { background: rgba(59,130,246,0.10); color: #3b82f6; }
+
+.dark .sev-critical { background: rgba(220,38,38,0.20); color: #f87171; }
+.dark .sev-high     { background: rgba(234,88,12,0.20); color: #fb923c; }
+.dark .sev-medium   { background: rgba(202,138,4,0.20); color: #fbbf24; }
+.dark .sev-low      { background: rgba(22,163,74,0.18); color: #4ade80; }
+.dark .sev-info     { background: rgba(59,130,246,0.18); color: #60a5fa; }
+
+// ── Status badges ────────────────────────────────────────────────────────────
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.status-open      { background: rgba(234,88,12,0.10);  color: #ea580c; }
+.status-ack       { background: rgba(109,92,224,0.10); color: #6d5ce0; }
+.status-closed    { background: rgba(100,116,139,0.10);color: #64748b; }
+.status-tp        { background: rgba(220,38,38,0.10);  color: #dc2626; }
+.status-fp        { background: rgba(22,163,74,0.10);  color: #16a34a; }
+.status-benign    { background: rgba(59,130,246,0.10); color: #3b82f6; }
+
+.dark .status-open   { background: rgba(234,88,12,0.18);  color: #fb923c; }
+.dark .status-ack    { background: rgba(109,92,224,0.18); color: #8b90e6; }
+.dark .status-closed { background: rgba(100,116,139,0.18);color: #94a3b8; }
+.dark .status-tp     { background: rgba(220,38,38,0.18);  color: #f87171; }
+.dark .status-fp     { background: rgba(22,163,74,0.18);  color: #4ade80; }
+.dark .status-benign { background: rgba(59,130,246,0.18); color: #60a5fa; }
+
+// ── MITRE chip ───────────────────────────────────────────────────────────────
+.mitre-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(109,92,224,0.10);
+  color: #6d5ce0;
+  border: 1px solid rgba(109,92,224,0.18);
+}
+
+.dark .mitre-chip {
+  background: rgba(139,144,230,0.14);
+  color: #8b90e6;
+  border-color: rgba(139,144,230,0.22);
+}
+
+// ── Stat cards (Overview) ────────────────────────────────────────────────────
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-default, rgba(0,0,0,0.08));
+  background: var(--color-surface-panel);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.dark .stat-card {
+  border-color: #232a37;
+  background: #151a23;
+}
